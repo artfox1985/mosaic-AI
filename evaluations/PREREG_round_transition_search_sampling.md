@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B GEBAUT und ABGENOMMEN (par.17: Knopf `MOSAIC_ROUND_TRANSITION_LEAF`, Kontrakt unveraendert, Drift/Konservierung gruen), Sichttor GRUEN (17.7, n = 300, 0 Verstoesse), Kostentor HAELT (17.8, +6,6 Prozent, 1,64 Prozent pseudo-terminale Blaetter). **A/B NEGATIV (17.9): Champion mit gegen ohne Knopf 169:191 von 360, Block-z -1,13, Punkte -1,3, Strafleiste +0,8 -- Variante B kommt nicht ins Rezept; die Linie Rundenuebergangs-Rauschen ist damit auf beiden Wegen geschlossen.** Offen: Stufe-0-Sonde par.16 als Diagnostik (Nutzer), Replayer-Nachspiel 17.9a. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche das Tiling sehen -- im Blatt (Variante B) oder als Encoder-Eingabe (Variante C)? | Beleg: B NEGATIV (17.9: 169:191, Block-z -1,13). Stufe-0-Sonde DURCH (16.9): Value-Rangfolge traegt bei Punktabstand (M2 0,807), die UEBERSTIMMUNG der exakten Rechnung schadet (46 von 156 Kippungen richtig, Wilson-OG 0,371). ENTSCHIEDEN 16.10 (Nutzer 2026-09-17): Variante A draussen; Stichentscheid wird Knopf `net_tiling_tiebreak` (Default 1) und geht ins A/B (36f); Variante C als Arm v29-b07 codiert (par.18), Kompilat, Kostentor und Tor 1 offen. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -1176,6 +1176,223 @@ M = 6 sind UNGEMESSEN -- der Trockenlauf lief mit 20 Sims und M = 4; hochrechnen
 die Schaetzung, die `CLAUDE.md` verbietet. Der erste Volllauf beginnt deshalb mit `--rounds 4`
 allein (Grad EXAKT, die aussagekraeftigste Klasse) und misst dabei seine eigene Laufzeit.
 
+### 16.9 VOLLLAUF (2026-09-17): Runde 4 TRAEGT die Reihenfolge, aber die UEBERSTIMMUNG schadet; Runde 3 ohne Verdikt
+
+Maschine vorher frei geprueft (Prozessabfrage: kein `python`, `cargo`, `rustc`), Wheel mit
+Variante B (Default aus, Kontrakt `39994362fba145a6`), Nutzer-Freigabe "fahr die sonde".
+
+#### 16.9a Kostenmessung ZUERST, nicht hochgerechnet (16.7 hatte sie ausdruecklich offen)
+
+Zwei kurze Laeufe mit den registrierten Einstellungen (`--sims 400 --draws 6 --max-cands 4`),
+je `--max-positions 3`, `laufzeit`-Block im Artefakt:
+
+| Runde | Artefakt | n | Wanduhr | CPU | Threads | s je Stellung |
+| --- | --- | --- | --- | --- | --- | --- |
+| R4 | `counterfactual_ranking_cost_probe.json` | 3 Stellungen | 9,4 s | 9,1 s | 1 | **3,132** |
+| R3 | `counterfactual_ranking_cost_probe_r3.json` | 3 Stellungen | 35,1 s | 34,5 s | 1 | **11,708** |
+
+**Der Befund der Kostenmessung ist selbst ein Beleg fuer die Zweiteilung aus 16.2:** in R4
+kostet `--sims 400` praktisch dasselbe wie die 20 Sims des Trockenlaufs (3,132 gegen 3,4 s je
+Stellung), weil dort der Alpha-Beta-Loeser antwortet, der die Sim-Zahl nicht liest; in R3 laeuft
+die Baumsuche wirklich und kostet **3,74-mal** so viel. Wer die R4-Zahl auf R3 hochrechnet
+(oder umgekehrt), liegt um diesen Faktor daneben.
+
+#### 16.9b Der Volllauf R4
+
+```
+python -u tools/probes/counterfactual_tiling_ranking.py --sims 400 --draws 6 --max-cands 4 \
+  --rounds 4 --max-files 400 --max-positions 800 --progress-every 20 \
+  --out evaluations/artifacts/counterfactual_ranking_r4.json
+```
+
+`laufzeit`: `{"wanduhr_s": 2644.5, "cpu_s": 2596.6, "threads": 1, "stellungen": 800,
+"paare": 3744, "s_je_stellung": 3.306}`, Fehler 0, Fortschritt je 20 Dateien ablesbar.
+
+**Warum 800 und nicht die 60 aus 16.8:** 60 je Runde ist das MINDEST-Soll. Der Lauf hat
+genommen, was der registrierte Deckel je Datei und Runde (`--max-per-file 2`, unveraendert)
+ueber alle 400 Fensterdateien hergibt; 800 Stellungen sind das 13-fache des Solls. Der
+Deckel blieb absichtlich unveraendert, damit keine Partie die Grundmenge stellt. Dass der
+Lauf damit 44 min statt der angepeilten 60-90 min dauert, ist die Folge dieses Deckels und
+kein Abbruch: die Angebotsgrenze war erreicht (Datei 400 von 400).
+
+**Guetegrad: `ref_grade` ist `exact_ab` fuer ALLE 3.744 Paare** -- kein einziger stiller
+Rueckfall auf `net_search`, der Laufzeit-Waechter aus 16.2 hat nichts gemeldet. Was dieser
+Lauf damit selbst belegt, ist das Greifen des Zweigs; dass dieser Zweig auf seinem ganzen Pfad
+wertkopf-frei ist, steht in 16.2 mit der Pruefstelle `round5.rs:357-359` und ist dort am
+2026-09-16 nachgefahren worden -- **in dieser Sitzung NICHT erneut am Code geprueft,
+uebernommen**.
+
+| Kennzahl | n | Grundmenge | Einheit | Wert |
+| --- | --- | --- | --- | --- |
+| M1 Mehrdeutigkeit | 1.106 | gescannte R4-Tiling-Stellungen des Fensters | Stellungen | **72,33 Prozent** mit >= 2 Kandidaten (800), Median 4,0 Kandidaten, Maximum 12 |
+| M2 Richtung, `dpoints != 0` | 1.886 | Paare mit Punktabstand, Gleichstand ausgeschlossen (21) | Paare | **0,8070** Treffer (1.522), Wilson95 **[0,7886; 0,8242]**, Binomial p < 1e-6 |
+| M2 Richtung, `dpoints == 0` | 740 | punktgleiche Paare ohne Nullprodukt | Paare | 0,5486 (406), Wilson95 [0,5126; 0,5842], p = 0,0090 |
+| M3 Rangstabilitaet, `dpoints != 0` | 1.907 | Paare mit Punktabstand | Paare | **0,7992** |
+| M3 Rangstabilitaet, `dpoints == 0` | 1.837 | punktgleiche Paare | Paare | 0,3048 (Rauschboden 0,0312) |
+| M4 Ueberstimmung | 1.907 | Paare mit Punktabstand | Paare | **156 Kippungen (8,18 Prozent), davon 46 richtig = 0,2949**, Wilson95 **[0,2289; 0,3707]** |
+| M5 Aggregatoren, `dpoints != 0` | 1.886 / 1.810 / 1.524 | dieselbe Grundmenge, drei Lesarten | Paare | Mittelwert 0,8070, Worst Case 0,6674 [0,6454; 0,6887], nur M3-stabile 0,8425 [0,8234; 0,8599] |
+| M5 Aggregatoren, `dpoints == 0` | 740 / 492 / 560 | dito | Paare | Mittelwert 0,5486, Worst Case **0,1504**, nur M3-stabile 0,5750 |
+
+**M6 Fall-Klassen** (Mehrfachnennung je Paar, Quote ueber die Mittelwert-Lesart):
+
+| Klasse | Paare | Quote | Wilson95 | M3 |
+| --- | --- | --- | --- | --- |
+| Spezialfeld | 360 | **0,8667** | [0,8277; 0,8979] | 0,8583 |
+| Spalte | 2.340 | 0,7744 | [0,7562; 0,7916] | 0,7316 |
+| Reihe | 845 | 0,7160 | [0,6846; 0,7454] | 0,7373 |
+| Chip | 731 | 0,5926 | [0,5526; 0,6314] | 0,6019 |
+| Lange Reihe | 320 | 0,5938 | [0,5391; 0,6461] | 0,6500 |
+| sonstige | 1.084 | 0,5314 | [0,4751; 0,5868] | 0,2131 |
+
+#### 16.9c Verdikt nach der LESART VORAB (16.5)
+
+**Fuer die Runde 4 gilt Ausgang 1, TRAEGT** -- und zwar genau in der Form, in der 16.5 ihn
+vorab beschrieben hat ("in R2-R4 bereits bei `dpoints != 0`"): beide Schwellen aus 16.4 halten
+dort, Wilson-Untergrenze 0,7886 > 0,50 und M3 0,7992 >= 0,60. Der Value-Kopf trifft die
+Reihenfolge zweier lokal plausibler Tiling-Plaene in Runde 4 in vier von fuenf Faellen, gegen
+eine wertkopf-freie Wahrheit gemessen.
+
+**Fuer die punktgleiche Teilklasse gilt Ausgang 2, TRAEGT NICHT:** Schwelle (i) haelt knapp
+(0,5126 > 0,50), Schwelle (ii) reisst (M3 0,3048 < 0,60), und 16.4 verlangt beide. Zwei
+Einschraenkungen dazu, damit die Zahl nicht ueberlesen wird: 0,3048 liegt rund zehnfach ueber
+dem Rauschboden 0,0312, ist also kein reines Rauschen; und in **1.097 von 1.837** punktgleichen
+Paaren ist das Produkt `dwp * ref_mean` exakt null, diese Paare fallen aus jeder Quote heraus
+und zaehlen per Definition (`counterfactual_tiling_ranking.py:395-396,412`) gegen M3. Welcher
+der beiden Faktoren null ist, weist das Artefakt nicht getrennt aus -- die naheliegende Lesart
+"die Plaene sind exakt gleich viel wert" ist damit NICHT belegt, nur naheliegend.
+
+**Und der Teil, der gegen den heute laufenden Zweig spricht -- Ausgang 3, SCHADET, auf der
+Grundmenge von M4:** `punkte * P(Sieg)` kippt die reine Punktereihenfolge in 156 von 1.907
+Paaren (8,18 Prozent). Von diesen 156 Kippungen gehen nur **46 in die Richtung der Wahrheit
+(0,2949)**, und die OBERE Grenze des 95-Prozent-Intervalls liegt bei **0,3707, also unter
+0,50**. Das ist die Signatur, die 16.5 Ausgang 3 vorab beschrieben hat: nicht Rauschen,
+sondern systematisch falsche Rangfolge.
+
+**Die beiden Befunde widersprechen sich nicht, sie ergaenzen sich**, und das ist der eigentliche
+Ertrag des Laufs: eine Kippung setzt per Konstruktion voraus, dass das Netz den Plan mit den
+WENIGEREN Rundenpunkten stark genug bevorzugt, um den Punktabstand zu ueberwiegen
+(`counterfactual_tiling_ranking.py:417`). Die hohe Gesamtquote von 0,8070 entsteht also
+ueberwiegend dort, wo Netz und Punkte dasselbe sagen; genau dort, wo das Netz den Punkten
+widerspricht, hat es in 70,5 Prozent der Faelle unrecht. Die Rangfolge des Value-Kopfs ist in
+Runde 4 gut; sein Vetorecht gegen die exakte lokale Rechnung ist es nicht.
+
+**Registrierte Folge (16.5 Ausgang 3), NICHT ausgefuehrt:** Vorschlag,
+`NET_TILING_TIEBREAK_ENABLED` (`tiling_solver.rs:858`) abzuschalten oder sein Rundenfenster
+(`:1603-1610`) zu verengen. Das ist ein **Nutzer-Entscheid** und kein stiller Eingriff; er
+aendert Engine-Verhalten und braucht deshalb die Anker-Invarianz-Pruefung (CLAUDE.md, "Nach
+jeder Engine-Aenderung"). Offen bleibt dabei die Frage, die diese Sonde NICHT beantwortet: ob
+ein enger gefasstes Kriterium (kippen nur bei grossem `dwp` und kleinem `dpoints`, oder nur in
+M3-stabilen Faellen) besser waere als abschalten.
+
+**Der STOPP-Test aus 16.5 ist nicht ausgeloest:** 72,33 Prozent der gescannten
+R4-Tiling-Stellungen haben mindestens zwei strukturell verschiedene Kandidaten, Median 4. Die
+Frage 1 aus par.14.3 ist damit beantwortet, der Strang endet nicht wegen Eindeutigkeit.
+**Nicht vergleichbar mit 16.8:** dort standen 73 von 400 als Zahl ueber ALLE Runden zusammen,
+hier ist die Grundmenge ausschliesslich R4, und der Scan bricht ab, sobald das Soll je Runde
+gefuellt ist.
+
+**Antwort auf die Aggregator-Frage aus par.14.3** (Mittelwert, Worst Case oder
+Rang-Stabilitaet), soweit die Sonde sie misst: in R4 mit Punktabstand tragen alle drei
+(0,8070 / 0,6674 / 0,8425); die Einschraenkung auf M3-stabile Paare schaerft am meisten, der
+Worst Case ist der strengste Mass und haelt hier noch. In der punktgleichen Klasse dagegen
+faellt der Worst Case auf 0,1504 -- dort ist die Reihenfolge eine Muenze, und ein
+Worst-Case-Aggregator wuerde das richtig anzeigen.
+
+#### 16.9d Standard-Kennzahlen (CLAUDE.md), n = 2.788 Kandidaten, Grundmenge Nach-Tiling-Bretter der R4-Stellungen, Einheit Kandidaten
+
+| Kennzahl | Median |
+| --- | --- |
+| Reihenauslastung (Summe `row_fill`) | 13,0 |
+| Spaltenauslastung: maximale Spaltenhoehe / volle Spalten / >= 3 / >= 4 | 5,0 / 0,0 / 2,0 / 2,0 |
+| Strafleistenauslastung (`floor_len`) | 1,0 |
+| Punkte je Wertungsplatte, je Kriterium | 0 / 0 / 0 / 0 / 8 / 3 / -12 / 0 |
+| Eigene Punkte | 29,0 |
+| Spezialfelder belegt | 1,0 |
+
+**Margin zum Gegner FEHLT mit Begruendung** (keine stille Auslassung): die Sonde bewertet
+STELLUNGEN und Plaene, nicht Partien; ohne Fortsetzung bis zum Ende gibt es keinen
+Partieausgang und damit keine Punktedifferenz. Das Artefakt traegt dieselbe Begruendung im
+Feld `hinweis_margin`.
+
+#### 16.9e Rueckwaerts-Pruefung: wer hat sich auf diesen Zweig berufen?
+
+Gegreppt ueber `evaluations/`, `docs/` und den Code nach `NET_TILING_TIEBREAK_ENABLED` und dem
+Namen der Sonde. Die eine Fundstelle, die dieselbe Sache behandelt, ist
+**`PREREG_geometric_envelope.md` par.3f** ("kippt aber trotzdem fast nie einen Punktvorsprung",
+4 von 192) und die daran haengende Bauentscheidung in par.3f/K3 (:675-682: "par.3f hat gemessen,
+dass das nur ein Stichentscheid unter punktgleichen Abschluessen ist").
+
+**Kein Widerspruch, aber drei verschiedene Groessen -- und das muss hier stehen, bevor jemand
+die Zahlen gegeneinander rechnet:**
+
+* par.3f zaehlt n = 192 STELLUNGEN, Grundmenge `frozen_eval_set` v3, Einheit Stellungen, und
+  zwar die TATSAECHLICHE Argmax-Entscheidung; 16.9 zaehlt n = 1.907 PAARE, Grundmenge
+  R4-Kandidatenpaare des v29-Fensters mit Punktabstand, Einheit Paare. 8,18 Prozent je Paar und
+  2,1 Prozent je Stellung sind damit nicht dieselbe Quote.
+* par.3f steht auf `v23-b01_brierbest`, sechs Generationen vor `v29-b03`, und par.16.8 hat
+  dessen netzabhaengige Zahlen ausdruecklich als nicht uebertragbar markiert.
+* **Neu und in par.3f nicht enthalten ist die RICHTUNG der Kippungen.** par.3f hat gezaehlt, WIE
+  OFT gekippt wird, nie, ob die Kippung recht hatte. Genau das sagt M4: in 70,5 Prozent der
+  Faelle nicht.
+
+#### 16.9f Runde 3, GETRENNT GEFUEHRT (zweiter Guetegrad, wertkopfbehaftet)
+
+```
+python -u tools/probes/counterfactual_tiling_ranking.py --sims 400 --draws 6 --max-cands 4 \
+  --rounds 3 --max-files 400 --max-positions 300 --progress-every 20 \
+  --out evaluations/artifacts/counterfactual_ranking_r3.json
+```
+
+`laufzeit`: `{"wanduhr_s": 3283.3, "cpu_s": 3229.7, "threads": 1, "stellungen": 300,
+"paare": 1461, "s_je_stellung": 10.944}`, Fehler 0. Stellungszahl 300 statt 800: bei 11 s je
+Stellung waeren 800 Stellungen 2,4 h gewesen; 300 sind das Fuenffache des Solls aus 16.8.
+
+**`ref_grade` ist `net_search` fuer alle 1.461 Paare** -- also der zweite Guetegrad aus 16.2:
+unabhaengige GEWICHTE (`v29-b05` gegen `v29-b03`), aber dieselbe ART von Schaetzer. Ein
+positives Ergebnis belegt hier hoechstens UEBEREINSTIMMUNG zweier Wertkoepfe, keine
+Richtigkeit. Das steht so schon in 16.2 und wird durch die Zahlen nicht besser.
+
+| Kennzahl | n | Grundmenge | Einheit | Wert |
+| --- | --- | --- | --- | --- |
+| M1 Mehrdeutigkeit | 377 | gescannte R3-Tiling-Stellungen | Stellungen | 79,58 Prozent (300), Median 4 Kandidaten, Maximum 12 |
+| M2, `dpoints != 0` | 579 | Paare mit Punktabstand | Paare | 0,7720, Wilson95 [0,7361; 0,8043] |
+| M2, `dpoints == 0` | 882 | punktgleiche Paare | Paare | 0,7449, Wilson95 [0,7151; 0,7726] |
+| M3, `dpoints != 0` / `== 0` / alle | 579 / 882 / 1.461 | dito | Paare | **0,5769** / 0,6156 / 0,6003 |
+| M4 Ueberstimmung | 579 | Paare mit Punktabstand | Paare | 11 Kippungen (1,90 Prozent), davon 9 richtig (0,8182), Wilson95 [0,5230; 0,9486] |
+| M5, `dpoints != 0` | 579 / 579 / 334 | dito | Paare | Mittelwert 0,7720, Worst Case 0,5181 (p = 0,41), nur M3-stabile 0,8982 |
+
+**Verdikt R3 nach 16.4/16.5: Ausgang 2, TRAEGT NICHT -- an der Entscheidungsklasse, die 16.5
+benennt.** Bei `dpoints != 0` haelt Schwelle (i) klar (0,7361 > 0,50), Schwelle (ii) reisst
+knapp (M3 **0,5769** < 0,60), und 16.4 verlangt beide. Die punktgleiche Klasse haelt dagegen
+beide (0,7151 > 0,50 und 0,6156 >= 0,60) -- das ist der Fall, fuer den 16.2 die Warnung vorab
+hingeschrieben hat: zwei Wertkoepfe sind sich einig, und Einigkeit ist keine Wahrheit. Als
+Befund wird daraus deshalb nichts ueber die Richtigkeit abgeleitet.
+
+**Der Gegensatz zu R4 bei M4 ist NICHT belastbar:** in R3 kippt `punkte * P(Sieg)` nur 11-mal
+(1,90 Prozent gegen 8,18 Prozent in R4), und von diesen 11 gehen 9 in die Richtung der
+Referenz. Die Wilson-Untergrenze liegt mit 0,5230 zwar knapp ueber 0,50, aber n = 11 Paare bei
+wertkopfbehafteter Wahrheit traegt gegen die 156 Paare mit wertkopf-freier Wahrheit aus R4
+nicht. Wer daraus "in R3 ist die Ueberstimmung gut" liest, hat die Grundmenge und den Guetegrad
+uebersehen.
+
+**M6 Fall-Klassen R3** (Quote / M3): Chip 339 Paare 0,7788 / 0,6106; Spezialfeld 62 Paare
+0,7742 / 0,5484; sonstige 497 Paare 0,7445 / 0,5573; Spalte 780 Paare 0,7231 / 0,5910; Reihe
+206 Paare 0,6408 / 0,4660; lange Reihe 63 Paare 0,5873 / 0,4921.
+**Standard-Kennzahlen R3** (n = 1.067 Kandidaten, Grundmenge Nach-Tiling-Bretter, Einheit
+Kandidaten, Mediane): Reihenauslastung 9,0; Spalten maximal 4,0 / voll 0,0 / >= 3 2,0 / >= 4
+1,0; Strafleiste 1,0; Plattenpunkte je Kriterium 0 / 0 / 0 / 0 / 6 / 0 / -9 / 0; eigene Punkte
+18,0; Spezialfelder belegt 0,0. Margin fehlt aus demselben Grund wie in 16.9d.
+
+**Runden 1 und 2 sind NICHT gefahren** (16.8: R1 ist zu duenn, und beide haetten denselben
+zweiten Guetegrad). Sie bleiben offen; was ihnen fehlt, ist in 16.5 Ausgang 4 benannt.
+
+**Folge, nicht ausgefuehrt:** wer K3 (`PREREG_geometric_envelope.md` par.3f/8.4) anfasst, liest
+16.9c mit -- die dort gebaute Reihenfolge ("der Value-Stichentscheid rueckt hinter die
+Geometrie") zeigt in dieselbe Richtung wie dieser Befund, ihre Begruendung ("faktisch nur ein
+Stichentscheid unter Punktgleichen") traegt nach 16.9 aber nur noch je STELLUNG, nicht je Paar.
+STATUS.md (Abschnitt zum Tiling-Stichentscheid, "nie gemessen worden, obwohl der Zweig aktiv
+ist") ist damit ueberholt; nachgezogen wird das vom Koordinator, nicht hier.
+
 ## par.17 BAUSTAND Variante B (2026-09-16)
 
 Fuehrt par.9 aus, mit den Bauvorgaben par.4.2 (stellungsgebundener Seed), par.8 (Mischregel
@@ -1398,6 +1615,15 @@ untersucht -- Artefakt `evaluations/artifacts/feature_parity_rust_python.json`. 
 aufnimmt, sollte bei der Frage anfangen, ob `remaining_colors` auf rekonstruierten
 Korpus-Zustaenden (ohne `dome_pool_view`) beide Seiten gleich sieht.
 
+**NACHTRAG 2026-09-17: untersucht und geschlossen, Registrierung in
+`PREREG_rust_data_layer.md` par.9a.** Der Befund gehoert nicht hierher und nicht zu diesem Bau.
+Ursache ist der A2-Phantom-Fix vom 2026-09-12 (`2a0cf4bf`): die v26-Records vom 2026-09-09
+tragen `cell_reachable_mask` nach der alten Formel, `state_to_planes_direct` rechnet sie frisch.
+Beide abweichenden Zustaende tragen Phantom-Fliesen, auf Records nach dem Fix 0 von 600
+Abweichungen. Der hier geaeusserte `dome_pool_view`-Verdacht ist WIDERLEGT: das Feld fehlt in
+allen 300 Alt-Zustaenden, abweichend sind 2. Die Rekonstruktion ist unbeteiligt --
+`remaining_colors` liest nur Felder, die vollstaendig aus dem JSON kommen.
+
 **Damit ist Fahrplan Nr. 33 abgenommen und Nr. 34 durch.** Offen bleibt in der Reihenfolge:
 Kostentor par.5 Schritt 1 (Nr. 35), dann der gepaarte A/B par.9 (Nr. 36).
 
@@ -1504,3 +1730,557 @@ Die Lesart aus 17.9 bleibt: kein Gewinn, die Strafleiste steigt mit Knopf um run
 Partie, die Vollendung faellt leicht, die Teilspalten (>= 3, >= 4) steigen leicht -- das Netz sieht
 nach dem Tiling der Runde offenbar mehr Teilstrukturen, loest sie aber nicht ein. Die
 Kennzahlen-Luecke aus 17.9 ist damit geschlossen.
+
+## par.18 VARIANTE C: ZUSCHNITT UND BAU (Nutzer-Auftrag 2026-09-17: "fahr die sonde und variante c")
+
+Variante B ist ENTSCHIEDEN und negativ (17.9): die SUCH-Seite der Linie
+"Drafting muss das Tiling kennen" (par.7) ist damit zu. Uebrig bleibt die
+ENCODER-Seite, die par.7 unter dem Namen Variante C fuehrt: "dem Netz das
+projizierte Nach-Tiling-Raster und den erwarteten Kuppel-Bonus als Eingabe
+geben". Sie kostet in der Suche kein Sampling, braucht aber ein Training --
+darum ein eigener Fensterarm, **`v29-b07`**. Nutzniesser sind unveraendert
+par.12 (Spezialfeld-Ertrag: die Kette Drafting, Tiling, Freischaltung) und
+par.13 (rundenuebergreifende Tiling-Bewertung).
+
+### 18.1 ZUSCHNITT (Nutzer-Einwand 2026-09-17: keine Skalare, echte Positionen)
+
+**Nutzer, woertlich:** *"variante c kommt mir vor, als wuerden wir die
+geschaetzten punkte (die wir je zug sowieso immer berechnen) an das netz
+zurueckgeben. evtl. besser aufgeloest mit echter position."*
+
+Der Einwand trifft, und zwar am Code nachpruefbar: `estimated_score` im
+Spielerblock (Abschnitt 5, `features.rs:696` im JSON-Pfad, `features.rs:1202`
+im Direktpfad) IST bereits `solve_round_final_score(state, pi) - p.score`, also
+genau die Punktevorschau des Loesers, je Spieler, normiert /100. Ein zweiter
+Skalar "projizierte Rundenpunkte" waere eine Wiederholung; und ein Skalar, der
+den Rundenscore an die Blattbewertung haengt, ist als K4 schon gemessen und
+hochsignifikant negativ (`PREREG_round_estimate_leaf_term.md` par.7c/7d).
+**Gestrichen sind deshalb die beiden Skalare des ersten Vorschlags**
+("Rundenpunkte /30", "Kuppelbonus /10"). Gebaut wird nur, was das Netz aus dem
+Bestand NICHT ableiten kann: die Geometrie.
+
+Je Spieler, in Zugreihenfolge (erst der ziehende Spieler, dann der Gegner --
+dieselbe Ordnung wie die Abschnitte 5, 6, 13, 14 und 16):
+
+| Block | Werte | Bedeutung | Normierung |
+| --- | --- | --- | --- |
+| (a) Raster | 36 | Zelle (Slot-Zeile, Slot-Spalte, Space-Index) wird im Tiling DIESER Runde NEU gefuellt | 0/1 |
+| (d) Slots | 9 | Kuppelplatte wird in dieser Runde VOLLENDET (alle vier Felder belegt), also auch ihr Spezialfeld freigeschaltet und abgerechnet | 0/1 |
+
+**45 je Spieler, 90 gesamt, `INPUT_SIZE` 794 -> 884.**
+
+**Warum (a) als DELTA und nicht als Nachher-Raster:** der heutige Fuellstand
+jeder der 36 Zellen steht schon im Vektor (Abschnitt 6, `filled_id/6` je Space,
+`features.rs:744-781` bzw. `:1238-1252`). Ein absolutes Nachher-Raster haette
+36 bereits bekannte Werte je Spieler wiederholt; das Delta traegt genau die neue
+Information. Zellen ohne Kuppelplatte (`dome_slots[sr][sc] == None`) sind 0.
+
+**Warum (d) ueberhaupt, obwohl es aus (a) fast folgt:** die Vollendung ist der
+gemessene Engpass (`project_column_completion_structural_weakness`), und sie ist
+aus dem Delta nur zusammen mit dem Bestand rekonstruierbar (Zelle schon voll
+plus Zelle wird voll). Ein eigenes Bit je Slot macht daraus ein Merkmal statt
+einer Konjunktion, die das Netz erst lernen muss. **Freischaltung und Vollendung
+fallen zusammen** und brauchen darum kein zweites Bit: `try_unlock_special`
+(`dome.rs:139-157`) entriegelt das Spezialfeld, sobald die anderen drei Felder
+belegt sind, und `check_special_trigger` (`round_end.rs:346-389`) setzt im
+SELBEN Schritt `placed_special` und schreibt den Kuppel-Bonus -- beide sitzen in
+`execute_full_tiling` (`round_end.rs:298-325`), das der Loeser je Platzierung
+ruft. Ein Slot, dessen drei Normalfelder in der Projektion voll werden, ist
+darin also vollstaendig belegt (`DomeSpace::is_filled`, `dome.rs:53-58`, liest
+fuer Spezialfelder `placed_special`).
+
+### 18.2 DIE DESIGNFRAGE IST IM BESTAND BEANTWORTET: der Loeser laeuft mitten im Drafting
+
+**Nutzer, 2026-09-17:** *"das haben wir jetzt auch schon als punktevorschau
+waehrend dem drafting."* Am Code bestaetigt, vier Belegstellen:
+
+* `lib.rs:1650-1651` rechnet `tiling_potenzial = solve_round_final_score(&state,
+  player) - p.score` auf einem beliebigen, ueber `json_to_state` rekonstruierten
+  Zustand -- auch mitten im Drafting.
+* `py.rs:1112` ruft denselben Loeser im GUI-Pfad.
+* `features.rs:1202` tut es je encodiertem Zustand ohnehin schon (Abschnitt 5).
+* Kein Phasen-Gatter auf dem Weg: `legal_steps` -> `generate_tiling_actions`
+  (`round_end.rs:677-715`) und `validate_tiling_action`
+  (`round_end.rs:135-175`) lesen ausschliesslich `state.players[..]`; das
+  einzige Legalitaetskriterium der Reihe ist `row.is_complete()`.
+
+**`resolve_to_pre_chance` ist dafuer NICHT brauchbar** (zwei Gruende, nicht
+einer): es hat ein hartes Phasen-Gatter (`round_transition.rs:138`,
+`phase != Tiling` -> `None`) und es spielt das Tiling BEIDER Seiten plus den
+Rundenwechsel -- es liefert den Zustand der naechsten Runde, nicht das Raster
+dieser. Variante C braucht "Tiling JETZT", nicht "naechste Runde".
+
+**Semantik der Projektion, verbindlich:** das punktemaximale Tiling der JETZT
+VOLLEN Musterreihen, je Spieler getrennt auf dem eigenen Brett; Teilreihen
+bleiben liegen (der Loeser sieht sie nicht als platzierbar); Bonuschips setzt
+der Loeser so, wie er sie im Hot-Path setzt (GREEDY-Allokation, `exact = false`,
+`legal_steps`-Doku `tiling_solver.rs:144-150`); Reihenfolge oben nach unten und
+die `tiled_max_row`-Sperre gelten wie im echten Tiling. Das ist Wert fuer Wert
+dieselbe Wahrheitsquelle wie die Punktevorschau der Anzeige und wie
+`estimated_score` -- Netz-Eingabe und Anzeige koennen nicht auseinanderlaufen.
+
+**Vorderseiten-Sicht:** die Projektion liest nur, was am Tisch offen liegt --
+Musterreihen, Strafleiste, Kuppelraster und Bonuschips BEIDER Spieler
+(`serialize::serialize_player` schreibt diese Felder offen; die Chips sind nach
+dem Aufdecken offen). Kein verdeckter Bestand geht ein: kein Beutel, kein Turm,
+kein Kuppelstapel, keine Ziehreihenfolge. Damit ist sie kein
+Netz-sieht-MEHR-Fall im Sinn von `PREREG_stack_top_feature.md` par.10 -- ein
+Mensch kann dieselbe Vorschau rechnen, und die GUI zeigt sie ihm bereits.
+
+### 18.3 BAU (additiv, Muster `PREREG_stack_top_feature.md` Abschnitt 16)
+
+1. **`tiling_solver.rs`: `project_max_tiling(state, pi) -> TilingProjection`.**
+   Der Bestand liefert nur den PUNKTWERT (`solve_max_tiling_points`), nicht den
+   gelegten Plan; `top_k_tilings` liefert fertige Bretter, ist aber der
+   exakt-Chip-Enumerator mit eigener Blattgrenze und fuehrt eine
+   Diagnose-Statistik (`TILING_BUDGET_STATS`) -- als Encoder-Hot-Path falsch.
+   Gebaut ist darum der kleinste Schnitt: DIESELBE Rekursion wie `solve_rec`
+   (gleiche Schrittliste, gleiche GREEDY-Chips, gleiches `NODE_BUDGET`, gleiche
+   Abbruchbedingungen), die zusaetzlich die Belegungsmaske des punktemaximalen
+   Blattes mitfuehrt. Der Punktwert ist damit per Konstruktion identisch zu
+   `solve_max_tiling_points`, und ein Test haelt das fest.
+2. **Memoisierung** thread-lokal unter demselben Schluessel (`TilingKey`) und
+   demselben Knopf (`MOSAIC_TILING_CACHE`) wie der Punkt-Cache: die Projektion
+   haengt an genau denselben Feldern (Herleitung `tiling_solver.rs:244-274`).
+   Bitgleich mit und ohne Cache (deterministische Funktion).
+3. **`features.rs` Abschnitt 17, beide Pfade**, `INPUT_SIZE` 884. Direktpfad aus
+   dem `GameState`. JSON-Pfad: der Record traegt kein Projektionsfeld und soll
+   keines bekommen (ein Record-Feld wirkte erst eine Generation spaeter,
+   Praezedenz P.12 in `PREREG_stack_top_feature.md` par.17) -- der JSON-Pfad
+   rekonstruiert den Zustand ueber `serialize::json_to_state` mit festem Seed 0
+   und ruft dieselbe Funktion. Das ist die bestehende Route fuer genau diesen
+   Fall (`lib.rs:1785` Planes, `lib.rs:1636` Shaping-Export); der RNG treibt
+   dort nur verdeckte Bestaende, die die Projektion nicht liest. Scheitert die
+   Rekonstruktion (Alt-Schnappschuss ohne ein Pflichtfeld), bleiben alle 90
+   Werte 0 -- dieselbe Toleranz wie in den Abschnitten 15 und 16.
+4. **Python-Zwilling: dieser EINE Block kommt aus dem Wheel.** Abschnitt 16
+   liess sich in Python nachbauen, weil er Record-Felder liest; die Projektion
+   braucht den exakten Tiling-Loeser. Ein Python-Nachbau waere eine ZWEITE
+   Wahrheitsquelle fuer eine Spielregel (CLAUDE.md: Regelfragen an den Code,
+   nicht an eine Ableitung) und die naechste stille Abweichung.
+   `state_to_tensor_python` ruft darum fuer die 90 Werte den neuen, additiven
+   Export `tiling_projection_values_from_json` des Wheels -- dieselbe Funktion,
+   die der Rust-Pfad nutzt, also bitgleich per Konstruktion. Fehlt das Wheel
+   oder ist es zu alt, ist das ein HARTER Fehler, kein stiller Nullblock (die
+   Umkehrung des Unfalls vom 2026-09-11).
+5. **`config.INPUT_SIZE` bleibt bei 794**, bis der Koordinator sie IM SELBEN ZUG
+   mit der Wheel-Installation auf 884 setzt (Unfall 2026-09-11; die
+   Scharfschaltung beider Python-Wege haengt an dieser einen Zeile, und der
+   Fenster-Cache-Schluessel liest sie zur Laufzeit).
+
+### 18.4 KOSTEN -- ANNAHME, nicht gemessen
+
+Der Loeser wird je ENCODIERTEM Zustand zweimal gerufen (ein Spieler, ein
+Gegner), also je Blatt der Netzsuche und je Record im Cache-Bau. Bezugspunkt
+ist das K4-Kostentor: EIN memoisierter Loeser-Aufruf je Blatt kostete **+4,3
+Prozent Wanduhr** (`PREREG_round_estimate_leaf_term.md` par.7b, gemessen).
+**Und genau hier ist die K4-Zahl KEINE Prognose, sondern eine Untergrenze:**
+K4s zusaetzlicher Aufruf war laut Registratur-Eintrag ein HashMap-TREFFER --
+woertlich: "der Feature-Bau desselben Blattes hat den Schluessel fuer beide
+Spieler schon gefuellt, es bleibt ein HashMap-Treffer"
+(`engine/src/knob_registry.rs:111`, Eintrag `MOSAIC_ROUND_EST_C`, in dieser
+Sitzung gelesen). Die
+Projektion ist dagegen ein eigener Cache-Eintrag; beim Spieler am Zug aendert
+sich das Brett mit jeder Musterreihen-Fuellung, dort ist sie meist ein
+FEHLSCHLAG. **ANNAHME (ungeprueft), sauber formuliert:** die Projektion
+verdoppelt ungefaehr die Loeser-Arbeit des Encoders (der rechnet je Zustand
+schon zweimal `solve_round_final_score`, Abschnitt 5); welcher Anteil der
+Blattkosten das ist, ist unbekannt. Beim Gegner greift die Memoisierung fast
+immer (sein Brett aendert sich im Drafting nicht). Was sie gar nicht deckt: der
+Cache-Bau rekonstruiert je Record einen `GameState` (`json_to_state`). Beides
+ist zu MESSEN, nicht zu schaetzen:
+
+* Kostentor der Suche, Schwelle 25 Prozent (par.5 Schritt 1, gleiche Form wie
+  Nr. 35),
+* Bauzeit eines Blocks gegen die Bestandszeit (`docs/measured_runtimes.md`).
+
+### 18.5 LESART VORAB
+
+* **Tor 1:** gepaart gegen `v29-b03` (der Sicht-Arm ist die Basislinie dieses
+  Fensters), **zwei Seeds a 200 Paare, Blockgroesse 5, ohne Frueh-Stopp**, mit
+  `--log-games`.
+* **Netz-Gesundheit** nach par.6d des Fensters: leben die 90 neuen Spalten
+  (Spaltennorm > 0 nach dem Training)? Eine Spalte mit Norm exakt 0 heisst
+  "nie gesehen", und dann ist ein Nullbefund kein Befund ueber Variante C.
+* **Primaerkanal neben den Siegen sind die beiden benannten Nutzniesser:**
+  volle Spalten je Partie (Vollendung, nicht Teilspalten) und belegte
+  Spezialfelder je Partie. Dazu die sechs Standard-Kennzahlen (CLAUDE.md).
+* **Was die Werte bewegen KANN, ohne dass Staerke folgt:** die Projektion ist
+  eine Vorschau auf das punktemaximale Tiling der JETZT vollen Reihen, nicht auf
+  das spaeter gespielte -- zwischen Blatt und Rundenende fuellen sich Reihen
+  weiter.
+
+### 18.6 WAS DURCH DIESEN BAU ROT WIRD (und was nicht)
+
+* **`contract_hash_matches_pinned_literal`** (`lib.rs`): `INPUT_SIZE` steckt im
+  Vertragsstring, der Hash wechselt. Erwartet und bewusst.
+* **`feature_golden_hash_matches_fixture`**: der Vektor ist 90 Werte laenger,
+  die Fixture hasht die VEKTOREN. Neu zu erzeugen, vom Koordinator.
+* **`net_parity_hash_matches_champion_fixture` bleibt GRUEN** -- anders als bei
+  Abschnitt 16. Begruendung: sie hasht die RECORDS (`self_play.rs`, Kopf der
+  Fixture), und Variante C legt KEIN Record-Feld an; eine Encoder-Verlaengerung
+  oder -Normierung bewegt sie nachweislich nicht (dritter Beleg in
+  `PREREG_stack_top_feature.md` par.17a). Wird sie trotzdem rot, ist das ein
+  Befund und kein Formfehler.
+* **Anker-Invarianz:** der Heuristik-Pfad liest den Encoder nicht
+  (`mcts.rs`/`heuristic_v3.rs`/`round5.rs` rufen `solve_round_final_score`,
+  nicht `features.rs`), und der neue Projektions-Cache ist eine eigene
+  thread-lokale Map. Die Pruefung bleibt trotzdem Pflicht, sobald das Wheel
+  neu gebaut ist (CLAUDE.md).
+* **Reihenfolge-Falle bei der Paritaetssonde:**
+  `tools/probes/feature_parity_rust_python.py` vergleicht den ROHEN Rust-Export
+  (`state_features_from_json`, dann 884 Werte) gegen den Zwilling, und der
+  haengt an `config.INPUT_SIZE`. Zwischen Wheel-Bau und der 884 in `config.py`
+  meldet die Sonde darum eine Laengen-Abweichung -- kein Befund, sondern die
+  Zwischenstellung. Die Sonde gehoert NACH die `config.py`-Zeile. (Der
+  Befund aus par.17.7 (f), Kanal 76 im Korpus, ist davon unabhaengig und
+  weiter offen.)
+
+### 18.7 BAUSTAND 2026-09-17 (Opus-Agent): CODE VOLLSTAENDIG, NICHT KOMPILIERT
+
+Der Code steht, aber **kein `cargo` gelaufen**: waehrend des ganzen Zuges lief die
+Counterfactual-Sonde eines Parallel-Agenten
+(`tools/probes/counterfactual_tiling_ranking.py --sims 400 --draws 6
+--max-cands 4 --rounds 4 --max-files 400`, zwei Python-Prozesse, ueber vier
+Minuten hinweg mehrfach geprueft). Ein Build ist Volllast und damit Nebenlast
+(CLAUDE.md) -- also bewusst nicht gestartet.
+
+| Datei | Was |
+| --- | --- |
+| `engine/src/tiling_solver.rs` | `PROJECTION_CELLS`/`PROJECTION_SLOTS`, `TilingProjection` (Default manuell, `Copy`), `board_masks`, `project_rec` (Zwilling von `solve_rec`), `compute_projection`, `cached_projection`, `pub fn project_max_tiling`; `PROJECTION_CACHE` im bestehenden `thread_local!`-Block, `clear_tiling_caches_for_test` raeumt sie mit; drei neue Tests |
+| `engine/src/features.rs` | `INPUT_SIZE` 794 -> 884; Abschnitt 17 mit `TILING_PROJECTION_VALUES`, `push_tiling_projection`, `tiling_projection_from_state`, `tiling_projection_from_json`, `pub fn tiling_projection_values_from_json`; Anhang in BEIDEN Pfaden; drei neue Tests; `sight_appendix_is_appended_after_755` auf den 16er-Bereich begrenzt (sonst haette die Laengenzusage von Abschnitt 16 den Zuwachs mitgemessen) |
+| `engine/src/lib.rs` | additiver Export `tiling_projection_values_from_json` samt Registrierung im Modul; Vertragshash-Literal `39994362fba145a6` -> `cfd94509f0aab102`, NACHGERECHNET (FNV-1a-64 ueber den kanonischen String; dieselbe Rechnung mit 794 reproduziert das alte Literal) |
+| `engine/py/neural_net.py` | `TILING_PROJECTION_VALUES`/`LEN_WITH_TILING_PROJECTION`; Abschnitt 17 im Zwilling, der die 90 Werte ueber `_tiling_projection_values` aus dem Wheel holt (harter Fehler, wenn der Export fehlt); Scharfschaltung an `config.INPUT_SIZE` wie bei Abschnitt 16 |
+| `docs/architecture_reference.md` | neue Zeile in "Wo der Code Information ABSICHTLICH vernichtet": die `json_to_state`-Rekonstruktion im JSON-Pfad ist eine neue AUFRUFSTELLE einer bestehenden Mischregel, und nichts davon geht in die 90 Werte ein |
+| `docs/generation_naming.md` | `v29-b07` reserviert, weitere Arme ab `v29-b08` |
+| `evaluations/v29_program_agent_plan.md` | Fahrplan-Zeile 36c |
+
+`python tools/check_conventions.py`: alle Regeln gruen (die drei
+Groessen-Ratschen-Warnungen sind Bestand). `python -m py_compile` auf
+`neural_net.py` gruen.
+
+**Offen, in dieser Reihenfolge (Koordinator):** `cargo test --release --lib`
+und `cargo test --release --no-run` (letzteres wegen der pre-push-Falle);
+Feature-Golden-Fixture NEU ERZEUGEN (bewusster Entscheid, der Vektor ist
+laenger); Wheel bauen und `config.INPUT_SIZE` auf 884 IM SELBEN ZUG; Anker-Drift
+und Anker-Konservierung; die Paritaetssonde ERST danach; Kostentor; Cache-Bloecke;
+Training; Tor 1 gegen b03.
+
+### 16.10 ENTSCHIEDEN (Nutzer 2026-09-17, nach 16.9 und 17.9): Variante A draussen, Stichentscheid als Knopf ins A/B, Variante C weiter
+
+Nutzer woertlich: *"variante a bleibt draussen. c weiter wie geplant. tiling stichentscheid als knopf
+bauen und im A/B messen"*.
+
+1. **Variante A (N Neubefuellungen am Blatt) wird NICHT gebaut.** Die Prereg koppelt sie selbst an B
+   (P5: "folgt laut par.7 nur, wenn B traegt"; "Kein Bau ohne eigene Registrierung"), B ist negativ
+   (17.9), und v30+ bekommt keine neuen Vorregistrierungen (Nutzer 2026-09-16). par.4.3 (robuster
+   Aggregator) faellt damit mit.
+2. **Variante C laeuft weiter wie in par.18** (Arm `v29-b07`): Kompilieren waehrend des b08-Trainings,
+   Wheel/INPUT_SIZE/Drift/Kostentor/Bloecke/Training/Tor 1 nach Tor 1 von b08 (Reihenfolge und
+   Begruendung in `evaluations/STATUS.md` Abschnitt 1, Stand 08:20).
+3. **Netz-Stichentscheid im Tiling wird ein Knopf und kommt ins A/B.** Aus `NET_TILING_TIEBREAK_ENABLED`
+   (`tiling_solver.rs:1032`, Leser `:1778` und `:1835`, Runden 2-4) wird `MOSAIC_NET_TILING_TIEBREAK`
+   (Spec-Feld `net_tiling_tiebreak`, 0/1, **Default 1 = heutiges Verhalten**, bitidentisch), Muster
+   `round_transition_leaf`. Baustand folgt in 16.11 (Agent), Kompilat und Tore beim Koordinator.
+
+**Messung (bindend, Arm aus DIESER offenen Prereg, keine neue Registrierung):** Champion
+`v28-b02_brierbest` @400 gegen sich selbst, Champion-Spec plus `net_tiling_tiebreak: 0` (Arm "aus")
+gegen `: 1` (Arm "an", Bestand), gepaart, Blockgroesse 5, Deckel 200 Paare, SPRT alpha = beta = 0,001,
+`--log-games`, 10 Threads, Seed 20261170, Kette `tools/night_tiling_tiebreak_ab.sh`; Laufzeit ins
+Artefakt; sechs Standard-Kennzahlen, dazu als Primaerkanal der Sonde die Plattenpunkte je Kriterium
+und die Spaltenvollendungen (der Zweig entscheidet Tiling-Plaene). Vorher Anker-Drift und
+-Konservierung auf dem neuen Wheel (Pflicht nach jeder Engine-Aenderung); ob der Anker-Pfad den
+Zweig ueberhaupt liest, stellt 16.11 mit Pruefstelle fest.
+
+**Lesart vorab (Entscheidungsmass Block-Ebene wie par.5):**
+* "aus" signifikant besser (Block-z >= 1,96 zugunsten aus) -> der Sonden-Befund traegt in der Arena;
+  `net_tiling_tiebreak: 0` wird Rezept-Knopf der v30-Spec (Nutzer-Entscheid, Champion behaelt seine
+  gemessene Identitaet, neue bXX nach `feedback_measured_identity_gets_own_bxx`).
+* flach (|z| < 1,96) -> die Arena sieht den Zweig nicht; dann gilt die Korrektheits-Regel
+  (`feedback_correctness_over_measured_benefit`): die Sonde belegt, dass der Zweig die exakte Rechnung
+  zu 70 Prozent falsch ueberstimmt (16.9c, 46 von 156). Empfehlung des Koordinators fuer diesen Fall:
+  aus. Nutzer-Entscheid.
+* "aus" signifikant schlechter -> der Zweig traegt trotz falscher Einzelkippungen (z.B. weil er
+  Punktgleichheit bricht, die die Sonde nicht als Kippung zaehlt); bleibt an, 16.9c wird Diagnostik.
+
+Kosten (gemessen an `rt_leaf_on_vs_off`, 17.9): 13,1 s je Partie mit 10 Threads, 400 Partien rund
+87 min. Eintaktung: parallel zum b07-Training als der eine CPU-Auftrag (STATUS Abschnitt 1).
+
+### 16.11 Baustand Knopf net_tiling_tiebreak (2026-09-17)
+
+Gebaut nach 16.10 Punkt 3, Muster `round_transition_leaf`. **Default ist der BESTAND** – der
+Knopf steht auf 1, also bitidentisch; die Polung ist damit umgekehrt zu seinen Nachbarn (bei
+`round_transition_leaf` ist 0 der Bestand, hier 1). Nicht kompiliert (die Messkette lief), der
+Koordinator baut.
+
+**Geaenderte Dateien und Zeilen (Quellstand nach dem Bau):**
+
+| Datei | Zeilen | Was |
+| --- | --- | --- |
+| `engine/src/tiling_solver.rs` | :1046 / :1051 | `NET_TILING_TIEBREAK_DEFAULT = 1` und `NET_TILING_TIEBREAK_OFF = 0` ersetzen `NET_TILING_TIEBREAK_ENABLED: bool = true` |
+| | :1058 | `net_tiling_tiebreak_applies(mode, round_number)` – EIN Praedikat fuer beide Leser, damit das Rundenfenster `2..=4` nicht zweimal dasteht |
+| | :1761 / :1816 | neuer Parameter an `best_first_step_exact_or_valued_envelope`, Lesestelle 1 (Zweig 2) |
+| | :1840 / :1877 | neuer Parameter an `best_first_step_envelope_valued`, Lesestelle 2 (Gleichstand im K3-(d)-Zweig) |
+| | :1723 | die Wrapper `best_first_step_exact_or_valued[_ex]` reichen den DEFAULT durch (Bestandsform) |
+| `engine/src/net_mcts.rs` | :542 | `read_net_tiling_tiebreak_env()` (`MOSAIC_NET_TILING_TIEBREAK`, ungueltig -> 1 plus einmalige Warnung) |
+| | :1026 | `SearchConfig::net_tiling_tiebreak` |
+| | :1138 | `from_env` |
+| | :1196 | Feld in `KNOWN_FIELDS` |
+| | :1500 | Spec-Parsing, OPTIONAL mit Default 1, `2` und `"x"` sind harte Fehler |
+| `engine/src/self_play.rs` | :3593 | `PlayerLoopConfig::net_tiling_tiebreak` (je Seite), acht Konstruktionsstellen |
+| | :2388 / :2439 / :2498 | `resolve_tiling_step_tiebreak` (neu), `resolve_tiling_step_with_variant` und `tiling_step_with_variant` mit Parameter |
+| `engine/src/referee.rs` | :212 / :678 | Worker-Pfad aus `search_config`, In-Process-Pfad aus der Spec DIESER Seite |
+| `engine/src/py.rs` | :1151 | GUI-Sitzung aus `SearchConfig::from_env()` |
+| `engine/src/lib.rs` | :863 | Lauf-Manifest `net_tiling_tiebreak` |
+| `engine/src/knob_registry.rs` | :138 | `KnobEntry` (Waechter `all_mosaic_env_vars_in_code_are_registered`) |
+| `engine/examples/kernbeweis_910002_probe.rs` | :128 | Struct-Literal nachgezogen (sonst bricht der pre-push-Hook) |
+| `docs/knobs.md` | generiert | `python -X utf8 tools/generate_knob_docs.py`, 128 Knoepfe |
+| `models/tiebreak_on.spec.json`, `models/tiebreak_off.spec.json` | neu | Champion-Spec plus `net_tiling_tiebreak: 1` bzw. `0` |
+| `tools/night_tiling_tiebreak_ab.sh` | neu | A/B-Kette, `bash -n` gruen |
+
+**Transportweg des Werts (kein Env-Getter im Solver).** Der Wert gehoert der SEITE, nicht dem
+Prozess: ein prozessweiter Getter waere fuer das A/B "Champion mit gegen Champion ohne" im
+selben Prozess unbrauchbar, genau die Lage, die `PREREG_agent_encapsulation.md` par.1 beschreibt.
+Er wandert deshalb als Parameter:
+
+`Spec-Datei / MOSAIC_NET_TILING_TIEBREAK` -> `SearchConfig` (net_mcts.rs:1026) ->
+`PlayerLoopConfig.net_tiling_tiebreak` je Seite (self_play.rs, aus `search_config_a` bzw.
+`search_config_b` der Netz-gegen-Netz-Arena, aus `search_config` im Self-Play) ->
+`tiling_step_with_variant` / `resolve_tiling_step_with_variant` (self_play.rs:2433 und :2492) ->
+`best_first_step_exact_or_valued_envelope` (tiling_solver.rs:1761) -> Lesestelle 1 (:1816) und,
+ueber den K3-(d)-Zweig, `best_first_step_envelope_valued` (:1840) -> Lesestelle 2 (:1877).
+Nebenpfade: Referee-Worker ueber `search_config` (referee.rs:212), Referee in-process ueber die
+Spec der Seite (referee.rs:678, nur wenn fuer die Seite ueberhaupt ein Netz geladen ist), GUI
+ueber `SearchConfig::from_env()` (py.rs:1151). Alle Bestands-Wrapper (`resolve_tiling_step`,
+`tiling_step`, `best_first_step_exact_or_valued[_ex]`) reichen den DEFAULT durch und sind damit
+unveraendert.
+
+**Anker-Befund (Punkt 2 des Auftrags, geprueft, nicht abgeleitet): der Heuristik-Pfad erreicht
+KEINE der beiden Lesestellen.** Drei unabhaengige Sperren, jede fuer sich ausreichend:
+
+1. Beide Zweige verlangen einen Evaluator: `tiling_solver.rs:1817` und `:1879` sind je ein
+   `if let Some(eval) = evaluator`. Ohne Evaluator faellt Lesestelle 1 auf
+   `best_first_step_exact` durch und Lesestelle 2 auf den zuerst gefundenen Gleichstands-
+   Kandidaten.
+2. Der Heuristik-Pfad uebergibt IMMER `None`: `self_play.rs:2460`
+   (`None => best_first_step_exact_or_valued(state, pi, None)`), und die Heuristik-Seiten tragen
+   `tiling_net: None` (self_play.rs:4469 Heuristik-Self-Play, :5006 Heuristik-Seite der
+   Elo-Verankerungs-Arena, :8003 Test).
+3. Lesestelle 2 sitzt ueberdies hinter `!envelope.is_off()` (tiling_solver.rs:1805); die
+   Heuristik-Pfade uebergeben `EnvelopeTilingParams::OFF` (self_play.rs:2382 und :2395, referee.rs:209),
+   und auch die CHAMPION-Spec `models/frozen_champions/v28-b02/spec.json` hat
+   `envelope_tiling_w = 0.0` und `envelope_tiling_value_w = 0.0`: im A/B wirkt also allein
+   Lesestelle 1. Lesestelle 2 ist trotzdem mitgeschaltet, sonst haette der Knopf eine stille
+   Luecke, sobald K3 (d) einmal an ist.
+
+Die Anker-Spec `models/frozen_heuristics/hv4_anchor/spec.json` traegt das neue Feld nicht; weil es
+OPTIONAL mit Default 1 ist, laedt sie unveraendert und beschreibt weiter dasselbe Verhalten.
+Der Referee-Zweig in-process liest die Spec nur, wenn fuer die Seite ein Netz geladen ist
+(referee.rs:675-680): der Anker-Lauf bezahlt keinen zusaetzlichen Dateizugriff.
+
+**Tests (geschrieben, nicht gelaufen):**
+
+* `tiling_solver::tests::net_tiling_tiebreak_default_keeps_todays_behaviour` – Tor (a): mit
+  Default 1 kippt der diskriminierende Evaluator die punktegleiche Wahl wie bisher, und zwar
+  identisch zum Bestands-Wrapper `best_first_step_exact_or_valued`.
+* `…::net_tiling_tiebreak_off_falls_back_to_exact_points` – Tor (b), Lesestelle 1: bei 0
+  entscheidet `best_first_step_exact`, der Evaluator kippt nichts mehr.
+* `…::net_tiling_tiebreak_off_also_disables_the_envelope_branch_tiebreak` – Tor (b),
+  Lesestelle 2: `best_first_step_envelope_valued` mit `w_tile = w_val = 0` (bereinigter Score
+  gleich Punktzahl, Gleichstandsgruppe gleich punktegleiche Spitze); an -> Evaluator entscheidet,
+  aus -> der zuerst gefundene Kandidat.
+* `…::net_tiling_tiebreak_applies_only_in_rounds_2_to_4_and_only_when_on` – Rundenfenster und
+  Polung des gemeinsamen Praedikats.
+* `net_mcts::tests::search_config_spec_net_tiling_tiebreak_is_optional_and_validated` – Tor (c):
+  Feld fehlt -> 1 (der Bestand), 0 kommt an, `2` und `"x"` werden hart abgewiesen und die
+  Fehlermeldung nennt das Feld.
+
+**Kette.** `tools/night_tiling_tiebreak_ab.sh`: gehaertete Warteschleife (`cpu_frei`/`warte_frei`
+aus `night_v29_b08_head_pair.sh`, PowerShell-Prozessfilter mit dem Namensabgleich auf python),
+`set -uo pipefail`, keine Pipe hinter dem langen Lauf, `python -X utf8 -u`. Erste Pruefung ist
+`grep -q net_tiling_tiebreak engine/src/net_mcts.rs`: ohne den Knopf waeren beide Arme derselbe
+Spieler, und die Spec-Dateien wuerden als unbekanntes Feld abgewiesen. Dann `paired_gating.py`
+mit `--sims-a 400 --sims-b 400 --c-puct 1.5 --block-size 5 --max-pairs 200 --sprt-alpha 0.001
+--sprt-beta 0.001 --threads 10 --log-games --no-promote-winner`, Seed 20261170, Ausgabe
+`evaluations/artifacts/tiebreak_on_vs_off_s20261170.json`, danach `arena_column_probe.py
+--artifact` und `plate_points_from_arena.py ... --block 5`. KEIN Kostentor: der abgeschaltete
+Knopf spart bis zu `NET_TILING_TOPK` = 12 Vorwaertspaesse je Tiling-Zug, ein Aufschlag ist
+strukturell ausgeschlossen.
+
+**Was der Koordinator beim Kompilieren erwarten muss.** Vier Signaturen haben einen Parameter
+mehr (`best_first_step_exact_or_valued_envelope`, `best_first_step_envelope_valued`,
+`resolve_tiling_step_with_variant`, `tiling_step_with_variant`) und `SearchConfig` ein Feld; die
+einzige Aufrufstelle ausserhalb von `src/` ist das Struct-Literal in
+`engine/examples/kernbeweis_910002_probe.rs`, sie ist nachgezogen –
+`cargo test --release --no-run` bleibt die Pflichtpruefung vor dem Push. Die Netz-Paritaets-
+Fixture darf sich NICHT aendern (kein Record-Feld, keine Feature-Aenderung), und Anker-Drift wie
+-Konservierung muessen GRUEN sein; ist eines davon rot, liegt es nicht an der Polung des
+Defaults, sondern an einem uebersehenen Aufrufer.
+
+### 18.5 Kompilat und Abnahme (Koordinator, 2026-09-17)
+
+**10:12-10:15, `cargo test --release --lib`** (neben dem GPU-Training v29-b08 als der eine CPU-Auftrag;
+Build 45 s, Tests 99,8 s): **683 bestanden, 1 rot, 19 ignoriert.** Das eine Rot ist die vorab
+angekuendigte `feature_golden_hash_matches_fixture` (Vektor 90 Werte laenger, `features.rs:3501`,
+`got=3e0b3d2ef7fbef28 want=4cfafb6867c5f368`), wird bewusst neu erzeugt. Gruen darunter: die neuen
+Tests aus par.18 (Projektion, Abschnitt 17) und 16.11 (Stichentscheid-Knopf), das Vertragshash-Literal
+`cfd94509f0aab102` (`contract_hash_matches_pinned_literal`) und die Netz-Paritaets-Fixture des Champions
+(`net_parity_hash_matches_champion_fixture`, dritter Beleg fuer par.17a: eine reine Encoder-Verlaengerung
+bewegt den Record-Hash nicht). Naechste Schritte in der Reihenfolge aus STATUS Abschnitt 1: `--no-run`
+(Beispiele, Benches), Fixture-Neubau, Wheel-Bau; Installation, INPUT_SIZE 884, Drift, Kostentor erst
+nach Tor 1 von b08.
+
+**10:20-10:24:** `cargo test --release --no-run` gruen (Beispiele und Benches kompilieren, pre-push-Falle
+zu); `feature_golden_hash_matches_fixture` mit `MOSAIC_UPDATE_FEATURE_FIXTURE=1` neu erzeugt (130 Zeilen,
+`engine/tests/fixtures/feature_contract_v1.txt`, Kopf: INPUT_SIZE=884, Grund 2026-09-17 eingetragen) und
+ohne Variable in frischem Prozess gruen. **Wheel GEBAUT 10:14:23** (`python -m maturin build --release`,
+`engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`, 6.567.159 Byte, Fixture-Test plus Bau
+72 s), **NICHT installiert** -- Installation, `config.INPUT_SIZE` 884, Drift, Paritaet, Kostentor, Bloecke,
+Training und Tor 1 laufen als Kette `tools/night_v29_b07_variante_c.sh` nach Tor 1 von b08 (18.6).
+
+### 18.6 Kette zur Abnahme und Messung (geschrieben 2026-09-17, nicht gestartet)
+
+`tools/night_v29_b07_variante_c.sh`, `bash -n` gruen, noch NIE gelaufen. Sie faehrt genau die
+Reihenfolge aus STATUS Abschnitt 1 (Koordinator-Entscheid 08:20) und stoppt bei jedem roten Tor;
+ROT ist ueberall ein Nutzer-Entscheid, die Kette repariert nichts.
+
+**Vorbedingung, die die Kette NICHT selbst herstellt:** `config.py` Zeile 49 muss von Hand auf
+`INPUT_SIZE = 884` stehen (par.18.3 Punkt 5). Stufe 0 bricht sonst ab. Grund ist die
+Reihenfolge-Falle aus par.18.6 oben: zwischen Wheel und `config.py` meldet die Paritaetssonde nur
+die Zwischenstellung.
+
+**Stufen, Exit-Codes in Klammern:**
+
+0. Vorbedingungen (1/2): `INPUT_SIZE = 884`, `FEATURE_FORMULA_VERSION` in `config.py`, Wheel
+   `engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl` (gebaut 10:14, nicht
+   installiert), Champion, Champion-Spec, b03-Modell, Fenster, Traeger-Manifest,
+   Anker-Artefakt, Kostentor-Referenz. Danach `warte_frei` (dieselbe Prozessliste wie
+   `night_v29_b08_head_pair.sh`) -- das Warten steht VOR der Installation, weil `pip install`
+   scheitert, solange ein Python-Prozess das `.pyd` haelt.
+1. Wheel installieren (10), Vertrag pruefen (11/12): der Export
+   `tiling_projection_values_from_json` muss da sein (`lib.rs:1787`, registriert `lib.rs:2342`),
+   `engine_config_json()` (`lib.rs:753`) muss `input_size` 884 melden (Feld `lib.rs:768`), und
+   `config.INPUT_SIZE` muss ebenfalls 884 sein. Contract-Hash und Engine-Version werden gedruckt
+   (Erwartung `cfd94509f0aab102`, 18.5).
+2. Anker-Invarianz nach Skill `mosaic-anchor-invariance`, Artefakt
+   `models/frozen_heuristics/hv4_anchor` (Leitersegment 2): DRIFT (20) im Default-Modus,
+   KONSERVIERUNG (21) mit `--venv`, beide mit `--out`. Erwartung GRUEN: der Heuristik-Pfad liest
+   den Encoder nicht (par.18.6 oben). Kosten gemessen 22,2 s und 13,4 s.
+3. Paritaetssonde `tools/probes/feature_parity_rust_python.py` (Aufruf ohne Argumente, wie im
+   Dateikopf). Die Kette stoppt NUR bei `kind == "shape"` (30), also bei einem Laengenfehler.
+   Wertabweichungen werden namentlich berichtet und laufen weiter: erwartet ist der bekannte
+   Kanal-76-Befund in der Grundmenge `corpus` (Planes, Erreichbarkeit je Zelle, 2 von 300
+   Zustaenden, Ursache A2-Phantom-Fix, `PREREG_rust_data_layer.md` par.9a) -- er ist aelter als
+   Variante C und unabhaengig von ihr.
+4. **Kostentor par.18.4 (3).** Form: Champion `v28-b02_brierbest` gegen sich selbst, Champion-Spec
+   BEIDSEITS, 2 x 20 Paare (Seeds 20261180 / 20261181), Blockgroesse 5, 10 Threads, `--log-games`.
+   Gemessen wird allein `laufzeit.s_je_partie`; Variante C hat keinen Knopf, also gibt es keinen
+   Aus-Arm im selben Prozess -- verglichen wird gegen die vor der Installation gemessene Zahl.
+   **Referenz, gleiche Form: 13,326 s je Partie** (`evaluations/artifacts/rt_leaf_kosten_ohne_s20261151.json`,
+   `laufzeit.s_je_partie`, 20 Paare, 10 Threads, Logs, Spec = Champion-Spec plus abgeschalteter
+   rt-leaf-Knopf; in dieser Sitzung am Artefakt gelesen). Zweite Orientierung, ANDERE Form (200
+   Paare): 13,069 s je Partie (`rt_leaf_on_vs_off_s20261152.json`, par.17.9). Schwelle **+25
+   Prozent** auf die 20-Paare-Referenz. Verdikt-Datei
+   `evaluations/artifacts/variante_c_kostentor_verdikt.txt` mit beiden Prozentsaetzen. Riss heisst
+   STOPP VOR dem Blockbau. *Ungeprueft/Vorbehalt:* die Referenzlaeufe liefen am 2026-09-17 um 01:35
+   neben dem b06-GPU-Training, die neuen Laeufe warten auf eine freie CPU -- die Lastbedingungen
+   sind aehnlich, aber nicht identisch.
+5. Split (13/17): `tools/window_train_split.py` mit denselben Argumenten wie die b08-Kette, Listen
+   `data/window_v29_b07_train.txt` / `_val.txt`, Schluessel aus der Ausgabe. Die Kette bricht ab,
+   wenn der Schluessel `421448d12eb8` herauskommt: das ist der 794er Schluessel von b08, dann waere
+   die 884 nicht im Schluessel angekommen (`file_cache_key.py:158` und `corpus_dataset.py:490`
+   lesen `config.INPUT_SIZE`).
+6. Bloecke und Monolith unter dem neuen Schluessel (14/16), `--workers 6`, `--merge-out`, Bauzeit
+   in Sekunden gedruckt, Stempel `mosaic_cache_key` gegen den Schluessel geprueft.
+   Bestandsvergleich: 1.964 s fuer 2.800 Dateien unter 794 (`docs/measured_runtimes.md`, b08-Kette).
+7. **Training `v29-b07` = GENAU das b03-Rezept** (`models/manifest_train_v29-b03_20260914_111513.json`,
+   `cli_args` in dieser Sitzung gelesen): `--epochs 12 --lr 5e-05 --lr-schedule cosine --lr-t-max 12
+   --val-frac 0.05 --encoder 2d --value-head wdl --value-target-variant nortv
+   --value-target-lambda 0.7 --ownership-head-2d --ownership-weight 1.0 --opp-points-head
+   --endgame-head --moon-loss-weight 1.0 --destretch-a 0.0051 --destretch-b 1.9269
+   --select-by-brier --fast-loader --seed 20260941 --load v28-b02_brierbest
+   --file-list data/window_v29.txt`; die einzigen Abweichungen sind `--name v29-b07` und
+   `--cache-file` (b03 hatte `cache_file: null`).
+   **Warmstart 794 auf 884 ist GEBAUT und geprueft** (`train.py:1684-1698`, in dieser Sitzung
+   gelesen): ist `flat_branch.0.weight` im Checkpoint schmaler als im neuen Modell (gleiche
+   Zeilenzahl, kleinere Spaltenzahl), werden die fehlenden Eingangsspalten mit NULL aufgefuellt
+   statt die Schicht frisch zu starten -- `torch.cat([_o, _pad], dim=1)`, `train.py:1695-1696`.
+   Der Flach-Zweig ist `nn.Linear(input_size, hidden_size)` (`neural_net.py:2101`), die
+   Gewichtsform also `[hidden, input]`; die 90 neuen Werte haengen hinten (par.18.3 Punkt 3), also
+   greift genau dieser Zweig. Das Netz ist im ersten Schritt exakt das alte, die neuen Merkmale
+   wirken erst, wenn das Training sie ankoppelt. Dasselbe Muster hat 755 auf 794 getragen
+   (Kommentar ebenda: `PREREG_stack_top_feature.md` par.7, v24-b04, 2026-09-05). Die Kette druckt
+   vorher, dass die Zeile "Eingangsbreite 794 -> 884, 90 neue Spalten null-initialisiert" in der
+   Trainingsausgabe erscheinen MUSS; bleibt sie aus, faellt der Flach-Zweig unter
+   "Shape-Mismatch, startet frisch" (`train.py:1699-1702`) und der Arm waere gegen b03 nicht
+   vergleichbar.
+8. **Tor 1 (15):** `v29-b07` gegen `models/alphazero_v29-b03_brierbest.onnx`, Champion-Spec
+   beidseits, zwei Seeds **20261190 / 20261191**, je 200 Paare, Blockgroesse 5, SPRT 0,001/0,001
+   (also ohne Frueh-Stopp), `--threads 10 --log-games --no-promote-winner`, Artefakte
+   `evaluations/artifacts/tor1_v29-b07_vs_b03_s<seed>.json`; danach je Lauf
+   `tools/probes/arena_column_probe.py --artifact` und `tools/plate_points_from_arena.py ... --block 5`.
+9. Abschlusszeile "faellig danach": Manifest-Diff b07 gegen b03 (erwartet GENAU `name`,
+   `cache_file` und die INPUT_SIZE-abhaengigen Felder; jedes weitere abweichende Feld ist ein
+   Befund), Verdikt nach par.18.5 auf Block-Ebene mit den beiden benannten Nutzniessern,
+   Netz-Gesundheit der 90 neuen Spalten (Spaltennorm > 0), die sechs Standard-Kennzahlen,
+   Laufzeiten nach `docs/measured_runtimes.md`, Registrierung samt Zeile-1-Kopf und
+   Index-Generator.
+
+**Was die Kette bewusst NICHT tut:** sie setzt `config.INPUT_SIZE` nicht, sie baut kein Wheel, sie
+promoviert nichts (`--no-promote-winner` in jedem Arena-Aufruf), und sie loescht nichts.
+
+### 18.7 Abnahme auf dem installierten Wheel (2026-09-17, 13:59-14:01)
+
+Kette `tools/night_v29_b07_variante_c.sh`, Start 13:59:30 nach Tor 1 von b08, `config.INPUT_SIZE` vorher von
+Hand auf 884 (Z.49, Kommentar um Abschnitt 17 ergaenzt). Maschine frei.
+
+* **Wheel installiert** (`mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl` vom 10:14), Vertragspruefung gruen:
+  Export `tiling_projection_values_from_json` vorhanden, `engine_config_json().input_size` = 884,
+  `config.INPUT_SIZE` = 884 (Kettenausgabe Stufe 1).
+* **Anker-Drift GRUEN** (14:00:17, "1/1 Dateien Feld fuer Feld gleich", Live-Wheel gegen Artefakt hv4_anchor)
+  und **Anker-Konservierung GRUEN** (14:00:36, Artefakt-venv). Die Engine-Aenderung (Encoder 884, Projektion,
+  Stichentscheid-Knopf) bewegt den Anker nicht; kein neues Leitersegment noetig.
+* **Paritaetssonde Rust gegen Python** (`feature_parity_rust_python.json`, 14,3 s): Flachvektor **884 Werte
+  gleich in 1.033 von 1.033 Zustaenden** (733 frische pygame-Zustaende plus 300 Korpus-Zustaende aus
+  `selfplay_v26-b01-policy_*`), also liefert der Wheel-Export fuer Abschnitt 17 im Python-Zwilling genau
+  dieselben 90 Werte wie der Rust-Pfad; Planes 733 von 733 frisch gleich, im Korpus 298 von 300 -- die
+  zwei Abweichungen sind der bekannte Kanal-76-Befund (`index_unraveled [76, 5, 1]`, Python 0 gegen Rust 1,
+  A2-Phantom-Fix, `PREREG_rust_data_layer.md` par.9a, dort ebenfalls 2 von 300). Nichts Neues durch
+  Variante C; `gate_passed=False` der Sonde ist dieser Altbefund, Kette laeuft weiter (nur Laengenfehler
+  stoppen).
+* Kostentor (18.4) laeuft seit 14:01:12; Ergebnis folgt in 18.8.
+
+### 18.8 Kostentor GEMESSEN (2026-09-17, 14:01-14:16): HAELT
+
+Champion `v28-b02_brierbest` @400 gegen sich selbst, Champion-Spec beidseits, 2 x 20 Paare (Seeds
+20261180/20261181), Blockgroesse 5, 10 Threads, `--log-games`, exklusiv. Ergebnis je Lauf 20:20 mit 20 Splits
+(gleiche Spec beidseits, wie erwartet). Grundmenge Partien, Einheit Sekunden je Partie (`laufzeit.s_je_partie`).
+
+| Lauf | s je Partie |
+| --- | --- |
+| neu, 884-Wheel mit Projektion, Seed 20261180 | 11,837 |
+| neu, Seed 20261181 | 11,339 |
+| **neu, Mittel** | **11,588** |
+| Referenz par.18.6 (20 Paare, `rt_leaf_kosten_ohne_s20261151.json`, 01:35 neben GPU-Training b06) | 13,326 |
+| Orientierung (200 Paare, `rt_leaf_on_vs_off_s20261152.json`, Aus-Arm) | 13,069 |
+| **exklusive Vergleichsgroesse, alter 794-Wheel: Tor 1 b08 gegen b03, 11:21-13:58, 800 Partien** | **11,515** |
+
+**Verdikt:** Aufschlag gegen die registrierte Referenz **-13,0 Prozent**, Schwelle +25 -> **HAELT**
+(`variante_c_kostentor_verdikt.txt`). Die registrierte Referenz lief aber NEBEN einem GPU-Training und ist
+damit langsamer als der exklusive Lauf; der ehrlichere Vergleich ist die exklusive Zahl vom selben Tag auf dem
+alten Wheel (Tor 1 b08, 11,5 s je Partie, gleiche Netzarchitektur 2d/794-Eingang, andere Modelle): dagegen
+**+0,6 Prozent**. Der Loeser im Encoder kostet in der Suche also praktisch nichts Messbares -- vereinbar
+mit dem Kostentor-Befund von K4 (dort +4,3 Prozent mit Loeser-Aufruf, `knob_registry.rs:111`: der
+Tiling-Cache faengt die meisten Aufrufe). Die ANNAHME aus 18.4 ("verdoppelt grob die Loeser-Arbeit") war
+zu pessimistisch. Was NICHT gemessen ist: die Kosten je Record im Blockbau (`json_to_state`-Rekonstruktion
+plus Projektion); die kommen mit der Bauzeit in 18.9.
+
+### 18.9 Bloecke und Monolith unter 884 (2026-09-17, 14:17-14:52)
+
+Split byte-gleich mit b08 und b03; Schluessel `790ac07353a6` (884, Formel-Version, FROM_RUST=1); Bloecke plus
+Merge fuer 2.800 Dateien mit 6 Workern **2.144 s** (exklusiv), Stempel gleich dem Schluessel. Vergleich am
+selben Tag unter gleichen Bedingungen: b08 unter 794 **1.964 s** (par.10.5 der Minimalkern-Prereg). **Die
+Projektion kostet im Blockbau +180 s = +9,2 Prozent** (Grundmenge 2.800 Dateien, 4.538.842 Zustaende; je
+Zustand rund 40 Mikrosekunden zusaetzlich, Herleitung aus der Differenz) -- das ist die
+`json_to_state`-Rekonstruktion plus Projektion je Record (18.4, dort ungemessen). Training `v29-b07` seit
+14:52:49 (Monolith per `--cache-file` bestaetigt, 2800 Dateien, 4.538.842 Zustaende).

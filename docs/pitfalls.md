@@ -410,6 +410,24 @@ Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
   ist, kann niemand einen Cache-Namen pruefen, ohne den Bau zu wiederholen.
   Offen, Wiedervorlage beim naechsten Anfassen des Schluessels.
 
+  **Dritte Variante derselben Familie, 2026-09-17: nicht ein vergessener Knopf,
+  sondern eine geaenderte FORMEL hinter einer gespeicherten Groesse.** Der
+  A2-Phantom-Fix vom 2026-09-12 hat `provocation::remaining_colors` geaendert;
+  davon haengen `cell_reachable_mask` (Planes-Kanal 76) und `col_f_max` ab, die
+  in den Records STEHEN. Der Python-Zwilling liest sie, `features.rs` rechnet sie
+  neu -- also entscheidet `MOSAIC_FEATURES_FROM_RUST` ueber den Inhalt der
+  gecachten Merkmale, und er stand in keinem Schluessel (Begruendung "beide Bauer
+  sind bit-identisch", auf Alt-Records seit dem 2026-09-12 hinfaellig). Weil
+  Bloecke MEMOISIERT werden, erbt ein Arm die Semantik dessen, der den Block
+  zuerst gebaut hat. Behoben auf Nutzer-Entscheid: beide Schluessel tragen seit
+  dem 2026-09-17 `+featfmt_<config.FEATURE_FORMULA_VERSION>` und
+  `+featsrc_rust`/`+featsrc_record`
+  (`tools/tests/test_cache_key_feature_formula_version.py`,
+  `PREREG_rust_data_layer.md` par.9b). **Die Lehre ueber den Einzelfall hinaus:**
+  ein Knopf im Schluessel reicht nicht, wenn sich die FORMEL unter einem
+  gespeicherten Feld bewegen kann -- wer eine solche Formel anfasst, zieht die
+  Formelversion hoch, sonst adressieren zwei Semantiken denselben Namen.
+
 - **Der Fenster-Cache-Schluessel haengt an der PFADFORM der Dateiliste, nicht
   nur am Datensatz** (gemessen 2026-09-16). Das ist die Wurzel der
   Cache-Verwirrung, nicht der einzelne vergessene Knopf.

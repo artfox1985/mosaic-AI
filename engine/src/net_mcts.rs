@@ -530,6 +530,38 @@ pub(crate) fn read_round_transition_leaf_env() -> u32 {
     }
 }
 
+/// `MOSAIC_NET_TILING_TIEBREAK` (`PREREG_round_transition_search_sampling.md`
+/// par.16.10). Ungueltig -> Default plus einmalige Warnung, gleiche Disziplin
+/// wie [`read_round_transition_leaf_env`] darueber.
+///
+/// ACHTUNG, umgekehrte Polung gegenueber `round_transition_leaf`: der BESTAND
+/// dieses Knopfs ist der EINGESCHALTETE Zustand
+/// ([`crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT`] = 1, bis 2026-09-17
+/// die harte Konstante `NET_TILING_TIEBREAK_ENABLED = true`). `0` ist die
+/// Verhaltensaenderung, nicht `1`.
+pub(crate) fn read_net_tiling_tiebreak_env() -> u32 {
+    use crate::tiling_solver::{NET_TILING_TIEBREAK_DEFAULT, NET_TILING_TIEBREAK_OFF};
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_NET_TILING_TIEBREAK") else {
+        return NET_TILING_TIEBREAK_DEFAULT;
+    };
+    if raw.trim().is_empty() {
+        return NET_TILING_TIEBREAK_DEFAULT;
+    }
+    match raw.trim().parse::<u32>() {
+        Ok(v) if v == NET_TILING_TIEBREAK_OFF || v == NET_TILING_TIEBREAK_DEFAULT => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_NET_TILING_TIEBREAK={raw:?} ungueltig (0 oder 1) -- \
+                     {NET_TILING_TIEBREAK_DEFAULT} gilt."
+                );
+            });
+            NET_TILING_TIEBREAK_DEFAULT
+        }
+    }
+}
+
 pub(crate) fn read_moon_order_search_sims_env() -> u32 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SIMS") else {
@@ -972,6 +1004,26 @@ pub struct SearchConfig {
     /// wenn der Knopf an ist (kein stiller Halbzustand: die drei Suchtreiber
     /// setzen ihn, siehe dortige Aufrufe).
     pub round_transition_leaf_ctx: Option<RoundTransitionLeafCtx>,
+    /// Netz-Stichentscheid im TILING dieser Seite
+    /// (`PREREG_round_transition_search_sampling.md` par.16.10, Nutzer
+    /// 2026-09-17: "tiling stichentscheid als knopf bauen und im A/B messen"):
+    /// [`crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT`] (= 1) ist der
+    /// BESTAND, [`crate::tiling_solver::NET_TILING_TIEBREAK_OFF`] schaltet den
+    /// Zweig an BEIDEN Lesestellen ab
+    /// (`tiling_solver::best_first_step_exact_or_valued_envelope` und
+    /// `best_first_step_envelope_valued`), dann entscheiden die exakten Punkte
+    /// bzw. der bereinigte Huellen-Score.
+    ///
+    /// Umgekehrte Polung gegenueber den Nachbarn: `0` ist hier die
+    /// Verhaltensaenderung. Spec-Feld je Seite (`net_tiling_tiebreak`,
+    /// OPTIONAL mit Default 1, damit jede eingefrorene Spec weiter laedt UND
+    /// weiter genau dasselbe tut), Env-Default `MOSAIC_NET_TILING_TIEBREAK`.
+    ///
+    /// Der Wert wird als PARAMETER bis in den Solver gereicht (ueber
+    /// `PlayerLoopConfig`), nicht ueber einen prozessweiten Getter -- sonst
+    /// waere das A/B "Champion mit gegen Champion ohne" im selben Prozess nicht
+    /// fahrbar.
+    pub net_tiling_tiebreak: u32,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1083,6 +1135,7 @@ impl SearchConfig {
             // Kein Env-Knopf und kein Spec-Feld: der Kontext entsteht erst an
             // der Wurzel einer Suche (`with_round_transition_leaf_context`).
             round_transition_leaf_ctx: None,
+            net_tiling_tiebreak: read_net_tiling_tiebreak_env(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1140,6 +1193,7 @@ impl SearchConfig {
             "moon_order_search_sims",
             "moon_order_search_scale",
             "round_transition_leaf",
+            "net_tiling_tiebreak",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1437,6 +1491,26 @@ impl SearchConfig {
                 x as u32
             }
         };
+        // Netz-Stichentscheid im Tiling (par.16.10): OPTIONAL, aber mit dem
+        // Default [`crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT`] = 1 --
+        // hier ist der BESTAND der eingeschaltete Zustand, eine Spec ohne das
+        // Feld beschreibt also weiter bitgenau das, was sie schon immer
+        // beschrieben hat (gleiche Begruendung wie bei `moon_order_variants`,
+        // dessen Bestand ebenfalls "an" ist).
+        let net_tiling_tiebreak = match obj.get("net_tiling_tiebreak") {
+            None => crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'net_tiling_tiebreak' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=1.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'net_tiling_tiebreak' muss 0 oder 1 sein, ist {x}"
+                    ));
+                }
+                x as u32
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -1576,6 +1650,7 @@ impl SearchConfig {
             moon_order_search_scale,
             round_transition_leaf,
             round_transition_leaf_ctx: None,
+            net_tiling_tiebreak,
             heuristic_variant,
             sims,
             root_noise,
@@ -8519,6 +8594,12 @@ mod tests {
             moon_order_search_scale: MOON_ORDER_SEARCH_SCALE_DEFAULT,
             round_transition_leaf: ROUND_TRANSITION_LEAF_DEFAULT,
             round_transition_leaf_ctx: None,
+            // ZWEITE AUSNAHME von "nichts ist an" (wie `moon_order_variants`
+            // darueber): der BESTAND dieses Knopfs IST der eingeschaltete
+            // Zustand (par.16.10, bis 2026-09-17 die Konstante
+            // `NET_TILING_TIEBREAK_ENABLED = true`). `0` waere hier eine
+            // Verhaltensaenderung, kein Nullpunkt.
+            net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -8705,6 +8786,48 @@ mod tests {
             .expect_err("2 muss hart abgewiesen werden");
         std::fs::remove_file(&p_bad).ok();
         assert!(msg.contains("round_transition_leaf"), "Fehlermeldung nennt das Feld: {msg}");
+    }
+
+    /// Tor (c) des Knopf-Auftrags zu `net_tiling_tiebreak`
+    /// (`PREREG_round_transition_search_sampling.md` par.16.10/16.11): eine Spec
+    /// OHNE das Feld laedt weiter und beschreibt den BESTAND -- und der ist hier
+    /// die `1`, nicht die `0` (umgekehrte Polung gegenueber den Nachbarn, bis
+    /// 2026-09-17 war es die harte Konstante `NET_TILING_TIEBREAK_ENABLED =
+    /// true`). `0` kommt an, `2` und `"x"` sind harte Fehler.
+    #[test]
+    fn search_config_spec_net_tiling_tiebreak_is_optional_and_validated() {
+        use crate::tiling_solver::{NET_TILING_TIEBREAK_DEFAULT, NET_TILING_TIEBREAK_OFF};
+        let dir = std::env::temp_dir();
+        let write = |tag: &str, extra: &str| {
+            let path = dir.join(format!("mosaic_test_spec_tiebreak_{tag}_{}.json", std::process::id()));
+            std::fs::write(&path, format!("{{{SPEC_MIN_FIELDS}{extra}}}")).unwrap();
+            path
+        };
+        let p_missing = write("missing", "");
+        let cfg = SearchConfig::from_spec_file(p_missing.to_str().unwrap())
+            .expect("eine Spec ohne das Feld muss weiter laden");
+        std::fs::remove_file(&p_missing).ok();
+        assert_eq!(cfg.net_tiling_tiebreak, NET_TILING_TIEBREAK_DEFAULT);
+        assert_eq!(cfg.net_tiling_tiebreak, 1, "der Default IST der Bestand (Zweig AN)");
+
+        let p_off = write("off", r#", "net_tiling_tiebreak": 0"#);
+        let cfg_off = SearchConfig::from_spec_file(p_off.to_str().unwrap()).expect("0 ist gueltig");
+        std::fs::remove_file(&p_off).ok();
+        assert_eq!(cfg_off.net_tiling_tiebreak, NET_TILING_TIEBREAK_OFF);
+
+        for (tag, extra) in [
+            ("zwei", r#", "net_tiling_tiebreak": 2"#),
+            ("text", r#", "net_tiling_tiebreak": "x""#),
+        ] {
+            let p_bad = write(tag, extra);
+            let msg = SearchConfig::from_spec_file(p_bad.to_str().unwrap())
+                .expect_err("ungueltiger Wert muss hart abgewiesen werden");
+            std::fs::remove_file(&p_bad).ok();
+            assert!(
+                msg.contains("net_tiling_tiebreak"),
+                "Fehlermeldung nennt das Feld ({tag}): {msg}"
+            );
+        }
     }
 
     /// Tor (a) des Bauauftrags: **Knopf 0 laesst alles bitidentisch.** Drei

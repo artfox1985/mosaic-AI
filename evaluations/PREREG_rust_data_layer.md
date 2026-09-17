@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A GEBAUT, TOR BESTANDEN und im Betrieb bewaehrt (par.7/par.8): Rust-Bauer bit-identisch zum Python-Zwilling (1.033 Zustaende), Blockbau des v28-Fensters in 26 min, Arm v28-b02 damit trainiert. TEIL B ohne Ausloeser. NEU par.9 (2026-09-14): nach dem 794er-Wheel ist der Flachvektor in beiden Populationen gleich, die PLANES weichen in 2 von 300 ALT-Records ab (Kanal 76, Erreichbarkeit) -- Ursache ist der A2-Phantom-Fix vom 2026-09-12, das Tor vergleicht dort eine gespeicherte gegen eine neu gerechnete Groesse. Auf frischen Zustaenden gruen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A), Rohformat aus Rust (Teil B)? | Beleg: TEIL A GEBAUT UND BEWAEHRT (par.7/par.8), TEIL B ohne Ausloeser. Paritaets-Tor rot nur auf ALT-Records (par.9/par.9a): 2 von 300 Zustaenden, Ursache der A2-Phantom-Fix vom 2026-09-12, gespeichert gegen frisch gerechnet. Weg (1) GEBAUT (par.9b, Nutzer 2026-09-17): Formelversion und MOSAIC_FEATURES_FROM_RUST in BEIDEN Cache-Schluesseln; Alt-Caches orphaned, Neubau ab v29-b08 (Kette 36e). -->
 
 # Vorregistrierung: Datenschicht in Rust (Merkmalsbauer und Rohformat)
 
@@ -193,7 +193,9 @@ Dreifachbau. Mit Variante B (`PREREG_v28_window.md` par.8, elf neue Werte) steht
 Rust, pyo3-Export der beiden Bauer, Python-Zwilling nur noch Test-Orakel, hartes Tor aus
 par.2 unveraendert (Bit-Identitaet VOR der Umstellung, `np.array_equal`; Schalter
 `MOSAIC_FEATURES_FROM_RUST` NICHT im Cache-Schluessel; Kill-Kriterium bei nicht herstellbarer
-Identitaet). Verdikt hier, sobald das Tor gefahren ist. Teil B bleibt ohne Ausloeser liegen
+Identitaet). **Dieser Punkt ist UEBERHOLT seit par.9b (2026-09-17): der Schalter steht in
+BEIDEN Cache-Schluesseln**, weil die Bit-Identitaet auf Alt-Records nicht mehr gilt.
+Verdikt hier, sobald das Tor gefahren ist. Teil B bleibt ohne Ausloeser liegen
 und wird beim naechsten Bestandsabgleich UEBERHOLT, falls die Schwelle weiter verfehlt wird.
 
 ## par.7 TEIL A: TOR BESTANDEN (2026-09-11, 14:46)
@@ -260,3 +262,138 @@ aendert -- das ist ein Nutzer-Entscheid.
 
 **Nicht geprueft:** ob die 2 von 300 wirklich alle auf den Phantom-Fall zurueckgehen. Der Beleg
 ist die Kette Formel-Aenderung -> Alt-Record, nicht eine Zustand-fuer-Zustand-Analyse.
+
+## par.9a NACHGEPRUEFT (2026-09-17): es ist der Phantom-Fall, Zustand fuer Zustand -- und der Flachvergleich ist an dieser Stelle blind
+
+par.9 liess ausdruecklich offen, "ob die 2 von 300 wirklich alle auf den Phantom-Fall
+zurueckgehen". Sie tun es. Ausgeloest hat die Nachpruefung der Lauf vom 2026-09-17
+(`evaluations/artifacts/feature_parity_rust_python.json`, Sonde erneut rot), gemeldet als
+fremder Befund in `PREREG_round_transition_search_sampling.md` par.17.7 (f) und in STATUS.
+
+**Geprueft** (einkernige Diagnoseskripte im Scratchpad, kein Wheel-Bau, Prozessliste vorher leer):
+
+1. Kreuztabelle ueber die GANZE Korpus-Grundmenge (n = 300 Zustaende aus 3 Dateien
+   `data/selfplay_v26-b01-policy_*.pkl`, Einheit Zustaende): 9 Zustaende tragen
+   `phantom_count > 0`, abweichend sind 2 (Index 101 und 265) -- beide gehoeren zu diesen 9.
+   Jede Abweichung ist genau 1 Wert in Kanal 76; kein anderer Kanal ist beteiligt.
+2. Zustand 101 nachgerechnet: Zelle (5,1) fordert blau, Musterreihe 5 haelt 3 blau, es fehlen
+   also 3. Ohne Phantom-Abzug bleiben 2 blau uebrig (nicht erreichbar, 0.0), mit Abzug 3
+   (erreichbar, 1.0) -- die Schwelle liegt exakt dazwischen. Der ziehende Spieler haelt
+   1 Phantom-Blau in Reihe 1.
+3. Haerter als die Zeitreihe: das MITGESPEICHERTE Feld `col_f_max` (`serialize.rs` Z.233-235,
+   aus derselben `remaining`-Variablen wie die Maske) trifft in beiden Zustaenden die ALTE
+   Formel exakt (12 von 12 Spaltenwerten) und die neue in keinem. Die Records sind also
+   nachweislich ohne Phantom-Abzug geschrieben, nicht nur ihrem Datum nach.
+4. Gegenprobe auf NEUEN Records (n = 600 Zustaende aus 6 Dateien
+   `data/selfplay_v28-b02-value-tempc_20260913_*.pkl`, erzeugt nach dem Fix): 15 Zustaende
+   mit `phantom_count > 0`, 0 Abweichungen.
+
+**Keiner der drei Kandidaten liegt falsch.** Der Rust-Bauer rechnet nach heutiger Formel, der
+Python-Zwilling liest, was im Record steht, und die Rekonstruktion ist unbeteiligt:
+`remaining_colors` liest Fabriken, grosse Fabrik, Musterreihen, Strafleiste und Kuppelraster,
+und die kommen vollstaendig aus dem JSON (Mondstapel MIT Farben, `serialize.rs` Z.205 und
+Z.950); Beutel und Turm liest sie ausdruecklich nicht. Der feste Seed 0 in `json_to_state` ist
+damit unbeteiligt. Auch der `dome_pool_view`-Verdacht aus par.17.7 (f) ist widerlegt: das Feld
+fehlt in ALLEN 300 Alt-Zustaenden, abweichend sind 2.
+
+**NEU, nicht in par.9: der Flachvergleich ist an dieser Stelle strukturell blind.** Dieselbe
+Formel steckt im Flachvektor, als `col_f_max` (6 Werte; `features.rs` Z.907 LIEST sie aus dem
+Record, `features.rs` Z.1371 RECHNET sie frisch). Die Sonde meldet flach 300/300 gruen -- aber
+nur, weil sie dort ZWEIMAL die gespeicherte Groesse vergleicht: der Python-Zwilling liest
+`col_f_max`, und der pyo3-Export `state_features_from_json` ruft den JSON-Pfad, der ebenfalls
+liest. In beiden betroffenen Zustaenden weicht der Wert tatsaechlich ab (`col_f_max[1]`: Record
+5, frische Formel 6). Fuer die Planes gibt es in Rust keinen JSON-Pfad (`state_planes_from_json`
+geht immer ueber `state_to_planes_direct`) -- nur deshalb faellt die Klasse dort auf. Ein Tor,
+das den `direct`-Pfad nie anfasst, kann sie nicht sehen.
+
+**Trainingsdaten: ja, beruehrt -- aber nicht durch einen falschen Wert, sondern durch eine
+nicht unterscheidbare Semantik.** Die Kette, jedes Glied geprueft:
+
+- Der Blockbau ruft die WEICHE `state_to_planes` (`corpus_dataset.py` Z.1269), also entscheidet
+  `MOSAIC_FEATURES_FROM_RUST` ueber den Inhalt der gecachten Planes: gesetzt = frisch gerechnet,
+  ungesetzt = Maske aus dem Record.
+- Der Schalter steht in KEINEM Schluesselbestandteil (`file_cache_key.py` Z.128-180 fuer den
+  Block, `corpus_dataset.py` Z.489-616 fuers Fenster) -- bewusst so (`docs/knobs.md` Z.202), aber
+  die Begruendung "beide Bauer sind bit-identisch" gilt auf Alt-Records seit dem 2026-09-12
+  nicht mehr.
+- Bloecke werden MEMOISIERT, nicht neu gebaut (`build_cache_incremental.py` Z.134-137). Ein Arm
+  erbt damit die Semantik dessen, der den Block zuerst gebaut hat, unabhaengig von der eigenen
+  Schalterstellung.
+- Innerhalb von v29 stand der Schalter uneinheitlich (`grep -c`): `night_v29_b02_b03.sh` Z.25
+  setzt ihn auf 1, `night_v29_chain.sh`, `night_v29_b04_moon_played_v2.sh` und
+  `night_v29_b06_minimal_core.sh` setzen ihn nicht.
+- Das v29-Fenster traegt 1.746 von 2.947 Dateien mit Zeitstempel VOR dem 2026-09-12 (selbst
+  gezaehlt gegen `data/window_v29.txt`, Einheit Dateien), darunter die 400 Sockel
+  `selfplay_v26-b01-policy_*`.
+- Kein Block ist am 2026-09-12, 09-15 oder 09-17 gebaut worden (14.846 Dateien
+  `data/.filecache_*.h5`, Zaehlung je Bautag: 09-09 208, 09-10 1.009, 09-11 3.587, 09-13 1.098,
+  09-14 5.997, 09-16 2.947). Der b06-Monolith vom 2026-09-17 hat also ausschliesslich
+  vorhandene Bloecke zusammengefuegt.
+- ABGELEITET, nicht gemessen: die 4.804 Bloecke vom 09-09 bis 09-11 entstanden unter INPUT_SIZE
+  755 (par.7) und sind unter dem heutigen 794 (`config.py` Z.49) nicht mehr adressierbar, weil
+  `INPUT_SIZE` im Blockschluessel steht.
+
+**Groessenordnung des Effekts:** betroffen sind nur Zustaende aus Records von vor dem
+2026-09-12, und dort nur die mit Phantom-Fliesen an genau dieser Schwelle: 2 von 300 Zustaenden
+(0,67 Prozent), je 1 Wert von 2.844. Das ist kein Grund, Bloecke zu verwerfen; es ist ein Grund,
+die Semantik nicht raten zu muessen.
+
+**Was daraus folgt, als Vorschlag, NICHT umgesetzt (Nutzer-Entscheid):** entweder eine
+FORMEL-VERSION in den Schluessel (dann trennen sich alte und neue Semantik sauber, um den Preis
+eines Neubaus), oder die gespeicherten Felder `cell_reachable_mask`/`col_f_max` aufgeben und
+ueberall frisch rechnen (dann gibt es die Klasse nicht mehr, um den Preis der Rechenzeit je
+Zustand), oder par.9s Vorschlag folgen und das Tor auf frische Zustaende beschraenken (dann
+bleibt die Klasse bestehen, wird aber nicht mehr gemeldet). Die dritte Variante ist die
+billigste und die einzige, die nichts repariert.
+
+## par.9b ENTSCHIEDEN (Nutzer 2026-09-17, "ja mach das"): Weg (1) aus par.9a ist GEBAUT
+
+Der Nutzer hat die erste der drei Varianten aus par.9a gewaehlt: eine FORMEL-VERSION der
+Merkmalsberechnung geht in BEIDE Cache-Schluessel, und `MOSAIC_FEATURES_FROM_RUST` wird in
+jeder Kette einheitlich gesetzt. Damit raet niemand mehr, welche Semantik in einem Block
+oder Monolithen liegt: sie steht im Schluessel.
+
+**Was gebaut ist (Dateien und Zeilen, Stand 2026-09-17):**
+
+- `config.py` Z.65-87: `FEATURE_FORMULA_VERSION = "a2phantom-20260912"`, additiv, mit der
+  Regel im Kommentar – wer eine Merkmalsformel aendert, die eine GESPEICHERTE Groesse
+  betrifft (heute `cell_reachable_mask`, `col_f_max`), zieht diese Version im selben Zug
+  hoch. `INPUT_SIZE` unberuehrt.
+- `engine/py/file_cache_key.py` Z.43-68: `_features_from_rust_key()` liest
+  `MOSAIC_FEATURES_FROM_RUST` SELBST aus der Umgebung (Muster `_moon_target_source_key()`,
+  Semantik wie `neural_net.py` Z.98: exakt "1"). Z.208-221: der Block-Schluessel haengt
+  `|featfmt_<VERSION>` und `|featsrc_rust` bzw. `|featsrc_record` UNBEDINGT an.
+- `engine/py/corpus_dataset.py` Z.625-648: derselbe Anteil im Fenster-Schluessel
+  (`+featfmt_...`, `+featsrc_rust`/`+featsrc_record`), ebenfalls unbedingt.
+- `mosaic_env_fingerprint` (`corpus_dataset.py`) brauchte KEINE Aenderung: er erhebt alle
+  gesetzten `MOSAIC_*`-Variablen automatisch, `MOSAIC_FEATURES_FROM_RUST` also mit.
+- `engine/src/knob_registry.rs` Z.160 (Doku-Text, kein Verhalten) und daraus neu erzeugt
+  `docs/knobs.md` Z.202: der Knopf ist nicht mehr als "NICHT im Cache-Schluessel"
+  registriert, die alte Begruendung ("beide Bauer bit-identisch") steht mit ihrem
+  Verfallsdatum dabei.
+- `tools/tests/test_cache_key_feature_formula_version.py` (neu, unittest): Formelversion und
+  Merkmalsquelle aendern BEIDE Schluessel, plus die Marker im Schluesselmaterial.
+- Ketten: `tools/night_v29_b06_minimal_core.sh` und `tools/night_v29_b04_moon_played_v2.sh`
+  setzen `export MOSAIC_FEATURES_FROM_RUST=1` im Kopfblock; die Regel dazu steht in
+  `docs/working_rules.md` (Abschnitt "Training und Korpus"). Historische `night_v29_*`-Skripte
+  sind unberuehrt.
+
+**Gemessene Folge (Beispielschluessel, Liste `data/selfplay_test-{a_0001,a_0002,b_0001}.pkl`,
+Einheit Fenster-Schluessel, Knoepfe auf Default):** `bea417f31e0e` -> `ba128e934a4a`.
+Nachgeprueft, dass sich NICHTS ausser den zwei neuen Markern bewegt hat: das
+Schluesselmaterial ohne `+featfmt_*+featsrc_record` ergibt exakt den alten Wert. Auf einer
+zweiten Liste mit `encoder=2d`, `nortv`: Block `8d676c734796` -> `0ddea578fc5d` (ungesetzt)
+bzw. `67d0e8b89c62` (`=1`), Fenster `3d455d48d960` -> `9251bb7d23bc` bzw. `ee6e64631180`.
+VORHER waren die beiden Schalterstellungen schluesselgleich – genau der Befund aus par.9a.
+
+**Gewollte Folge, vom Nutzer so entschieden:** alle vorhandenen Bloecke und Monolithe sind
+unter den neuen Schluesseln nicht mehr adressierbar. Der Neubau faellt mit dem
+INPUT_SIZE-Wechsel fuer den Arm v29-b07 ohnehin an. Der eingefrorene Default-Schluessel in
+`tools/tests/test_window_cache_key_planes_ablation.py` ist entsprechend nachgezogen (der
+Waechter verlangt dafuer ausdruecklich einen Prereg-Eintrag – das ist dieser hier).
+
+**Was Weg (1) NICHT tut:** er repariert das Paritaets-Tor nicht. Das Tor vergleicht auf
+Alt-Records weiter eine gespeicherte gegen eine neu gerechnete Groesse und ist im
+Flachvektor fuer dieselbe Klasse blind (par.9a). Wer es fuer eine Abnahme braucht, fahre es
+auf FRISCHEN Zustaenden; die Beschraenkung des Tors bleibt der offene Nutzer-Entscheid aus
+par.9.

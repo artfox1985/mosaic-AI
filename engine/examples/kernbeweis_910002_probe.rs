@@ -120,6 +120,12 @@ fn main() {
         // Wurzel einer Suche und nie in einem Struct-Literal.
         round_transition_leaf: mosaic_rust::net_mcts::ROUND_TRANSITION_LEAF_DEFAULT,
         round_transition_leaf_ctx: None,
+        // Netz-Stichentscheid im Tiling (PREREG_round_transition_search_
+        // sampling.md par.16.10): hier steht BEWUSST der Default 1 und nicht
+        // 0 -- der Bestand dieses Knopfs ist der eingeschaltete Zustand,
+        // gleiche Lage wie bei `moon_order_variants` darueber, und diese
+        // Sonde ist ein Byte-Identitaets-Nachweis.
+        net_tiling_tiebreak: mosaic_rust::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

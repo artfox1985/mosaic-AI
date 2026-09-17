@@ -46,7 +46,7 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 # PFLICHTSCHRITT beim Wheel-Bau von Abschnitt 16 (PREREG_stack_top_feature.md
 # par.17): diese Zeile im SELBEN Zug auf 794 setzen, in dem das neue Wheel
 # installiert wird -- vorher nicht, nachher nicht.
-INPUT_SIZE = 794        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13)
+INPUT_SIZE = 884        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13; +90 Tiling-Projektion Abschnitt 17, Variante C Arm v29-b07, PREREG_round_transition_search_sampling.md par.18, 2026-09-17)
                         # +11 Kuppelstapel-Wissen aus `dome_pool_view` (Praefixlaenge; eigene Bloecke Laenge/Spezial/Wild;
                         #  Typenfolge der obersten 4 Positionen des obersten eigenen Blocks; fremde Bloecke Laenge/Spezial/Wild)
                         #  -- Variante B, PREREG_dome_stack_information_sets.md par.7/par.15f, PREREG_v28_window.md par.6, 2026-09-11: 744 -> 755
@@ -61,6 +61,30 @@ NUM_ACTIONS = 406       # action_to_id Ausgabebereich (405 = dome_stack_peek: Ak
                         #  Pfade) + 6 use_chips + 4 bonus_chip + 1 dome_stack_peek = 406;
                         #  ersetzt die vorherige dome_slot_head/dome_rotation_head-
                         #  Prior-Faktorisierung, siehe net_mcts.rs::build_untried_actions)
+
+# --- VERSION DER MERKMALSFORMELN (2026-09-17, Nutzer-Entscheid Weg (1) aus
+#     PREREG_rust_data_layer.md par.9a) ---
+#
+# WAS SIE MARKIERT: den A2-Phantom-Abzug in `provocation::remaining_colors` bzw.
+# `still_reachable_colors` (Commit 2a0cf4bf, "Code-Abschluss Stufe 1",
+# PREREG_code_cleanup_closeout.md par.8 A2, 2026-09-12). Die Funktion zieht
+# seither die Phantom-Fliesen der Gegner-Reihen ab, die nie gezogen worden sind.
+# Von ihr haengen ZWEI GESPEICHERTE Groessen ab: `cell_reachable_mask`
+# (Planes-Kanal 76) und `col_f_max` (6 Flachvektor-Werte). Records von VOR dem
+# 2026-09-12 tragen die alte Zahl, der Rust-Bauer rechnet die neue -- beide
+# Bauer sind auf Alt-Records also NICHT mehr bit-identisch (par.9a: 2 von 300
+# Zustaenden, je 1 Wert in Kanal 76; auf frischen Records 0 von 600).
+#
+# WOZU SIE DIENT: sie steht in BEIDEN Cache-Schluesseln (Block:
+# `engine/py/file_cache_key.py`, Fenster: `engine/py/corpus_dataset.py
+# ::window_cache_key`) und trennt damit alte von neuer Semantik, statt sie
+# unter einem Namen zu memoisieren.
+#
+# REGEL: wer eine Merkmalsformel aendert, die eine GESPEICHERTE Groesse betrifft
+# (heute `cell_reachable_mask`, `col_f_max`), zieht diese Version im SELBEN Zug
+# hoch. Sonst adressieren zwei verschiedene Datensaetze denselben Schluessel --
+# dieselbe Fehlerklasse, die am 2026-09-14 b02s Monolithen gekostet hat.
+FEATURE_FORMULA_VERSION = "a2phantom-20260912"
 
 # --- TRAININGSPARAMETER NN ---
 BATCH_SIZE    = 256

@@ -68,6 +68,13 @@ PHASE_ORDER = ("start_placement", "drafting", "tiling", "scoring", "end", "final
 # von Abschnitt 16 installiert ist). Spiegel von `features.rs::SIGHT_VALUES`:
 # 755 + 39.
 LEN_WITH_SIGHT_APPENDIX = 794
+# Vektorlaenge MIT Abschnitt 17 (Tiling-Projektion, Variante C, Arm v29-b07;
+# = `features.rs::INPUT_SIZE`, sobald das Wheel von Abschnitt 17 installiert
+# ist). 794 + 90, mit `TILING_PROJECTION_VALUES` = 2 x (36 Zellen + 9 Slots) --
+# Spiegel von `features.rs::TILING_PROJECTION_VALUES`
+# (PREREG_round_transition_search_sampling.md par.18).
+TILING_PROJECTION_VALUES = 2 * (36 + 9)
+LEN_WITH_TILING_PROJECTION = LEN_WITH_SIGHT_APPENDIX + TILING_PROJECTION_VALUES
 # Hoechststand einer Farbe im Turm (`tower.rs`); die Prereg normiert /13.
 TOWER_COLOR_NORM = 13.0
 # Obergrenze fuer den BESTAND gehaltener Bonuschips: `BONUS_CHIPS_PER_ROUND`
@@ -628,7 +635,54 @@ def state_to_tensor_python(data):
     _fpn = data.get("first_player_next_round")
     features.append(1.0 if (_fpn is not None and int(_fpn) == _curr) else 0.0)
 
+    # SCHARFSCHALTUNG Abschnitt 17, dieselbe Schaltstelle wie oben: solange
+    # `config.INPUT_SIZE` unter 884 steht, endet der Vektor hier.
+    if INPUT_SIZE < LEN_WITH_TILING_PROJECTION:
+        return torch.tensor(features, dtype=torch.float32)
+
+    # 17. Tiling-Projektion (Variante C, Arm v29-b07,
+    # PREREG_round_transition_search_sampling.md par.18): 90 Werte ANS ENDE,
+    # Indizes 0..793 unveraendert. Je Spieler in Zugreihenfolge 36 Zellen "wird
+    # im Tiling DIESER Runde neu gefuellt" plus 9 Slots "wird in dieser Runde
+    # vollendet".
+    #
+    # DIESER EINE BLOCK IST KEIN PYTHON-ZWILLING (par.18.3 Punkt 4): er braucht
+    # den exakten Tiling-Loeser der Engine. Ein Nachbau hier waere eine ZWEITE
+    # Wahrheitsquelle fuer eine Spielregel -- genau das, was CLAUDE.md
+    # ("Spielregeln: in den Code schauen, nie ableiten") und die Lehre aus den
+    # symmetrischen Defekten verbieten. Gerufen wird dieselbe Funktion, die der
+    # Rust-Pfad nutzt; die 90 Werte sind damit bitgleich per Konstruktion.
+    #
+    # Ein fehlendes oder zu altes Wheel ist ein HARTER Fehler und KEIN stiller
+    # Nullblock: ein Nullblock unter dem 884er-Cache-Schluessel waere die
+    # Umkehrung des Unfalls vom 2026-09-11 und genauso unsichtbar.
+    features.extend(_tiling_projection_values(data))
+
     return torch.tensor(features, dtype=torch.float32)
+
+
+def _tiling_projection_values(data):
+    """Die 90 Werte von Abschnitt 17 aus dem Wheel (siehe Begruendung oben).
+
+    Spiegelt `features.rs::tiling_projection_from_json`: derselbe Loeser, dieselbe
+    Reihenfolge, dieselbe Nulltoleranz fuer Alt-Snapshots (die faellt in Rust,
+    nicht hier -- hier ist ein FEHLENDER Export der harte Fehler).
+    """
+    import mosaic_rust
+    if not hasattr(mosaic_rust, "tiling_projection_values_from_json"):
+        raise RuntimeError(
+            "Das installierte Wheel kennt `tiling_projection_values_from_json` nicht, "
+            "config.INPUT_SIZE steht aber schon auf >= %d (Abschnitt 17, Arm v29-b07). "
+            "Wheel neu bauen und installieren -- ein Nullblock waere ein stiller "
+            "Cache-Unfall." % LEN_WITH_TILING_PROJECTION
+        )
+    _v = mosaic_rust.tiling_projection_values_from_json(json.dumps(data))
+    if len(_v) != TILING_PROJECTION_VALUES:
+        raise RuntimeError(
+            "tiling_projection_values_from_json lieferte %d Werte, erwartet %d"
+            % (len(_v), TILING_PROJECTION_VALUES)
+        )
+    return _v
 
 
 # --- 2D-Encoder-Skelett (Task #11, Phase 1) --------------------------------

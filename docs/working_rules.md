@@ -152,6 +152,19 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   `cli_args.fast_loader` und `laufzeit.lader` (das b03-Manifest 002718 noch
   nicht: Lauf startete vor dem Fix).
 
+- **Jede Kette setzt `MOSAIC_FEATURES_FROM_RUST=1` ausdruecklich im Kopfblock**
+  (Nutzer-Entscheid 2026-09-17, `PREREG_rust_data_layer.md` par.9a/par.9b). Der
+  Schalter entscheidet, welcher Bauer den Inhalt der gecachten Merkmale liefert:
+  `features.rs` rechnet die Erreichbarkeits-Groessen frisch, der Python-Zwilling
+  LIEST sie aus dem Record. Auf Records von vor dem 2026-09-12 (A2-Phantom-Fix)
+  sind die beiden nicht mehr bit-identisch, und weil Bloecke memoisiert werden,
+  erbt ein Arm sonst die Semantik dessen, der den Block zuerst gebaut hat.
+  Er steht darum seit dem 2026-09-17 in BEIDEN Cache-Schluesseln (Block und
+  Fenster), gemeinsam mit `config.FEATURE_FORMULA_VERSION` – wer eine
+  Merkmalsformel aendert, die eine GESPEICHERTE Groesse betrifft
+  (`cell_reachable_mask`, `col_f_max`), zieht diese Version im selben Zug hoch.
+  Anlass war, dass der Schalter innerhalb von v29 uneinheitlich stand: gesetzt
+  in `night_v29_b02_b03.sh`, ungesetzt in drei weiteren Ketten.
 - **Zwei gleichzeitige Aenderungen brauchen den Kontrollarm auf der
   UNVERAENDERTEN Achse.** Praezedenz: Ownership-Kopf einschalten plus
   Korpuswechsel -- ohne den w0-Kontrollarm auf DEMSELBEN Korpus sind Kopf und

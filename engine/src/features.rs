@@ -15,10 +15,11 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 794; // 755 + 39 Sicht-Anbau (Abschnitt 16, Sicht-Arm v29-b03, 2026-09-13)
+pub const INPUT_SIZE: usize = 884; // 794 + 90 Tiling-Projektion (Abschnitt 17, Arm v29-b07, 2026-09-17)
 // 714 + 8 Plattentyp-Sicht + 10 Strafleisten-Farben + 12 Phantom-Anteile = 744
 // (Abschnitte 12-14, v24-b04, 2026-09-05); + 11 Abschnitt 15 = 755;
-// + 39 Abschnitt 16 (Sicht-Anbau v29-b03) = 794.
+// + 39 Abschnitt 16 (Sicht-Anbau v29-b03) = 794;
+// + 90 Abschnitt 17 (Tiling-Projektion, Variante C, v29-b07) = 884.
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -581,6 +582,90 @@ fn sight_values_from_state(state: &GameState) -> SightValues {
     s
 }
 
+// == Abschnitt 17: Tiling-Projektion (Variante C, Arm v29-b07) ===============
+//
+// `PREREG_round_transition_search_sampling.md` par.18. Variante B hat die SUCHE
+// das Tiling sehen lassen und ist negativ (par.17.9); Variante C gibt dem NETZ
+// das projizierte Raster als Eingabe. 45 Werte je Spieler, in Zugreihenfolge
+// (Spieler am Zug zuerst, wie die Abschnitte 5, 6, 13, 14 und 16):
+//
+//   36 Zellen "wird im Tiling DIESER Runde neu gefuellt" (0/1)
+//    9 Slots  "wird in dieser Runde vollendet" (0/1)
+//
+// KEINE Skalare (Nutzer-Einwand 2026-09-17, par.18.1): die projizierten
+// Rundenpunkte stehen als `estimated_score` schon im Spielerblock (Abschnitt 5),
+// und ein Punkt-Skalar am Blattwert ist als K4 gemessen negativ
+// (`PREREG_round_estimate_leaf_term.md` par.7c/7d).
+//
+// Wahrheitsquelle ist der BESTEHENDE Loeser
+// (`tiling_solver::project_max_tiling`, dieselbe Rekursion wie
+// `solve_max_tiling_points`) -- dieselbe Vorschau, die die Anzeige als
+// `tiling_potenzial` zeigt. Sie gilt in jeder Phase; mitten im Drafting ist sie
+// das Tiling der bis hier VOLLEN Musterreihen.
+
+/// Laenge des Anhangs aus Abschnitt 17: je Spieler 36 Zellen plus 9 Slots.
+pub const TILING_PROJECTION_VALUES: usize =
+    2 * (crate::tiling_solver::PROJECTION_CELLS + crate::tiling_solver::PROJECTION_SLOTS);
+
+/// Haengt die 90 Werte aus Abschnitt 17 an: je Spieler in Zugreihenfolge erst
+/// die 36 Zellen (Slot-Zeile, Slot-Spalte, Space-Index), dann die 9 Slots.
+fn push_tiling_projection(f: &mut Vec<f32>, per_player: &[crate::tiling_solver::TilingProjection; 2]) {
+    for proj in per_player {
+        for cell in proj.newly_filled {
+            f.push(if cell { 1.0 } else { 0.0 });
+        }
+        for slot in proj.newly_completed {
+            f.push(if slot { 1.0 } else { 0.0 });
+        }
+    }
+}
+
+/// Projektion beider Spieler aus dem `GameState`, Spieler am Zug zuerst.
+fn tiling_projection_from_state(state: &GameState) -> [crate::tiling_solver::TilingProjection; 2] {
+    let curr = state.current_player.min(1);
+    [
+        crate::tiling_solver::project_max_tiling(state, curr),
+        crate::tiling_solver::project_max_tiling(state, 1 - curr),
+    ]
+}
+
+/// Projektion beider Spieler aus dem Record (`state_to_json`).
+///
+/// Der Loeser braucht einen `GameState`, und ein RECORD-FELD ist hier bewusst
+/// NICHT der Weg: ein neues Feld wuerde erst eine Generation spaeter wirken
+/// (Praezedenz P.12, `PREREG_stack_top_feature.md` par.17). Stattdessen dieselbe
+/// Route, die der Planes-Export und der Shaping-Export schon fahren
+/// (`lib.rs::state_planes_from_json`, `lib.rs::scoring_shaping_e_json`):
+/// `json_to_state` mit festem Seed 0. Der RNG mischt dort ausschliesslich
+/// verdeckte Bestaende (Beutel, Turm, Kuppelstapel, Chip-Vorrat) -- die
+/// Projektion liest davon nichts, sie haengt allein an `state.players[..]`
+/// (Herleitung im Kommentarblock ueber `tiling_solver::TilingKey`). Bewacht wird
+/// das von `direct_matches_json_path_*`: beide Pfade muessen Wert fuer Wert
+/// gleich sein.
+///
+/// Scheitert die Rekonstruktion (Alt-Schnappschuss ohne ein Pflichtfeld),
+/// bleiben alle 90 Werte 0 -- dieselbe Toleranz wie in den Abschnitten 15/16,
+/// also "Merkmal aus" statt einer erfundenen Projektion.
+fn tiling_projection_from_json(v: &Value) -> [crate::tiling_solver::TilingProjection; 2] {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let mut rng = StdRng::seed_from_u64(0);
+    match crate::serialize::json_to_state(v, &mut rng) {
+        Ok(state) => tiling_projection_from_state(&state),
+        Err(_) => [crate::tiling_solver::TilingProjection::default(); 2],
+    }
+}
+
+/// NUR die 90 Werte von Abschnitt 17, aus dem Record -- der Block, den der
+/// Python-Zwilling aus dem Wheel holt (`lib.rs::tiling_projection_values_from_json`,
+/// par.18.3 Punkt 4). Bitgleich zu dem, was `state_to_features` anhaengt: es ist
+/// derselbe Aufruf.
+pub fn tiling_projection_values_from_json(v: &Value) -> Vec<f32> {
+    let mut f: Vec<f32> = Vec::with_capacity(TILING_PROJECTION_VALUES);
+    push_tiling_projection(&mut f, &tiling_projection_from_json(v));
+    f
+}
+
 /// Vollständiger Feature-Vektor aus dem State-Dict (`state_to_json`).
 pub fn state_to_features(v: &Value) -> Vec<f32> {
     let mut f: Vec<f32> = Vec::with_capacity(INPUT_SIZE);
@@ -1015,6 +1100,12 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
     // fehlt eines (Alt-Records vor v29), bleibt der zugehoerige Wert 0.
     push_sight_values(&mut f, &sight_values_from_json(v));
 
+    // 17. Tiling-Projektion (Variante C, Arm v29-b07) -- siehe
+    // `push_tiling_projection` fuer die Belegung der 90 Indizes. Quelle ist der
+    // Loeser auf dem ueber `json_to_state` rekonstruierten Zustand, nicht ein
+    // Record-Feld (Begruendung an `tiling_projection_from_json`).
+    push_tiling_projection(&mut f, &tiling_projection_from_json(v));
+
     f
 }
 
@@ -1448,6 +1539,10 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     // denselben Sichtregeln; die `direct_matches_json_path_*`-Tests bewachen
     // die Gleichheit.
     push_sight_values(&mut f, &sight_values_from_state(state));
+
+    // 17. Tiling-Projektion (Variante C) -- siehe JSON-Pfad. Hier direkt aus dem
+    // Zustand; der JSON-Pfad rekonstruiert sich denselben Zustand erst.
+    push_tiling_projection(&mut f, &tiling_projection_from_state(state));
 
     f
 }
@@ -1986,6 +2081,11 @@ mod tests {
     /// neuen Werte nie sehen (`Net::build_inputs` kuerzt auf die vom
     /// MODELL deklarierte Laenge).
     const LEN_BEFORE_SIGHT_APPENDIX: usize = 755;
+    /// Vektorlaenge VOR Abschnitt 17 (Tiling-Projektion, Variante C, v29-b07);
+    /// die Champions v28-b02 (755) und die v29-Arme (794) duerfen die 90 neuen
+    /// Werte nie sehen -- `Net::build_inputs` kuerzt auf die vom MODELL
+    /// deklarierte Laenge.
+    const LEN_BEFORE_TILING_PROJECTION: usize = 794;
 
     /// Spielt ab einem frischen Start bis zu `steps` zufällige, legale
     /// Drafting-Züge und sammelt den Zustand NACH jedem Zug (inkl. des
@@ -2307,7 +2407,7 @@ mod tests {
     #[test]
     fn sight_appendix_is_appended_after_755() {
         assert_eq!(
-            INPUT_SIZE - LEN_BEFORE_SIGHT_APPENDIX,
+            LEN_BEFORE_TILING_PROJECTION - LEN_BEFORE_SIGHT_APPENDIX,
             SIGHT_VALUES,
             "Abschnitt 16 ist genau {SIGHT_VALUES} Werte lang"
         );
@@ -2316,7 +2416,9 @@ mod tests {
             for (i, s) in random_drafting_states(seed, 40).into_iter().enumerate() {
                 let f = state_to_features_direct(&s);
                 assert_eq!(f.len(), INPUT_SIZE, "seed={seed} step={i}: Laenge");
-                for (j, x) in f[LEN_BEFORE_SIGHT_APPENDIX..].iter().enumerate() {
+                // Nur der 16er-Bereich; Abschnitt 17 dahinter hat eigene Grenzen
+                // (`tiling_projection_is_appended_after_794`).
+                for (j, x) in f[LEN_BEFORE_SIGHT_APPENDIX..LEN_BEFORE_TILING_PROJECTION].iter().enumerate() {
                     assert!(
                         (0.0..=1.0).contains(x),
                         "seed={seed} step={i}: Abschnitt-16-Wert {j} ausserhalb [0, 1]: {x}"
@@ -2520,6 +2622,102 @@ mod tests {
                 for k in 0..LEN_BEFORE_SIGHT_APPENDIX {
                     assert_eq!(f[k], via_json[k], "{ctx}: Altwert #{k} weicht ab");
                 }
+            }
+        }
+    }
+
+    /// Additivitaets-Regel (2D-Encoder-Regel, docs/architecture_reference.md):
+    /// Abschnitt 17 haengt HINTER den 794 Werten der v29-Arme und ist genau
+    /// [`TILING_PROJECTION_VALUES`] lang. Zusaetzlich der Nachweis, dass nichts
+    /// VERSCHOBEN wurde: der 39er-Block von Abschnitt 16 steht Wert fuer Wert
+    /// weiter an den Indizes 755..794.
+    #[test]
+    fn tiling_projection_is_appended_after_794() {
+        assert_eq!(
+            INPUT_SIZE - LEN_BEFORE_TILING_PROJECTION,
+            TILING_PROJECTION_VALUES,
+            "Abschnitt 17 ist genau {TILING_PROJECTION_VALUES} Werte lang"
+        );
+        assert_eq!(TILING_PROJECTION_VALUES, 90, "Zuschnitt laut Prereg par.18: 2 x (36 + 9)");
+        for seed in 0..4u64 {
+            for (i, s) in random_drafting_states(seed, 40).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let f = state_to_features_direct(&s);
+                assert_eq!(f.len(), INPUT_SIZE, "{ctx}: Laenge");
+                for (j, x) in f[LEN_BEFORE_TILING_PROJECTION..].iter().enumerate() {
+                    assert!(
+                        *x == 0.0 || *x == 1.0,
+                        "{ctx}: Abschnitt-17-Wert {j} ist weder 0 noch 1: {x}"
+                    );
+                }
+                let mut sight = Vec::new();
+                push_sight_values(&mut sight, &sight_values_from_state(&s));
+                assert_eq!(
+                    &f[LEN_BEFORE_SIGHT_APPENDIX..LEN_BEFORE_TILING_PROJECTION],
+                    sight.as_slice(),
+                    "{ctx}: Abschnitt 16 ist verschoben"
+                );
+            }
+        }
+    }
+
+    /// Sichtgleichheit gegen die WAHRHEITSQUELLE: jeder der 90 Werte ist genau
+    /// das, was `tiling_solver::project_max_tiling` fuer diesen Spieler sagt --
+    /// und zwar in Zugreihenfolge (Spieler am Zug zuerst). Geprueft in BEIDEN
+    /// Encoder-Pfaden ueber mindestens 300 Zustaende.
+    #[test]
+    fn tiling_projection_matches_the_solver_in_both_paths() {
+        let base = LEN_BEFORE_TILING_PROJECTION;
+        let cells = crate::tiling_solver::PROJECTION_CELLS;
+        let slots = crate::tiling_solver::PROJECTION_SLOTS;
+        let mut checked = 0usize;
+        let mut saw_fill = false;
+        for seed in 0..12u64 {
+            for (i, s) in random_drafting_states(seed, 60).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let f = state_to_features_direct(&s);
+                let via_json = state_to_features(&state_to_json(&s, true));
+                let curr = s.current_player.min(1);
+                for (slot_of_vector, pi) in [curr, 1 - curr].into_iter().enumerate() {
+                    let proj = crate::tiling_solver::project_max_tiling(&s, pi);
+                    let off = base + slot_of_vector * (cells + slots);
+                    for c in 0..cells {
+                        let want = if proj.newly_filled[c] { 1.0 } else { 0.0 };
+                        assert_eq!(f[off + c], want, "{ctx}: Zelle {c} von Spieler {pi}");
+                        assert_eq!(via_json[off + c], want, "{ctx}: Zelle {c} (JSON-Pfad)");
+                        if want == 1.0 {
+                            saw_fill = true;
+                        }
+                    }
+                    for sl in 0..slots {
+                        let want = if proj.newly_completed[sl] { 1.0 } else { 0.0 };
+                        assert_eq!(f[off + cells + sl], want, "{ctx}: Slot {sl} von Spieler {pi}");
+                        assert_eq!(via_json[off + cells + sl], want, "{ctx}: Slot {sl} (JSON-Pfad)");
+                    }
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked >= 300, "nur {checked} Zustaende geprueft, >= 300 gefordert");
+        assert!(saw_fill, "kein einziger Zustand fuellt eine Zelle -- leer gruen");
+    }
+
+    /// Der EINZELN exportierte Block (den der Python-Zwilling aus dem Wheel
+    /// holt) ist Wert fuer Wert der Schwanz des vollen Vektors -- sonst koennten
+    /// Rust-Pfad und Zwilling auseinanderlaufen, ohne dass es auffaellt.
+    #[test]
+    fn projection_export_matches_the_vector_tail() {
+        for seed in 0..4u64 {
+            for (i, s) in random_drafting_states(seed, 30).into_iter().enumerate() {
+                let v = state_to_json(&s, true);
+                let full = state_to_features(&v);
+                let block = tiling_projection_values_from_json(&v);
+                assert_eq!(block.len(), TILING_PROJECTION_VALUES, "seed={seed} step={i}: Laenge");
+                assert_eq!(
+                    &full[LEN_BEFORE_TILING_PROJECTION..],
+                    block.as_slice(),
+                    "seed={seed} step={i}: Export weicht vom Vektor ab"
+                );
             }
         }
     }

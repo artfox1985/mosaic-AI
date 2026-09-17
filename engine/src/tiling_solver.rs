@@ -354,6 +354,11 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashMap::new());
     static ENDAWARE_CACHE: std::cell::RefCell<std::collections::HashMap<TilingKeyEndaware, i32>> =
         std::cell::RefCell::new(std::collections::HashMap::new());
+    /// Variante C (par.18): Memoisierung der RASTER-Projektion, derselbe
+    /// Schluessel und derselbe Knopf (`MOSAIC_TILING_CACHE`) wie der
+    /// Punkt-Cache. Eigene Map, damit der Punkt-Cache unberuehrt bleibt.
+    static PROJECTION_CACHE: std::cell::RefCell<std::collections::HashMap<TilingKey, TilingProjection>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
     static PLAIN_STATS: std::cell::RefCell<std::collections::HashMap<TilingKey, u32>> =
         std::cell::RefCell::new(std::collections::HashMap::new());
     static ENDAWARE_STATS: std::cell::RefCell<std::collections::HashMap<TilingKeyEndaware, u32>> =
@@ -471,6 +476,7 @@ pub(crate) fn set_cache_override_for_test(v: Option<bool>) {
 pub(crate) fn clear_tiling_caches_for_test() {
     PLAIN_CACHE.with(|c| c.borrow_mut().clear());
     ENDAWARE_CACHE.with(|c| c.borrow_mut().clear());
+    PROJECTION_CACHE.with(|c| c.borrow_mut().clear());
     PLAIN_STATS.with(|c| c.borrow_mut().clear());
     ENDAWARE_STATS.with(|c| c.borrow_mut().clear());
 }
@@ -500,6 +506,174 @@ pub fn solve_round_final_score(state: &GameState, pi: usize) -> i32 {
     // uninstrumentiert (siehe dortige Regel "keine Rekursion einzeln zaehlen").
     crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::TilingSolver, || {
         cached_plain(state, pi)
+    })
+}
+
+// ── Variante C: das Tiling als RASTER statt als Punktwert ────────────────────
+//
+// `PREREG_round_transition_search_sampling.md` par.18 (Arm v29-b07). Der
+// Bestand liefert von der Projektion "wie saehe das Tiling aus, wenn es JETZT
+// stattfaende" nur die PUNKTE (`solve_max_tiling_points`, ueber
+// `solve_round_final_score` auch als Punktevorschau der Anzeige und als
+// Encoder-Merkmal `estimated_score`). Der Encoder-Arm braucht die GEOMETRIE:
+// welche Zellen der Kuppel dieses Tiling fuellt und welche Platten es
+// vollendet.
+//
+// KEIN zweiter Solver: dieselbe Rekursion wie `solve_rec` (gleiche
+// Schrittliste, GREEDY-Chips, gleiches `NODE_BUDGET`, gleiche
+// Abbruchbedingungen), die zusaetzlich die Belegung des punktemaximalen
+// Blattes mitfuehrt. Der Punktwert ist dadurch per Konstruktion derselbe --
+// `projection_points_match_the_solver` haelt das fest.
+
+/// Zellen eines Kuppelrasters: 9 Slots mal 4 Felder.
+pub const PROJECTION_CELLS: usize = 36;
+/// Slots eines Kuppelrasters (3 mal 3).
+pub const PROJECTION_SLOTS: usize = 9;
+
+/// Was das punktemaximale Tiling des AKTUELLEN Zustands am Brett des Spielers
+/// veraendert. Beide Masken sind DELTAS gegen den heutigen Stand: sie stehen
+/// nur dort auf `true`, wo der Zustand vorher NICHT schon so war (der heutige
+/// Fuellstand steht im Encoder ohnehin, siehe par.18.1).
+///
+/// Zellenreihenfolge: Slot-Zeile, Slot-Spalte, Space-Index (`slot * 4 + si`),
+/// also dieselbe Linearisierung wie `tiling_outcome_signature`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TilingProjection {
+    /// Zelle wird in diesem Tiling neu gefuellt (Spezialfliesen eingeschlossen).
+    pub newly_filled: [bool; PROJECTION_CELLS],
+    /// Kuppelplatte wird in diesem Tiling vollendet (alle vier Felder belegt).
+    /// Freischaltung und Abrechnung des Spezialfelds fallen damit zusammen:
+    /// `try_unlock_special` (dome.rs) und `check_special_trigger`
+    /// (round_end.rs) laufen beide innerhalb DESSELBEN `execute_full_tiling`.
+    pub newly_completed: [bool; PROJECTION_SLOTS],
+    /// Punkte dieses Tilings -- identisch zu `solve_max_tiling_points`.
+    pub points: i32,
+}
+
+impl Default for TilingProjection {
+    fn default() -> Self {
+        TilingProjection {
+            newly_filled: [false; PROJECTION_CELLS],
+            newly_completed: [false; PROJECTION_SLOTS],
+            points: 0,
+        }
+    }
+}
+
+/// Absoluter Belegungsstand eines Bretts: je Zelle `is_filled`, je Slot "alle
+/// vier Felder belegt". Ein Slot ohne Kuppelplatte bleibt in beiden Masken 0.
+fn board_masks(player: &PlayerBoard) -> ([bool; PROJECTION_CELLS], [bool; PROJECTION_SLOTS]) {
+    let mut filled = [false; PROJECTION_CELLS];
+    let mut complete = [false; PROJECTION_SLOTS];
+    for sr in 0..3 {
+        for sc in 0..3 {
+            let slot_idx = sr * 3 + sc;
+            if let Some(tile) = &player.dome_grid.dome_slots[sr][sc] {
+                let mut all = true;
+                for si in 0..4 {
+                    let f = tile.spaces.get(si).is_some_and(|sp| sp.is_filled());
+                    filled[slot_idx * 4 + si] = f;
+                    if !f {
+                        all = false;
+                    }
+                }
+                complete[slot_idx] = all;
+            }
+        }
+    }
+    (filled, complete)
+}
+
+/// Zwilling von `solve_rec` (`exact = false`, also GREEDY-Chips wie der
+/// Hot-Path), der neben den Punkten die Belegung des besten Blattes
+/// zurueckgibt. Gleichstand faellt wie dort auf den ZUERST gefundenen
+/// maximalen Pfad (strikt `>`), die Auswahl ist damit deterministisch.
+fn project_rec(
+    state: &GameState,
+    pi: usize,
+    depth: u32,
+    budget: &mut u32,
+) -> (i32, [bool; PROJECTION_CELLS], [bool; PROJECTION_SLOTS]) {
+    let (filled_here, complete_here) = board_masks(&state.players[pi]);
+    if depth >= MAX_DEPTH || *budget == 0 {
+        return (0, filled_here, complete_here);
+    }
+    *budget -= 1;
+    let steps = legal_steps(state, pi, false);
+    if steps.is_empty() {
+        return (0, filled_here, complete_here);
+    }
+    // Baseline 0 = „hier aufhoeren" mit dem Brett, wie es steht -- dieselbe
+    // Baseline wie in `solve_rec`.
+    let mut best = (0, filled_here, complete_here);
+    for step in &steps {
+        if *budget == 0 {
+            break;
+        }
+        if let Some((next, pts)) = apply_step(state, pi, step) {
+            let (sub, filled, complete) = project_rec(&next, pi, depth + 1, budget);
+            let total = pts + sub;
+            if total > best.0 {
+                best = (total, filled, complete);
+            }
+        }
+    }
+    best
+}
+
+fn compute_projection(state: &GameState, pi: usize) -> TilingProjection {
+    let (filled_now, complete_now) = board_masks(&state.players[pi]);
+    let mut budget = NODE_BUDGET;
+    let (points, filled_after, complete_after) = project_rec(state, pi, 0, &mut budget);
+    let mut newly_filled = [false; PROJECTION_CELLS];
+    let mut newly_completed = [false; PROJECTION_SLOTS];
+    for (out, (after, now)) in newly_filled.iter_mut().zip(filled_after.iter().zip(filled_now.iter())) {
+        *out = *after && !*now;
+    }
+    for (out, (after, now)) in
+        newly_completed.iter_mut().zip(complete_after.iter().zip(complete_now.iter()))
+    {
+        *out = *after && !*now;
+    }
+    TilingProjection { newly_filled, newly_completed, points }
+}
+
+fn cached_projection(state: &GameState, pi: usize) -> TilingProjection {
+    if !cache_enabled() {
+        return compute_projection(state, pi);
+    }
+    // DERSELBE Schluessel wie der Punkt-Cache: die Projektion haengt an genau
+    // denselben Feldern (Herleitung im Kommentarblock ueber `TilingKey`), weil
+    // sie dieselbe Rekursion auf demselben `PlayerBoard` fuehrt.
+    let key = tiling_key(&state.players[pi]);
+    if let Some(v) = PROJECTION_CACHE.with(|c| c.borrow().get(&key).copied()) {
+        return v;
+    }
+    let v = compute_projection(state, pi);
+    PROJECTION_CACHE.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() >= CACHE_CAP {
+            c.clear();
+        }
+        c.insert(key, v);
+    });
+    v
+}
+
+/// Projektion des punktemaximalen Tilings auf dem AKTUELLEN Zustand (par.18):
+/// Raster und vollendete Platten, nicht nur der Punktwert.
+///
+/// Gilt in JEDER Phase -- der Solver kennt kein Phasen-Gatter (`legal_steps` ->
+/// `generate_tiling_actions`/`validate_tiling_action` lesen nur
+/// `state.players[..]`, Legalitaetskriterium ist `row.is_complete()`). Mitten
+/// im Drafting ist das Ergebnis also "das Tiling der bis hier VOLLEN
+/// Musterreihen"; Teilreihen bleiben liegen. Genau diese Vorschau rechnet die
+/// Anzeige heute als `tiling_potenzial` (lib.rs) und der Encoder als
+/// `estimated_score` (features.rs Abschnitt 5).
+pub fn project_max_tiling(state: &GameState, pi: usize) -> TilingProjection {
+    // Dieselbe Profiling-Kategorie wie die beiden anderen Einstiege (Task #32).
+    crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::TilingSolver, || {
+        cached_projection(state, pi)
     })
 }
 
@@ -855,7 +1029,35 @@ fn best_first_step_round5(state: &GameState, pi: usize) -> Option<TilingStep> {
 /// Abschluessen mit (nahezu) IDENTISCHEN Punkten -- deshalb hier bewusst als
 /// Multiplikation und nicht als additiver Shaping-Term wie bei
 /// `TILING_SHAPING_ENABLED` implementiert.
-pub const NET_TILING_TIEBREAK_ENABLED: bool = true;
+///
+/// SEIT 2026-09-17 EIN KNOPF statt einer Konstanten
+/// (`PREREG_round_transition_search_sampling.md` par.16.10, Nutzer: "tiling
+/// stichentscheid als knopf bauen und im A/B messen"): Umgebungsvariable
+/// `MOSAIC_NET_TILING_TIEBREAK`, Spec-Feld `net_tiling_tiebreak` je Seite,
+/// Muster `round_transition_leaf`. Der Default ist der BESTAND, also `1` --
+/// die Umstellung ist damit bitidentisch, und alles bisher Gemessene bleibt
+/// gueltig. Der Wert wird NICHT hier aus der Umgebung gelesen, sondern als
+/// Parameter durchgereicht (siehe
+/// [`best_first_step_exact_or_valued_envelope`]): er gehoert der SEITE, und ein
+/// prozessweiter Getter waere fuer ein A/B im selben Prozess unbrauchbar.
+///
+/// Anlass der Messung: die Stufe-0-Sonde (par.16.9c) hat gezaehlt, dass der
+/// Zweig die exakte lokale Rechnung zu rund 70 Prozent FALSCH ueberstimmt.
+pub const NET_TILING_TIEBREAK_DEFAULT: u32 = 1;
+/// Der ausgeschaltete Wert des Knopfs: der Stichentscheid entfaellt, es
+/// entscheiden die exakten Punkte (bzw. der bereinigte Score in
+/// [`best_first_step_envelope_valued`]). Benannte Konstante statt einer nackten
+/// `0`, gleiche Disziplin wie `ROUND_TRANSITION_LEAF_ON` in `net_mcts.rs`.
+pub const NET_TILING_TIEBREAK_OFF: u32 = 0;
+
+/// Wendet der Knopf den Stichentscheid auf diese Runde an? EINE Stelle fuer
+/// beide Leser ([`best_first_step_exact_or_valued_envelope`] und
+/// [`best_first_step_envelope_valued`]), damit das Rundenfenster `2..=4` nicht
+/// zweimal dasteht und still auseinanderlaufen kann.
+#[inline]
+pub fn net_tiling_tiebreak_applies(mode: u32, round_number: u32) -> bool {
+    mode != NET_TILING_TIEBREAK_OFF && (2..=4).contains(&round_number)
+}
 
 /// `k` fuer `top_k_tilings` beim netz-gefuehrten Stichentscheid -- identisch
 /// zur Messung in `tiling_candidate_spread.json` (dort mit `k=12` erhoben),
@@ -971,7 +1173,7 @@ fn select_best_tiling_candidate(
 // NACH dem vollstaendigen Abschluss, state.scoring_tile_ids).total` addiert,
 // und nach dieser SUMME gewaehlt -- siehe `best_first_step_plate_valued`.
 //
-// UNTERSCHIED zu `NET_TILING_TIEBREAK_ENABLED` (oben): dieser Zweig deckt
+// UNTERSCHIED zu `net_tiling_tiebreak` (oben): dieser Zweig deckt
 // Runde 1 MIT ab (Rundenfenster 1..=4, siehe `best_first_step_exact_or_valued`
 // unten). Der bestehende Runde-1-Ausschluss des Netz-Stichentscheids ist gegen
 // einen GELERNTEN Proxy begruendet (Value-Head-RMSE, siehe dessen Doku) --
@@ -1389,7 +1591,7 @@ pub fn best_first_step_valued(
 /// 1. `MOSAIC_TILING_PLATTEN_W != 0` UND Runde in `1..=4` ->
 ///    `best_first_step_plate_valued` (Task #100, additive Endwertungs-Summe,
 ///    KEIN Netz noetig). Liefert das `Some`, ist der Zug entschieden.
-/// 2. Sonst: `NET_TILING_TIEBREAK_ENABLED` UND Runde in `2..=4` UND ein
+/// 2. Sonst: `net_tiling_tiebreak` UND Runde in `2..=4` UND ein
 ///    Evaluator vorhanden -> `best_first_step_valued` (Task #20, Netz-
 ///    Stichentscheid `punkte * P(Sieg)` bzw. `P(Sieg)`).
 /// 3. Sonst: `best_first_step_exact` -- deckt Runde >= 5 selbst ab
@@ -1520,6 +1722,7 @@ pub fn best_first_step_exact_or_valued_ex(
 ) -> TilingStep {
     best_first_step_exact_or_valued_envelope(
         state, pi, evaluator, own_marg, &crate::envelope::EnvelopeTilingParams::OFF, None,
+        NET_TILING_TIEBREAK_DEFAULT,
     )
 }
 
@@ -1542,6 +1745,12 @@ pub fn best_first_step_exact_or_valued_ex(
 /// `margin_evaluator` (vorhergesagte Endmarge am Endzustand des Kandidaten,
 /// `self_play::net_tiling_margin_value`); der multiplikative Stichentscheid
 /// entfaellt dann (Gleichstand -> erster Kandidat).
+/// par.16.10: `net_tiling_tiebreak` ist der Knopf DIESER SEITE
+/// (`MOSAIC_NET_TILING_TIEBREAK` / Spec-Feld `net_tiling_tiebreak`,
+/// [`NET_TILING_TIEBREAK_DEFAULT`] = Bestand). Er kommt als Parameter herein
+/// und nicht aus einem Env-Getter, weil ein prozessweiter Wert fuer ein A/B
+/// im selben Prozess unbrauchbar waere (gleiche Begruendung wie bei
+/// `heuristic_variant` in `SearchConfig`).
 pub fn best_first_step_exact_or_valued_envelope(
     state: &GameState,
     pi: usize,
@@ -1549,6 +1758,7 @@ pub fn best_first_step_exact_or_valued_envelope(
     own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
     envelope: &crate::envelope::EnvelopeTilingParams,
     margin_evaluator: Option<&dyn Fn(&GameState) -> Option<f64>>,
+    net_tiling_tiebreak: u32,
 ) -> TilingStep {
     // Spaltenbau (MOSAIC_SPALTENBAU, eigene Entscheidung siehe column_build.rs-
     // Moduldoku): PRUEFT ZUERST, damit das dynamisch gewaehlte Ziel der
@@ -1596,12 +1806,14 @@ pub fn best_first_step_exact_or_valued_envelope(
         let w_e = crate::envelope::profile_weight(&envelope.profile, state.round_number);
         if let Some(step) = best_first_step_envelope_valued(
             state, pi, envelope.w_tile, envelope.w_val, w_e, evaluator, margin_evaluator,
+            net_tiling_tiebreak,
         ) {
             return step;
         }
     }
-    // Zweig 2 (Task #20): Netz-Stichentscheid, Runden 2-4.
-    if NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
+    // Zweig 2 (Task #20): Netz-Stichentscheid, Runden 2-4. Seit par.16.10 am
+    // Knopf `net_tiling_tiebreak` dieser SEITE (Default 1 = Bestand).
+    if net_tiling_tiebreak_applies(net_tiling_tiebreak, state.round_number) {
         if let Some(eval) = evaluator {
             if let Some(step) = best_first_step_valued(state, pi, eval) {
                 return step;
@@ -1625,6 +1837,7 @@ pub(crate) fn best_first_step_envelope_valued(
     w_e: f64,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
     margin_evaluator: Option<&dyn Fn(&GameState) -> Option<f64>>,
+    net_tiling_tiebreak: u32,
 ) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, NET_TILING_TOPK);
     if cands.is_empty() {
@@ -1658,7 +1871,11 @@ pub(crate) fn best_first_step_envelope_valued(
     let tied: Vec<&(f64, TilingOutcome)> =
         scored.iter().filter(|(s, _)| (s - best).abs() <= crate::envelope::ENVELOPE_TIE_EPS).collect();
     // par.8.6: bei W_VAL > 0 kein multiplikativer Stichentscheid mehr.
-    if w_val == 0.0 && tied.len() >= 2 && NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
+    // par.16.10: zusaetzlich am Knopf `net_tiling_tiebreak` dieser Seite.
+    if w_val == 0.0
+        && tied.len() >= 2
+        && net_tiling_tiebreak_applies(net_tiling_tiebreak, state.round_number)
+    {
         if let Some(eval) = evaluator {
             let mode = tiling_select_mode_env();
             let mut best_c: Option<(f64, &TilingStep)> = None;
@@ -2202,7 +2419,7 @@ mod tests {
     /// eine echte Multiplikation, ein extremer Evaluator-Ausschlag KANN
     /// Punkte kosten (siehe Testfall b: dort wird das bewusst ausgenutzt).
     /// Bei den GEMESSENEN Value-Spreizungen realer Netze (Median ~0,017,
-    /// siehe `NET_TILING_TIEBREAK_ENABLED`-Doku) passiert das laut
+    /// siehe `net_tiling_tiebreak`-Doku) passiert das laut
     /// `tiling_candidate_spread.json` (51/51 Faelle) nie -- dort korreliert
     /// der Wert eines echten Netzes NICHT systematisch invers mit den
     /// Punkten. Ein Evaluator, der stattdessen streng nach Punkte-RANG
@@ -2281,6 +2498,118 @@ mod tests {
                 actual, expected,
                 "Seed {seed} Runde {round}: Evaluator haette die Wahl gekippt, \
                  ausserhalb Runde 2-4 darf er das nicht"
+            );
+        }
+    }
+
+    // ── Knopf `net_tiling_tiebreak` (PREREG_round_transition_search_sampling.md
+    //    par.16.10/16.11, Nutzer 2026-09-17) ───────────────────────────────────
+
+    /// Tor (a) des Bauauftrags: **Default 1 verhaelt sich wie vorher.** Der
+    /// diskriminierende Evaluator aus Test (b) kippt die punktegleiche Wahl
+    /// weiterhin, und zwar Schritt fuer Schritt identisch zu dem, was der
+    /// Wrapper `best_first_step_exact_or_valued` liefert -- der setzt den
+    /// Default selbst ein und ist die Bestandsform.
+    #[test]
+    fn net_tiling_tiebreak_default_keeps_todays_behaviour() {
+        let (seed, s, cands) = find_tied_tiling_candidates(300).expect(
+            "keine Runde-2-Stellung mit >=2 punktegleichen, unterschiedlichen Top-Abschluessen \
+             in 300 Seeds gefunden -- Testkonstruktion ueberpruefen",
+        );
+        let target_sig = tiling_outcome_signature(&cands[1].final_state, 0);
+        let biased = |gs: &GameState| if tiling_outcome_signature(gs, 0) == target_sig { 0.9 } else { 0.1 };
+
+        let with_default = best_first_step_exact_or_valued_envelope(
+            &s, 0, Some(&biased), None, &crate::envelope::EnvelopeTilingParams::OFF, None,
+            NET_TILING_TIEBREAK_DEFAULT,
+        );
+        assert_eq!(
+            with_default, cands[1].first_step,
+            "Seed {seed}: bei Default 1 muss der Stichentscheid weiter greifen"
+        );
+        assert_eq!(
+            with_default,
+            best_first_step_exact_or_valued(&s, 0, Some(&biased)),
+            "Seed {seed}: der Default muss exakt das tun, was der Bestands-Wrapper tut"
+        );
+    }
+
+    /// Tor (b), erste Lesestelle: **0 schaltet den Zweig in
+    /// [`best_first_step_exact_or_valued_envelope`] ab** -- dann entscheiden die
+    /// exakten Punkte (`best_first_step_exact`), der Evaluator wird nicht mehr
+    /// gefragt.
+    #[test]
+    fn net_tiling_tiebreak_off_falls_back_to_exact_points() {
+        let (seed, s, cands) = find_tied_tiling_candidates(300).expect(
+            "keine Runde-2-Stellung mit >=2 punktegleichen, unterschiedlichen Top-Abschluessen \
+             in 300 Seeds gefunden -- Testkonstruktion ueberpruefen",
+        );
+        let target_sig = tiling_outcome_signature(&cands[1].final_state, 0);
+        let biased = |gs: &GameState| if tiling_outcome_signature(gs, 0) == target_sig { 0.9 } else { 0.1 };
+
+        let off = best_first_step_exact_or_valued_envelope(
+            &s, 0, Some(&biased), None, &crate::envelope::EnvelopeTilingParams::OFF, None,
+            NET_TILING_TIEBREAK_OFF,
+        );
+        assert_eq!(
+            off,
+            best_first_step_exact(&s, 0),
+            "Seed {seed}: bei 0 muss die reine Punktemaximierung entscheiden"
+        );
+        assert_ne!(
+            off, cands[1].first_step,
+            "Seed {seed}: bei 0 darf der Evaluator die Wahl nicht mehr kippen"
+        );
+    }
+
+    /// Tor (b), zweite Lesestelle: **0 schaltet auch den Gleichstands-
+    /// Stichentscheid des K3-(d)-Zweigs ab**
+    /// ([`best_first_step_envelope_valued`]). `w_tile = 0` und `w_val = 0`
+    /// bewusst: dann ist der bereinigte Score exakt die Punktzahl, die
+    /// Gleichstandsgruppe ist genau die punktegleiche Spitze, und der Test
+    /// prueft den Stichentscheid statt der Huellen-Arithmetik. Ohne Knopf
+    /// gewinnt wie bisher der ZUERST gefundene Kandidat.
+    #[test]
+    fn net_tiling_tiebreak_off_also_disables_the_envelope_branch_tiebreak() {
+        let (seed, s, cands) = find_tied_tiling_candidates(300).expect(
+            "keine Runde-2-Stellung mit >=2 punktegleichen, unterschiedlichen Top-Abschluessen \
+             in 300 Seeds gefunden -- Testkonstruktion ueberpruefen",
+        );
+        let target_sig = tiling_outcome_signature(&cands[1].final_state, 0);
+        let biased = |gs: &GameState| if tiling_outcome_signature(gs, 0) == target_sig { 0.9 } else { 0.1 };
+
+        let on = best_first_step_envelope_valued(
+            &s, 0, 0.0, 0.0, 1.0, Some(&biased), None, NET_TILING_TIEBREAK_DEFAULT,
+        )
+        .expect("Kandidaten vorhanden");
+        let off = best_first_step_envelope_valued(
+            &s, 0, 0.0, 0.0, 1.0, Some(&biased), None, NET_TILING_TIEBREAK_OFF,
+        )
+        .expect("Kandidaten vorhanden");
+        assert_eq!(
+            on, cands[1].first_step,
+            "Seed {seed}: bei Default 1 entscheidet der Evaluator den Gleichstand"
+        );
+        assert_eq!(
+            off, cands[0].first_step,
+            "Seed {seed}: bei 0 gewinnt der zuerst gefundene Gleichstands-Kandidat"
+        );
+        assert_ne!(on, off, "Seed {seed}: der Knopf muss hier tatsaechlich etwas aendern");
+    }
+
+    /// Rundenfenster und Polung des Knopf-Praedikats an EINER Stelle geprueft
+    /// ([`net_tiling_tiebreak_applies`]) -- beide Lesestellen haengen daran.
+    #[test]
+    fn net_tiling_tiebreak_applies_only_in_rounds_2_to_4_and_only_when_on() {
+        for round in 1u32..=5 {
+            assert_eq!(
+                net_tiling_tiebreak_applies(NET_TILING_TIEBREAK_DEFAULT, round),
+                (2..=4).contains(&round),
+                "Runde {round}: Rundenfenster des Bestands verschoben"
+            );
+            assert!(
+                !net_tiling_tiebreak_applies(NET_TILING_TIEBREAK_OFF, round),
+                "Runde {round}: bei 0 darf der Zweig nie greifen"
             );
         }
     }
@@ -2552,7 +2881,7 @@ mod tests {
 
     /// (3) Runde 1 wirkt: derselbe Nachweis wie oben, aber in Runde 1 -- dort
     /// ist der BESTEHENDE Pfad (`best_first_step_exact` -> `best_first_step_inner`)
-    /// plattenblind (kein `NET_TILING_TIEBREAK_ENABLED`-Zweig, der ist auf
+    /// plattenblind (kein `net_tiling_tiebreak`-Zweig, der ist auf
     /// Runden 2-4 begrenzt). Der neue Zweig muss trotzdem greifen.
     #[test]
     fn plate_weight_overrides_points_in_round_1() {
@@ -3143,5 +3472,127 @@ mod tests {
             val_b_cached, val_b_direct,
             "Cache-Kollision: Zustand B erhielt faelschlich Zustand As gecachten Wert"
         );
+    }
+
+    // ── Variante C: Raster-Projektion (par.18) ───────────────────────────────
+
+    /// Die tragende Zusage: die Projektion rechnet DENSELBEN Solver. Waeren die
+    /// Punkte verschieden, waere sie ein zweiter Solver mit eigener Wahrheit.
+    #[test]
+    fn projection_points_match_the_solver() {
+        let mut checked = 0usize;
+        for seed in 1u64..=40 {
+            let s = rich_state(seed);
+            for pi in 0..2 {
+                set_cache_override_for_test(Some(false));
+                clear_tiling_caches_for_test();
+                let proj = compute_projection(&s, pi);
+                let pts = solve_max_tiling_points(&s, pi);
+                set_cache_override_for_test(None);
+                clear_tiling_caches_for_test();
+                assert_eq!(
+                    proj.points, pts,
+                    "seed={seed} pi={pi}: Projektion {} gegen Solver {pts}",
+                    proj.points
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked >= 80, "nur {checked} Faelle geprueft");
+    }
+
+    /// Regelzusagen der Projektion: keine Zelle wird doppelt gefuellt (das
+    /// Delta steht nie auf einer schon belegten Zelle), Punkte sind nie
+    /// negativ, eine vollendete Platte hat nachher WIRKLICH alle vier Felder
+    /// belegt, und ohne volle Musterreihe ist alles 0.
+    #[test]
+    fn projection_is_a_delta_and_obeys_the_rules() {
+        // (a) Leeres Brett, keine volle Reihe -> nichts passiert.
+        let empty = tiling_state(7);
+        let p0 = project_max_tiling(&empty, 0);
+        assert_eq!(p0.points, 0);
+        assert!(!p0.newly_filled.iter().any(|x| *x), "leere Reihen fuellen keine Zelle");
+        assert!(!p0.newly_completed.iter().any(|x| *x), "leere Reihen vollenden nichts");
+
+        // (b) Reiche Stellungen: Delta-Eigenschaft und Slot-Zusage.
+        let mut saw_fill = false;
+        for seed in 1u64..=40 {
+            let s = rich_state(seed);
+            for pi in 0..2 {
+                let proj = project_max_tiling(&s, pi);
+                assert!(proj.points >= 0, "seed={seed} pi={pi}: negative Punkte");
+                let (filled_now, complete_now) = board_masks(&s.players[pi]);
+                for i in 0..PROJECTION_CELLS {
+                    if proj.newly_filled[i] {
+                        saw_fill = true;
+                        assert!(
+                            !filled_now[i],
+                            "seed={seed} pi={pi}: Zelle {i} war schon belegt (Doppelfuellung)"
+                        );
+                    }
+                }
+                for slot in 0..PROJECTION_SLOTS {
+                    if proj.newly_completed[slot] {
+                        assert!(
+                            !complete_now[slot],
+                            "seed={seed} pi={pi}: Slot {slot} war schon vollendet"
+                        );
+                        // Vollendet heisst: alle vier Felder sind NACHHER belegt,
+                        // also jedes entweder schon belegt oder neu gefuellt.
+                        for si in 0..4 {
+                            let idx = slot * 4 + si;
+                            assert!(
+                                filled_now[idx] || proj.newly_filled[idx],
+                                "seed={seed} pi={pi}: Slot {slot} Feld {si} bleibt leer, trotzdem vollendet"
+                            );
+                        }
+                    }
+                }
+                // Eine Musterreihe schickt GENAU EINEN Stein auf die Kuppel
+                // (engine_manual.md, Phase 2), je Platzierung kann hoechstens ein
+                // Spezialfeld abgerechnet werden -> bei sechs Reihen nie mehr als
+                // zwoelf neue Zellen.
+                let n = proj.newly_filled.iter().filter(|x| **x).count();
+                assert!(n <= 12, "seed={seed} pi={pi}: {n} neue Zellen, hoechstens 12 moeglich");
+            }
+        }
+        assert!(saw_fill, "Testkonstruktion fuellt nie eine Zelle -- leer gruen");
+    }
+
+    /// Der Cache darf nichts aendern (bitgleich mit und ohne), und er darf
+    /// zwei verschiedene Bretter nicht verschmelzen.
+    #[test]
+    fn projection_cache_is_bit_identical_and_does_not_collide() {
+        for seed in 1u64..=12 {
+            let s = rich_state(seed);
+            set_cache_override_for_test(Some(false));
+            clear_tiling_caches_for_test();
+            let uncached = compute_projection(&s, 0);
+            set_cache_override_for_test(Some(true));
+            clear_tiling_caches_for_test();
+            let cached_cold = cached_projection(&s, 0);
+            let cached_warm = cached_projection(&s, 0);
+            set_cache_override_for_test(None);
+            clear_tiling_caches_for_test();
+            assert_eq!(uncached, cached_cold, "seed={seed}: kalt weicht ab");
+            assert_eq!(uncached, cached_warm, "seed={seed}: warm weicht ab");
+        }
+
+        // Kollisionsprobe wie beim Punkt-Cache: zwei Bretter, die sich in einer
+        // ergebnisrelevanten Zelle unterscheiden.
+        set_cache_override_for_test(Some(true));
+        clear_tiling_caches_for_test();
+        let mut s_a = tiling_state(11);
+        let tile = build_dome_tile_pool()[2].clone(); // si1 = Rot
+        s_a.players[0].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        s_a.players[0].pattern_lines[0].add_tiles(&[Rot]);
+        let mut s_b = s_a.clone();
+        s_b.players[0].pattern_lines[0].tiles.clear(); // Reihe nicht mehr voll
+        let a = cached_projection(&s_a, 0);
+        let b = cached_projection(&s_b, 0);
+        set_cache_override_for_test(None);
+        clear_tiling_caches_for_test();
+        assert!(a.newly_filled.iter().any(|x| *x), "Fall A muesste eine Zelle fuellen");
+        assert!(!b.newly_filled.iter().any(|x| *x), "Fall B bekam As Eintrag (Kollision)");
     }
 }

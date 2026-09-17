@@ -40,6 +40,34 @@ def _moon_target_source_key() -> str:
     return v if v in ("label", "played") else "label"
 
 
+def _features_from_rust_key() -> bool:
+    """Liest `MOSAIC_FEATURES_FROM_RUST` fuer BEIDE Cache-Schluessel.
+
+    `PREREG_rust_data_layer.md` par.9a, Nutzer-Entscheid 2026-09-17 (Weg (1)).
+    Der Schalter entscheidet, WELCHER Bauer den Inhalt der gecachten Planes und
+    des Flachvektors liefert: gesetzt = `features.rs` rechnet frisch, ungesetzt
+    = der Python-Zwilling LIEST die gespeicherten Felder aus dem Record
+    (`neural_net.py` Z.781 fuer `cell_reachable_mask`).
+
+    WARUM ER JETZT IM SCHLUESSEL STEHT: bis zum 2026-09-17 stand er bewusst in
+    KEINEM (`docs/knobs.md`), Begruendung "beide Bauer sind bit-identisch".
+    Das gilt auf ALT-Records seit dem 2026-09-12 nicht mehr: der A2-Phantom-Fix
+    hat `provocation::remaining_colors` geaendert, und die Records von davor
+    tragen die alte Zahl, waehrend Rust die neue rechnet (par.9a: 2 von 300
+    Zustaenden, Planes-Kanal 76). Weil Bloecke MEMOISIERT werden
+    (`build_cache_incremental.py` Z.134-137), erbte ein Arm sonst die Semantik
+    dessen, der den Block zuerst gebaut hat -- unabhaengig von der eigenen
+    Schalterstellung. Innerhalb von v29 stand der Schalter uneinheitlich.
+
+    Aus der Umgebung GELESEN, kein Parameter: Holschuld an einer Stelle statt
+    Bringschuld an sieben (`tools/tests/test_cache_key_knobs_are_env_coupled.py`,
+    Vorfall `moon_target_source` vom 2026-09-16). Dieselbe Semantik wie
+    `neural_net.py` Z.98 -- exakt "1", nichts sonst.
+    """
+    import os
+    return os.environ.get("MOSAIC_FEATURES_FROM_RUST") == "1"
+
+
 def _special_planes_off_key() -> bool:
     """Liest `MOSAIC_SPECIAL_PLANES_OFF` fuer den Cache-Schluessel.
 
@@ -104,7 +132,7 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     # geholt. Beides hier nachzubauen statt oben zu importieren haelt die
     # Bindungszeit identisch -- sonst koennte der Schluessel eine andere
     # INPUT_SIZE sehen als die Bauschleife.
-    from config import INPUT_SIZE
+    from config import INPUT_SIZE, FEATURE_FORMULA_VERSION
     import hashlib
     import os
     # LAZY, nicht oben: `neural_net` re-exportiert diesen Namen, ein Import auf
@@ -177,4 +205,18 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     _mts = _moon_target_source_key()
     if _mts != "label":
         material += f"|moontarget_{_mts}_v1"
+    # Merkmals-FORMEL und Merkmals-QUELLE (2026-09-17, Nutzer-Entscheid Weg (1)
+    # aus PREREG_rust_data_layer.md par.9a). UNBEDINGT angehaengt, anders als die
+    # Arm-Schalter oben -- und das ist der gewollte Preis: alle vorhandenen
+    # Bloecke sind unter dem neuen Schluessel nicht mehr adressierbar. Der Neubau
+    # faellt fuer den Arm v29-b07 mit dem INPUT_SIZE-Wechsel ohnehin an.
+    #
+    # Warum BEIDE Teile: die VERSION trennt alte von neuer Formel (ein Block aus
+    # der Zeit vor dem A2-Phantom-Fix traegt andere `cell_reachable_mask`- und
+    # `col_f_max`-Werte), die QUELLE trennt die beiden Bauer, die auf Alt-Records
+    # seit dem 2026-09-12 nicht mehr bit-identisch sind (`_features_from_rust_key`).
+    # Beides gehoert in BEIDE Schluessel: der Block traegt die Planes, das Fenster
+    # den Monolithen (`feedback_feature_knob_belongs_in_both_cache_keys`).
+    material += "|featfmt_" + str(FEATURE_FORMULA_VERSION)
+    material += "|featsrc_rust" if _features_from_rust_key() else "|featsrc_record"
     return hashlib.md5(material.encode()).hexdigest()[:12]
