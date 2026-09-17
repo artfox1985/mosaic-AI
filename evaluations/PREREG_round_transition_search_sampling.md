@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B GEBAUT und ABGENOMMEN (par.17/17.7): Knopf `MOSAIC_ROUND_TRANSITION_LEAF` im Wheel, Kontrakt-Hash unveraendert, Anker-Drift und -Konservierung GRUEN, Lib-Suite 673 gruen samt Paritaets-Fixture; Sichttor par.10 GRUEN (n=300 Blatt-Zustaende Runde 3/4, bag_count<21, 0 Verstoesse). OFFEN: Kostentor (par.5, Nr. 35), A/B (par.9, Nr. 36), Volllauf Stufe-0-Sonde (par.16). -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B GEBAUT und ABGENOMMEN (par.17: Knopf `MOSAIC_ROUND_TRANSITION_LEAF`, Kontrakt unveraendert, Drift/Konservierung gruen), Sichttor GRUEN (17.7, n = 300, 0 Verstoesse), Kostentor HAELT (17.8, +6,6 Prozent, 1,64 Prozent pseudo-terminale Blaetter). **A/B NEGATIV (17.9): Champion mit gegen ohne Knopf 169:191 von 360, Block-z -1,13, Punkte -1,3, Strafleiste +0,8 -- Variante B kommt nicht ins Rezept; die Linie Rundenuebergangs-Rauschen ist damit auf beiden Wegen geschlossen.** Offen: Stufe-0-Sonde par.16 als Diagnostik (Nutzer), Replayer-Nachspiel 17.9a. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -1400,3 +1400,107 @@ Korpus-Zustaenden (ohne `dome_pool_view`) beide Seiten gleich sieht.
 
 **Damit ist Fahrplan Nr. 33 abgenommen und Nr. 34 durch.** Offen bleibt in der Reihenfolge:
 Kostentor par.5 Schritt 1 (Nr. 35), dann der gepaarte A/B par.9 (Nr. 36).
+
+### 17.8 KOSTENTOR (Fahrplan 35) BESTANDEN -- 2026-09-17, 01:55
+
+`tools/night_v29_rt_leaf_gates.sh`, Muster K4 (`PREREG_round_estimate_leaf_term.md` par.7b): zwei
+Laeufe mit beidseits GLEICHER Spec am Champion `v28-b02_brierbest` @400, `paired_gating`,
+20 Paare = 40 Partien je Lauf, 10 Threads, `--log-games`.
+
+| Lauf | Spec | Seed | Wanduhr | s je Partie | CPU s |
+| --- | --- | --- | --- | --- | --- |
+| mit Knopf | `models/rt_leaf_on.spec.json` (Champion-Spec plus `round_transition_leaf: 1`) | 20261150 | 568,0 s | **14,200** | 2.408,9 |
+| ohne Knopf | `models/rt_leaf_off.spec.json` (`round_transition_leaf: 0`) | 20261151 | 533,1 s | **13,326** | 2.288,2 |
+
+**Aufschlag +6,6 Prozent Wanduhr (+5,3 Prozent CPU) gegen die Schwelle von 25 Prozent (par.4.1):
+TOR HAELT**, rund ein Viertel des Erlaubten. Kontrollprobe: beide Laeufe enden 20:20 mit
+identischen Punkten je Seite (52,20 / 52,20 bzw. 49,25 / 49,25), die Seiten spielen also
+dasselbe -- der Knopf war beidseitig gleich gesetzt.
+
+**Anteil pseudo-terminaler Blaetter (par.5 Schritt 1, par.17.5 Punkt 3), aus den 40
+`[rt_leaf]`-Zeilen des mit-Laufs:** 19.132 von 1.165.982 Netz-Blaettern = **1,64 Prozent**
+(Grundmenge Blaetter des Netz-Blattpfads ueber 40 Partien, Einheit Blaetter); `applied` =
+19.132, also an JEDEM pseudo-terminalen Blatt der Runden 1-4 wurde der Uebergang gerechnet.
+Lesart vorab (par.5): der Anteil ist klein, damit ist auch der moegliche Effekt begrenzt -- er
+wirkt nur an 1,6 Prozent der Blaetter, aber genau an denen, an denen die Runde faellt.
+
+**Nebenlast offengelegt:** waehrend beider Laeufe lief das Training v29-b06 auf der GPU
+(erlaubt nach `docs/working_rules.md` "Auslastung"; sein Lader belegt aber 5-6 Kerne). Beide
+Seiten des Tors sind gleich betroffen -- der Quotient traegt, die absoluten 13-14 s je Partie
+liegen ueber den 11,5-11,8 s der b04-Arena ohne GPU-Nachbar und sind nicht als Planungsgroesse
+zu nehmen. Artefakte `rt_leaf_kosten_mit_s20261150.json`, `rt_leaf_kosten_ohne_s20261151.json`,
+`rt_leaf_kostentor_verdikt.txt`.
+
+**Damit laeuft Schritt 2 (par.5, Fahrplan 36):** A/B Champion mit gegen ohne Knopf, 200 Paare,
+Seed 20261152, gestartet 01:54:36. Bezug ist `v28-b02_brierbest`, nicht "v29-b01" (par.9 war die
+Erwartung vom 2026-09-12; der Champion ist geblieben).
+
+### 17.9 A/B (Fahrplan 36) GEMESSEN -- 2026-09-17, 03:13: Variante B TRAEGT NICHT
+
+**Aufbau (par.5 Schritt 2):** dasselbe Netz gegen sich selbst -- Champion `v28-b02_brierbest` @400,
+Champion-Spec plus `round_transition_leaf: 1` (`models/rt_leaf_on.spec.json`) gegen `: 0`
+(`rt_leaf_off.spec.json`), gepaart, Blockgroesse 5, Deckel 200 Paare, SPRT alpha = beta = 0,001,
+`--log-games`, 10 Threads, Seed 20261152. Nebenlast: GPU-Training v29-b06 bis 02:32 (erlaubt).
+
+| Groesse | Wert |
+| --- | --- |
+| Siege an : aus | **169 : 191** von 360 Partien (180 Paare; SPRT H0, Schranke bei LLR -6,94 unterschritten) |
+| McNemar p | 0,248 |
+| gepaarte Differenz | -0,122 je Paar (Partien-Skala) |
+| **Block-Ebene** (par.5 Entscheidungsmass) | 36 Bloecke a 10 Partien, Siegdifferenz an minus aus **-0,61 je Block**, SE 0,54, **z = -1,13** |
+| eigene Punkte an / aus | 50,37 / 51,69 (**-1,33**) |
+| Marge | -1,33 |
+| Strafleiste (`boden`) | 8,59 / 7,80 (**+0,79** Strafpunkte mit Knopf) |
+| Plattenpunkte gesamt | 6,12 / 6,07 (+0,05) |
+| Plattenpunkte je Kriterium, an minus aus | Vertikale Reihen **-0,86** (6,22 / 7,09), Mehrfarbige Felder +1,04 (3,07 / 2,03), Diagonale -0,15, Farbenreiche +0,16, Eckplatten -0,11, Aeussere Felder +0,13, Spezialfelder +0,06 (-10,42 / -10,48), Horizontale -0,05 |
+| Laufzeit | 4.704,7 s, 13,07 s je Partie |
+
+**Verdikt nach par.5 Falsifikator:** keine signifikante Staerkeverbesserung auf Block-Ebene,
+also **negativ**: Variante B kommt NICHT ins Rezept. Die Richtung ist sogar leicht gegen den
+Knopf (z = -1,13, weniger Punkte, mehr Strafleiste, weniger Punkte aus vertikalen Reihen); das
+ist kein signifikanter Schaden, aber auch kein Ansatz eines Gewinns. par.5 ("die Linie
+'Rundenuebergangs-Rauschen' gilt zusammen mit dem v11-Befund als auf beiden Wegen geprueft und
+geschlossen") greift damit fuer die Suchseite.
+
+**Einordnung, am Kostentor abgelesen (17.8):** der Knopf wirkt an 1,64 Prozent der Blaetter.
+Selbst ein grosser Effekt je Blatt bliebe an dieser Stelle klein; und was er dort tut, ist das
+Tiling mit dem exakten Loeser plus EINE Neubefuellung -- das Netz bewertet danach eine einzelne
+Zufallswelt statt eines Erwartungswerts. Ob eine Mittelung ueber mehrere Neubefuellungen
+(par.4.3, robuster Aggregator) oder Top-K (par.14) das dreht, ist NICHT gemessen und ohne
+Nutzer-Auftrag nicht eingetaktet: v30+ bekommt keine neuen Vorregistrierungen (Nutzer
+2026-09-16), beide stehen aber als offene Punkte in DIESER Prereg.
+
+**Kennzahlen-Luecke, begruendet (CLAUDE.md, Standard-Kennzahlen):** Reihen- und
+Spaltenauslastung sowie die Strafleisten-Verteilung aus der Spaltensonde FEHLEN fuer den
+mit-Knopf-Lauf: `tools/analyze_game_log.py` erkennt die neue Diagnosezeile `[rt_leaf] ...` im
+Runde-5-Log nicht als Nicht-Aktionszeile und bricht das Nachspiel ab -- 0 von 360 replaybar
+(`arena_columns_rt_leaf_on_vs_off_s20261152.json`, ROT; ebenso 0 von 40 im Kostentor-mit-Lauf,
+waehrend der ohne-Lauf 40 von 40 nachspielt). Ersatz oben: Strafleiste als `boden` und
+Spaltenbau als Kriterium "Vertikale Reihen" aus `plate_points_from_arena.py`. Reparatur des
+Parsers ist beauftragt (Diagnose-Marker-Liste), das Nachspiel wird nach Tor 1 von b06 nachgeholt
+und hier als 17.9a nachgetragen.
+
+**Fahrplan:** 33 abgenommen, 34 gruen, 35 haelt, 36 negativ. Offen in dieser Prereg nur noch die
+Stufe-0-Sonde (par.16, Volllauf `--rounds 4`) als Diagnostik ohne Rezeptfolge -- ob sie noch
+gefahren wird, ist Nutzer-Entscheid.
+
+### 17.9a Nachgeholte Kennzahlen aus der Spaltensonde (2026-09-17, 04:57, nach der Replayer-Reparatur)
+
+`tools/analyze_game_log.py` kennt die Diagnosezeilen jetzt ueber eine Marker-Liste (`[moon_order]`,
+`[rt_leaf]`; `docs/pitfalls.md`). Nachspiel des A/B `rt_leaf_on_vs_off_s20261152`: **359 von 360
+Partien replaybar** (1 divergiert, Replayer-Grenze Chip-Vollendung), Kostentor-mit-Lauf 40 von 40.
+
+| Kennzahl (an / aus, n = 359 je Seite) | an | aus | Diff |
+| --- | --- | --- | --- |
+| volle Spalten | 0,919 | 0,967 | -0,047 |
+| Spalten >= 3 / >= 4 | 3,251 / 2,279 | 3,195 / 2,226 | +0,056 / +0,053 |
+| Zeilen voll / Zeilen-Fuellung | 0,114 / 17,83 | 0,128 / 17,81 | -0,014 / +0,02 |
+| Strafleiste | **8,588** | 7,799 | **+0,788** |
+| Spezialfelder belegt | 1,287 | 1,309 | -0,022 |
+| lange Reihen vollendet | 3,089 | 3,022 | +0,067 |
+| Punkte / Margin | 50,40 / -1,36 | 51,76 / +1,36 | -1,36 / -2,72 |
+
+Die Lesart aus 17.9 bleibt: kein Gewinn, die Strafleiste steigt mit Knopf um rund 0,8 Punkte je
+Partie, die Vollendung faellt leicht, die Teilspalten (>= 3, >= 4) steigen leicht -- das Netz sieht
+nach dem Tiling der Runde offenbar mehr Teilstrukturen, loest sie aber nicht ein. Die
+Kennzahlen-Luecke aus 17.9 ist damit geschlossen.

@@ -24,7 +24,26 @@ Cache-Sanierung auf Nutzer-Auftrag.
 
 ### LAEUFT
 
-**Auf der Maschine: nichts.** Kein Training, keine Arena, keine Sonde. Die Maschine ist frei.
+**Stand 2026-09-17, 05:05: NICHTS laeuft, die Maschine ist frei. Das v29-Programm ist bis auf die
+Nutzer-Entscheide durch** (b04 negativ, Variante B negativ, b06 unterlegen; Einzelheiten unten und in
+den Preregs). ~~Stand 01:40: zwei Ketten laufen parallel~~ (Chronik): (1) `tools/night_v29_b06_minimal_core.sh` -- Training
+v29-b06 auf der GPU seit 01:35 (Monolith `data/.cache_fd13f54061cd_b06.h5`, Stempel geprueft), danach
+wartet die Kette auf freie CPU fuer Tor 1 gegen b03 (Seeds 20261140/20261141); (2)
+`tools/night_v29_rt_leaf_gates.sh` -- Kostentor Nr. 35 (an gegen aus, je 20 Paare) seit 01:35,
+bei bestandenem Tor A/B Nr. 36 (200 Paare, Champion mit gegen ohne `MOSAIC_ROUND_TRANSITION_LEAF`).
+**Kostentor DURCH 01:55 (par.17.8): +6,6 Prozent Wanduhr, Tor haelt; pseudo-terminale Blaetter 1,64 Prozent.
+A/B laeuft seit 01:54:36, erwartet bis etwa 03:30.** **A/B DURCH 03:13 (par.17.9): NEGATIV** --
+169:191 von 360, Block-z -1,13, Punkte -1,3, Strafleiste +0,8; Variante B kommt nicht ins Rezept,
+Fahrplan 33-36 sind damit abgeschlossen. Werkzeug-Defekt dabei: die `[rt_leaf]`-Logzeile bricht
+den Replayer (`analyze_game_log.py`), Spaltensonde fuer alle mit-Knopf-Laeufe ROT -- Reparatur
+delegiert, Nachspiel nach Tor 1 von b06. **b06 TRAINIERT (02:32, 57 min; Koepfe aus). Tor 1 gegen b03 DURCH 04:54
+(`minimal_strength_core` par.10.3): UNTERLEGEN, 236:294 von 530 (44,5 Prozent), McNemar p 0,011,
+Block-z -2,86 -- die 5-Prozentpunkte-Marge reisst; mit b05 zusammen: mindestens einer von
+ownership/opp_points/endgame traegt als Trainingssignal.** Netz-Gesundheit b04/b05/b06 GRUEN (2,60
+Prozent tote Einheiten wie b03). Spaltensonde fuer die Variante-B-Laeufe nachgeholt (17.9a).
+Kein Commit, solange die Tore-Kette laeuft (Wanduhr-Messung). Loeschkandidaten fuer den Nutzer:
+`data/.cache_fd13f54061cd.h5` (falscher Stempel) und `models/manifest_train_v29-b06_20260917_011916.json`
+(Manifest des vom Waechter abgebrochenen ersten Anlaufs).
 
 **Der Nutzer faehrt v29-b04 selbst in seiner Shell** (ausdruecklicher Wunsch 2026-09-16:
 *"gib mir den python befehl fuer b04. das werd ich in der shell fahren"*). Grund: der vorige
@@ -1007,8 +1026,8 @@ die andere Abschnitte beruehren:
     nach dem Entscheider). Kostentor beim Start der Erzeugung: `s_je_partie` gegen v29. R2 ist
     neben P.12 die zweite Ausnahme vom Rahmen "v30 nur Rezept-Knoepfe".
 
-11. ~~Marge und Zeitpunkt fuer den Minimalkern~~ **ENTSCHIEDEN 2026-09-16 (Nutzer: "marge 5
-    prozentpunkte, b06 nach variante b eintakten")**: `v29-b06` (b03 ohne die vier
+11. ~~Marge und Zeitpunkt fuer den Minimalkern~~ **ENTSCHIEDEN 2026-09-16; GEMESSEN 2026-09-17: b06 ist
+    b03 UNTERLEGEN (44,5 Prozent, p 0,011, par.10.3).** Offen daraus: **Punkt 13.** Ursprung: `v29-b06` (b03 ohne die vier
     Hilfs-Losses) gegen b03, Nichtunterlegenheit = gepoolt mindestens 45,0 Prozent auf 800
     Partien und kein Seed signifikant dagegen; Fahrplan 36a nach dem A/B von Variante B.
     `PREREG_minimal_strength_core.md` par.10, Name reserviert. **Vorpruefung durch (par.10.1):**
@@ -1020,6 +1039,20 @@ die andere Abschnitte beruehren:
 12. **Rezept-Aufnahme `--moon-loss-weight 0`** (Fahrplan 32b, `PREREG_moon_stack_order.md`
     par.12.8): b05 schwach positiv, b04 negativ -- der Kopf ist Ballast. Aufnahme ins v30-Rezept
     ja/nein; b06 (par.10 der Minimalkern-Prereg) faehrt ihn ohnehin auf 0 mit.
+
+13. **Strang A einzeln fahren?** (`minimal_strength_core` par.10.3 Lesart): b06 reisst die Marge,
+    b05 (nur moon aus) war leicht besser -- also traegt mindestens einer von ownership /
+    opp_points / endgame als Trainingssignal. Die registrierte Fortsetzung ist A.3 (drei Arme
+    einzeln gegen b03, je rund 4,5 h, 13-14 h gesamt). Ohne sie: alle drei Koepfe bleiben im
+    v30-Rezept, `moon_loss_weight 0` bleibt Empfehlung (Punkt 12).
+
+14. **Variante B** (`round_transition_search_sampling` par.17.9): negativ, kommt nicht ins Rezept
+    -- kein Entscheid noetig, nur zur Kenntnis. Offen dort: Stufe-0-Sonde par.16 als Diagnostik
+    (fahren oder streichen).
+
+15. **Loeschkandidaten** (pfadgenau, h5 ohne restic-Beleg noetig, Manifest klein):
+    `data/.cache_fd13f54061cd.h5` (1,15 GB, falscher Stempel 4dd9f020b232),
+    `models/manifest_train_v29-b06_20260917_011916.json` (abgebrochener erster b06-Anlauf).
 
 ## 7. VERBOTE UND STEHENDE REGELN
 
