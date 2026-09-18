@@ -581,6 +581,16 @@ gemessenen Haeufigkeit:
 **WARNUNG, die bestehen bleibt:** mit p = 0,15 laege die Partie-Rate bei rund 80 Prozent. Der
 Wert aus par.11b darf so NICHT in eine Erzeugung.
 
+**NACHTRAG 2026-09-18, 23:50 -- die Herleitung oben steht auf einer FREMDEN GRUNDMENGE.** Die
+11,07 stammen aus `PREREG_moon_stack_order.md` par.9b und zaehlen dort **Mondstapel-Dreierstapel**
+(Sonnensteine aus Fabriken), nicht zurueckgelegte Kuppelplatten. Am v30-Korpus gemessen sind es
+**0,2225 Gelegenheiten mit mindestens drei Restplatten je Partie** (n = 1.778 Stapelzuege aus 400
+Partien, Grundmenge Stapelzuege der Sockel-Klasse) -- ein Faktor 50. Die eigene Messung in par.11b
+(0,19 Abweichungen je Partie) haette den Fehler sofort gezeigt. **Mit p = 0,0146 wuerde in 0,33
+Prozent der Partien gestreut, nicht in 15 Prozent** (13 Streuungen je 4.000 Partien); fuer das
+registrierte Ziel waere p = 0,52 noetig. Der Entscheid "15 Prozent der Partien" bleibt gueltig, die
+ZAHL dahinter nicht. Details und Vorlage: 12.12.
+
 **Gebaut sind die anderen beiden Punkte:** Schwelle ab drei Restplatten
 (`RETURN_ORDER_MIN_REST = 3`) und das Rundenfenster 1 bis 4 gleichgewichtet
 (`return_order_round_allowed`, Fruehausstieg vor dem RNG-Aufbau). Elf Tests im Modul.
@@ -1203,14 +1213,40 @@ Bauform: eine eigene Regel, die unabhaengig von `_IGNORE_PTV` greift.
 * **Engine-Aenderung heisst Anker-Invarianz** (`/mosaic-anchor-invariance`, 22,4 s + 16,6 s) und
   `cargo test --release --no-run` wegen `examples/` und `benches/`.
 
-**Offen und vom Nutzer zu entscheiden, BEVOR gebaut wird:**
+**KORREKTUR 2026-09-18, 23:50 (Nutzer: "diese fragen sind sicher nicht offen. das haben wir schon alles
+durchgekaut").** Der Koordinator hatte Dosis, Reichweite und den Zweck als offen ausgegeben, ohne par.11b und
+par.11c gelesen zu haben. Sie sind entschieden, und zwar hier:
 
-* **Dosis und Reichweite:** p je Rueckgabe-Entscheid, und in WELCHEN Klassen. Der Sockel ist der
-  Policy-Traeger; streut man dort, verliert man die betroffenen Policy-Ziele (nach Schritt 3 gewollt), das
-  sind nach der Zaehlung vom 2026-09-18 aber nur 0,18 Prozent der Records -- der Verlust ist vernachlaessigbar.
-* **Ob die Streuung ueberhaupt noch noetig ist**, wenn die temperierte Klasse schon rund 22 Prozent
-  abweichende Rueckgabe-Entscheide liefert (Herleitung, `PREREG_v30_window.md` par.9). Die Zahl, die das
-  entscheiden wuerde, ist UNGEMESSEN.
+* **Schwelle ab DREI Restplatten** (par.11b Punkt 1, gebaut als `RETURN_ORDER_MIN_REST = 3`).
+* **Runden 1 bis 4 gleichgewichtet, Runde 5 aus** (par.11b, gebaut als `return_order_round_allowed`).
+* **Keine Laengengewichtung, keine Bevorzugung frueher Runden** (par.11b, Nutzer: *"das liegt am netz es zu
+  lernen was sinnvoller ist. wir zeigen es ihm nur."*).
+* **Muenze je Gelegenheit, nicht je Partie** (par.11c: das Reservoir ist im Rueckgabe-Pfad strukturell nicht
+  erreichbar, weil die Permutation sofort wirkt).
+* **Zweck: ABDECKUNG des Zustandsraums**, nicht eine bessere Reihenfolge lehren (par.11c, Nutzer: *"ich will
+  ja nur dass das netz sieht das kuppelplatten auch einfach so aus dem stapel gezogen werden koennen."*).
+  Damit ist auch die zweite angebliche Frage beantwortet: die Streuung haengt nicht an einer gemessenen
+  Wirkung.
+
+**ABER: die DOSIS steht auf einer fremden Grundmenge -- Rechenfehler, gefunden beim Nachlesen.** par.11c
+leitet `p = 1 - 0,85^(1/11,07) = 0,0146` aus "11,07 Gelegenheiten mit mindestens drei Restplatten je Partie
+(142.945 Faelle auf 12.907 Partien, `PREREG_moon_stack_order.md` par.9b)" her. **Die 142.945 sind
+MONDSTAPEL-Dreierstapel** (Sonnensteine aus Fabriken, `moon_stack_order` par.9b: *"Korrekt gezaehlt sind es
+142.945 Dreierstapel, also 22,4 Prozent aller Ereignisse"*, Grundmenge Mondstapel-Ereignisse), **nicht
+zurueckgelegte Kuppelplatten**. Die Zahl beschreibt einen anderen Gegenstand als ihr Verbraucher.
+
+**Gemessen am v30-Korpus** (2026-09-18, n = 1.778 Stapelzuege aus 400 Partien der Sockel-Klasse, Grundmenge
+Stapelzuege, Einheit Zuege je Partie): Zuege mit mindestens vier gezogenen Platten, also mindestens DREI
+Restplatten und damit genau der Knopf-Schwelle, gibt es **89 = 0,2225 je Partie**. Die Herleitung nahm das
+**50-fache** an. Unabhaengige Stuetze im selben Dokument, zwei Absaetze ueber der Rechnung: par.11b misst
+**0,19 Abweichungen je Partie** (150 Partien, Modus 1) mit Serienlaengen 4 bis 12 -- dieselbe
+Groessenordnung wie 0,22, nicht wie 11.
+
+**Folge, gerechnet:** mit `p = 0,0146` wuerde in **0,33 Prozent der Partien** gestreut statt in 15 Prozent,
+das sind **13 Streuungen je 4.000-Partien-Klasse**. Fuer das registrierte Ziel "in 15 Prozent der Partien
+mindestens einmal" waere **p = 0,52** noetig (463 Streuungen je Klasse). **NUTZER-VORLAGE:** die Dosis ist
+entschieden, ihre Zahl aber auf der falschen Grundmenge gerechnet -- 0,0146 beibehalten hiesse, einen Knopf
+zu bauen, der praktisch nie feuert.
 
 **Was fuer den Bau spricht, unabhaengig von der Dosis** (Nutzer-Hinweis 2026-09-18, 23:10 -- der tiefe
 Stapelzug wird durch die Rueckgabewahl attraktiver, und in fruehen Runden ist das keine falsche Taktik):
