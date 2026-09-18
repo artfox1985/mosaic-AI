@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# v30-ERZEUGUNG: die drei Klassen nacheinander (Muster tools/night_v29_generate.sh, Befehle aus
+# v30-ERZEUGUNG, REST (Klassen 2 und 3): der Sockel laeuft seit 14:50:04 verwaist weiter (Wrapper 14:53 beendet,
+# weil seine Wiedervorlage-Pruefung pickle.load auf gzip rief und das Self-Play getoetet haette); diese Kette wartet
+# auf sein Ende, prueft den ersten Sockel-Record (gzip) und faehrt die beiden Schwarm-Klassen.
+# Ursprung: die drei Klassen nacheinander (Muster tools/night_v29_generate.sh, Befehle aus
 # PREREG_v29_window.md par.5; Seeds 20260930/31/32). FREIGABE des Nutzers 2026-09-17: "du hast auch die
 # freigabe mit den self plays fuer v30 loszulegen" (STATUS Abschnitt 6 Punkt 21).
 #
@@ -52,7 +55,7 @@ busy() {
   n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '[s]elf_play\.py|[t]rain\.py|[p]aired_gating|[a]nchor|[f]rozen_referee|[b]uild_cache_parallel|[c]argo|[m]aturin' -and \$_.Name -match 'python' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
   [ "$n" != "0" ]
 }
-echo "== WARTEN auf eine freie Maschine $(date +%F' '%H:%M:%S)"
+echo "== WARTEN auf das Ende des Sockels (self_play) und eine freie Maschine $(date +%F' '%H:%M:%S)"
 while busy; do echo "   noch belegt ($(date +%H:%M:%S))"; sleep 300; done
 echo "   frei ($(date +%H:%M:%S))"
 
@@ -77,16 +80,9 @@ sys.exit(0 if hit else 4)
 EOF
 }
 
-echo "== 1) Sockel (Traeger), 4.000 Partien, policy-aktiv $(date +%F' '%H:%M:%S)"
-python -X utf8 -u self_play.py --mode network --model "$MODEL" --spec "$SPEC" \
-  --games 4000 --sims 100 --version "${GEN}-policy" \
-  --threads 11 --chunk 10 --per-file 10 --seed 20260930 \
-  --tau-argmax-from-move 1 --deviate-prob 1.0 --start-slot-random-p 0.15 &
-SP=$!
-sleep 600
-first_record_check "${GEN}-policy" || { echo "STOPP: Wiedervorlage P.16 rot -- Erzeugung wird abgebrochen"; kill "$SP" 2>/dev/null; exit 4; }
-wait "$SP"
-echo "   Exit $? ($(date +%H:%M:%S)), Dateien: $(ls data/ | grep -c "^selfplay_${GEN}-policy_")"
+echo "== 1b) Wiedervorlage am fertigen Sockel $(date +%F' '%H:%M:%S)"
+first_record_check "${GEN}-policy" || { echo "STOPP: Wiedervorlage P.16 rot -- Klassen 2 und 3 werden NICHT gestartet"; exit 4; }
+echo "   Sockel-Dateien: $(ls data/ | grep -c "^selfplay_${GEN}-policy_")"
 
 echo "== 2) Schwarm a, 4.000 Partien, value-only, temperiert $(date +%F' '%H:%M:%S)"
 python -X utf8 -u self_play.py --mode network --model "$MODEL" --spec "$SPEC" \

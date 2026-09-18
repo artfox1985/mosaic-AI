@@ -1820,3 +1820,11 @@ Literal `6ef829e564c58bd5` gruen; `--no-run` gruen (Beispiele, Benches); Wheel 0
 414, INPUT_SIZE 888 im selben Zug. Abnahme (Installation, Drift, Konservierung, Paritaet, Polsterung b10,
 Kostentor, A/B, Record-Stichprobe) laeuft in `tools/night_v30_wheel_acceptance.sh` seit 09:31; Ergebnis in
 `PREREG_minimal_strength_core.md` 10.12ff.
+
+### 12.12 Wiedervorlage Mondknoten im v30-Korpus (2026-09-18): GRUEN
+
+**Wiedervorlage am ersten Record der v30-Erzeugung GRUEN (2026-09-18, 14:54; `data/selfplay_v29-b11-policy_20260918_1450_g10.pkl`,
+1.952 Records aus 10 Partien, gzip-gelesen, IDs ueber `neural_net.action_to_id`):** P.12 `designs` 577 Records,
+P.16 `designs_ordered` 577 Records (nur wo ein eigener Block liegt), Mondknoten 406-410 in `valid_actions` 478 / in
+`policy` 424, Rueckgabeknoten 411-413 11 / 11, Rotation 640 / 640, Slot 8.132. Der v30-Korpus traegt die neuen
+Merkmale und Knoten mit Lernziel; nichts faellt nach v31.

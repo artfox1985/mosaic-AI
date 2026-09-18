@@ -28,10 +28,31 @@ Generationsbericht steht im Archiv.
 **`af420224`** (14:35, 6.154 Dateien, `verify_backup.ps1` gruen); `restic find --snapshot af420224`: die 28
 Ketten-Skripte der Loeschliste 28 von 28, `selfplay_v26-b01-*` 1.201 von 1.201, `manifest_v26-b01-*` 3 von 3;
 Bloecke und Monolithe (`*.h5`) sind planmaessig NICHT in der Sicherung (`docs/backup_restore.md`, rekonstruierbar).
-Schritte 3-5 warten auf die pfadgenaue Freigabe des Nutzers (Abschnitt 6 Punkt 1). Schritt 6 (diese Neufassung)
-DURCH. Schritt 7: Prozessliste vor dem Start geprueft, Erzeugung startet mit
+Schritte 3-5 DURCH (Nutzer 2026-09-18, 15:0x: "Loeschfreigabe erteilt"; Ausfuehrung 15:05-15:10): 28 Ketten-Skripte per
+`git rm` (restic af420224: 28 von 28); 60 Modelldateien ohne Rolle (685 MB; Klassen wie vorgelegt, die Zahl 54 war
+ein Ueberschlag; je Arm `run:`-Snapshot im Repo); Korpus `selfplay_v26-b01-*` 1.201 Dateien plus 3 Manifeste
+(1,14 GB; restic 1.201 von 1.201 und 3 von 3); alle 10 Monolithe (6,13 GB) und alle 20.446 Alt-Bloecke (9,19 GB)
+plus 382 vom Waechter schon gebaute v26-Bloecke (Waisen), `*.h5` planmaessig nicht in der Sicherung
+(rekonstruierbar). `cache_inventory.py --orphans`: 0 Bloecke, 0 Waisen. Verbleibend: 12 Modelldateien
+(Champion b09, Generator b11, Vorgaenger v28-b02, b07, v27-b01, engine_test), 2.427 Korpusdateien (v28-b02,
+v27-b01, v29-b11 wachsend). Cache-Waechter 15:12 neu gestartet (baut die 888er-Bloecke fuer alle Fensterdateien).
+Skill-Vorlage auf `night_v30_chain.sh` umgestellt. Die Loeschungen sind noch NICHT committet (kein Commit neben
+dem laufenden Self-Play; Commit heute Abend oder morgen frueh). Schritt 6 (diese Neufassung) DURCH. Schritt 7: Prozessliste vor dem Start geprueft, Erzeugung startet mit
 `MOSAIC_V30_GENERATOR=models/alphazero_v29-b11.onnx MOSAIC_V30_GEN_NAME=v29-b11 bash tools/night_v30_generate.sh`,
-daneben der Cache-Waechter (Kopf der Kette). Startzeit und erster Record: siehe unten, sobald gestartet.
+daneben der Cache-Waechter (Kopf der Kette). **ERZEUGUNG GESTARTET 2026-09-18, 14:50:04** (Sockel `v29-b11-policy`, 4.000 Partien @100, Manifest
+`data/manifest_v29-b11-policy_20260918_145006.json`; Wheel-Vertrag 888/414 geprueft). **Vorfall 14:53:** die Kette
+haette nach 10 Minuten den ersten Record mit `pickle.load` auf einer gzip-Datei geprueft (derselbe Fehler wie in der
+Abnahme-Kette) und das Self-Play bei Exit ungleich 0 getoetet; der Ketten-Wrapper (bash) wurde deshalb beendet,
+das Self-Play (python, PID 27628) laeuft verwaist weiter und schreibt nach `data/`. `tools/night_v30_generate.sh`
+ist repariert (gzip), und `tools/night_v30_generate_rest.sh` wartet auf das Ende des Sockels, prueft den ersten
+Record (gzip) und faehrt Klassen 2 und 3 (Seeds 20260931/32). Cache-Waechter (3 Worker, 888-Schluessel) daneben.
+Commit `3d2550a7` vor dem Start (Push-Stand 18).
+
+**Wiedervorlage am ersten Record der v30-Erzeugung GRUEN (2026-09-18, 14:54; `data/selfplay_v29-b11-policy_20260918_1450_g10.pkl`,
+1.952 Records aus 10 Partien, gzip-gelesen, IDs ueber `neural_net.action_to_id`):** P.12 `designs` 577 Records,
+P.16 `designs_ordered` 577 Records (nur wo ein eigener Block liegt), Mondknoten 406-410 in `valid_actions` 478 / in
+`policy` 424, Rueckgabeknoten 411-413 11 / 11, Rotation 640 / 640, Slot 8.132. Der v30-Korpus traegt die neuen
+Merkmale und Knoten mit Lernziel; nichts faellt nach v31.
 
 ### Als naechstes, in dieser Reihenfolge
 

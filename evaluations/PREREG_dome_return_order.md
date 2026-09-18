@@ -1143,3 +1143,11 @@ Siehe `PREREG_moon_stack_order.md` 12.11: 702 Tests gruen nach bewusster Neuerze
 Netz-Paritaets-Fixture bewegt sich durch das neue Record-Feld `designs_ordered`, Hash `d049d1329abf2343`), Wheel
 09:30:43, config 888/414. Abnahme laeuft (`tools/night_v30_wheel_acceptance.sh`); die Record-Stichprobe darin
 zaehlt die Rueckgabe-Knoten (IDs 411-413) und ihre `policy`-Eintraege -- das ist die Wiedervorlage aus 12.9.
+
+### 12.11 Wiedervorlage P.16 und Rueckgabeknoten im v30-Korpus (2026-09-18): GRUEN
+
+**Wiedervorlage am ersten Record der v30-Erzeugung GRUEN (2026-09-18, 14:54; `data/selfplay_v29-b11-policy_20260918_1450_g10.pkl`,
+1.952 Records aus 10 Partien, gzip-gelesen, IDs ueber `neural_net.action_to_id`):** P.12 `designs` 577 Records,
+P.16 `designs_ordered` 577 Records (nur wo ein eigener Block liegt), Mondknoten 406-410 in `valid_actions` 478 / in
+`policy` 424, Rueckgabeknoten 411-413 11 / 11, Rotation 640 / 640, Slot 8.132. Der v30-Korpus traegt die neuen
+Merkmale und Knoten mit Lernziel; nichts faellt nach v31.

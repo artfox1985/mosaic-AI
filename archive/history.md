@@ -20629,3 +20629,16 @@ Champion-Kandidatur -- die Kanten liefen b07 und b09).
   zu, wodurch alle Vorzeichen vertauscht waren (vom Nutzer an einer Zahl erkannt).
 * Ein Commit-Hook lief um 21:40 neben einem Wanduhr-Lauf (auf Nutzer-Anweisung, Laufzeit als
   gebremst markiert).
+
+
+## Loeschungen des Generationswechsels v29 -> v30 (2026-09-18, 15:05-15:10, Freigabe des Nutzers "Loeschfreigabe erteilt")
+
+Snapshot `af420224` (daily, 14:35, 6.154 Dateien). Geloescht: 28 Ketten-Skripte `tools/night_v29_*.sh`,
+`night_v28_chain.sh`, `night_k6_*.sh`, `night_tiling_tiebreak_ab.sh` (`git rm`, restic find 28 von 28); 60
+Modelldateien (`alphazero_v28-b01*`, `v29-b01*`, `v29-b02*`, `v29-b03*`, `v29-b03-eval*`, `v29-b04*`, `v29-b05*`,
+`v29-b06*`, `v29-b08*` in allen Varianten, dazu `.onnx/.pth/_best` von `v29-b07`, `v29-b09` und `v28-b02`; je Arm
+`run:`-Snapshot im Repo); Korpus `selfplay_v26-b01-*` 1.201 Dateien und 3 Manifeste (restic 1.201/1.201, 3/3);
+10 Monolithe `.cache_*.h5` und 20.446 plus 382 Bloecke `.filecache_*.h5` (nicht in der Sicherung, rekonstruierbar,
+alle unter dem v30-Schluessel 888 unerreichbar). Behalten: `v29-b09_brierbest` (Champion), `v29-b11` (Generator),
+`v28-b02_brierbest` (Vorgaenger), `v29-b07_brierbest`, `v27-b01_brierbest`, `engine_test.onnx`, die Artefakte
+`frozen_champions/v29-b09`, `v28-b02`, `v27-b01` (letzteres bis zur v30-Promotion).
