@@ -770,7 +770,7 @@ impl PyGame {
     /// PREREG_action_id_logging.md, Stueck S2: schreibt EINE maschinenlesbare
     /// Zeile je angewandter Drafting-Aktion in den Log-Strom -- die
     /// Aktions-ID aus DEMSELBEN Raum, gegen den der Policy-Kopf trainiert
-    /// (`features::action_to_id`, `NUM_ACTIONS = 406`), plus die kanonischen
+    /// (`features::action_to_id`, `NUM_ACTIONS` = 414 seit Weg A/R3, damals 406), plus die kanonischen
     /// Felder als Rueckfallebene, falls sich der Raum spaeter verschiebt.
     ///
     /// ```text

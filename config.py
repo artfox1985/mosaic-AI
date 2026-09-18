@@ -46,7 +46,7 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 # PFLICHTSCHRITT beim Wheel-Bau von Abschnitt 16 (PREREG_stack_top_feature.md
 # par.17): diese Zeile im SELBEN Zug auf 794 setzen, in dem das neue Wheel
 # installiert wird -- vorher nicht, nachher nicht.
-INPUT_SIZE = 884        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13; +90 Tiling-Projektion Abschnitt 17, Variante C Arm v29-b07, PREREG_round_transition_search_sampling.md par.18, 2026-09-17)
+INPUT_SIZE = 888        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13; +90 Tiling-Projektion Abschnitt 17, Variante C Arm v29-b07, PREREG_round_transition_search_sampling.md par.18, 2026-09-17; +4 geordnete eigene Designs Abschnitt 18, P.16/R2, PREREG_dome_return_order.md par.12.6/12.8, 2026-09-18)
                         # +11 Kuppelstapel-Wissen aus `dome_pool_view` (Praefixlaenge; eigene Bloecke Laenge/Spezial/Wild;
                         #  Typenfolge der obersten 4 Positionen des obersten eigenen Blocks; fremde Bloecke Laenge/Spezial/Wild)
                         #  -- Variante B, PREREG_dome_stack_information_sets.md par.7/par.15f, PREREG_v28_window.md par.6, 2026-09-11: 744 -> 755
@@ -54,7 +54,9 @@ INPUT_SIZE = 884        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie
                         #  floor-Normierung /7.0 -> /4.0 korrigiert (kein Dim-Effekt);
                         #  Bonuschip-Farbmaske je Fabrik ergänzt: +5*4=+20; 673 -> 664 -> 684;
                         #  wild_remaining_frac ergänzt (Wild-Anteil der verdeckten Kuppelstapel-Restplatten): 707 -> 708)
-NUM_ACTIONS = 406       # action_to_id Ausgabebereich (405 = dome_stack_peek: Aktion A Schritt 1, parameterlos)
+NUM_ACTIONS = 414       # action_to_id Ausgabebereich (405 = dome_stack_peek: Aktion A Schritt 1, parameterlos)
+                        #  (406..410 choose_moon_top je Farbe, 411..413 choose_return_first je Zieh-Position: Weg A + R3,
+                        #   PREREG_moon_stack_order.md par.12.6/12.10, PREREG_dome_return_order.md par.12.7-12.9, 2026-09-18; 406 -> 414)
                         # (Baustein B, zweistufiger Kuppel-Suchknoten: 328 (Stone+Tiling)
                         #  + 27 choose_dome_slot (Kachel*Slot) + 36 choose_draw_stack_slot
                         #  (Pending*Slot) + 4 choose_dome_rotation (gemeinsam fuer beide

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: par.10 Marge 5 pp. b06 UNTERLEGEN (10.3: 44,5 Prozent, Block-z -2,86). Zweierpaket b08 (ownership 0, ohne endgame) HAELT (10.6: 405:395 von 800, Block-z +0,33). **ENTSCHIEDEN 2026-09-17: v30-Rezept ohne endgame-Kopf, ownership-Loss 0, opp_points bleibt (Traeger per Differenz).** Strang A abgeschlossen, Strang B/C erledigt. -->
+<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: par.10 Marge 5 pp. b06 UNTERLEGEN (10.3: 44,5 Prozent). b08 (ownership 0, ohne endgame) HAELT (10.6: 50,6 Prozent). **b09 = v30-Rezept auf dem v29-Fenster HAELT (10.10: 416:384 von 800 = 52,0 Prozent, Block-z +1,03, Strafleiste -1,2, Punkte +1,4).** ENTSCHIEDEN: v30 ohne endgame, ownership 0, moon 0, opp_points bleibt; b07 und b09 laufen die Champion-Kanten (10.9). Strang A abgeschlossen. -->
 
 # Vorregistrierung: Minimaler Staerkekern
 
@@ -623,3 +623,488 @@ b07-Verdikt und dem Setzen von `config.INPUT_SIZE`; Training rund 1 h (GPU, Mono
   bei b07/b08, weil der Mond-Loss (Gewicht 0) nicht mehr in die Summe geht -- kein Qualitaetsunterschied, andere
   Summe. Export `models/alphazero_v29-b09_brierbest.onnx` (884). **Tor 1 gegen b03 wartet seit 21:21:30 auf das
   Ende des K6-A/B**, dann exklusiv (Seeds 20261220/20261221).
+
+### 10.9 Kette fuer die Champion-Kanten (geschrieben 2026-09-17, nicht gestartet)
+
+Auftrag: STATUS Abschnitt 6 Punkt 18 (Nutzer 2026-09-17: *"dann warten wir auf b07 und fahren mit dem
+staerksten arm. v29-b09 nehmen wir ebenfalls mit"*). Kette `tools/night_champion_edges_v29.sh`,
+`bash -n` gruen, NICHT gestartet. Sie fuehrt die beiden Kandidaten **`v29-b07`** und **`v29-b09`**
+(beide INPUT_SIZE 884, `config.py:49`) durch die drei Aufhaengungen der Promotions-Checkliste
+(`docs/promotion_checklist.md` Punkte 2-4), Reihenfolge b07 zuerst, je Kandidat a) Gating, b) Anker,
+c) Champion-2.
+
+**Stufe 0, Vorbedingungen und Warten.** Modelle, Champion-Spec, die zwei Artefakt-Verzeichnisse
+`models/frozen_heuristics/hv4_anchor` und `models/frozen_champions/v27-b01` (je mit `venv/`), die vier
+Werkzeuge. Wheel-Probe wie in `tools/night_k6_w025_ab.sh`: `engine_config_json()` muss
+`special_unlock_w` kennen (das 884er Wheel vom 2026-09-17, 19:37), dazu `INPUT_SIZE = 884` in
+`config.py`. Danach Warteschleife auf ZWEI Bedingungen, Poll 120 s mit Meldung je Poll: CPU frei
+(gehaerteter PowerShell-Filter mit der Namensbedingung auf python, Muster `night_k6_w025_ab.sh`) UND
+`evaluations/artifacts/k6_w025_vs_off_s20261211.json` vorhanden. Die zweite Bedingung ist der Punkt:
+ohne sie startet die Kette neben der WARTENDEN K6-Kette und nimmt ihr die Maschine weg.
+`MOSAIC_CHAIN_NO_WAIT=1` ueberspringt die Schleife.
+
+**Stufe a) Gating gegen Champion-1** (`tools/paired_gating.py`): `models/alphazero_v28-b02_brierbest.onnx`,
+Champion-Spec `models/frozen_champions/v28-b02/spec.json` BEIDSEITS, 400 Sims, c_puct 1,5, Blockgroesse 5,
+`--max-pairs 200 --sprt-alpha 0.001 --sprt-beta 0.001`, `--threads 10 --log-games --no-promote-winner`.
+Spec und Flags sind uebernommen von der b03-Kante gegen den Champion (`PREREG_v29_window.md` par.9,
+"Flags bitgleich zur b01-Kante"; Skript `tools/night_v29_tor1_b03_vs_champion.sh`); der Unterschied ist
+gewollt: par.9 lief mit alpha = beta = 0,05 und drei frueh gestoppten Seeds, hier laeuft der Deckel von
+200 Paaren. Zwei Seeds je Kandidat (b07 20261230/20261231, b09 20261240/20261241), Artefakte
+`gating_<kandidat>_vs_v28-b02_s<seed>.json`, danach `tools/probes/arena_column_probe.py --artifact` und
+`tools/plate_points_from_arena.py ... --block 5`.
+
+**Stufe b) Anker-Kante** (`tools/frozen_referee_match.py`): 1:1 der Aufruf, der
+`evaluations/artifacts/anchor_edge_v29-b03_vs_hv4_anchor.json` erzeugt hat
+(`tools/night_v29_anchor_edge_b03.sh:42-54`, am Artefakt gegengelesen: `sims_a` 400, `c_puct_a` 1,5,
+`sims_worker` 150, `c_puct_worker` 0,3, `n_games` 150, `workers` 6, `force_cross_era` true,
+`spec_a` = Champion-Spec). Neu sind nur Modell, Seed-Basis und Ausgabename
+`anchor_edge_<kandidat>_vs_hv4_anchor.json`. Festes n=150 ohne Frueh-Stopp ist Checkliste Punkt 3.
+
+**Stufe c) Champion-2-Kante** gegen das Artefakt `v27-b01` @400: Form der Kante des amtierenden
+Champions, am Artefakt `champion2_v28-b02_vs_v26-b01.json` abgelesen (`sims_worker` 400,
+`c_puct_worker` 1,5, `n_games` 150, 6 Prozesse, `force_cross_era`, `spec_a` = die damalige
+Champion-Spec) und in `PREREG_code_cleanup_closeout.md` (Abschnitt "Champion-2-Kante (Promotion
+Schritt 4)") registriert. **n=150 ist belegt, nicht geschaetzt** -- auch `STATUS.md` Abschnitt 3 fuehrt
+"Anker-Kante n=150 / Champion-2-Kante n=150". Artefakte
+`champion2_<kandidat>_vs_v27-b01_s<seed-basis>.json`.
+
+**Kein INPUT_SIZE-Fallback noetig.** `tools/frozen_referee_match.py` kennt keinen input_size-Schalter
+(grep ohne Treffer), und die Engine schneidet den Flachteil auf die Modellbreite
+(`engine/src/net.rs:979`, `split_planes_flat_batch_src`: Planes ab 0 auf die Modellbreite, Flachteil ab
+der QUELL-Grenze). Das Artefakt v27-b01 ist 744 (`models/frozen_champions/v27-b01/manifest.json`, Feld
+`input_size`) und bringt sein eigenes Wheel mit. Praezedenz: die Kante v28-b02 (damals 755) gegen v26-b01
+(744) lief ohne Zusatzflag.
+
+**Spec-Nebenbefund, der eine Wahl erledigt:** `models/frozen_champions/v27-b01/spec.json` ist Feld fuer
+Feld INHALTSGLEICH mit `models/frozen_champions/v28-b02/spec.json` (verglichen 2026-09-17). Fuer die
+Champion-2-Kante gibt es also keine Spec-Entscheidung, die das Ergebnis verschiebt.
+
+**Seeds.** Gating aus dem Auftrag. Die beiden Anker-Seed-Basen (b07 20261600, b09 20261700) sind HIER
+gewaehlt, damit die je 150 fortlaufenden Seeds nicht in die Spanne der b03-Anker-Kante fallen
+(20261097 bis 20261246; `--seed-base` erzeugt `n_games` fortlaufende Seeds,
+`tools/frozen_referee_match.py:598-599`). Die Champion-2-Basen 20261250 und 20261251 stehen im Auftrag;
+ihre Spannen teilen 149 von 150 Seeds, die zwei Kanten sind damit faktisch gepaart -- lesbar, aber
+bewusst festgehalten, damit niemand es fuer Zufall haelt.
+
+**Kennzahlen.** Die sechs Standard-Kennzahlen (CLAUDE.md) laufen auf den vier Gating-Artefakten. Auf den
+vier frozen-Kanten laufen sie NICHT, und das ist begruendet statt weggelassen: `arena_column_probe.py`
+braucht je Partie `names`/`first_player`/`game_seed` aus `--log-games` (Docstring `_replay_end_state`),
+`frozen_referee_match` schreibt je Partie nur `scores`/`winner`/`steps`/`seed`/`first_player`/`board_a`/`log`
+(am Artefakt `anchor_edge_v29-b03_vs_hv4_anchor.json` nachgesehen). Was dort ablesbar ist -- eigene Punkte
+und Margin -- rechnet die Kette in Stufe Z selbst aus `games[].scores` und `games[].board_a`
+(`board_a` ist der Sitzindex von Seite A, `tools/frozen_referee_match.py:338`); Reihen-, Spalten- und
+Strafleistenauslastung bleiben in diesen zwei Stufen unmessbar.
+
+**Stufe Z.** Die Kette DRUCKT je Kandidat die fertigen `tools/elo_tracker.py add`-Zeilen mit den Zahlen
+aus den Artefakten (`--player-a/--player-b/--n`, `--knobs spec:frozen_champions/v28-b02/spec.json`, beim
+Gating `--units-from-paired-artifact`, `--early-stop` nur wenn `done_pairs < 200`) und fuehrt sie NICHT
+aus; dazu Laufzeiten. Der Koordinator prueft und traegt ein (Regel 0).
+
+**Kosten.** Gating 200 Paare @400 mit Logs: gemessen 4.606,9 s = 77 min
+(`evaluations/artifacts/tor1_v29-b08_vs_b03_s20261160.json`, `laufzeit.wanduhr_s`), Planungsgroesse
+STATUS Abschnitt 3 86-91 min, vier Laeufe. Anker-Kante n=150, 6 Worker: gemessen 1.292,8 s = 22 min
+(`anchor_edge_v29-b03...`, `elapsed_s`; `docs/measured_runtimes.md:197` nennt 1.441-1.491 s), zwei Laeufe.
+Champion-2-Kante n=150: gemessen 2.516 s und 2.578 s (`docs/measured_runtimes.md:202` und `:241`), zwei
+Laeufe. **ANNAHME: Summe rund 7,5 bis 8 h exklusiv** -- alle gemessenen Zahlen stammen von Kandidaten mit
+kleinerem Eingang, dass 884 die Kanten nicht teurer macht, ist unbelegt.
+
+**Offene Punkte fuer den Koordinator.**
+
+1. **`v29-b07` ist gesetzt, nicht aus einem Verdikt abgeleitet.** Der Auftrag nennt beide Kandidaten
+   namentlich; die Kette prueft kein "staerkster Arm"-Kriterium. Faellt b07s Tor 1 gegen b03 anders aus
+   als in STATUS Abschnitt 6 Punkt 20 vermerkt (dort: b07 traegt, Block-z +2,40), muss der Kandidatensatz
+   vor dem Start geaendert werden.
+2. **Die frozen-Artefakte tragen keinen `laufzeit`-Block** (nur `elapsed_s`, `total_steps`, `s_per_step`),
+   anders als es CLAUDE.md fuer Messartefakte verlangt. Die Kette liest deshalb `elapsed_s` und rechnet
+   `s je Partie` selbst. Ob `tools/frozen_referee_match.py` den Block nachtraegt, ist ein eigener
+   Entscheid -- eine Aenderung daran beruehrt ein Werkzeug, das in den Anker-Kanten haengt.
+3. **Eine Replikationszeile ist nicht vorgesehen** (Checkliste Punkt 2: noetig "falls Fruehstopp unter 150
+   Paaren"). Mit alpha = beta = 0,001 und Deckel 200 sollte kein Stopp fallen; falls doch, ist die
+   Replikation nachzuziehen und `--early-stop` zu setzen (die Kette druckt das Flag dann selbst).
+4. **Kein `set_champion`, kein Einfrieren, keine Pflicht-Diagnostik in dieser Kette.** Checkliste Punkte 1
+   und 5-7 laufen erst nach dem Nutzer-Entscheid; die Abschlussausgabe listet sie.
+
+### 10.10 Tor 1 v29-b09 gegen b03 GEMESSEN (2026-09-17/18, 21:34-00:24): das v30-Rezept HAELT, flach positiv
+
+Aufbau 10.7: `alphazero_v29-b09_brierbest.onnx` (884; moon 0, ownership 0, ohne endgame) gegen
+`alphazero_v29-b03_brierbest.onnx` (794), Champion-Spec beidseits, 400 Sims, zwei Seeds a 200 Paare ohne
+Frueh-Stopp, Blockgroesse 5, 10 Threads, exklusiv auf dem 884-Wheel mit K6-Knopf (Default 0). Grundmenge Partien,
+Einheit Siege.
+
+| Groesse | Seed 20261220 | Seed 20261221 | gepoolt |
+| --- | --- | --- | --- |
+| Siege b09 : b03 | 213 : 187 | 203 : 197 | **416 : 384 von 800 = 52,0 Prozent** |
+| Vorzeichentest | p 0,25 | p 0,84 | Sweeps 110 / 94, p 0,29 |
+| Diff je Paar, KI95 | +0,130 [-0,074; +0,334] | +0,030 [-0,161; +0,221] | |
+| eigene Punkte b09 / b03 | 52,66 / 51,26 | 54,03 / 52,71 | +1,37 |
+| **Block-Ebene** | | | 80 Bloecke, Siegdiff **+0,40 je Block, SE 0,39, z = +1,03** |
+| Laufzeit | 4.912,1 s (12,28 s je Partie) | 5.090,3 s (12,73 s je Partie) | |
+
+**Verdikt nach 10.7:** Marge haelt mit Abstand (52,0 gegen 45,0 Prozent), kein Seed dagegen, Block-z +1,03 nicht
+signifikant -> **die drei Knoepfe wirken zusammen mindestens neutral, eher leicht positiv; das v30-Rezept ist
+auf dem v29-Fenster bestaetigt.** Einordnung gegen die Einzelarme: b05 (nur moon 0) 53,4 Prozent, b08 (ownership 0,
+ohne endgame) 50,6 Prozent, b07 (nur 884) 54,0 Prozent, b09 (alles ausser der Projektion neu, plus 884) 52,0
+Prozent -- alle innerhalb der Seed-Streuung voneinander; die Knoepfe sind nicht additiv im Sinne einer Summe der
+Einzeleffekte, aber auch nicht gegenlaeufig. Fuer den Kaltstart in v30 (18.11) ist das die Basislinie, die er
+mindestens erreichen muss.
+
+**Sechs Standard-Kennzahlen** (Mittel je Seite ueber beide Seeds; `arena_columns_tor1_v29-b09_vs_b03_s*.json`,
+`plate_points_tor1_b09_s*.json`):
+
+| Kennzahl | b09 | b03 | Diff |
+| --- | --- | --- | --- |
+| Reihen: volle Zeilen / lange Reihen vollendet | 0,144 / 3,02 | 0,130 / 3,05 | +0,014 / -0,03 |
+| Spalten: volle / >= 3 | 0,925 / 3,19 | 0,966 / 3,21 | -0,041 / -0,02 |
+| **Strafleiste gesamt** | **7,81** | 8,97 | **-1,16** (`penalty_log` +1,80) |
+| Plattenpunkte je Kriterium | Eckplatten 8,85, Mehrfarbige 2,06, Vertikale 7,05, Spezialfelder -10,47 | 8,49, 2,64, 7,15, -10,45 | +0,36, **-0,57**, -0,11, -0,03 |
+| Spezialfelder belegt / Kuppelbonus | 1,29 / 5,32 | 1,27 / 5,30 | +0,02 / +0,02 |
+| Eigene Punkte / Marge | 53,35 / +1,37 | 51,98 / -1,37 | +1,37 / +2,73 |
+
+Lesart: b09 gewinnt seine 1,4 Punkte fast ganz ueber die Strafleiste (-1,16 Strafpunkte, der groesste
+Strafleisten-Effekt aller v29-Arme) und gibt bei den mehrfarbigen Feldern (-0,57) und den vollen Spalten (-0,04)
+etwas ab. Das ist ein anderes Profil als b07 (Spalten +0,05, Strafleiste -0,37): ohne die Hilfs-Losses spielt
+das Netz vorsichtiger. Merkposten fuer die v30-Abnahme: die Spalten-Kennzahl darf im Kaltstart nicht weiter
+sinken.
+
+**Folgen:** Fahrplan 36g DURCH; b09 ist Kandidat 2 fuer die Champion-Kanten (Kette 10.9 laeuft an) und Rueckfall 2
+fuer das v30-Training (18.11) ist damit gedeckt.
+
+### 10.11 Champion-Kanten v29-b07 GEMESSEN (2026-09-18, 01:48-05:36), Kette 10.9, exklusiv
+
+| Kante | Form | Ergebnis | Laufzeit |
+| --- | --- | --- | --- |
+| Gating gegen Champion-1 `v28-b02_brierbest` @400, Seed 20261230 | 200 Paare, Champion-Spec beidseits | b07 **204 : 196**, p 0,77 | 4.898 s |
+| Gating, Seed 20261231 (Replikation) | 200 Paare | b07 **214 : 186**, p 0,18 | 4.896 s |
+| Gating gepoolt | 800 Partien, 80 Bloecke | **418 : 382 = 52,3 Prozent, Block-z +1,17** | |
+| Anker-Kante hv4_anchor @150 (c_puct 0,3) gegen b07 @400, Seed-Basis 20261600 | 150 Partien ohne Stopp, Cross-Aera | b07 **129 : 21 = 86,0 Prozent** (b03: 128:22) | 1.246 s |
+| Champion-2-Kante gegen `v27-b01` @400, Seed-Basis 20261250 | 150 Partien ohne Stopp | b07 **81 : 69 = 54,0 Prozent** | 2.388 s |
+
+Grundmenge Partien, Einheit Siege. Alle drei Aufhaengungen liegen vor; keine ist gegen b07. **Lesart:** b07 ist
+gegen den Champion nicht signifikant besser (52,3 Prozent, z +1,17; b03 hatte 56,1 Prozent auf 490 Partien in
+drei Seeds, `v29_window` par.9), gegen den Anker gleich stark wie b03 (86,0 gegen 85,3 Prozent), gegen v27-b01
+mit 54,0 Prozent vorn. Die Elo-Zeilen druckt die Kette am Ende (Stufe Z); Eintrag nach Pruefung durch den
+Koordinator. Promotion ist Nutzer-Entscheid (Checkliste Punkte 5-7 danach: Pflicht-Diagnostiken, STATUS,
+Einfrieren).
+
+### 10.12 Generator-Identitaet v29-b10 und Abnahme-Kette (geschrieben 2026-09-18, nicht gestartet)
+
+**Entscheid (Nutzer 2026-09-18, "ja nimm es so in die kette auf").** Generator der v30-Erzeugung
+wird der Champion-Kandidat `v29-b07` (884 Eingaenge, 406er-Policy) mit auf 414 GEPOLSTERTEM
+Policy-Kopf: acht Nullzeilen im Gewicht und acht Nullen im Bias, ohne einen Trainingsschritt.
+Weil das ein anderes Artefakt ist als `v29-b07_brierbest`, bekommt es nach
+`feedback_measured_identity_gets_own_bxx` einen eigenen Namen: **`v29-b10`** (reserviert in
+`docs/generation_naming.md`).
+
+**Warum ueberhaupt polstern.** Das Wheel traegt NUM_ACTIONS 414 (Mondknoten 406-410, Rueckgabe
+411-413; Weg A / R3, par.12.6/12.10 in `PREREG_moon_stack_order.md`, par.12.7/12.8 in
+`PREREG_dome_return_order.md`) und INPUT_SIZE 888 (R2 / P.16 `designs_ordered`). Das Tor der
+neuen Suchknoten liest die Policy-Breite aus dem ONNX (`engine/src/net.rs`, `policy_width()` /
+`detect_policy_width`); ein 406er-Netz faellt kanonisch zurueck, die neuen Knoten blieben also
+ungenutzt und die Erzeugung ohne sie. Die Polsterung macht den Kopf 414 breit, ohne das alte
+Verhalten zu aendern: nach dem maskierten log_softmax sind die acht neuen Aktionen
+gleichverteilte, nicht bevorzugte Masse, und fuer die 406 alten Aktionen ist b10 exakt b07.
+
+**Werkzeug: `tools/pad_policy_head_export.py`** (geschrieben 2026-09-18, `py_compile` gruen, NICHT
+gelaufen). Laedt `models/alphazero_v29-b07_brierbest.pth` (`['model_state']`), polstert
+(1) den Policy-Ausgang auf `config.NUM_ACTIONS` an dim=0, Gewicht UND Bias, und (2) den
+Flach-Eingang (`flat_branch.0.weight`) auf `config.INPUT_SIZE` mit Nullspalten hinten. Beide
+Bauformen sind aus `train.py` uebernommen: Eingang `train.py:1684-1702` ("Additive
+Eingabe-Erweiterung"), Ausgang `train.py:1699-1729` ("Additive AUSGABE-Erweiterung des
+Policy-Kopfs"). Danach baut es das Modell mit `neural_net.build_model_from_checkpoint`
+(neural_net.py:2382), prueft die State-Dict STRIKT gegen das Modell (Key-Mengen und Formen; der
+Lader selbst arbeitet mit `strict=False`, neural_net.py:2441, und wuerde eine vergessene
+Polsterung still als zufaelligen Kopf durchlassen -- der Vorfall bei v6, `export_onnx.py:76-79`),
+schreibt `models/alphazero_v29-b10.pth` und exportiert ueber `export_onnx.export`, also GENAU die
+Routine, die `train.py:2704-2707` fuer jedes `_brierbest.onnx` aufruft. Damit stimmen opset (13),
+Eingabenamen (`planes`, `state`) und Ausgabenreihenfolge; die `.ref.txt` schreibt dieselbe Routine
+mit (`export_onnx.py:255-263`). Ausgabe: alte/neue Breiten, Pfade, sha256, `laufzeit`; Artefakt
+`evaluations/artifacts/pad_policy_head_v29-b10.json`. `--dry-run` druckt nur die Formen.
+
+**Kette: `tools/night_v30_wheel_acceptance.sh`** (`bash -n` gruen, alle sechs eingebetteten
+Python-Bloecke `py_compile` gruen, NICHT gestartet). Stufen mit Zeitstempel und Exit, STOPP bei Rot:
+
+| Stufe | Inhalt | Tor / STOPP |
+| --- | --- | --- |
+| 0 | `config.py` traegt `INPUT_SIZE = 888` und `NUM_ACTIONS = 414` (setzt der Koordinator), Wheel neuer als `engine/src/net_mcts.rs`, Quell-`.pth` und Spec da, `warte_frei` | ABBRUCH vor jeder Last |
+| 1 | `pip install --force-reinstall --no-deps`, dann Vertrag aus `engine_config_json()` (lib.rs:753): `input_size` 888 (:768), `num_actions` 414 (:771), `contract_hash` == `6ef829e564c58bd5` (Literal lib.rs:2548-2553), `return_order_mode` vorhanden, plus `config`-Seite | STOPP 12 |
+| 2 | Anker-Drift und -Konservierung, `hv4_anchor`, Leitersegment 2 | STOPP 20 / 21 |
+| 3 | `tools/probes/feature_parity_rust_python.py` | STOPP nur bei LAENGENfehler (30) |
+| 4 | Polsterung und Export (Werkzeug oben), dann Engine-Kontrolle: `mosaic_rust.onnx_eval` (lib.rs:653-661) auf dem neuen ONNX, `len(policy)` muss 414 sein | STOPP 40-43 |
+| 5 | **Kostentor**: b10 gegen sich selbst, `models/v30_generation.spec.json` beidseits, 2 x 20 Paare (Seeds 20261260/20261261), 400 Sims, Blockgroesse 5, 10 Threads, `--log-games`. Referenz **12,0 s je Partie** (`docs/measured_runtimes.md` Zeile 187: Tor 1 b07 gegen b03 auf dem 884-Wheel, Seed 20261191, 200 Paare, 10 Threads, Logs, exklusiv), Schwelle +25 Prozent. Verdikt `evaluations/artifacts/v30_wheel_kostentor_verdikt.txt` | Riss = STOPP 3, Nutzer-Entscheid |
+| 6 | **A/B gepolstert gegen ungepolstert**: A `v29-b10`, B `v29-b07_brierbest`, Spec beidseits, 400 Sims, 200 Paare, Blockgroesse 5, SPRT 0,001, Seed 20261270, `--no-promote-winner`; danach `arena_column_probe` und `plate_points_from_arena`. Artefakt `evaluations/artifacts/ab_v29-b10_vs_b07_s20261270.json` | Marge 5 pp: >= 45,0 Prozent HAELT, sonst STOPP 60 |
+| 7 | **Wiedervorlage-Probe**: 20 Partien Self-Play mit dem Generator (Argumente der Sockel-Klasse aus `tools/night_v30_generate.sh`), dann Pruefung der `data/selfplay_v29-b10-probe_*.pkl` | STOPP 70 / 71 bei (a) oder (b) |
+
+**Wie Stufe 7 die neuen Knoten nachweist (Feldnamen mit Pruefstelle).** Der Record traegt den
+Zustand unter `state`, das Policy-Ziel unter `policy` als Liste von
+`{"action": <Aktions-Dict>, "prob": ...}` und die Maske unter `valid_actions` als Liste von
+Aktions-Dicts (Pruefstelle: die Zeilen `m.insert("state"/"policy"/"valid_actions")` in
+`engine/src/self_play.rs`; kein Zeilenanker, weil die Datei am 2026-09-18 parallel bearbeitet
+wird). **Ein Feld namens `policy_target` gibt es im Record NICHT** -- gemeint ist dieses `policy`;
+`policy_target_valid` daneben ist ein Gueltigkeits-FLAG, nicht das Ziel. Die Aktions-ID entsteht
+erst in Python aus dem Dict: `neural_net.action_to_id` (neural_net.py:976), `choose_moon_top` ->
+406-410 (:1060), `choose_return_first` -> 411-413 (:1066). P.16 `designs_ordered` steckt
+geschachtelt in `dome_pool_view.blocks[*]` (`serialize.rs:119/167`) und wird deshalb am JSON-Text
+des Zustands gesucht, dieselbe Bauform wie `first_record_check` in
+`tools/night_v30_generate.sh:68-70`. Die Probe zaehlt je ID-Bereich (406-410 Mond, 411-413
+Rueckgabe, 328-354 und 355-390 Kuppel-/Stapel-Slot, 391-394 Rotation, 405 Stapel-Blick) getrennt
+fuer `policy` und `valid_actions`, Grundmenge Records dieser Probe, Einheit Vorkommen.
+(a) kein `designs_ordered` in irgendeinem Record oder (b) keine einzige ID >= 406 ist STOPP: dann
+waere die Erzeugung nutzlos und das Merkmal fiele eine Generation zurueck
+(`feedback_record_field_must_precede_generation`). (c) leere `policy` an einem neuen Knoten ist
+BEFUND, kein Stopp -- der Value-Anteil bleibt gueltig.
+
+**Lesart des A/B.** Erwartet ist Gleichstand, weil die acht Nullzeilen das alte Netz nicht
+veraendern. Haelt b10 die 5-Prozentpunkte-Marge, ist er der Generator; reisst sie, ist der
+gepolsterte Kopf als Generator nicht abgenommen und die Erzeugung bleibt ungestartet
+(Nutzer-Entscheid).
+
+**ANNAHME, ungeprueft:** der Kostentor-Aufschlag wird spuerbar sein, weil die Mond- und
+Rueckgabeknoten ZUSAETZLICHE Suchen sind; deshalb die 25-Prozent-Schwelle statt einer engeren.
+Ob und wie stark, ist offen, bis Stufe 5 gelaufen ist.
+
+**Messdateien:** `data/selfplay_v29-b10-probe_*.pkl` aus Stufe 7 gehoeren beim Bau des
+v30-Fensters in `MOSAIC_DATA_EXCLUDE` (`feedback_window_pinning_during_generation`).
+
+**Freigabe nach gruener Kette:** `MOSAIC_V30_GENERATOR=models/alphazero_v29-b10.onnx
+MOSAIC_V30_GEN_NAME=v29-b10 bash tools/night_v30_generate.sh`, aber erst nach dem
+Generationswechsel (`/mosaic-generation-turnover`).
+
+### 10.13 Champion-Kanten v29-b09 GEMESSEN (2026-09-18, 05:36-09:21), Kette 10.9, exklusiv -- und der Vergleich der Kandidaten
+
+| Kante | b09 | b07 (10.11) |
+| --- | --- | --- |
+| Gating gegen v28-b02, Seed 1 / Seed 2 | 210:190 / 213:187 | 204:196 / 214:186 |
+| Gating gepoolt (800 Partien) | **423:377 = 52,9 Prozent** | 418:382 = 52,3 Prozent |
+| Anker hv4@150, 150 Partien | 128:21+1 = **128:22 = 85,3 Prozent**, Punkte 59,3 gegen 41,9 | 129:21 = 86,0 Prozent, Punkte 58,8 gegen 42,1 |
+| Champion-2 gegen v27-b01, 150 Partien | **90:60 = 60,0 Prozent**, Punkte 54,2 gegen 50,5 | 81:69 = 54,0 Prozent, Punkte 54,5 gegen 51,6 |
+| Tor 1 gegen b03 (10.10 / 18.12) | 416:384, Block-z +1,03 | 432:368, Block-z +2,40 |
+
+Grundmenge Partien, Einheit Siege; Handshakes bewusst Cross-Aera, Golden-Selbsttest ohne Abweichung bei allen
+vier Referee-Kanten. Laufzeiten: Gating 4.778 / 4.855 s, Anker 1.281 s, Champion-2 2.340 s. Die acht Elo-Zeilen
+sind nach Pruefung gegen die Artefakte am 09:35 ins Register eingetragen (`tools/elo_tracker.py add`, Segment 2).
+**Champion-2-Kanten von b07 und b09 teilen 149 von 150 Seeds** (Basen 20261250/20261251) und sind damit
+faktisch gepaart: auf denselben Startbedingungen gegen v27-b01 gewinnt b09 90, b07 81 -- ein Hinweis, kein Tor.
+
+**Lesart:** beide Kandidaten bestehen alle drei Aufhaengungen; gegen den Champion sind sie gleich (52,9 gegen
+52,3 Prozent, beide nicht signifikant), gegen den Anker gleich, gegen v27-b01 liegt b09 vorn. Der einzige
+signifikante Befund der Serie bleibt b07 gegen b03 (Block-z +2,40); b09 gegen b03 ist flach. **Empfehlung des
+Koordinators: b07 als Champion** (der belegte Stärkebefund; b09s Vorsprung bei v27-b01 liegt in der
+Seed-Streuung), Generator b10 = b07 mit 414er-Kopf (10.12). Gegenposition, ehrlich: b09 traegt das v30-Rezept
+und ist in keiner Kante schlechter; wer den Generator mit dem Trainingsrezept gleichziehen will, nimmt b09.
+Nutzer-Entscheid (Checkliste Punkte 5-7 danach).
+
+**Leiter nach den Eintraegen (09:40, `elo_tracker.py report`, Segment 2, Block-Bootstrap):** v29-b03 1382 [1342; 1431]
+(640 Partien, 3 von 4 Kanten Frueh-Stopp), **v29-b09 1366 [1329; 1408]** (1.100 Partien, unverzerrt), **v29-b07 1357
+[1318; 1401]** (1.100), v28-b02 1349 [1315; 1385] (3.950), v27-b01 1308 [1272; 1344]. Alle Intervalle ueberlappen;
+die Leiter trennt die beiden Kandidaten nicht.
+
+### 10.14 Abnahme des 414/888-Wheels (2026-09-18, 09:31-09:55): Tore 1-4 gruen, KOSTENTOR GERISSEN, Kette gestoppt
+
+Kette `tools/night_v30_wheel_acceptance.sh` (10.12). **Gruen:** Installation, Manifest-Export `input_size` 888 /
+`num_actions` 414 / Vertragshash `6ef829e564c58bd5`; Anker-Drift und -Konservierung; Paritaetssonde (Flachvektor 888
+in 1.033 von 1.033 Zustaenden gleich, Planes nur der Kanal-76-Altbefund); Polsterung `v29-b10` (Policy-Kopf
+`policy_head.2` 406 -> 414, Eingang 884 -> 888, `models/alphazero_v29-b10.onnx`, die Engine laedt ihn mit
+`policy_width` 414, Artefakt `pad_policy_head_v29-b10.json`).
+
+**Kostentor (b10 gegen sich selbst, `v30_generation.spec.json` beidseits, 2 x 20 Paare, 400 Sims, 10 Threads):**
+17,11 s je Partie (Seed 20261260, 09:33-09:44) und 15,26 s (Seed 20261261, 09:44-09:55), Mittel 16,18 s gegen die
+Referenz 12,0 s (Tor 1 b07, 884-Wheel) -> **+34,9 Prozent, Schwelle +25, GERISSEN** (Exit 3, A/B und
+Record-Stichprobe nicht gestartet). Vorbehalt zum ersten Seed: parallel lief 09:40-09:4x der Elo-Report mit
+Block-Bootstrap (Koordinator-Nebenlast, ein Kern); der zweite Seed ist sauber und liegt mit **+27 Prozent**
+ebenfalls ueber der Schwelle.
+
+**Ursache (Herleitung am Code, keine Messung je Knoten):** mit offenem 414er-Tor entscheidet die Schleife den
+Stapelzug als eigene Suchknoten (Slot, Rueckgabe, Rotation) und den Mondknoten, jeder mit vollen `base_sims`
+(`net_effective_sims` entkoppelt Sims von der Aktionszahl, `net_mcts.rs:4122/4146`). In ARENEN ohne
+`MOSAIC_STACK_DRAW_RESEARCH` sind Slot und Rotation damit NEUE Suchen (bei 406er-Netzen loest der Resolver in
+einem Stueck); in der ERZEUGUNG (Research-Knopf an) wurden Slot und Rotation schon in v29 einzeln gesucht -- dort
+kommen nur Mond- und Rueckgabeknoten hinzu. Der gemessene Aufschlag ist also die Obergrenze fuer Arenen, nicht die
+Erwartung fuer die Erzeugung (ungemessen; die 20-Partien-Stichprobe der Kette wuerde sie liefern).
+
+**Nutzer-Entscheid (STATUS Abschnitt 6 Punkt 24).**
+
+### 10.15 ENTSCHIEDEN (Nutzer 2026-09-18, 10:05): "Weiter mit a und b09"
+
+1. **Champion = `v29-b09`** (10.10, 10.13: Tor 1 gegen b03 416:384, Gating 423:377, Anker 128:22, Champion-2 90:60;
+   Leiter 1366 [1329; 1408]). Promotion nach Checkliste Punkte 5-7 im Generationswechsel; b07 bleibt gemessener
+   Arm mit dem signifikanten Einzelbefund gegen b03 (18.12).
+2. **Kostentor-Riss hingenommen (Weg a aus 10.14)**; Budget-Knopf fuer die Hilfsknoten als Wiedervorlage v31.
+3. **Generator = `v29-b11`** = b09 gepolstert (Policy 406 -> 414, Eingang 884 -> 888), Kette
+   `tools/night_v30_acceptance_b11.sh` mit `SKIP_WHEEL_GATES=1`: Polsterung, Engine-Kontrolle (policy_width 414),
+   A/B b11 gegen b09 (200 Paare, Seed 20261271, Marge 5 Prozentpunkte), Record-Stichprobe 20 Partien (Seed
+   20260928, `designs_ordered`, IDs >= 406, `policy`-Eintraege). Das Kostentor aus 10.14 gilt architekturgleich
+   (ANNAHME, b10 und b11 sind dieselbe Netzform). Danach `/mosaic-generation-turnover` und
+   `MOSAIC_V30_GENERATOR=models/alphazero_v29-b11.onnx MOSAIC_V30_GEN_NAME=v29-b11 bash tools/night_v30_generate.sh`.
+
+### 10.16 Promotions-Kette v29-b09 (geschrieben 2026-09-18, nicht gestartet)
+
+Auftrag: 10.15 Punkt 1 (Nutzer 2026-09-18, 10:05, "Weiter mit a und b09"). Kette
+`tools/night_v29_b09_promotion.sh`, `bash -n` gruen, NICHT gestartet. Sie arbeitet die noch
+OFFENEN Punkte von `docs/promotion_checklist.md` ab; die drei Elo-Kanten (Punkte 2, 3, 4) sind
+durch und in 10.13 registriert und fehlen hier bewusst.
+
+**Vorlage.** `tools/night_v28_freeze.sh` und `tools/night_v28_promotion.sh` (Promotion v28-b02 am
+2026-09-12, 03:48-06:45). Beide Skripte sind im Aufraeumen `3688817b` geloescht worden und wurden
+fuer diese Kette aus der Historie gelesen; ihre Aufrufe von `set_champion`, `cargo test`,
+`cp`/`venv`/`pip`, `build_frozen_golden_probe`, `frozen_referee_match`, `platt_fit` und
+`gumbel_scale_calibration` sind 1:1 uebernommen, nur mit neuem Namen. Belegstellen zur
+Reihenfolge und zu den Zahlen des damaligen Laufs: `archive/history.md` Z. ~18218-18232 und
+`PREREG_code_cleanup_closeout.md` Abschnitt "Pflicht-Diagnostiken (Schritte 5b/5c)".
+
+**Stufe 0 Vorbedingungen und Warten.** Modell `.onnx`/`.pth`, Trainings-Manifest, Live-Wheel,
+Vorlage-Artefakt `models/frozen_champions/v28-b02` samt `venv/`, die fuenf Werkzeuge, beide
+Zustandssaetze; `models/frozen_champions/v29-b09/` darf NICHT existieren (ein gemessenes Artefakt
+wird nie ueberschrieben). Dann die gehaertete Warteschleife aus `tools/night_k6_w025_ab.sh:27`
+(Namensbedingung auf `python`, dazu `cargo`/`rustc`), Poll 120 s mit Meldung je Poll,
+`MOSAIC_CHAIN_NO_WAIT=1` ueberspringt sie. Die Schleife ist hier nicht nur wegen der Messungen
+noetig: Stufe 4 ist ein `cargo`-Bau und damit Volllast ueber viele Kerne.
+
+**Stufe 1, Punkt 1.** `python -X utf8 tools/set_champion.py v29-b09_brierbest`. Argumentform am
+Werkzeug geprueft: ein positionales `name` OHNE `alphazero_`-Praefix und `.onnx`-Suffix, das
+Werkzeug validiert die Existenz von `models/alphazero_<name>.onnx` (`tools/set_champion.py:28-34,
+47-50`). Die SPEC setzt `set_champion.py` NICHT (es schreibt nur `models/champion.txt`, Z. 40).
+Auffindbar wird sie durch Stufe 5: `server.py::_resolve_champion_spec` streift `_brierbest` ab und
+findet `models/frozen_champions/v29-b09/spec.json` (`server.py:257-266`). Die Kette druckt beide
+Kandidatenpfade und den ausdruecklichen Hinweis, dass zwischen Stufe 1 und Stufe 5 KEIN
+Server-Neustart fallen darf: in diesem Fenster gibt es keine Spec, und der Server kehrte still zu
+Env-Defaults zurueck (Vorfall v25-b01 bis v27-b01, Checkliste Punkt 1).
+
+**Stufe 2, Punkt 5b (Platt).** Zwei Fits auf `models/alphazero_v29-b09_brierbest.pth`:
+`--eval-set evaluations/frozen_eval_set_v3.pkl` (Anzeige) und `evaluations/frozen_eval_set.pkl`
+(Trend), Artefakte `platt_fit_v29-b09_v3.json` und `platt_fit_v29-b09.json` -- dieselbe Form wie
+bei v28-b02. **Zum Verteilungs-Caveat:** `tools/platt_fit.py` kennt als Quelle NUR `--eval-set`
+(`tools/platt_fit.py:39`), einen Schalter auf frische Partien gibt es nicht; vorhanden sind
+`frozen_eval_set.pkl` (v12-Aera), `_v2` und `_v3` (b01-Aera, 1.800 Zustaende, 360 je Runde,
+`PREREG_frozen_v3_eval_set.md:129`), `data/holdout/` existiert NICHT (geprueft 2026-09-18). Dass
+`_v3` fuer die v29-Aera "zeitgemaess" ist, ist damit eine ANNAHME und kein Beleg; ein
+v29-Zustandssatz ist offen. Die Kette DRUCKT A, B und Brier beider Fits samt der beiden Zeilen
+`_DISPLAY_CAL_A/_B` und traegt sie NICHT in `server.py` ein (Koordinator).
+
+**Stufe 3, Punkt 5c (sigma/Prior).** `tools/gumbel_scale_calibration.py --model v29-b09_brierbest
+--sims 400 --n-states 300 --out evaluations/artifacts/gumbel_scale_calibration_v29-b09.json`.
+**Argumentform korrigiert gegenueber dem Auftrag:** `--model` nimmt einen NAMEN, keinen Pfad; das
+Werkzeug baut `models/alphazero_<name>.onnx` selbst (`tools/gumbel_scale_calibration.py:85` und
+`:98`). Einen `--eval-set`-Schalter gibt es nicht, Zustandssatz und Orakel-Labels sind fest
+verdrahtet (Z. 65/66). Die Kette druckt die Kennzahl, die Vergleichswerte (v28-b02 2,222,
+v27-b01 2,161, v26-b01 2,270) und die Regel als Zeile: ueber 3 oeffnet sich die
+`c_visit/c_scale`-Familie per Regel, kein Ermessen.
+
+**Stufe 4, Punkt 5d (Paritaets-Fixture).** Erst Schreiblauf mit
+`MOSAIC_UPDATE_NET_PARITY_FIXTURE=1`, dann derselbe Test in einem frischen Prozess ohne die
+Variable; rot heisst STOPP. `--lib` ist richtig: der Test liegt in der Bibliothek
+(`engine/src/self_play.rs:8848`), nicht unter `engine/tests/`. Der PATH bekommt vorher das
+Python-Verzeichnis (sonst `STATUS_DLL_NOT_FOUND`, CLAUDE.md). Die Stufe steht NACH Stufe 1, weil
+die Fixture `models/champion.txt` folgt.
+
+**Stufe 5, Punkt 7 (Artefakt).** `model.onnx`, `model.pth`, `spec.json` als Kopie der
+Champion-Spec `models/frozen_champions/v28-b02/spec.json` mit einem Feld-fuer-Feld-Vergleich als
+Tor (b09 IST mit dieser Spec gemessen: `tools/night_champion_edges_v29.sh:96`,
+`tools/night_v29_b09_v30_recipe.sh:89`), Wheel-Kopie, `wheel.sha256`, Live-Beleg aus
+`direct_url.json`, venv, Vorab-Manifest, Golden Probe (`--seed-base 916001`), Referee-Selbsttest
+mit 2 Echtpartien. Das Manifest traegt die zwei Pflichtfelder `name_dialect: "hv"` und
+`worker_python.interpreter_relative` (ohne sie scheitert der Referee ohne Befund, Vorfall
+2026-09-04). `numpy` und `onnxruntime` werden nachinstalliert, weil die Vorlage-venv beide traegt
+(nachgesehen in `models/frozen_champions/v28-b02/venv/Lib/site-packages`).
+
+*Eine bewusste Abweichung von der v28-Vorlage:* die Wheel-Kopie im Artefakt traegt den
+KANONISCHEN Dateinamen `mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl` (v28:
+`mosaic_rust_knobs_20260912.whl`), und die venv wird AUS DIESER KOPIE installiert statt aus
+`engine/target/wheels/`. Grund steht in der Checkliste selbst (Punkt 7: pip lehnt umbenannte
+Wheel-Dateinamen ab, also Kopie unter kanonischem Namen installieren); dazu haengt das Artefakt
+sonst an einem Pfad, den der naechste Wheel-Bau ueberschreibt.
+
+*Netzbreite gegen Motorbreite, benannt statt verschwiegen:* b09 ist 884 Eingaenge / 406 Aktionen
+(`models/manifest_train_v29-b09_20260917_200920.json`, `engine_config.input_size`/`num_actions`;
+Kontrakt zur Trainingszeit `cfd94509f0aab102`), das installierte Wheel vom 2026-09-18, 09:30 ist
+888/414 (`config.py:49`/`:57`). Das Manifest fuehrt beide Paare getrennt, und `contract_hash` ist
+der des LEBENDEN Wheels: gegen ihn prueft der Handshake
+(`tools/frozen_referee_match.py:144-155`), und Artefakt-Wheel und Live-Wheel sind hier dasselbe
+(sha256 `da24f156eda89563...`, gelesen 2026-09-18). Ein `--force-cross-era` ist deshalb NICHT
+noetig.
+
+**Stufe 6.** Die Kette druckt die faelligen Registrierungen: `server.py`-Eintrag, STATUS-
+Champion-Zeile, history-Kapitel, Promotions-Absatz hier samt Zeile-1-Kopf und
+`generate_prereg_index.py`, Vervollstaendigung des Manifests nach dem Feldbild von v28-b02,
+Laufzeiten nach `docs/measured_runtimes.md` -- und den UNGEKLAERTEN Punkt (siehe unten). Danach
+eine Gegenprobe, die `server.py:257-266` nachbildet und zeigt, dass die Champion-Spec jetzt
+gefunden wird.
+
+**Kosten (Planung).** Platt 12 s + 9 s, sigma/Prior 787 s
+(`docs/measured_runtimes.md:206`, je v28-b02); venv 24 s, Golden Probe **1.450 s** einkernig @400,
+Referee-Selbsttest 78 s (`docs/measured_runtimes.md:211`; die Checkliste nennt "rund 22 min" fuer
+die Golden Probe, gemessen sind 24 min). Stufe 4 ist in keiner Zeile der Kostentabelle eigens
+ausgewiesen: ANNAHME 10-25 min fuer die zwei `cargo`-Laeufe, davon der Grossteil Bauzeit.
+Summe ANNAHME rund 50-70 min Wanduhr, exklusiv. Alle gemessenen Zahlen stammen vom 755er Modell
+auf dem damaligen Wheel; dass 884/888 sie nicht verschiebt, ist ANNAHME.
+
+**OFFEN, nicht still weggelassen: die #29-Buchfuehrung** (Checkliste Punkt 5). Eine Datei dieses
+Namens gibt es im Baum NICHT; gegreppt ueber `evaluations/` und `docs/` am 2026-09-18 finden sich
+nur VERWEISE (`docs/promotion_checklist.md:55`, `PREREG_lambda_wdl_arm.md:46`,
+`PREREG_t35b_ranking.md:26`, `PREREG_task_d_weights.md:106/112/132/163`). Die Frage selbst ist
+Task #29 und liegt in `evaluations/PREREG_value_rank_metric.md` (Zeile 1: ENTSCHIEDEN, die
+Rangmetrik ist NICHT validiert). ANNAHME: gemeint ist, die Offline-Kennzahlen des Siegers dort
+oder in der Fenster-Prereg festzuhalten, damit spaeter eine echte Vorhersage geprueft werden
+kann. Wohin, ist ein Nutzer-Entscheid; die Kette druckt den Punkt samt dieser Lage.
+
+### 10.17 A/B v29-b11 gegen v29-b09 und Record-Stichprobe GEMESSEN (2026-09-18, 12:22-13:49): der Generator steht
+
+**A/B (Kette `tools/night_v30_acceptance_b11.sh`, `SKIP_WHEEL_GATES=1`):** `v29-b11` (b09 mit 414er-Kopf, offenes Tor:
+Mond-, Rueckgabe-, Slot- und Rotationsknoten als eigene Suchen mit Gleichverteilungs-Prior) gegen
+`v29-b09_brierbest` (406er-Kopf: Aufloeser in einem Stueck, `return_order_mode 1`, kanonische Mondreihenfolge),
+beide mit `models/v30_generation.spec.json`, 400 Sims, Blockgroesse 5, Seed 20261271, 10 Threads, exklusiv.
+**SPRT hat H1 bei 175 Paaren angenommen** (LLR ueber +6,91).
+
+| Groesse | Wert |
+| --- | --- |
+| Siege b11 : b09 | **212 : 138 von 350 = 60,6 Prozent** |
+| Sweeps b11 / b09 | 63 / 26; McNemar p 0,00011 |
+| **Block-Ebene** | 35 Bloecke, **z = +3,94** |
+| eigene Punkte b11 / b09 | 57,38 / 53,34 (**+4,0**) |
+| Laufzeit | 5.040,5 s, 14,4 s je Partie (b11-Seite traegt die Zusatzsuchen) |
+
+**Lesart, mit dem Konfundierer vorneweg:** dasselbe Netz, dieselben Gewichte fuer alle 406 alten Aktionen -- der
+Unterschied ist allein, dass die Suche den Stapelzug (Slot, Rueckgabe, Rotation) und die Mondreihenfolge als eigene
+Knoten entscheidet. Das kostet +35 Prozent Wanduhr (10.14), also ist der Gewinn zum Teil mehr Rechnung je Partie;
+wie viel davon "mehr Suche" und wie viel "bessere Entscheidung" ist, trennt dieser Aufbau nicht (ein Kontroll-A/B
+b09 @540 Sims gegen b09 @400 waere die Trennung; nicht gefahren, v30+-Regel). Fuer die Erzeugung ist das ohne
+Belang: der Generator spielt so, wie der Korpus es tragen soll. **Marge haelt weit, b11 ist der Generator.**
+Nebenbefund fuer STATUS Punkt 19: die neuen Knoten sind kein reiner Korrektheitsentscheid mehr, sie tragen
+gemessen Staerke -- der bisher groesste Einzeleffekt der Kampagne, wenn auch konfundiert mit Rechenzeit.
+
+**Record-Stichprobe (Self-Play 20 Partien @100, `v29-b11-probe`, Seed 20260928, 3.941 Records, 79,6 s = 3,98 s je
+Partie gegen 3,18 in der v28-Erzeugung = +25 Prozent, `manifest_v29-b11-probe_20260918_134726.json`):** die
+Kette brach an der Auswertung ab (`pickle.load` auf gzip-Dateien, Exit 1 -- Werkzeugfehler, nicht Befund); der
+Koordinator hat die Pruefung mit `gzip.open` nachgeholt (Grundmenge Records, Einheit Vorkommen in
+`valid_actions` / `policy`, IDs ueber `neural_net.action_to_id`):
+
+| Pruefpunkt | Ergebnis |
+| --- | --- |
+| P.16 `designs_ordered` im Zustand | 792 von 3.941 Records (nur wo ein eigener Block liegt) -- **vorhanden** |
+| Mondknoten 406-410 | 1.035 in `valid_actions`, **905 in `policy`** |
+| Rueckgabeknoten 411-413 | 20 / **20** (selten, wie 12.5 erwartet: rund 0,5 je Partie und Seite) |
+| Slot 328-390 / Rotation 391-394 / Peek 405 | 15.172 / 1.280 (policy 1.280) / 1.271 |
+| Records mit neuem Knoten (>= 406) | 479, **alle 479 mit nicht-leerer `policy`** |
+
+**Wiedervorlage aus STATUS Punkt 21 damit GRUEN:** der v30-Korpus wird die Knoten mit Lernziel tragen. Die
+Probe-Dateien `data/selfplay_v29-b11-probe_*.pkl` sind Messdateien (MOSAIC_DATA_EXCLUDE beim Fensterbau).
+**Freigabe fuer `MOSAIC_V30_GENERATOR=models/alphazero_v29-b11.onnx MOSAIC_V30_GEN_NAME=v29-b11 bash
+tools/night_v30_generate.sh` nach dem Generationswechsel.** Erwartete Erzeugungskosten aus der Probe: rund
++25 Prozent gegen v28 (ANNAHME aus 20 Partien), also rund 12,5 h fuer 3 x 4.000.
+
+### 10.18 Promotion v29-b09 DURCH (2026-09-18, 13:54-14:32, Kette 10.16, dritter Anlauf)
+
+Zwei Anlaeufe scheiterten am Python-Lader nach dem Kontraktwechsel (Policy-Breite aus config statt Checkpoint;
+Zwilling ohne Eingangs-Schnitt) -- beides behoben (`neural_net.py`, `docs/pitfalls.md`), 141 Python-Tests gruen.
+
+| Checkliste | Ergebnis |
+| --- | --- |
+| 1 `set_champion.py` | `models/champion.txt` = `v29-b09_brierbest` |
+| 5b Platt-Fit (frozen_v3 = Anzeige) | **A -0,0513 / B 0,6488**, Brier 0,255 (v28-b02: -0,0539 / 0,6684 / 0,225); Trend frozen_v1 A 0,384 / B 0,607; in `server.py` eingetragen |
+| 5c sigma/Prior-Balance (400 Sims, 300 Zustaende) | Median **1,83**, IQR [0,66; 5,91], Mittel 11,9 -- unter 3, die c_visit/c_scale-Familie bleibt geschlossen |
+| 5d Netz-Paritaets-Fixture | neu `01e627ef5e520619` (3 Partien, 8 Sims), frischer Prozess gruen |
+| 7 Artefakt `models/frozen_champions/v29-b09/` | model.onnx/.pth, spec.json (= Champion-Spec), Wheel 414/888 (sha256 `da24f156eda89563...`, identisch mit dem Live-Wheel laut `direct_url.json`), manifest.json, venv, Golden-Probe (22 min, Seed-Basis 916001), Referee-Selbsttest: Handshake ok (`6ef829e564c58bd5` beidseits), Golden 10/10, zwei Echtpartien |
+| Laufzeit gesamt | 13:54:47 bis 14:32:29 = 38 min |
+
+Merkposten: der Champion spielt mit 406er-Policy auf dem 414er-Wheel kanonisch (kein neuer Knoten); die Kanten
+der Leiter sind damit weiter vergleichbar. Die #29-Buchfuehrung (Offline-Kennzahlen des Siegers) hat keine
+Datei; die Kennzahlen stehen hier und in 10.10 (val_brier 0,1785, Val-R2 0,550).

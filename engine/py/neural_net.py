@@ -75,6 +75,16 @@ LEN_WITH_SIGHT_APPENDIX = 794
 # (PREREG_round_transition_search_sampling.md par.18).
 TILING_PROJECTION_VALUES = 2 * (36 + 9)
 LEN_WITH_TILING_PROJECTION = LEN_WITH_SIGHT_APPENDIX + TILING_PROJECTION_VALUES
+# Vektorlaenge MIT Abschnitt 18 (geordnete eigene Designs, R2/Merkmal P.16;
+# PREREG_dome_return_order.md par.12.6). 884 + 4, Spiegel von
+# `features.rs::ORDERED_DESIGN_VALUES` (= DOME_POOL_TOP_TYPES, dieselben vier
+# Positionen wie die Typfolge aus Abschnitt 15).
+ORDERED_DESIGN_VALUES = 4
+LEN_WITH_ORDERED_DESIGNS = LEN_WITH_TILING_PROJECTION + ORDERED_DESIGN_VALUES
+# Normierung der Design-Nummer in Abschnitt 18: `tile_id / 17` (Prereg
+# wortgleich; 17 = groesste tile_id bei 18 Designs). Spiegel von
+# `features.rs::ORDERED_DESIGN_NORM`.
+ORDERED_DESIGN_NORM = 17.0
 # Hoechststand einer Farbe im Turm (`tower.rs`); die Prereg normiert /13.
 TOWER_COLOR_NORM = 13.0
 # Obergrenze fuer den BESTAND gehaltener Bonuschips: `BONUS_CHIPS_PER_ROUND`
@@ -658,6 +668,35 @@ def state_to_tensor_python(data):
     # Umkehrung des Unfalls vom 2026-09-11 und genauso unsichtbar.
     features.extend(_tiling_projection_values(data))
 
+    # SCHARFSCHALTUNG Abschnitt 18, dieselbe Schaltstelle wie oben: solange
+    # `config.INPUT_SIZE` unter 888 steht, endet der Vektor hier.
+    if INPUT_SIZE < LEN_WITH_ORDERED_DESIGNS:
+        return torch.tensor(features, dtype=torch.float32)
+
+    # 18. Geordnete eigene Designs (R2 / Merkmal P.16,
+    # PREREG_dome_return_order.md par.12.6), spiegelbildlich zu features.rs
+    # Abschnitt 18: vier Werte ANS ENDE, Indizes 0..883 unveraendert.
+    # Design-Nummer der Positionen 0..3 des OBERSTEN EIGENEN Rueckgabeblocks als
+    # `tile_id / 17`; `0`, wenn die Position fehlt oder das Feld nicht da ist
+    # (Alt-Records bis v29 lesen sich als "Merkmal aus").
+    #
+    # Quelle ist `dome_pool_view.blocks[].designs_ordered` -- dieselbe Menge wie
+    # das sortierte `designs` (P.12, Indizes 771-788), aber in
+    # Stapelreihenfolge. Nur der eigene Block traegt das Feld; fremde Bloecke
+    # haben `null` (die Vorderseite eines fremden Blocks hat der Betrachter nie
+    # gesehen, erst recht nicht ihre Reihenfolge).
+    _ordered = [0.0] * ORDERED_DESIGN_VALUES
+    for _b in _view.get("blocks", []) or []:
+        if not _b.get("own"):
+            continue
+        _ids = _b.get("designs_ordered") or []
+        if isinstance(_ids, list):
+            for _i in range(ORDERED_DESIGN_VALUES):
+                if _i < len(_ids) and _ids[_i] is not None:
+                    _ordered[_i] = float(int(_ids[_i])) / ORDERED_DESIGN_NORM
+        break  # nur der OBERSTE eigene Block, wie features.rs
+    features.extend(_ordered)
+
     return torch.tensor(features, dtype=torch.float32)
 
 
@@ -897,6 +936,9 @@ def state_to_planes_python(data) -> torch.Tensor:
 
 
 MAX_PENDING_STACK_TILES = 4  # muss zu features.rs::MAX_PENDING_STACK_TILES passen
+# Deckel der Rueckgabe-Kandidaten (R3) -- muss zu
+# `self_play.rs::RETURN_ORDER_MAX_PERMUTED` passen.
+RETURN_ORDER_MAX_PERMUTED = 3
 
 # Sentinel-ID fuer einen Aktionstyp ohne eigenen Zweig -- muss zu
 # `features.rs::UNKNOWN_ACTION_ID` passen. Bewusst NICHT 405
@@ -920,6 +962,10 @@ KNOWN_ACTION_TYPES = (
     "use_chips",
     "bonus_chip",
     "dome_stack_peek",
+    # Weg A / R3, 2026-09-18 (PREREG_moon_stack_order.md par.12.6,
+    # PREREG_dome_return_order.md par.12.7).
+    "choose_moon_top",
+    "choose_return_first",
 )
 
 
@@ -1010,6 +1056,17 @@ def action_to_id(action: dict) -> int:
 
     if t == "dome_stack_peek":
         return 405
+
+    if t == "choose_moon_top":
+        # Weg A: fuenf IDs, eine je Farbe, Reihenfolge wie COLOR_MAP
+        # (= `TileColor::NORMAL`). EINE Familie fuer ALLE Stufen des Knotens.
+        c_id = max(0, COLOR_MAP.get(action.get("color"), 0))
+        return 406 + c_id  # 406-410
+
+    if t == "choose_return_first":
+        # R3: drei IDs nach ZIEH-POSITION, Deckel = RETURN_ORDER_MAX_PERMUTED
+        # (self_play.rs), derselbe wie bei Modus 1.
+        return 411 + max(0, min(RETURN_ORDER_MAX_PERMUTED - 1, action.get("draw_index", 0)))  # 411-413
 
     # Kein stiller Rückfall mehr (früher `return 405`, also die ID von
     # `dome_stack_peek`): jeder von der Engine erzeugte Typ hat oben einen
@@ -1876,6 +1933,11 @@ class MosaicNet(nn.Module):
 
 
     def forward(self, x):
+        expected = self.body[0].in_features
+        if x.shape[-1] > expected:
+            # Gleiche additive Eingabe-Regel wie in `Mosaic2DNet.forward`: auf die
+            # Modell-Breite schneiden, wie es die Engine tut (`net.rs`, Flat-Pfad `n.min(len)`).
+            x = x[..., :expected]
         shared = self.body(x)
         pts_out = self.points_head(shared)
         pts_logits = None
@@ -2277,6 +2339,13 @@ class Mosaic2DNet(nn.Module):
             x_flat = torch.zeros(
                 x_planes.shape[0], self.input_size, dtype=x_planes.dtype, device=x_planes.device
             )
+        elif x_flat.shape[-1] > self.input_size:
+            # Additive Eingabe-Regel wie in der Engine (`net.rs::split_planes_flat_batch_src`
+            # schneidet den Flachteil auf die MODELL-Breite): ein aelteres Netz bekommt von
+            # einem breiteren Encoder nur seine ersten `input_size` Werte. Ohne diesen
+            # Schnitt scheiterte `tools/platt_fit.py` am 2026-09-18 an "1x888 and 884x512"
+            # (config.INPUT_SIZE 888, Champion b09 mit 884).
+            x_flat = x_flat[..., : self.input_size]
         c = self.conv(x_planes).flatten(1)
         f = self.flat_branch(x_flat)
         shared = self.fusion(torch.cat([c, f], dim=1))
@@ -2322,7 +2391,7 @@ class Mosaic2DNet(nn.Module):
         return out
 
 
-def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_actions: int = NUM_ACTIONS,
+def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_actions: int | None = None,
                                 hidden_override: int | None = None):
     """Baut ein `MosaicNet` ODER `Mosaic2DNet` passend zu `ckpt` (ein bereits
     geladenes `.pth`-Dict) und lädt die Gewichte -- gemeinsame Stelle für
@@ -2354,6 +2423,16 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     # ein Alt-Checkpoint (kein `value_head.2.weight` mit Breite 2) baut den
     # klassischen Tanh-Kopf, bleibt also unveraendert ladbar/exportierbar.
     value_head_variant = value_head_variant_from_state(state)
+    # Policy-Breite AUS DEM CHECKPOINT, nicht aus `config.NUM_ACTIONS` (gleiches
+    # Muster wie `in_size`/`pc`): seit dem Kontraktwechsel 406 -> 414 (Weg A + R3,
+    # 2026-09-18) traegt jeder Alt-Checkpoint einen schmaleren Kopf; die Engine
+    # liest die Breite ohnehin aus dem ONNX (`net.rs::policy_width`). Ohne diese
+    # Ableitung scheiterte `platt_fit.py` am 2026-09-18 an `size mismatch for
+    # policy_head.2.weight` (406 gegen 414). Wer eine ANDERE Breite will (z.B.
+    # die Warmstart-Polsterung in train.py), uebergibt `num_actions` explizit.
+    if num_actions is None:
+        pk = "policy_head.2.weight" if "policy_head.2.weight" in state else "policy_head.0.weight"
+        num_actions = int(state[pk].shape[0])
     if encoder == "2d":
         in_size = input_size if input_size is not None else state["flat_branch.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0

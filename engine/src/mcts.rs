@@ -303,6 +303,15 @@ fn move_priority(m: &SearchMove) -> i32 {
             Action::Stone(_) => 4,
             Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => 3,
             Action::ChooseDrawStackSlot(_) | Action::DrawStackPeek => 2,
+            // Weg A / R3 (PREREG_moon_stack_order.md par.12.2,
+            // PREREG_dome_return_order.md par.12.1): Teilzuege der jeweiligen
+            // Hauptaktion, also dieselbe Prioritaet wie diese. Auf DIESEM Pfad
+            // (Heuristik-Suche, Elo-Anker) sind sie unerreichbar -- die Knoten
+            // haengen an `GameState::extended_action_nodes`, das nur die
+            // Netz-Seiten in `self_play::unified_game_loop` setzen. Der Arm
+            // steht nur, weil `match` vollstaendig sein muss.
+            Action::ChooseMoonTop(_) => 4,
+            Action::ChooseReturnFirst(_) => 2,
             Action::Pass => 1,
         },
     }
@@ -786,6 +795,18 @@ pub(crate) fn label_search_move(sm: &SearchMove, state: Option<&GameState>) -> (
                 "bonus_chip",
                 format!("Bonuschip F{}", m.factory_id),
                 "chip",
+                action_to_dict(a),
+            ),
+            Action::ChooseMoonTop(c) => (
+                "choose_moon_top",
+                format!("Mondstapel: {} oben", c.value()),
+                "stone",
+                action_to_dict(a),
+            ),
+            Action::ChooseReturnFirst(pos) => (
+                "choose_return_first",
+                format!("Rueckgabe: Ziehposition {pos} zuerst"),
+                "dome",
                 action_to_dict(a),
             ),
             Action::Pass => ("pass", "Pass".to_string(), "pass", action_to_dict(a)),

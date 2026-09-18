@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1-3 NULL (par.9-11), Hebel haeufig aber flach (12.3b). Ziel des Kopfs ist No-Op (12.0); b04 TRAEGT NICHT (12.8), b05 (Gewicht 0) besser als b03 (427:373, z 1,98). **ENTSCHIEDEN 2026-09-17: `--moon-loss-weight 0` im v30-Rezept (12.9); Weg A (`ChooseMoonTop`) wird gebuendelt mit R3 zu NUM_ACTIONS 414 VOR der v30-Erzeugung gebaut (12.6), Korrektheitsentscheid, Wirkung ab v31.** -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1-3 NULL, Hebel haeufig aber flach (12.3b). b04 traegt nicht (12.8), b05 (Gewicht 0) besser als b03 -> `--moon-loss-weight 0` im v30-Rezept ENTSCHIEDEN (12.9). **Weg A (`ChooseMoonTop`, eigener Knoten, NUM_ACTIONS 414 mit R3) ENTSCHIEDEN (12.6) und CODIERT (12.10, unkompiliert, additiver Policy-Kopf, Vertragshash 6ef829e564c58bd5); Kompilat, Fixtures, Wheel, Drift, Kostentor VOR der v30-Erzeugung.** -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -1667,3 +1667,156 @@ b05 mit Gewicht 0 schlaegt b03 427:373, z 1,98) gilt damit als Rezeptentscheid. 
 in der ONNX-Form (Suche liest den Prior fuer die Auffaecherung), sein Loss-Gewicht ist 0. `v29-b09` faehrt
 das bereits (`minimal_strength_core` 10.7). Mit 12.6 (Weg A vor der v30-Erzeugung) wird der Kopf ab v31
 durch den eigenen Entscheidungsknoten ersetzt; bis dahin kanonische Reihenfolge plus Prior-Auffaecherung.
+
+
+### 12.10 Baustand Weg A (2026-09-18, Agent)
+
+Code vollstaendig, **Kompilat und Wheel stehen aus** (auf der Maschine liefen exklusive
+Arena-Messungen; der Auftrag war ausdruecklich "Code ohne Kompilat"). Es ist nichts gemessen
+und nichts committet.
+
+**Das Tor, an dem alles haengt.** Neues Zustandsfeld `GameState::extended_action_nodes:
+[bool; NUM_PLAYERS]` (`state.rs:116-134`). Es wird an GENAU EINER Stelle gesetzt:
+`self_play::unified_game_loop` (`self_play.rs`, direkt nach dem Bau des `Game`), je Seite aus
+`PlayerLoopConfig::tiling_net` und `net_mcts::net_supports_extended_action_nodes` (`net_mcts.rs`,
+neben `NUM_ACTIONS`). Dieses liest `Net::policy_width()` (`net.rs`, neues Feld plus
+`detect_policy_width` -- die Ausgangs-Fact des auf Batch 1 fixierten Plans, `None` wenn nicht
+konkret). Damit gilt: Policy-Breite >= 414 -> Knoten an, sonst aus.
+
+**Anker-Belege (Pruefstellen, nicht Herleitung).**
+
+* Alle acht `PlayerLoopConfig`-Konstruktionsstellen geprueft (`self_play.rs`, Zeilen 4467,
+  4987, 5004, 5176, 5196, 6020, 6039, 8001): JEDE Heuristik-Seite traegt `tiling_net: None`,
+  jede Netz-Seite `Some(net)` ihrer eigenen Seite. Der Heuristik-Pfad kann das Tor also nicht
+  einschalten -- `is_some_and` ist dort `false`.
+* `mcts.rs`, `round5.rs`, `referee.rs`, `py.rs` (GUI) setzen das Feld NIE. Sie erreichen die
+  Knoten damit nicht: `drafting_actions` betritt den neuen Zweig nur, wenn
+  `pending_moon_order` gesetzt ist, und gesetzt wird das nur in `apply_drafting` hinter
+  `game::moon_order_node_applies`, dessen erste Bedingung das Tor ist (`game.rs`).
+  `mcts.rs::move_priority`/`label_search_move` haben neue `match`-Arme bekommen, weil `match`
+  vollstaendig sein muss -- unerreichbar, mit Begruendung im Kommentar.
+* `json_to_state` setzt das Feld auf `false` (`serialize.rs`), ein aus einem Record
+  rekonstruierter Zustand traegt also keinen Knoten.
+* Zweite, unabhaengige Sperre fuer ein 406er-Netz: seine Policy hat fuer 406..413 keinen
+  Eintrag; `build_untried_actions` liest `logits.get(id)` -> `None` -> `NEG_INFINITY`.
+
+**Bauform (Bauvorgaben 1-5 aus 12.6).** `moves.rs`: `PendingMoonOrder { factory_id,
+remaining, top_down }` plus `Action::ChooseMoonTop(TileColor)`. Ablauf in
+`game.rs::apply_drafting`, Zweig `Action::Stone`: greift das Tor UND gibt es mindestens zwei
+eindeutige Reihenfolgen, laeuft `execution::execute_move_with_moon` mit `defer_moon` -- die
+Reststeine bleiben "in der Hand", KEIN `place_on_moon`, KEINE Chip-Pruefung, KEIN
+`switch_player()`. Jeder `ChooseMoonTop`-Teilzug nimmt einen Stein aus `remaining` und legt
+ihn oben auf `top_down`; sobald der Rest bestimmt ist (nur noch eine Farbe oder leer),
+legt `execution::finish_moon_placement` den Stapel ab, schreibt genau die Logzeilen, die der
+Bestand geschrieben haette, und DANN wechselt der Spieler.
+
+Drei Dinge, die beim Bau aufgefallen sind und im Code stehen:
+
+1. **Reihenfolge-Konvention**: `place_on_moon` legt Index 0 UNTEN ab (`factory.rs:62-67`),
+   nehmbar ist nur `stack.last()` (`factory.rs:74-84`). `ChooseMoonTop` waehlt also von oben
+   nach unten, und `PendingMoonOrder::resolved_bottom_up` dreht am Ende um.
+2. **Bonusplaettchen zu frueh**: `reveal_chip_if_empty` haengt an `is_fully_empty()`. Bei
+   zurueckgehaltenem Rest SIEHT die Fabrik leer aus -- die Pruefung ist deshalb im
+   Stein-Zweig ausgesetzt und wandert nach `finish_moon_placement`.
+3. **Phasenriegel**: aus demselben Grund konnte `check_drafting_complete` die Drafting-Phase
+   mitten im Zug beenden (wenn diese Fabrik die letzte nicht leere Quelle war). Neuer Riegel
+   am Kopf von `check_phase_transition` (`game.rs`), bitidentisch bei `None`. Test:
+   `moon_order_node_blocks_the_phase_transition_until_it_closes`.
+
+**Zahl der Teilzuege, praeziser als 12.2 Punkt 2.** Nicht "zwei bei drei Farben, einer bei
+zwei", sondern: solange mindestens zwei verschiedene Farben unter den NOCH NICHT zugeordneten
+Steinen sind, kommt ein weiterer Teilzug. Bei drei verschiedenen Farben sind das zwei, bei
+zwei Steinen einer -- aber bei `[A, A, B]` sind es eins ODER zwei, je nach erster Wahl, und
+die Zahl der Blaetter ist damit genau `unique_moon_orders` = 3. Eine feste Stufenzahl waere
+falsch gewesen.
+
+**Kein Fan-out mehr, wo der Knoten spielt.** `build_untried_actions` (`net_mcts.rs`) faechert
+`moon_order` nicht mehr auf, wenn der Knoten greift (alle Permutationen fuehrten auf denselben
+Folgezustand und frassen nur Wurzelbreite); `moon_order_post_search` (Stufe 3) steigt aus
+demselben Grund frueh aus. Beides mit `!game::moon_order_node_applies(...)` davor, also
+bitidentisch bei ausgeschaltetem Tor. Knopf-Beschreibungen in `knob_registry.rs`
+(`MOSAIC_MOON_ORDER_VARIANTS`) nachgezogen, `docs/knobs.md` neu erzeugt.
+
+**Transportweg des Zuges in den Record.** `drafting_actions` -> `valid_actions` und
+`d.policy` je Halbzug (`self_play.rs:3940-3952`, unveraendert): weil der Knoten den Spieler
+NICHT wechselt, sieht die Schleife ihn im naechsten Durchlauf als eigenen Entscheid --
+eigener `state`, eigene Besuchsverteilung, eigenes `policy_target`, genau wie
+`ChooseDomeRotation` heute. Aktions-ID 406..410 ueber `action_to_env_dict` (Typ
+`choose_moon_top`, Feld `color`) und `action_to_id_direct` (`self_play.rs`), Zweig in
+`features::action_to_id`, Python-Spiegel `neural_net.py` plus
+`tools/tests/test_action_id_mirror.py`.
+
+**Suche.** Keine Sonderbehandlung noetig, und das ist geprueft, nicht angenommen: alle drei
+Expansionsstellen lesen `mover = nodes[nid].state.current_player` VOR dem Apply
+(`net_mcts.rs`, Gumbel-Wurzel, Gumbel-Abstieg, PUCT-Widening) und der Backprop nimmt
+`value[nodes[i].player_who_acted]` -- zwei Kanten desselben Spielers hintereinander sind damit
+derselbe Fall wie die Kuppelrotation.
+
+**Sicht-Audit.** Der Knoten waehlt ausschliesslich unter den Reststeinen des eigenen
+Sonnenzugs; der Gegner sieht vom Mondstapel weiter nur die oberste Farbe. Keine neue
+Mischstelle -- Eintrag in `docs/architecture_reference.md` trotzdem gemacht, weil die Regel
+dort jede Aenderung am Aktionsraum verlangt (die ID-Buendelung "moon_order teilt eine ID" ist
+fuer eine 414er-Seite aufgehoben).
+
+**Dateien mit den tragenden Stellen.** `engine/src/moves.rs` (PendingMoonOrder,
+`Action::ChooseMoonTop`), `state.rs` (drei neue Felder), `execution.rs`
+(`execute_move_with_moon`, `execute_take_with_moon`, `finish_moon_placement`), `game.rs`
+(Tor-Funktionen, `drafting_actions`, `apply_drafting`, `check_phase_transition`, Tests),
+`features.rs` (`action_to_id`, `KNOWN_ACTION_TYPES` 11 -> 13, Testabdeckung),
+`net_mcts.rs` (`NUM_ACTIONS` 414, `net_supports_extended_action_nodes`, zwei Tore, Test),
+`net.rs` (`policy_width`), `self_play.rs` (Tor im Loop, `action_to_env_dict`,
+`action_to_id_direct`), `serialize.rs` (UI-Zugliste, exakter Rundtrip, `states_differ`),
+`mcts.rs` (zwei `match`-Arme), `lib.rs` (Vertragshash-Literal), `train.py`
+(Policy-Kopf-Polsterung), `engine/py/neural_net.py`, `tools/tests/test_action_id_mirror.py`,
+`tools/analyze_game_log.py` (Begruendung, warum dort NICHTS zu tun ist),
+`docs/architecture_reference.md`, `docs/knobs.md`.
+
+**Was beim Kompilieren ROT werden MUSS** (und der Koordinator setzt):
+
+* `config.py`: `NUM_ACTIONS` 406 -> 414 und `INPUT_SIZE` 884 -> 888, im SELBEN Zug wie die
+  Wheel-Installation (`feedback_watcher_workers_reimport_config`). Der Python-Spiegeltest
+  prueft das (`test_new_node_families_fill_406_to_413` liest `neural_net.NUM_ACTIONS`).
+* Feature-Golden-Fixture (`features.rs`, A3-Hash) -- Encoder ist vier Werte laenger.
+* Netz-Paritaets-Fixture des Champions -- `designs_ordered` ist ein neues RECORD-Feld
+  (siehe `PREREG_dome_return_order.md` 12.8).
+
+**Was GRUEN bleiben MUSS:** Vertragshash-Test (`lib.rs`, neues Literal `6ef829e564c58bd5`,
+FNV-1a-64 in Python nachgerechnet; dieselbe Rechnung reproduziert 884/406 ->
+`cfd94509f0aab102` und 794/406 -> `39994362fba145a6` als Verfahrensprobe), Anker-Drift und
+Anker-Konservierung, `action_to_id_ranges_stay_within_num_actions_and_dont_collide`
+(NUM_ACTIONS == max_id + 1 = 414), `action_to_id_direct_matches_json_path_across_random_games`,
+`direct_matches_json_path_*`, alle Rundtrip-Tests in `serialize.rs`.
+
+**Tests (geschrieben, NICHT gelaufen).** `game.rs`:
+`moon_order_node_is_off_without_the_gate_and_the_move_stays_bitidentical`,
+`moon_order_node_stays_off_when_only_one_colour_remains`,
+`moon_order_node_offers_exactly_the_distinct_remaining_colours`,
+`moon_order_node_switches_player_only_after_the_last_step`,
+`moon_order_node_blocks_the_phase_transition_until_it_closes`,
+`action_id_round_trip_covers_the_eight_new_ids`. `net_mcts.rs`:
+`moon_order_choice_predicate_matches_unique_moon_orders` (belegt, dass das gebaute Tor
+"mindestens zwei verschiedene Farben" fuer JEDE Multimenge dasselbe sagt wie die Prereg-Formel
+`unique_moon_orders(..).len() >= 2`, plus die Wild-Sperre). Alle Rust-Dateien sind mit
+`rustfmt --check` auf Parse-Fehler geprueft (kein Kompilat, also KEINE Typpruefung).
+
+**Offen / Nutzer- oder Koordinator-Entscheid:**
+
+1. **GUI und Referee bekommen die Knoten NICHT.** `py.rs::ai_drafting_net_step` und
+   `referee.rs` setzen das Tor nicht, spielen also auch mit einem 414er-Netz die kanonische
+   Reihenfolge. Bewusst so: damit bleiben Menschenpartien, `apply_stone(.., moon_order=..)`
+   und der Replayer byte-identisch. Wer das GUI mitziehen will, braucht dort eine Zuordnung
+   "welche Seite ist das Netz" -- die es heute nicht als Feld gibt.
+2. **Kostentor** (12.6 Punkt 5: 2 x 20 Paare, Schwelle 25 Prozent) ist nicht gefahren.
+3. `moon_order_target` (Record-Label des `moon`-Kopfs) bleibt unberuehrt und wird bei
+   aktivem Knoten aus einem Platzhalter gebildet. Unschaedlich, weil das Label laut 12.0 ein
+   No-Op ist und sein Gewicht im v30-Rezept 0 (12.9) -- aber es ist ab v31 toter Code.
+
+### 12.11 Kompilat (2026-09-18, 09:21-09:31)
+
+`cargo test --release --lib` mit Weg A, R3, R2 und Schleifen-Stapelzug: **702 bestanden, 0 rot, 19 ignoriert**
+(erster Lauf 698/4: Feature-Golden- und Netz-Paritaets-Fixture bewusst neu erzeugt, zwei Variante-C-Tests
+auf den 17er-Bereich `LEN_BEFORE_TILING_PROJECTION..LEN_BEFORE_ORDERED_DESIGNS` korrigiert); Vertragshash-
+Literal `6ef829e564c58bd5` gruen; `--no-run` gruen (Beispiele, Benches); Wheel 09:30:43. `config.py` NUM_ACTIONS
+414, INPUT_SIZE 888 im selben Zug. Abnahme (Installation, Drift, Konservierung, Paritaet, Polsterung b10,
+Kostentor, A/B, Record-Stichprobe) laeuft in `tools/night_v30_wheel_acceptance.sh` seit 09:31; Ergebnis in
+`PREREG_minimal_strength_core.md` 10.12ff.

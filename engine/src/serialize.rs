@@ -115,6 +115,12 @@ fn dome_pool_view(state: &GameState) -> Value {
         } else {
             Value::Null
         };
+        // R2 (P.16): dieselbe Menge UNSORTIERT, also in Stapelreihenfolge.
+        let designs_ordered = if own {
+            Value::Array(slice.iter().map(|t| json!(t.tile_id)).collect())
+        } else {
+            Value::Null
+        };
         blocks.push(json!({
             "own": own,
             "len": b.len,
@@ -144,6 +150,21 @@ fn dome_pool_view(state: &GameState) -> Value {
             // Additiv: Alt-Records ohne dieses Feld lesen sich im Encoder als
             // "Merkmal aus" (dieselbe Toleranz wie bei `dome_pool_view` selbst).
             "designs": designs,
+            // R2 / Merkmal P.16 (`PREREG_dome_return_order.md` par.12.6
+            // Bauvorgabe 1): dieselben Design-Nummern, aber in STAPEL-
+            // REIHENFOLGE (Index 0 = kommt zuerst wieder, wie `types`) --
+            // additiv NEBEN dem sortierten `designs`. Nur der eigene Block,
+            // fremde `null`: die Vorderseite eines fremden Blocks hat der
+            // Betrachter nie gesehen (Regel s.o.), und die REIHENFOLGE kennt
+            // ohnehin nur der Rueckleger (er hat sie gewaehlt,
+            // `state.rs::determinize_dome_pool` laesst sie ihm).
+            //
+            // Warum ueberhaupt neben `designs`: `designs` ist sortiert, weil
+            // par.12.4 die Reihenfolge fuer den EINGANG als unbekannt annahm.
+            // R1 hat dann gemessen, dass der Value-Kopf auf die Typfolge
+            // reagiert, bei GLEICHER Typfolge aber Spannweite 0 hat (26,3
+            // Prozent der Bloecke) -- genau dort setzt dieses Feld an.
+            "designs_ordered": designs_ordered,
         }));
         start = end;
     }
@@ -542,6 +563,12 @@ pub fn action_to_dict(a: &Action) -> Value {
             "return_order": m.return_order,
         }),
         Action::ChooseDomeRotation(rot) => json!({ "type": "dome_rotation", "rotation": rot }),
+        // Weg A / R3: UI-/Log-Schema (wie `dome_rotation` oben ein eigener
+        // Typname, der NIE in `features::action_to_id` geht -- dort heissen die
+        // agent_env-Typen `choose_moon_top`/`choose_return_first`, siehe
+        // `KNOWN_ACTION_TYPES`-Doku).
+        Action::ChooseMoonTop(c) => json!({ "type": "moon_top", "color": c.value() }),
+        Action::ChooseReturnFirst(pos) => json!({ "type": "return_first", "draw_index": pos }),
         Action::BonusChip(m) => json!({ "type": "bonus_chip", "factory_id": m.factory_id }),
         Action::Pass => json!({ "type": "pass" }),
     }
@@ -559,7 +586,7 @@ pub fn tiling_action_to_dict(ta: &TilingAction) -> Value {
 }
 
 /// Aktions-ID im ACTION-SPACE des Policy-Kopfes (`features::action_to_id`,
-/// `NUM_ACTIONS = 406`) fuer einen UI-`valid_moves`-Eintrag.
+/// `NUM_ACTIONS` = 414 seit Weg A/R3, damals 406) fuer einen UI-`valid_moves`-Eintrag.
 /// PREREG_action_id_logging.md, Stueck S1.
 ///
 /// ZWEI DINGE, die der Leser wissen MUSS (beide geprueft 2026-08-18):
@@ -590,6 +617,34 @@ fn serialize_valid_moves(state: &GameState) -> Value {
     }
 
     let mut moves: Vec<Value> = Vec::new();
+
+    // Weg A / R3 (2026-09-18): ist eine der beiden neuen Wahlen offen, ist die
+    // Liste GENAU ihre Kandidatenliste -- dieselbe Rangfolge wie in
+    // `game::drafting_actions`. Ueber die GUI ist dieser Zustand heute nicht
+    // erreichbar (`extended_action_nodes` setzt nur `unified_game_loop`); der
+    // Zweig steht hier, damit die Anzeige nicht still eine falsche Zugliste
+    // zeigt, falls das Tor je auch im GUI-Pfad gesetzt wird.
+    if let Some(pending) = &state.pending_moon_order {
+        for c in crate::game::moon_top_candidates(pending) {
+            moves.push(json!({
+                "type": "moon_top",
+                "id": move_action_id(state, &Action::ChooseMoonTop(c)),
+                "color": c.value(),
+            }));
+        }
+        return Value::Array(moves);
+    }
+    if let Some(pending) = &state.pending_return_order {
+        for pos in crate::game::return_first_candidates(pending) {
+            moves.push(json!({
+                "type": "return_first",
+                "id": move_action_id(state, &Action::ChooseReturnFirst(pos)),
+                "draw_index": pos,
+                "tile_id": pending.rest_in_draw_order[pos],
+            }));
+        }
+        return Value::Array(moves);
+    }
 
     // Mitten in einem Stapel-Zug (Aktion A): NUR weiterziehen oder eine der
     // gezogenen Platten wählen -- keine andere Aktion (siehe game::drafting_actions).
@@ -1204,6 +1259,17 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
         bonus_chip_pool,
         pending_stack_draw,
         pending_dome_choice: None, // s.o. Kategorie 3 (dokumentierte Ausnahme)
+        // Weg A / R3 (2026-09-18): dieselbe Kategorie-3-Ausnahme wie
+        // `pending_dome_choice` -- `state_to_json` serialisiert die beiden
+        // anhaengigen Wahlen nicht (der Encoder sieht sie nicht, genau wie die
+        // Kuppelrotation), der Rundtrip stellt sie also nicht her. Die EXAKTE
+        // Fassung liegt in `state_to_json_exact`/`json_to_state_exact`.
+        // `extended_action_nodes` ist KEIN Zustand des Spiels, sondern eine
+        // Eigenschaft der SPIELER-Konfiguration: aus einem Record rekonstruiert
+        // steht es auf `false`, und `unified_game_loop` setzt es neu.
+        pending_moon_order: None,
+        pending_return_order: None,
+        extended_action_nodes: [false; crate::state::NUM_PLAYERS],
         scoring_tile_ids,
         round_number,
         current_player,
@@ -1327,6 +1393,35 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
     // letzten 30 NICHT-Maschinenzeilen, s.o. `log_sichtbar`) -- der volle,
     // ungefensterte `state.log` (bereits als `RefereeGame::full_log()`
     // separat exponiert) geht sonst beim Rueckweg komplett verloren.
+    // Weg A / R3 (2026-09-18): die beiden neuen anhaengigen Wahlen und das
+    // Spieler-Tor. TOLERANT gelesen (fehlendes Feld -> Default), weil jedes
+    // bereits geschriebene Referee-/Seeding-JSON sie nicht hat und ihr Default
+    // genau der Bestand ist (nichts anhaengig, Knoten aus). Ein Pflichtfeld
+    // wuerde Alt-Nutzlasten hart brechen, ohne etwas zu retten.
+    obj.insert(
+        "pending_moon_order_exact".to_string(),
+        match &state.pending_moon_order {
+            None => Value::Null,
+            Some(p) => json!({
+                "factory_id": p.factory_id,
+                "remaining": p.remaining.iter().map(|c| c.value()).collect::<Vec<_>>(),
+                "top_down": p.top_down.iter().map(|c| c.value()).collect::<Vec<_>>(),
+            }),
+        },
+    );
+    obj.insert(
+        "pending_return_order_exact".to_string(),
+        match &state.pending_return_order {
+            None => Value::Null,
+            Some(p) => json!({
+                "chosen_id": p.chosen_id,
+                "slot_row": p.slot_row,
+                "slot_col": p.slot_col,
+                "rest_in_draw_order": p.rest_in_draw_order,
+            }),
+        },
+    );
+    obj.insert("extended_action_nodes_exact".to_string(), json!(state.extended_action_nodes));
     obj.insert("log_exact".to_string(), json!(state.log));
     // `first_player_next_round_exact`: NICHT etwa ein fehlendes Feld --
     // `state_to_json` schreibt `state.first_player_next_round` bereits
@@ -1484,6 +1579,65 @@ fn get_usize_arr(v: &Value, key: &str) -> Result<Vec<usize>, String> {
 
 /// Umkehrung von [`state_to_json_exact`]. Baut wie `json_to_state` einen
 /// `GameState`, überschreibt danach aber die vier verdeckten Sammlungen UND
+/// Weg A: `pending_moon_order_exact` -> [`crate::moves::PendingMoonOrder`].
+/// `None`/fehlend -> `None` (nichts anhaengig).
+fn pending_moon_order_from_json(
+    v: Option<&Value>,
+) -> Result<Option<crate::moves::PendingMoonOrder>, String> {
+    let Some(o) = v.filter(|x| !x.is_null()) else { return Ok(None) };
+    let colors = |key: &str| -> Result<Vec<TileColor>, String> {
+        o.get(key)
+            .and_then(|x| x.as_array())
+            .ok_or_else(|| format!("json_to_state_exact: pending_moon_order_exact.{key} fehlt"))?
+            .iter()
+            .map(|c| {
+                c.as_str()
+                    .and_then(TileColor::from_value)
+                    .ok_or_else(|| format!("json_to_state_exact: pending_moon_order_exact.{key} mit unbekannter Farbe"))
+            })
+            .collect()
+    };
+    Ok(Some(crate::moves::PendingMoonOrder {
+        factory_id: o
+            .get("factory_id")
+            .and_then(|x| x.as_u64())
+            .ok_or_else(|| "json_to_state_exact: pending_moon_order_exact.factory_id fehlt".to_string())?
+            as usize,
+        remaining: colors("remaining")?,
+        top_down: colors("top_down")?,
+    }))
+}
+
+/// R3: `pending_return_order_exact` -> [`crate::moves::PendingReturnOrder`].
+fn pending_return_order_from_json(
+    v: Option<&Value>,
+) -> Result<Option<crate::moves::PendingReturnOrder>, String> {
+    let Some(o) = v.filter(|x| !x.is_null()) else { return Ok(None) };
+    let num = |key: &str| -> Result<usize, String> {
+        o.get(key)
+            .and_then(|x| x.as_u64())
+            .map(|x| x as usize)
+            .ok_or_else(|| format!("json_to_state_exact: pending_return_order_exact.{key} fehlt"))
+    };
+    let rest: Vec<usize> = o
+        .get("rest_in_draw_order")
+        .and_then(|x| x.as_array())
+        .ok_or_else(|| "json_to_state_exact: pending_return_order_exact.rest_in_draw_order fehlt".to_string())?
+        .iter()
+        .map(|x| {
+            x.as_u64().map(|v| v as usize).ok_or_else(|| {
+                "json_to_state_exact: rest_in_draw_order-Eintrag keine Zahl".to_string()
+            })
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(Some(crate::moves::PendingReturnOrder {
+        chosen_id: num("chosen_id")?,
+        slot_row: num("slot_row")?,
+        slot_col: num("slot_col")?,
+        rest_in_draw_order: rest,
+    }))
+}
+
 /// `pending_dome_choice` (par.8d, fünftes Feld) mit der exakten Fassung aus
 /// dem JSON -- alle fünf PFLICHT, harter Fehler bei Fehlen (kein stiller
 /// Rückfall auf die Zähler-Rekonstruktion bzw. auf "kein Zug angefangen",
@@ -1575,6 +1729,18 @@ pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
     let pending_choice_json =
         v.get("pending_dome_choice_exact").ok_or_else(|| json_err("pending_dome_choice_exact"))?;
     state.pending_dome_choice = pending_dome_choice_from_json(pending_choice_json)?;
+
+    // Weg A / R3 (2026-09-18), tolerant: fehlendes oder `null`-Feld laesst den
+    // Default stehen (nichts anhaengig, Knoten aus) -- Begruendung s.o. in
+    // `state_to_json_exact`.
+    state.pending_moon_order = pending_moon_order_from_json(v.get("pending_moon_order_exact"))?;
+    state.pending_return_order =
+        pending_return_order_from_json(v.get("pending_return_order_exact"))?;
+    if let Some(arr) = v.get("extended_action_nodes_exact").and_then(|x| x.as_array()) {
+        for (i, slot) in state.extended_action_nodes.iter_mut().enumerate() {
+            *slot = arr.get(i).and_then(|x| x.as_bool()).unwrap_or(false);
+        }
+    }
 
     // par.8e-Folge: sechstes/siebtes Pflichtfeld (s.o. `state_to_json_exact`-
     // Doku) -- `log` woertlich statt UI-gefenstert, `first_player_next_round`
@@ -1798,6 +1964,28 @@ mod json_to_state_exact_tests {
                 "pending_stack_draw: {:?} != {:?}",
                 a.pending_stack_draw.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
                 b.pending_stack_draw.iter().map(|t| t.tile_id).collect::<Vec<_>>()
+            ));
+        }
+        // Weg A / R3 (2026-09-18): die beiden neuen anhaengigen Wahlen und das
+        // Spieler-Tor gehoeren in denselben Strukturvergleich -- sonst waere ein
+        // verlorener Zwischenzustand im Rundtrip wieder unsichtbar (genau die
+        // Luecke aus par.8e).
+        if a.pending_moon_order != b.pending_moon_order {
+            out.push(format!(
+                "pending_moon_order: {:?} != {:?}",
+                a.pending_moon_order, b.pending_moon_order
+            ));
+        }
+        if a.pending_return_order != b.pending_return_order {
+            out.push(format!(
+                "pending_return_order: {:?} != {:?}",
+                a.pending_return_order, b.pending_return_order
+            ));
+        }
+        if a.extended_action_nodes != b.extended_action_nodes {
+            out.push(format!(
+                "extended_action_nodes: {:?} != {:?}",
+                a.extended_action_nodes, b.extended_action_nodes
             ));
         }
         if a.pending_dome_choice != b.pending_dome_choice {

@@ -6,10 +6,12 @@
 
 use rand::Rng;
 
-use crate::execution::execute_move;
+use crate::execution::{execute_move, execute_move_with_moon, finish_moon_placement};
 use crate::moves::{
-    Action, DrawFromStackMove, PendingDomeChoice, PlaceDomeTileMove, TakeBonusChipMove,
+    Action, DrawFromStackMove, Move, PendingDomeChoice, PendingMoonOrder, PendingReturnOrder,
+    PlaceDomeTileMove, TakeBonusChipMove, TakeSource,
 };
+use crate::tile::TileColor;
 use crate::round_end::{
     apply_bonus_chips_to_row, execute_full_tiling, generate_tiling_actions,
     process_unplaceable_rows, score_penalty, validate_tiling_action, TilingAction,
@@ -637,10 +639,140 @@ pub fn determine_winner(state: &GameState) -> usize {
 
 // ── Game-Loop ─────────────────────────────────────────────────────────────────
 
+// ── Zusaetzliche Entscheidungsknoten (Weg A / R3) ─────────────────────────────
+//
+// `PREREG_moon_stack_order.md` par.12.2/12.6 (Mondstapel-Reihenfolge) und
+// `PREREG_dome_return_order.md` par.12.1/12.7 (Rueckgabe-Reihenfolge). BEIDE
+// haengen an demselben Tor: `state.extended_action_nodes[spieler]`. Steht es
+// auf `false` -- Heuristik-Seite, 406er-Netz, GUI, Referee, Replay --, liefern
+// die Funktionen hier `false` bzw. eine leere Kandidatenliste, und
+// `drafting_actions`/`apply_drafting` laufen Zeile fuer Zeile den Bestand.
+
+/// Farben in fester Reihenfolge (`TileColor::NORMAL`), die in `tiles`
+/// vorkommen. Das ist die Kandidatenordnung des Mondknotens UND die Reihenfolge
+/// der Aktions-IDs 406..410 (`features::action_to_id`, Zweig
+/// `choose_moon_top`).
+fn distinct_moon_colors(tiles: &[TileColor]) -> Vec<TileColor> {
+    TileColor::NORMAL.iter().copied().filter(|c| tiles.contains(c)).collect()
+}
+
+/// `true`, wenn es an der Mondstapel-Reihenfolge ueberhaupt etwas zu waehlen
+/// gibt: mindestens ZWEI verschiedene Farben unter den Reststeinen. Das ist
+/// genau die Bedingung `unique_moon_orders(remaining).len() >= 2` aus par.12.2
+/// Punkt 1 -- eine Multimenge mit nur einer Farbe hat exakt eine eindeutige
+/// Permutation. Die Gleichheit beider Formulierungen belegt der Test
+/// `moon_order_choice_predicate_matches_unique_moon_orders` (net_mcts.rs, dort
+/// ist `unique_moon_orders` sichtbar).
+///
+/// `TileColor::Wild` kann auf keiner Fabrik liegen (der Beutel fuehrt nur die
+/// fuenf Normalfarben, `supply.rs`), waere aber in den fuenf Aktions-IDs nicht
+/// kodierbar -- ein solcher Rest schaltet den Knoten deshalb ab statt eine
+/// nicht kodierbare Wahl anzubieten.
+pub fn moon_order_has_real_choice(remaining: &[TileColor]) -> bool {
+    if remaining.len() < 2 || remaining.iter().any(|c| !TileColor::NORMAL.contains(c)) {
+        return false;
+    }
+    distinct_moon_colors(remaining).len() >= 2
+}
+
+/// Tor des Mondknotens fuer EINEN konkreten Stein-Zug. `remaining` sind die
+/// Steine, die der Zug auf die Mondseite legen wuerde -- im Bestand traegt
+/// `m.take.moon_order` sie in kanonischer Reihenfolge (`validation.rs::
+/// generate_valid_moves` filtert `sun_tiles` in Fabrik-Reihenfolge).
+pub fn moon_order_node_applies(state: &GameState, m: &Move) -> bool {
+    state.extended_action_nodes[state.current_player]
+        && m.take.source == TakeSource::SmallFactorySun
+        && m.take.factory_id.is_some()
+        && moon_order_has_real_choice(&m.take.moon_order)
+}
+
+/// Tor des Rueckgabeknotens. `rest_len` ist die Zahl der zurueckzulegenden
+/// Platten; ab zwei gibt es eine Wahl. Gedeckelt wird erst bei den KANDIDATEN
+/// ([`return_first_candidates`]).
+pub fn return_order_node_applies(state: &GameState, rest_len: usize) -> bool {
+    state.extended_action_nodes[state.current_player] && rest_len >= 2
+}
+
+/// Tor des Stapelzugs als FOLGE eigener Entscheide (Nutzer-Entscheid
+/// 2026-09-18 "dann a", `PREREG_dome_return_order.md` par.12.9): spielt die
+/// Seite am Zug mit den zusaetzlichen Knoten, wird der Stapelzug NICHT mehr in
+/// einem Stueck von `self_play::resolve_and_apply_stack_draw_with` aufgeloest,
+/// sondern Teilzug fuer Teilzug von der Spielschleife entschieden -- Peek,
+/// `ChooseDrawStackSlot`, Rueckgabeknoten, `ChooseDomeRotation`, jeder mit
+/// eigener Suche und eigener Besuchsverteilung als Lernziel.
+///
+/// Gelesen wird das Tor in `self_play::apply_chosen_action_with`, und zwar fuer
+/// den Spieler, der den Peek macht (`current_player` wechselt innerhalb des
+/// Stapelzugs nicht, erst `ChooseDomeRotation` ruft `switch_player`). Steht das
+/// Tor aus -- Heuristik-Seite, 406er-Netz, GUI, Referee, Replay --, ist der
+/// Ablauf byte-identisch zum Bestand.
+pub fn stack_move_decided_by_loop(state: &GameState) -> bool {
+    state.extended_action_nodes[state.current_player]
+}
+
+/// Kandidaten-Positionen des Rueckgabeknotens: `0..min(rest, RETURN_ORDER_MAX_
+/// PERMUTED)`. Derselbe Deckel wie bei Modus 1 (`self_play::
+/// RETURN_ORDER_MAX_PERMUTED`), damit Knoten und Rueckfall dieselbe Menge
+/// beschreiben, und derselbe Deckel wie die drei Aktions-IDs 411..413.
+pub fn return_first_candidates(pending: &PendingReturnOrder) -> Vec<usize> {
+    let n = pending.rest_in_draw_order.len().min(crate::self_play::RETURN_ORDER_MAX_PERMUTED);
+    (0..n).collect()
+}
+
+/// Kandidaten des Mondknotens im aktuellen Zwischenstand.
+pub fn moon_top_candidates(pending: &PendingMoonOrder) -> Vec<TileColor> {
+    distinct_moon_colors(&pending.remaining)
+}
+
+/// Die NICHT gewaehlten gezogenen Platten in ZIEHREIHENFOLGE -- der
+/// Bezugsrahmen der Aktions-IDs 411..413. `chosen_id` wird genau EINMAL
+/// entfernt (Multimengen-Disziplin wie in `validate_draw_from_stack`).
+pub fn rest_in_draw_order(state: &GameState, chosen_id: usize) -> Vec<usize> {
+    let mut out: Vec<usize> = Vec::with_capacity(state.pending_stack_draw.len());
+    let mut removed = false;
+    for t in &state.pending_stack_draw {
+        if !removed && t.tile_id == chosen_id {
+            removed = true;
+            continue;
+        }
+        out.push(t.tile_id);
+    }
+    out
+}
+
 /// Alle gültigen Drafting-Aktionen für den aktiven Spieler eines Zustands.
 /// Leer → [Pass]. Single Source of Truth für Game-Loop und MCTS.
 pub fn drafting_actions(state: &GameState) -> Vec<Action> {
     let mut actions: Vec<Action> = Vec::new();
+
+    // Weg A Stufe 2+ (`PREREG_moon_stack_order.md` par.12.2): eine
+    // Mondstapel-Reihenfolge ist offen -- NICHTS anderes ist erlaubt, genau
+    // wie bei der Kuppelrotation darunter. Der Zweig ist unerreichbar, solange
+    // `extended_action_nodes` fuer den Spieler aus ist (dann wird das Feld nie
+    // gesetzt).
+    if let Some(pending) = &state.pending_moon_order {
+        for c in moon_top_candidates(pending) {
+            actions.push(Action::ChooseMoonTop(c));
+        }
+        if actions.is_empty() {
+            actions.push(Action::Pass);
+        }
+        return actions;
+    }
+
+    // R3 (`PREREG_dome_return_order.md` par.12.1): die Rueckgabe-Reihenfolge
+    // ist offen. Steht VOR dem `pending_stack_draw`-Zweig weiter unten, weil
+    // beide Felder gleichzeitig gesetzt sind (dieselbe Rangfolge-Begruendung
+    // wie bei `pending_dome_choice`).
+    if let Some(pending) = &state.pending_return_order {
+        for pos in return_first_candidates(pending) {
+            actions.push(Action::ChooseReturnFirst(pos));
+        }
+        if actions.is_empty() {
+            actions.push(Action::Pass);
+        }
+        return actions;
+    }
 
     // Baustein B Stufe 2: eine Kuppel-Slot-Wahl ist bereits getroffen, nur
     // noch die Rotation fehlt -- NICHTS anderes ist erlaubt (gilt für BEIDE
@@ -759,7 +891,23 @@ impl Game {
         // konsistent mit `drafting_actions`s eigener Rangfolge/Erlaubnisliste
         // (`pending_dome_choice` zuerst, dann `pending_stack_draw`, `Pass`
         // nur als Sackgassen-Fallback wie dort).
-        if self.state.pending_dome_choice.is_some() {
+        // Weg A / R3: dieselbe Rangfolge wie in `drafting_actions` -- offener
+        // Mondknoten zuerst, dann der offene Rueckgabeknoten, dann die
+        // Kuppelrotation, dann der laufende Stapelzug. Beide neuen Zweige sind
+        // unerreichbar, solange die Felder `None` sind (Tor aus).
+        if self.state.pending_moon_order.is_some() {
+            if !matches!(action, Action::ChooseMoonTop(_) | Action::Pass) {
+                return Err(
+                    "Offene Mondstapel-Reihenfolge muss zuerst abgeschlossen werden (Weg A).".into(),
+                );
+            }
+        } else if self.state.pending_return_order.is_some() {
+            if !matches!(action, Action::ChooseReturnFirst(_) | Action::Pass) {
+                return Err(
+                    "Offene Rueckgabe-Reihenfolge muss zuerst abgeschlossen werden (R3).".into(),
+                );
+            }
+        } else if self.state.pending_dome_choice.is_some() {
             if !matches!(action, Action::ChooseDomeRotation(_) | Action::Pass) {
                 return Err(
                     "Offene Kuppel-Rotation muss zuerst abgeschlossen werden (Aktion A/B Stufe 2)."
@@ -784,8 +932,86 @@ impl Game {
                 if let Some(e) = err {
                     return Err(e);
                 }
-                execute_move(&mut self.state, m);
-                self.state.switch_player();
+                // Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 1): bei
+                // mindestens zwei eindeutigen Reihenfolgen legt der Zug die
+                // Reststeine NICHT ab, sondern oeffnet den Knoten; der Zug ist
+                // damit nicht beendet, KEIN `switch_player()`. Sonst
+                // (Ein-Varianten-Fall, Tor aus, andere Quelle) genau der
+                // Bestandspfad -- eine Zeile, ein Aufruf, bitidentisch.
+                if moon_order_node_applies(&self.state, m) {
+                    let fid = m.take.factory_id.expect("small sun braucht factory_id");
+                    let mut held: Vec<TileColor> = Vec::new();
+                    execute_move_with_moon(&mut self.state, m, Some(&mut held));
+                    self.state.pending_moon_order = Some(PendingMoonOrder {
+                        factory_id: fid,
+                        remaining: held,
+                        top_down: Vec::new(),
+                    });
+                } else {
+                    execute_move(&mut self.state, m);
+                    self.state.switch_player();
+                }
+            }
+            Action::ChooseMoonTop(color) => {
+                let mut pending = match self.state.pending_moon_order.take() {
+                    Some(p) => p,
+                    None => return Err("Keine offene Mondstapel-Reihenfolge.".into()),
+                };
+                // Farbe muss unter den noch nicht zugeordneten Steinen sein.
+                let Some(pos) = pending.remaining.iter().position(|c| c == color) else {
+                    // Zustand unveraendert zuruecklegen, damit ein
+                    // fehlgeschlagener Versuch (Suche, API) nichts kaputt macht.
+                    self.state.pending_moon_order = Some(pending);
+                    return Err(format!(
+                        "Farbe {} liegt nicht unter den Reststeinen.",
+                        color.value()
+                    ));
+                };
+                pending.remaining.remove(pos);
+                pending.top_down.push(*color);
+                if moon_order_has_real_choice(&pending.remaining) {
+                    // Noch mindestens zwei Farben offen -> naechster Teilzug,
+                    // derselbe Spieler bleibt am Zug.
+                    self.state.pending_moon_order = Some(pending);
+                } else {
+                    // Der Rest ist bestimmt (alles dieselbe Farbe oder leer):
+                    // ablegen, Zug beenden, Spieler wechseln.
+                    finish_moon_placement(
+                        &mut self.state,
+                        pending.factory_id,
+                        pending.resolved_bottom_up(),
+                    );
+                    self.state.switch_player();
+                }
+            }
+            Action::ChooseReturnFirst(pos) => {
+                let pending = match self.state.pending_return_order.take() {
+                    Some(p) => p,
+                    None => return Err("Keine offene Rueckgabe-Reihenfolge.".into()),
+                };
+                if !return_first_candidates(&pending).contains(pos) {
+                    let n = return_first_candidates(&pending).len();
+                    self.state.pending_return_order = Some(pending);
+                    return Err(format!(
+                        "Rueckgabe-Position {pos} liegt ausserhalb der {n} Kandidaten."
+                    ));
+                }
+                // `return_order[0]` = die gewaehlte Platte, der Rest bleibt in
+                // Ziehreihenfolge (par.12.1: entschieden wird allein der Kopf).
+                let mut order: Vec<usize> = Vec::with_capacity(pending.rest_in_draw_order.len());
+                order.push(pending.rest_in_draw_order[*pos]);
+                for (i, id) in pending.rest_in_draw_order.iter().enumerate() {
+                    if i != *pos {
+                        order.push(*id);
+                    }
+                }
+                self.state.pending_dome_choice = Some(PendingDomeChoice::FromDrawStack {
+                    chosen_id: pending.chosen_id,
+                    slot_row: pending.slot_row,
+                    slot_col: pending.slot_col,
+                    return_order: order,
+                });
+                // Beendet den Zug NICHT -- Stufe "Rotation" folgt.
             }
             Action::ChooseDomeSlot(m) => {
                 if let Some(e) = validate_dome_move(&self.state, m) {
@@ -808,12 +1034,28 @@ impl Game {
                 if let Some(e) = validate_draw_from_stack(&self.state, m) {
                     return Err(e);
                 }
-                self.state.pending_dome_choice = Some(PendingDomeChoice::FromDrawStack {
-                    chosen_id: m.chosen_id,
-                    slot_row: m.slot_row,
-                    slot_col: m.slot_col,
-                    return_order: m.return_order.clone(),
-                });
+                // R3 (`PREREG_dome_return_order.md` par.12.1): bei mindestens
+                // zwei Restplatten kommt der Rueckgabeknoten ZWISCHEN diese
+                // Stufe und die Rotation. Das eingereichte `m.return_order`
+                // wird dann NICHT uebernommen -- der Knoten bestimmt den Kopf,
+                // der Rest bleibt Ziehreihenfolge. Bei ausgeschaltetem Tor
+                // genau der Bestandspfad.
+                let rest = rest_in_draw_order(&self.state, m.chosen_id);
+                if return_order_node_applies(&self.state, rest.len()) {
+                    self.state.pending_return_order = Some(PendingReturnOrder {
+                        chosen_id: m.chosen_id,
+                        slot_row: m.slot_row,
+                        slot_col: m.slot_col,
+                        rest_in_draw_order: rest,
+                    });
+                } else {
+                    self.state.pending_dome_choice = Some(PendingDomeChoice::FromDrawStack {
+                        chosen_id: m.chosen_id,
+                        slot_row: m.slot_row,
+                        slot_col: m.slot_col,
+                        return_order: m.return_order.clone(),
+                    });
+                }
                 // Beendet den Zug NICHT -- Stufe 2 (Rotation) folgt direkt.
             }
             Action::ChooseDomeRotation(rot) => {
@@ -870,6 +1112,15 @@ impl Game {
     }
 
     fn check_phase_transition(&mut self) {
+        // Weg A: waehrend der offenen Mondstapel-Reihenfolge liegen die
+        // Reststeine "in der Hand" -- die Fabrik sieht LEER aus, obwohl sie es
+        // nicht ist. Ohne diesen Riegel koennte `check_drafting_complete` die
+        // Phase beenden, waehrend ein Teilzug noch offen ist (der Fall tritt
+        // ein, sobald diese Fabrik die letzte nicht leere Quelle war).
+        // Bitidentisch, solange das Feld `None` ist.
+        if self.state.pending_moon_order.is_some() {
+            return;
+        }
         if self.state.phase == Phase::Drafting && check_drafting_complete(&mut self.state) {
             self.state.phase = Phase::Tiling;
             self.state.tiling_done = [false, false];
@@ -1061,6 +1312,301 @@ mod tests {
 
     fn names() -> [String; 2] {
         ["P1".into(), "P2".into()]
+    }
+
+    // ── Weg A: Mondstapel-Reihenfolge als eigener Entscheidungsknoten ─────────
+    //
+    // `PREREG_moon_stack_order.md` par.12.2/12.6. Die Tests decken ab: Bestand
+    // bitidentisch ohne Tor, Ein-Varianten-Fall kanonisch, genau die erlaubten
+    // Kandidaten, Spielerwechsel erst nach dem letzten Teilzug, Phasenriegel.
+
+    /// Frische Partie ohne ausstehende Startkuppeln.
+    fn started_game(seed: u64) -> Game {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game
+    }
+
+    /// Sucht eine kleine Fabrik samt Farbe, deren Reststeine MINDESTENS ZWEI
+    /// verschiedene Farben haben -- genau der Fall, in dem der Knoten greift.
+    fn small_sun_with_two_distinct_rest(
+        state: &GameState,
+    ) -> Option<(usize, TileColor, Vec<TileColor>)> {
+        for f in &state.factories {
+            for c in f.sun_colors() {
+                let rest: Vec<TileColor> = f.sun_tiles.iter().copied().filter(|&t| t != c).collect();
+                if moon_order_has_real_choice(&rest) {
+                    return Some((f.factory_id, c, rest));
+                }
+            }
+        }
+        None
+    }
+
+    fn stone_move(factory_id: usize, color: TileColor, rest: Vec<TileColor>, row: i32) -> Move {
+        Move {
+            take: TakeAction {
+                source: TakeSource::SmallFactorySun,
+                color,
+                factory_id: Some(factory_id),
+                moon_order: rest,
+            },
+            place: PlaceAction { row_index: row },
+        }
+    }
+
+    fn moon_stack_of(state: &GameState, factory_id: usize) -> Vec<TileColor> {
+        let f = state.factories.iter().find(|f| f.factory_id == factory_id).expect("Fabrik");
+        assert_eq!(f.moon_stacks.len(), 1, "genau ein Stapel erwartet");
+        f.moon_stacks[0].clone()
+    }
+
+    #[test]
+    fn moon_order_node_is_off_without_the_gate_and_the_move_stays_bitidentical() {
+        // Ohne `extended_action_nodes` -- Heuristik-Seite, 406er-Netz, GUI,
+        // Replay -- laeuft genau der Bestand: Rest liegt sofort ab, Spieler
+        // wechselt, kein anhaengiger Knoten.
+        let mut game = started_game(7);
+        let (fid, color, rest) =
+            small_sun_with_two_distinct_rest(&game.state).expect("Fixtur braucht so eine Fabrik");
+        assert!(!game.state.extended_action_nodes[0], "Default ist AUS");
+        let before = game.state.current_player;
+        game.apply_drafting(&Action::Stone(stone_move(fid, color, rest.clone(), -1))).unwrap();
+        assert!(game.state.pending_moon_order.is_none(), "kein Knoten ohne Tor");
+        assert_eq!(game.state.current_player, 1 - before, "Zug ist beendet");
+        assert_eq!(moon_stack_of(&game.state, fid), rest, "kanonische Reihenfolge");
+    }
+
+    #[test]
+    fn moon_order_node_stays_off_when_only_one_colour_remains() {
+        // Tor AN, aber nur eine eindeutige Reihenfolge: ebenfalls Bestandspfad
+        // (`unique_moon_orders([rot, rot]).len() == 1`).
+        let mut game = started_game(3);
+        game.state.extended_action_nodes = [true, true];
+        let fid = game.state.factories[0].factory_id;
+        game.state.factories[0].sun_tiles = vec![TileColor::Blau, TileColor::Rot, TileColor::Rot];
+        game.state.factories[0].moon_stacks.clear();
+        let rest = vec![TileColor::Rot, TileColor::Rot];
+        assert!(!moon_order_has_real_choice(&rest));
+        let before = game.state.current_player;
+        game.apply_drafting(&Action::Stone(stone_move(fid, TileColor::Blau, rest.clone(), -1)))
+            .unwrap();
+        assert!(game.state.pending_moon_order.is_none());
+        assert_eq!(game.state.current_player, 1 - before);
+        assert_eq!(moon_stack_of(&game.state, fid), rest);
+    }
+
+    #[test]
+    fn moon_order_node_offers_exactly_the_distinct_remaining_colours() {
+        // Kandidaten = die VERSCHIEDENEN Farben der noch nicht zugeordneten
+        // Reststeine, in `TileColor::NORMAL`-Reihenfolge (= Reihenfolge der IDs
+        // 406..410). Nichts anderes ist erlaubt.
+        let mut game = started_game(7);
+        game.state.extended_action_nodes = [true, true];
+        let (fid, color, rest) =
+            small_sun_with_two_distinct_rest(&game.state).expect("Fixtur braucht so eine Fabrik");
+        game.apply_drafting(&Action::Stone(stone_move(fid, color, rest.clone(), -1))).unwrap();
+        let pending = game.state.pending_moon_order.clone().expect("Knoten offen");
+        assert_eq!(pending.factory_id, fid);
+        assert_eq!(pending.remaining, rest, "die Reststeine liegen 'in der Hand'");
+        let f = game.state.factories.iter().find(|f| f.factory_id == fid).unwrap();
+        assert!(f.moon_is_empty(), "noch nichts abgelegt");
+
+        let want: Vec<Action> = TileColor::NORMAL
+            .iter()
+            .copied()
+            .filter(|c| rest.contains(c))
+            .map(Action::ChooseMoonTop)
+            .collect();
+        assert!(want.len() >= 2);
+        assert_eq!(drafting_actions(&game.state), want);
+
+        // Alles andere prallt ab.
+        assert!(game.apply_drafting(&Action::DrawStackPeek).is_err());
+        if let Some(c) = TileColor::NORMAL.iter().copied().find(|c| !rest.contains(c)) {
+            assert!(game.apply_drafting(&Action::ChooseMoonTop(c)).is_err());
+            assert!(
+                game.state.pending_moon_order.is_some(),
+                "ein Fehlschlag laesst den Knoten unveraendert stehen"
+            );
+        }
+    }
+
+    #[test]
+    fn moon_order_node_switches_player_only_after_the_last_step() {
+        // Der Spieler bleibt ueber ALLE Teilzuege am Zug und wechselt erst,
+        // wenn der Rest bestimmt ist. Danach liegt der Stapel in genau der
+        // gewaehlten Reihenfolge: zuerst gewaehlt = oben.
+        let mut game = started_game(7);
+        game.state.extended_action_nodes = [true, true];
+        let mover = game.state.current_player;
+        let (fid, color, rest) =
+            small_sun_with_two_distinct_rest(&game.state).expect("Fixtur braucht so eine Fabrik");
+        game.apply_drafting(&Action::Stone(stone_move(fid, color, rest.clone(), -1))).unwrap();
+
+        let mut picked: Vec<TileColor> = Vec::new();
+        let mut guard = 0;
+        while game.state.pending_moon_order.is_some() {
+            guard += 1;
+            assert!(guard <= 4, "der Knoten muss nach wenigen Teilzuegen schliessen");
+            assert_eq!(game.state.current_player, mover, "kein Wechsel mitten im Zug");
+            let cands = moon_top_candidates(game.state.pending_moon_order.as_ref().unwrap());
+            // Bewusst der LETZTE Kandidat, damit die gewaehlte Reihenfolge nicht
+            // versehentlich die kanonische ist.
+            let c = *cands.last().unwrap();
+            picked.push(c);
+            game.apply_drafting(&Action::ChooseMoonTop(c)).unwrap();
+        }
+        assert_eq!(game.state.current_player, 1 - mover, "Wechsel erst am Ende");
+
+        let stack = moon_stack_of(&game.state, fid);
+        assert_eq!(stack.len(), rest.len(), "dieselbe Multimenge, nur anders geordnet");
+        // Index 0 = unten, letzter = oben (factory.rs:62-67).
+        assert_eq!(*stack.last().unwrap(), picked[0], "zuerst gewaehlt liegt oben");
+        let mut a: Vec<&str> = stack.iter().map(|c| c.value()).collect();
+        let mut b: Vec<&str> = rest.iter().map(|c| c.value()).collect();
+        a.sort_unstable();
+        b.sort_unstable();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn moon_order_node_blocks_the_phase_transition_until_it_closes() {
+        // Der Riegel in `check_phase_transition`: waehrend der Knoten offen ist,
+        // SIEHT die Fabrik leer aus (der Rest liegt in der Hand). Ohne Riegel
+        // koennte die Drafting-Phase mitten im Zug enden.
+        let mut game = started_game(21);
+        game.state.extended_action_nodes = [true, true];
+        game.state.factories[0].sun_tiles = vec![TileColor::Blau, TileColor::Rot, TileColor::Gelb];
+        game.state.factories[0].moon_stacks.clear();
+        for f in game.state.factories.iter_mut().skip(1) {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
+        let fid = game.state.factories[0].factory_id;
+        let rest = vec![TileColor::Rot, TileColor::Gelb];
+        game.apply_drafting(&Action::Stone(stone_move(fid, TileColor::Blau, rest, -1))).unwrap();
+        assert_eq!(
+            game.state.phase,
+            Phase::Drafting,
+            "Phase bleibt, solange der Knoten offen ist"
+        );
+        assert!(game.state.pending_moon_order.is_some());
+        game.apply_drafting(&Action::ChooseMoonTop(TileColor::Rot)).unwrap();
+        assert!(game.state.pending_moon_order.is_none());
+        // Der Rest liegt jetzt auf dem Mond -- die Runde ist NICHT vorbei.
+        assert_eq!(game.state.phase, Phase::Drafting);
+    }
+
+    // ── R3: Rueckgabe-Reihenfolge als eigener Entscheidungsknoten ─────────────
+
+    /// Zieht `n` Platten verdeckt (Score 0 -> gratis, siehe
+    /// `stack_peek_at_zero_score_allows_unlimited_draws`).
+    fn peek_n(game: &mut Game, n: usize) {
+        game.state.players[game.state.current_player].score = 0;
+        for _ in 0..n {
+            game.apply_drafting(&Action::DrawStackPeek).expect("Peek muss gehen");
+        }
+    }
+
+    #[test]
+    fn return_order_node_offers_capped_draw_positions_and_orders_the_head() {
+        // Kandidaten sind die ZIEH-Positionen (gedeckelt auf
+        // RETURN_ORDER_MAX_PERMUTED), der Spieler bleibt am Zug, und
+        // `return_order[0]` ist die gewaehlte Platte -- der Rest bleibt in
+        // Ziehreihenfolge.
+        let mut game = started_game(12);
+        game.state.extended_action_nodes = [true, true];
+        let mover = game.state.current_player;
+        peek_n(&mut game, 4);
+        let drawn: Vec<usize> = game.state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+        assert_eq!(drawn.len(), 4);
+        let m = generate_draw_stack_moves(&game.state)
+            .into_iter()
+            .next()
+            .expect("mindestens ein Kandidat");
+        let chosen = m.chosen_id;
+        let rest = rest_in_draw_order(&game.state, chosen);
+        assert_eq!(rest.len(), 3);
+        game.apply_drafting(&Action::ChooseDrawStackSlot(m)).unwrap();
+
+        let pending = game.state.pending_return_order.clone().expect("R3-Knoten offen");
+        assert!(
+            game.state.pending_dome_choice.is_none(),
+            "die Rotation kommt erst NACH dem Knoten"
+        );
+        assert_eq!(pending.rest_in_draw_order, rest);
+        assert_eq!(
+            drafting_actions(&game.state),
+            (0..crate::self_play::RETURN_ORDER_MAX_PERMUTED)
+                .map(Action::ChooseReturnFirst)
+                .collect::<Vec<_>>(),
+            "drei Kandidaten, gedeckelt"
+        );
+        assert!(game.apply_drafting(&Action::ChooseDomeRotation(0)).is_err());
+        assert!(game.apply_drafting(&Action::ChooseReturnFirst(99)).is_err());
+        assert!(
+            game.state.pending_return_order.is_some(),
+            "ein Fehlschlag laesst den Knoten stehen"
+        );
+
+        game.apply_drafting(&Action::ChooseReturnFirst(1)).unwrap();
+        assert_eq!(game.state.current_player, mover, "kein Wechsel mitten im Zug");
+        match game.state.pending_dome_choice.clone().expect("jetzt die Rotation") {
+            PendingDomeChoice::FromDrawStack { return_order, chosen_id, .. } => {
+                assert_eq!(chosen_id, chosen);
+                let mut want = vec![rest[1]];
+                want.extend(rest.iter().enumerate().filter(|(i, _)| *i != 1).map(|(_, id)| *id));
+                assert_eq!(return_order, want, "gewaehlte Platte zuerst, Rest in Ziehreihenfolge");
+            }
+            other => panic!("falsche Stufe: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn return_order_node_is_off_without_the_gate() {
+        // Ohne Tor geht es wie im Bestand direkt zur Rotation, und das
+        // eingereichte `return_order` wird uebernommen.
+        let mut game = started_game(12);
+        assert!(!game.state.extended_action_nodes[0]);
+        peek_n(&mut game, 3);
+        let m = generate_draw_stack_moves(&game.state).into_iter().next().expect("Kandidat");
+        let eingereicht = m.return_order.clone();
+        game.apply_drafting(&Action::ChooseDrawStackSlot(m)).unwrap();
+        assert!(game.state.pending_return_order.is_none(), "kein Knoten ohne Tor");
+        match game.state.pending_dome_choice.clone().expect("direkt die Rotation") {
+            PendingDomeChoice::FromDrawStack { return_order, .. } => {
+                assert_eq!(return_order, eingereicht);
+            }
+            other => panic!("falsche Stufe: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn action_id_round_trip_covers_the_eight_new_ids() {
+        // Zug -> ID -> Zug fuer 406..413. Der ID-Weg ist
+        // `self_play::action_to_id_direct`, derselbe, den die Suche nutzt; beide
+        // neuen Zweige lesen `state` nicht.
+        let game = started_game(5);
+        for (i, c) in TileColor::NORMAL.iter().copied().enumerate() {
+            let a = Action::ChooseMoonTop(c);
+            let id = crate::self_play::action_to_id_direct(&game.state, &a);
+            assert_eq!(id, 406 + i);
+            assert_eq!(Action::ChooseMoonTop(TileColor::NORMAL[id - 406]), a);
+        }
+        for pos in 0..crate::self_play::RETURN_ORDER_MAX_PERMUTED {
+            let a = Action::ChooseReturnFirst(pos);
+            let id = crate::self_play::action_to_id_direct(&game.state, &a);
+            assert_eq!(id, 411 + pos);
+            assert_eq!(Action::ChooseReturnFirst(id - 411), a);
+        }
+        // Der Raum ist genau ausgefuellt: 413 ist die letzte ID.
+        assert_eq!(crate::net_mcts::NUM_ACTIONS, 414);
     }
 
     #[test]

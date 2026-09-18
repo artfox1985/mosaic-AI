@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: par.9 NULL ist Arithmetik (12.5: 0,6 Gelegenheiten je Partie und Seite). R1 GEMESSEN (12.4). ENTSCHIEDEN 12.6: R2 (P.16 `designs_ordered`) bauen, Modus 1 in der v30-Erzeugung an. **ENTSCHIEDEN 12.7 (Nutzer 2026-09-17): R3 (Rueckgabe-Reihenfolge als eigener Entscheidungsknoten) wird gebaut, gebuendelt mit Weg A des Mondstapels zu NUM_ACTIONS 414, additiver Policy-Kopf, VOR der v30-Erzeugung; Korrektheitsentscheid.** -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: par.9 NULL ist Arithmetik (12.5). R1 GEMESSEN (12.4). ENTSCHIEDEN 12.6/12.7: R2 (P.16 `designs_ordered`, INPUT_SIZE 888) und R3 (Rueckgabe-Knoten, IDs 411-413). **R2 und R3 CODIERT (12.8); ENTSCHIEDEN 2026-09-18 (Nutzer "dann a"): die Schleife entscheidet Slot, Rueckgabe und Rotation bei aktivem 414er-Tor als eigene Suchknoten mit Policy-Ziel (12.9, codiert, Bit-Identitaet ohne Tor belegt). Befund 12.9: `return_order_mode 1` ist unter `MOSAIC_STACK_DRAW_RESEARCH=1` wirkungslos, die Abdeckung kommt vom Knoten.** Kompilat und Abnahme VOR der v30-Erzeugung. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -844,3 +844,302 @@ Kontraktwechsel `NUM_ACTIONS` 406 -> 414 (5 Mond-IDs + 3 Rueckgabe-IDs), additiv
 bestehen: R2 ist die Sicht (das Netz sieht die Reihenfolge), R3 der Zug (das Netz waehlt sie im Baum); Modus 1
 bleibt der Rueckfall fuer 406er-Netze und fuer den Heuristik-Pfad. Alles VOR der v30-Erzeugung im Wheel;
 Wiedervorlage am ersten Record wie bei P.12/P.16. Fahrplan 36i.
+
+
+### 12.8 Baustand R3 und R2 (2026-09-18, Agent)
+
+Code vollstaendig, **Kompilat und Wheel stehen aus** (exklusive Arena-Messungen liefen; der
+Auftrag war "Code ohne Kompilat"). Nichts gemessen, nichts committet. Gebuendelt mit Weg A des
+Mondstapels zu EINEM Kontraktwechsel; die gemeinsamen Teile (Tor, Policy-Breite,
+Vertragshash, additive Polsterung, Anker-Belege) stehen in
+`PREREG_moon_stack_order.md` 12.10 und werden hier nicht wiederholt.
+
+#### R3 -- Rueckgabe-Reihenfolge als Entscheidungsknoten
+
+**Bauform.** `moves.rs`: `PendingReturnOrder { chosen_id, slot_row, slot_col,
+rest_in_draw_order }` plus `Action::ChooseReturnFirst(usize)`. In
+`game.rs::apply_drafting`, Zweig `Action::ChooseDrawStackSlot`: greift das Tor und gibt es
+mindestens zwei Restplatten, wird statt `pending_dome_choice` das neue
+`pending_return_order` gesetzt -- der Knoten sitzt damit GENAU zwischen
+`ChooseDrawStackSlot` und `ChooseDomeRotation`, wie in 12.1 vorgegeben. Der Teilzug waehlt
+`return_order[0]` per ZIEH-POSITION; der Rest bleibt in Ziehreihenfolge. Danach wird
+`pending_dome_choice::FromDrawStack` mit der fertigen Reihenfolge gesetzt, ohne
+`switch_player()`; die Rotation laeuft unveraendert weiter.
+
+**Kandidaten und IDs.** `game::return_first_candidates` liefert
+`0..min(rest, RETURN_ORDER_MAX_PERMUTED)` -- derselbe Deckel 3, den Modus 1 permutiert
+(`self_play.rs`, jetzt `pub(crate)`), und damit dieselbe Menge, die der Rueckfall beschreibt.
+Aktions-IDs 411..413 (`features::action_to_id`, Typ `choose_return_first`, Feld `draw_index`,
+gedeckelt statt ueberlaufend), Spiegel in `self_play::action_to_id_direct` und
+`neural_net.py`.
+
+**Das eingereichte `return_order` wird bei aktivem Knoten VERWORFEN**, und der Bezugsrahmen
+der IDs ist nicht es, sondern die Ziehreihenfolge: `game::rest_in_draw_order` bildet sie aus
+`pending_stack_draw` und entfernt `chosen_id` genau einmal (Multimengen-Disziplin wie
+`validate_draw_from_stack`).
+
+**Die ehrliche Grenze dieses Baus, und sie ist der wichtigste Satz hier.** Der Stapelzug wird
+im Betrieb NICHT von der Schleife entschieden, sondern von
+`self_play::resolve_and_apply_stack_draw_with`: die Suche waehlt an der Wurzel nur das
+`DrawStackPeek`, der Aufloeser macht danach alles allein (wie oft ziehen, welche Platte,
+Slot, Rotation, Reihenfolge). Folge:
+
+* Der Aufloeser SCHLIESST den Knoten selbst, mit genau der Wahl des Entscheiders
+  (`choose_return_order`, also `return_order_mode`): Position von `return_order[0]` in der
+  Ziehreihenfolge, bei Modus 0 also 0, bei Modus 1 immer ausdrueckbar (er permutiert genau den
+  gedeckelten Kopf). Endzustand identisch zu heute, aber ueber die Knoten-Transition.
+* **Damit traegt der Record fuer diesen Halbzug KEIN `policy_target` am Rueckgabeknoten** --
+  anders als beim Mondknoten, den die Schleife als eigenen Entscheid sieht. R3 wirkt zunaechst
+  nur IM SUCHBAUM (dort taucht der Knoten in jeder simulierten Fortsetzung nach einem Peek
+  auf und wird vom Netz bewertet).
+* Nutzer-/Koordinator-Entscheid, offen: soll die SCHLEIFE den Stapelzug uebernehmen (dann
+  entscheidet die Suche auch Slot und Rotation, was heute `best_eval_for_tile` tut -- eine
+  Agenten-Aenderung, die niemand vorregistriert hat), oder bleibt R3 ein reiner Baum-Knoten?
+  Solange Letzteres gilt, ist die Wiedervorlage "erster v30-Record enthaelt
+  `choose_return_first`" NICHT erfuellbar; `choose_moon_top` steht darin.
+* Randfall Modus 2 (Handregel, Diagnoseknopf): koennte eine Platte jenseits des Deckels nach
+  vorne ziehen. Dann nimmt der Aufloeser Position 0. Kein Zustandsschaden, aber Modus 2 ist
+  mit Knoten nicht mehr deckungsgleich mit sich selbst ohne Knoten. Im Code vermerkt.
+
+**Anker.** Der Heuristik-Pfad loest den Stapelzug gar nicht hier auf
+(`apply_via_chosen_action: false`) und setzt das Tor nie -- Belege in
+`moon_stack_order` 12.10.
+
+**Tests (geschrieben, nicht gelaufen), `game.rs`:**
+`return_order_node_offers_capped_draw_positions_and_orders_the_head` (Kandidaten gedeckelt
+auf 3 bei 3 Restplatten, kein Spielerwechsel, `return_order[0]` ist die gewaehlte Platte,
+Rest in Ziehreihenfolge, Rotation VOR dem Knoten wird abgelehnt, ungueltige Position laesst
+den Knoten stehen), `return_order_node_is_off_without_the_gate` (ohne Tor direkt zur
+Rotation, eingereichtes `return_order` uebernommen),
+`action_id_round_trip_covers_the_eight_new_ids` (411..413).
+
+#### R2 / P.16 -- geordnete eigene Designs (Bauvorgaben 1-5 aus 12.6)
+
+1. **Record-Feld** `dome_pool_view.blocks[].designs_ordered` (`serialize.rs::dome_pool_view`,
+   direkt neben `designs`): die `tile_id`s des EIGENEN Blocks in Stapelreihenfolge
+   (Index 0 = kommt zuerst wieder, dieselbe Richtung wie `types`), fremde Bloecke `Null`.
+   Additiv, `designs` bleibt unveraendert sortiert.
+2. **Encoder, beide Pfade** (`features.rs`, neuer Abschnitt 18): vier Werte ANS ENDE,
+   Design-Nummer der Positionen 0..3 des obersten eigenen Blocks als `tile_id / 17`, `0` wenn
+   die Position fehlt oder das Feld nicht da ist. `INPUT_SIZE` 884 -> 888. Dieselben vier
+   Positionen wie die Typfolge aus Abschnitt 15 (`DOME_POOL_TOP_TYPES`). JSON-Pfad aus dem
+   Record-Feld, Direktpfad aus dem `GameState` mit derselben Sichtregel; der Python-Zwilling
+   (`engine/py/neural_net.py`) hat denselben Block plus die Scharfschaltung
+   `if INPUT_SIZE < LEN_WITH_ORDERED_DESIGNS: return` (Muster von Abschnitt 16/17, Unfall
+   2026-09-11).
+   **Eine Mehrdeutigkeit, so registriert wie vorgegeben:** Design 0 und "Position fehlt" sind
+   beide `0,0` (die Prereg schreibt `tile_id / 17` und `0` fuer fehlend). Aufloesbar ist es
+   ueber den Nachbarwert aus Abschnitt 15, dessen Typwert an derselben Position genau dann `0`
+   ist, wenn die Position fehlt. Im Code vermerkt.
+3. **Schluessel und Tore.** `config.INPUT_SIZE` 884 -> 888 setzt der Koordinator im
+   Kompilat-Schritt (diese Sitzung hat `config.py` nicht angefasst, Auftrag); Merkmal in
+   Fenster- UND Val-Cache-Schluessel (`feedback_feature_knob_belongs_in_both_cache_keys`) --
+   das faellt automatisch, weil beide Schluessel `INPUT_SIZE` fuehren, ist aber vor dem ersten
+   Cache-Bau zu PRUEFEN und nicht anzunehmen. Netz-Paritaets-Fixture bewusst neu (neues
+   Record-Feld, dieselbe Lage wie Abschnitt 16); Anker-Drift und -Konservierung gruen erwartet
+   (die Heuristik liest den Vektor nicht).
+   **Sichtgleichheitstest gebaut:** `features.rs::ordered_designs_only_read_the_own_block_in_both_paths`
+   prueft ueber >= 300 Zustaende gegen eine DRITTE Rechnung (direkt aus `dome_tile_pool`),
+   dass beide Encoder-Pfade Wert fuer Wert dasselbe liefern, dass `designs_ordered` genau am
+   eigenen Block steht und fremde `null` bleiben (Netz-sieht-MEHR ausgeschlossen), und dass es
+   dieselbe Multimenge wie `designs` ist. Dazu
+   `ordered_designs_are_appended_after_884` (Additivitaet: Abschnitt 17 unverschoben, vier
+   Werte in [0,1], Laenge genau `ORDERED_DESIGN_VALUES`).
+   `tools/check_conventions.py`: gruen.
+4. **Wirkung** erst im v31-Training (das Feld muss im Korpus liegen); Verdikt-Groessen
+   unveraendert (par.6d Punkt 1 der Fenster-Prereg, R1 am v30-Netz getrennt nach gleicher und
+   verschiedener Typfolge). Kein Arena-Anspruch (12.5).
+5. **Rahmen** unveraendert (zweite Ausnahme vom Grundsatz "v30 nur Rezept-Knoepfe",
+   Nutzer-Entscheid).
+
+**Eintrag in `docs/architecture_reference.md`** gemacht, Abschnitt "Wo der Code Information
+ABSICHTLICH vernichtet": die SORTIERUNG in `designs` war eine Sicht-ANNAHME ("der Spieler
+haelt die Reihenfolge nicht auseinander"), und sie war falsch -- er hat sie selbst gewaehlt,
+und `determinize_dome_pool` laesst sie ihm auch in der Suche. `designs_ordered` hebt sie
+additiv auf, nur fuer den eigenen Block. Dazu die Zeile zu den beiden neuen Knoten.
+
+**Kompilat-Erwartung.** ROT (und vom Koordinator zu setzen): `config.py`
+(`NUM_ACTIONS` 414, `INPUT_SIZE` 888), Feature-Golden-Fixture, Netz-Paritaets-Fixture.
+GRUEN bleiben muss: Vertragshash (`lib.rs`, Literal `6ef829e564c58bd5`, nachgerechnet),
+Anker-Drift/-Konservierung, alle `direct_matches_json_path_*`, alle Rundtrip-Tests in
+`serialize.rs` (die drei neuen exakten Felder `pending_moon_order_exact`,
+`pending_return_order_exact`, `extended_action_nodes_exact` werden TOLERANT gelesen, damit
+bestehende Referee-/Seeding-Nutzlasten weiter laden).
+
+### 12.9 Baustand: die Schleife uebernimmt den Stapelzug (2026-09-18, Agent)
+
+**Nutzer-Entscheid 2026-09-18 ("dann a", STATUS Abschnitt 6 Punkt 22):** Slot, Rueckgabe und
+Rotation werden bei aktivem 414er-Tor eigene Entscheide der SUCHE mit Besuchsverteilung als
+Lernziel -- der offene Punkt aus 12.8 ("R3 traegt im Record kein Policy-Ziel") ist damit
+beantwortet. Code fertig, **Kompilat und Wheel stehen aus** (exklusive Arena-Kette lief), nichts
+gemessen, nichts committet. Gebuendelt mit Weg A, R3 und R2 zu EINEM Kontraktwechsel.
+
+**Der Fund, der den Bau klein gemacht hat.** Der Mechanismus existiert seit v23 als Knopf:
+`MOSAIC_STACK_DRAW_RESEARCH=1` schaltet die Sammelaufloesung ab, es wird nur der Peek angewandt,
+und die Schleife entscheidet danach neu (`self_play.rs:1328` Getter, Wirkort das Match in
+`apply_chosen_action_with`). Der Knopf steht in der v29- UND der v30-Erzeugung
+(`tools/night_v29_generate.sh:37`, `tools/night_v30_generate.sh:32`). Drei Folgerungen, alle am
+Code geprueft:
+
+1. `ChooseDrawStackSlot` und `ChooseDomeRotation` sind dort SCHON heute eigene Halbzuege mit
+   eigener Suche und eigenem Record -- die Schleife schreibt je Durchlauf genau einen Record mit
+   `policy` und `valid_actions` (`self_play.rs:4267`ff). Der Stapelzug wechselt den Spieler erst
+   in `ChooseDomeRotation` (`game.rs:1061`, `switch_player` am Ende des Arms); `DrawStackPeek`,
+   `ChooseDrawStackSlot` (`game.rs:1033`) und `ChooseReturnFirst` (`game.rs:987`) beenden den Zug
+   nicht.
+2. Der Rueckgabeknoten braucht deshalb KEINEN neuen Transportweg: `drafting_actions` bietet ihn
+   an (`game.rs:767`), `apply_drafting` hat den Rangfolge-Riegel, und die Schleife sieht ihn als
+   eigenen Entscheid.
+3. Was fehlte, war nur die KOPPLUNG an das Tor statt an eine Umgebungsvariable -- ohne sie bliebe
+   eine 414er-Seite in der Arena und im Gating (Knopf aus) beim Aufloeser, waehrend sie in der
+   Erzeugung zerlegt spielt.
+
+**Die Aenderung, eine Zeile plus Tor.** Neue Torfunktion `game::stack_move_decided_by_loop`
+(`game.rs:709`, liest `extended_action_nodes[current_player]`), gelesen im Match von
+`apply_chosen_action_with` (`self_play.rs:1378-1392`): der Aufloeser laeuft nur noch, wenn
+`!stack_draw_research() && !stack_move_decided_by_loop(...)`. Sonst wird der Peek einzeln
+angewandt und die Schleife entscheidet weiter.
+
+**Zustandsfluss der drei Teilzuege bei aktivem Tor** (je Schritt eine Suche, ein Record, kein
+Spielerwechsel):
+
+1. Der Wurzelentscheid der Schleife waehlt `DrawStackPeek` -> `execute_draw_stack_peek` legt eine
+   Platte in `pending_stack_draw`; weitere Peeks sind eigene Entscheide (der Bestand entschied
+   sie im Aufloeser per Erwartungswert-Regel).
+2. `ChooseDrawStackSlot(m)`: `rest_in_draw_order` bildet die Restplatten; ab zwei oeffnet
+   `pending_return_order` (`game.rs:1033-1045`), das eingereichte `m.return_order` wird
+   verworfen. Bei einer oder keiner Restplatte direkt `pending_dome_choice` -- Bestandspfad.
+3. `ChooseReturnFirst(pos)`: Position in der ZIEHREIHENFOLGE, Kandidaten `0..min(rest, 3)`
+   (`return_first_candidates`), IDs 411..413. Setzt `pending_dome_choice::FromDrawStack` mit
+   `return_order[0]` = gewaehlte Platte, Rest in Ziehreihenfolge.
+4. `ChooseDomeRotation(rot)`: vier Kandidaten (`draw_stack_slot_rotation_candidates` filtert
+   heute nichts weg), `execute_draw_from_stack`, dann `switch_player`.
+
+**Bit-Identitaets-Belege (Pruefstellen).**
+
+* Tor aus -> die Match-Bedingung ist wortgleich der Bestand, derselbe Aufloeser-Aufruf mit
+  denselben Argumenten (`self_play.rs:1386-1392`). Gesetzt wird das Tor an GENAU EINER Stelle,
+  `unified_game_loop` (`self_play.rs:3813-3815`), je Seite aus `tiling_net` plus Policy-Breite.
+* Heuristik-Seiten erreichen den Aufloeser in der Schleife ohnehin nicht
+  (`apply_via_chosen_action: false`, Belege in `moon_stack_order` 12.10) und setzen das Tor nie.
+* `referee.rs:868`, `referee.rs:970` und `py.rs:1067` (GUI) rufen `apply_chosen_action_with`
+  weiter mit einem Zustand, dessen Tor nie gesetzt wird -- fuer sie bleibt der Aufloeser der
+  Wirkort, byte-identisch. `json_to_state` setzt das Feld auf `false` (`serialize.rs:1272`),
+  Replay und Seeding ebenfalls.
+* Der Abweichungs-Sonde (`deviation_best_action`, `self_play.rs:3010`) wird das Tor jetzt
+  mitgeklont: sie bewertet fuer eine 414er-Seite denselben Folgezustand, der auch entsteht
+  (vorher haette sie unter `MOSAIC_STACK_DRAW_RESEARCH=1` den ganzen Zug aufgeloest, waehrend der
+  Spielpfad nur den Peek anwendet). Das ist eine KORREKTUR dieses Bestands-Missverhaeltnisses und
+  wirkt nur bei aktivem Tor.
+
+**Was mit dem Aufloeser wegfaellt, und das ist der wichtigste Nebenbefund.** `return_order_mode`
+(Modus 1/2) und die Erzeugungs-Streuung `MOSAIC_RETURN_ORDER_RANDOM_P` sitzen AUSSCHLIESSLICH im
+Aufloeser (`choose_return_order` hat genau einen Aufrufer, `self_play.rs:1187`;
+`apply_return_order_random` genau einen, `self_play.rs:1196`). Fuer eine Seite mit Tor wirken sie
+nicht mehr -- an ihre Stelle tritt der Knoten. **Unter `MOSAIC_STACK_DRAW_RESEARCH=1` gilt das
+schon heute fuer JEDE Seite**, also auch fuer die v29-Erzeugung und fuer die v30-Kette, deren
+Spec `return_order_mode: 1` fuehrt (`models/v30_generation.spec.json`): dieser Spec-Wert war dort
+ohne Wirkung und stand nur im Manifest-Export. Der Streu-Knopf steht in KEINEM Skript und in
+keiner Spec (geprueft mit einem Grep ueber `tools/*.sh` und `models/*.json`), verliert also keinen
+lebenden Verbraucher. Wer die Abdeckungs-Absicht aus par.11 im v30-Korpus haben will, bekommt sie
+jetzt ueber den Knoten (Temperatur der Besuchsverteilung, `action_temp_for`), nicht ueber den
+Knopf. Die Knopf-Registratur ist an allen drei Stellen nachgezogen, `docs/knobs.md` neu erzeugt
+(Quelle: Parse von `knob_registry.rs`, kein Wheel).
+
+**Budget je Knoten: das volle `base_sims`, kein neuer Knopf.** Begruendung nach Praezedenz, nicht
+nach Geschmack: (a) im Netzpfad ist das Budget je Entscheid ohnehin von der Aktionszahl
+ENTKOPPELT -- `net_effective_sims` gibt `base_sims` unveraendert zurueck
+(`net_mcts.rs:4122/4146`, `DECOUPLE_NET_SIMS_FROM_ACTIONS = true`), zwei Aktionen kosten dasselbe
+wie 195; (b) der Mondknoten aus Weg A laeuft aus demselben Grund mit dem vollen Budget
+(`moon_stack_order` 12.10); (c) `ChooseDrawStackSlot` und `ChooseDomeRotation` tun es in der
+Erzeugung seit v29. Die 256 Sims von `moon_order_post_search` (`net_mcts.rs`, Stufe 3) sind KEINE
+Praezedenz fuer den Knoten: das ist eine Nachsuche nach der Zugwahl, und Weg A schaltet sie ab.
+Ein kleineres Budget bekaeme man nur mit einem neuen Knopf -- ausdruecklich nicht gewollt.
+
+**Erwartete Zusatzkosten.** Je Stapelzug zaehlt die Schleife eine Suche fuer jeden weiteren Peek,
+eine fuer den Slot, eine fuer den Rueckgabeknoten (nur bei >= 2 Restplatten) und eine fuer die
+Rotation (vier Kandidaten).
+
+* **Gegen die v30-Kette (Knopf schon an): genau eine zusaetzliche Suche je Rueckgabe mit >= 2
+  Restplatten.** Alles andere lief dort bereits.
+* **Gegen einen Lauf mit Knopf AUS** (Arena, Gating, Kostentor) kommen Peeks, Slot und Rotation
+  hinzu. Gemessen ist nur die Haeufigkeit der Rueckgabe-Gelegenheit: **0,62 bzw. 0,65 Rueckgaben
+  mit mindestens zwei Restplatten je Partie und Seite** (n = 300 Partien, Grundmenge
+  Arena-Partien @400 Sims ohne Forschungsknopf, Einheit Rueckgaben je Partie und Seite --
+  Tabelle in 12.5). Mit zwei bis vier Zusatzsuchen je Stapelzug sind das **rund 800 bis 1.600
+  zusaetzliche Sims je Partie und Seite gegen rund 32.000 bei @400, also grob +2,5 bis +5
+  Prozent** -- HERLEITUNG aus den beiden genannten Zahlen, nicht gemessen. Das Kostentor aus
+  Punkt 23 (Schwelle 25 Prozent) misst es.
+* **Fuer die ERZEUGUNG ist die Haeufigkeit ungemessen**, und die naheliegende Zahl ist falsch:
+  die "11,07 Gelegenheiten mit mindestens drei Restplatten je Partie" aus par.11c stammen aus
+  `PREREG_moon_stack_order.md` par.9b (142.945 Dreierstapel auf 12.907 Partien, Zeile 549 dort) --
+  Grundmenge sind MONDSTAPEL-Ereignisse, Einheit Dreierstapel je Partie, nicht Kuppelplatten.
+  par.11c bezeichnet sie als "Restplatten"; das ist eine Grundmengen-Verwechslung. 12.5 Punkt 1
+  hat die Luecke halb gesehen (Faktor 18 zur Arena), aber die Bezeichnung nicht korrigiert.
+  Betroffen ist allein die Dosis-Rechnung des Streu-Knopfs (p = 0,0146), und die hat keinen
+  lebenden Verbraucher (siehe oben). **Wiedervorlage:** die Zahl aus dem ersten v30-Self-Play
+  zaehlen -- `choose_return_first`-Records je Partie; die Record-Pruefung aus Punkt 21 oeffnet die
+  Datei ohnehin.
+
+**Tests (geschrieben, NICHT gelaufen), alle in `self_play.rs`:** gemeinsame Fixture
+`stack_draw_ready_game` (`self_play.rs:8017`).
+
+* (a) `stack_move_stays_with_the_resolver_without_the_gate` (`:8037`) -- ohne Tor beendet EIN
+  `apply_chosen_action` den ganzen Stapelzug, Rueckgabe ist die Stufe-1-Aktion, Platte liegt,
+  `pending_return_order` bleibt leer, Spielerwechsel gefallen. Dieselben Zusicherungen wie
+  `resolve_and_apply_stack_draw_produces_valid_placement` (`:7987`), das den Bestand
+  festschreibt.
+* (b) `stack_move_is_decided_by_the_loop_with_the_gate` (`:8063`) -- drei Peeks je einzeln
+  angewandt, dann Slot, dann der Knoten (nur seine Kandidaten legal, genau zwei), dann Rotation;
+  `current_player` bleibt bis zur Rotation 0, `return_order[0]` ist die gewaehlte Platte. Dass
+  jeder dieser Teilzuege einen eigenen Record mit Policy-Ziel bekommt, folgt aus dem
+  `recording`-Zweig (`self_play.rs:4267`ff) -- ein Record-Test dazu braucht ein 414er-ONNX, die
+  Fixture `engine_test.onnx` traegt 406 (offener Punkt unten).
+* (c) Aktions-IDs 411..413 rundreisefaehig: `game.rs::action_id_round_trip_covers_the_eight_new_ids`
+  aus 12.8 deckt sie ab, dazu `action_to_id_direct_matches_json_path_across_random_games`. Nichts
+  Neues gebaut.
+* (d) `loop_ownership_ignores_return_order_mode_and_the_randomizer` (`:8131`) -- mit Tor holt
+  weder `return_order_mode = 1` noch ein gesetzter Streu-Traeger den Aufloeser zurueck, und die
+  Muenze der Streuung bleibt ungefallen. Das ist die Zusicherung "Arena-Loop verhaelt sich wie
+  Self-Play-Loop": beide uebergeben genau diese Argumente (`self_play.rs:4190`ff).
+
+Alle beruehrten `.rs`-Dateien sind mit `rustfmt --check` auf Kopien parse-geprueft (KEIN Kompilat,
+also keine Typpruefung). `python -X utf8 tools/check_conventions.py`: gruen.
+
+**Kompilat-Erwartung.** Unveraendert die aus 12.8 und `moon_stack_order` 12.10 -- diese Aenderung
+fuegt nichts hinzu, was rot werden muesste: keine oeffentliche Signatur geaendert (nur eine neue
+`pub fn` in `game.rs`), also auch keine Nachziehpflicht in `engine/examples/` oder
+`engine/benches/` (geprueft mit einem Grep nach `apply_chosen_action` dort: keine Fundstelle).
+Replayer und GUI bleiben unberuehrt; NEUE Logzeilen entstehen nicht, im Gegenteil fallen bei
+aktivem Tor die `[return_order]`-Zeilen weg (sie kamen aus dem Aufloeser). GRUEN bleiben muss
+zusaetzlich `resolve_and_apply_stack_draw_produces_valid_placement` -- der Bestand des Aufloesers.
+
+**Offene Punkte.**
+
+1. **Zeile-1-Kopf dieser Prereg ist nach diesem Absatz ueberholt** (er fuehrt den Entscheid noch
+   als offene Frage). Der Auftrag dieser Sitzung war ausdruecklich "Zeile 1 nicht aendern";
+   nachziehen und `python tools/generate_prereg_index.py` laufen lassen ist damit Sache des
+   Koordinators.
+2. **Record-Test mit Tor fehlt**, weil die Test-ONNX 406 Ausgaenge hat. Sobald das gepolsterte
+   b10 (Punkt 23) liegt, ist er billig nachzuziehen -- und die Self-Play-Stichprobe der
+   Abnahmekette prueft dasselbe am echten Korpus.
+3. **Der R3-Rueckfall im Aufloeser ist ueber `apply_chosen_action_with` nicht mehr erreichbar**
+   (Tor an -> Schleife, Tor aus -> Knoten oeffnet nie). Er bleibt fuer direkte Aufrufer stehen,
+   mit Kommentar an der Stelle (`self_play.rs:1240`ff); Loeschen ist ein eigener Entscheid.
+4. **Sackgassen-Fall `Pass`:** findet die Schleife mitten im Stapelzug keine legale Slot-Wahl und
+   keinen weiteren Peek, bietet `drafting_actions` `Pass` an, was den Spieler mit gefuelltem
+   `pending_stack_draw` wechseln liesse. Das ist KEIN neuer Fall -- er existiert unveraendert
+   unter `MOSAIC_STACK_DRAW_RESEARCH=1`, also in der v29-Erzeugung; ungemessen, ob er je eintritt.
+5. **Der Encoder sieht die Zwischenstufe nicht:** `features.rs` liest `pending_stack_draw`, aber
+   weder `pending_dome_choice` noch `pending_return_order`. Eingabevektor am Slot-, Rueckgabe- und
+   Rotationsknoten sind damit gleich; unterschieden werden die Stufen nur ueber die legale
+   Aktionsmenge. Gilt seit Baustein B fuer Slot/Rotation genauso, ist also Bestand und kein
+   Regress -- fuer das Policy-Ziel unschaedlich (es lebt auf `valid_actions`), fuer den
+   Value-Kopf heisst es mehrere gleiche Eingaben je Stapelzug mit demselben Ausgang.
+
+### 12.10 Kompilat (2026-09-18, 09:21-09:31)
+
+Siehe `PREREG_moon_stack_order.md` 12.11: 702 Tests gruen nach bewusster Neuerzeugung beider Fixtures (die
+Netz-Paritaets-Fixture bewegt sich durch das neue Record-Feld `designs_ordered`, Hash `d049d1329abf2343`), Wheel
+09:30:43, config 888/414. Abnahme laeuft (`tools/night_v30_wheel_acceptance.sh`); die Record-Stichprobe darin
+zaehlt die Rueckgabe-Knoten (IDs 411-413) und ihre `policy`-Eintraege -- das ist die Wiedervorlage aus 12.9.

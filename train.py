@@ -1696,6 +1696,37 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                     old_state[_k] = torch.cat([_o, _pad], dim=1)
                     print(f"   ↔ {_k}: Eingangsbreite {_o.shape[1]} -> {_n.shape[1]}, "
                           f"{_n.shape[1] - _o.shape[1]} neue Spalten null-initialisiert (additive Eingabe)")
+        # Additive AUSGABE-Erweiterung des Policy-Kopfs (Weg A / R3,
+        # PREREG_moon_stack_order.md par.12.6 Bauvorgabe 1, 2026-09-18): ist die
+        # letzte Linear-Schicht des Policy-Kopfs im Checkpoint SCHMALER als im
+        # neuen Modell (406 gegen 414), werden die fehlenden Ausgangszeilen mit
+        # NULL aufgefuellt statt den Kopf frisch zu starten. Das Netz gibt im
+        # ersten Schritt fuer die acht neuen Aktionen genau 0 aus -- nach dem
+        # masked log_softmax also eine gleichverteilte, nicht bevorzugte Masse --
+        # und bleibt fuer die 406 alten Aktionen exakt das alte Netz.
+        #
+        # Spiegelbildlich zur EINGANGS-Polsterung darueber, nur eben dim=0
+        # (Ausgangszeilen) statt dim=1 (Eingangsspalten), und Bias mit.
+        # Verengung wird NICHT gepolstert (neue IDs haengen hinten an, die Regel
+        # ist additiv) -- ein schmaleres neues Modell faellt unten in die
+        # Shape-Mismatch-Liste und startet frisch.
+        for _k in ("policy_head.2.weight", "policy_head.0.weight"):
+            if _k in old_state and _k in new_state:
+                _o, _n = old_state[_k], new_state[_k]
+                if _o.dim() == 2 and _n.dim() == 2 and _o.shape[1] == _n.shape[1] and _o.shape[0] < _n.shape[0]:
+                    _pad = torch.zeros(_n.shape[0] - _o.shape[0], _o.shape[1], dtype=_o.dtype, device=_o.device)
+                    old_state[_k] = torch.cat([_o, _pad], dim=0)
+                    _bk = _k.replace(".weight", ".bias")
+                    if _bk in old_state and _bk in new_state:
+                        _ob, _nb = old_state[_bk], new_state[_bk]
+                        if _ob.dim() == 1 and _nb.dim() == 1 and _ob.shape[0] < _nb.shape[0]:
+                            old_state[_bk] = torch.cat(
+                                [_ob, torch.zeros(_nb.shape[0] - _ob.shape[0], dtype=_ob.dtype, device=_ob.device)],
+                                dim=0,
+                            )
+                    print(f"   ↔ {_k}: Policy-Breite {_o.shape[0]} -> {_n.shape[0]}, "
+                          f"{_n.shape[0] - _o.shape[0]} neue Ausgangszeilen null-initialisiert "
+                          f"(additiver Policy-Kopf)")
         skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
         if skipped:
             print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")

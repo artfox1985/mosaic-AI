@@ -15,7 +15,7 @@ Pipeline (Auftrag "Spiel-Analyse-Werkzeug", 2026-07-25):
           #a {"id": 137, "p": 0, "a": {"type": "stone", ...}}
 
       Das ist dieselbe ID, gegen die der Policy-Kopf trainiert
-      (`features.rs::action_to_id`, `NUM_ACTIONS = 406`); sie steht seither
+      (`features.rs::action_to_id`, `NUM_ACTIONS` = 414 seit Weg A/R3, damals 406); sie steht seither
       auch an jedem `valid_moves`-Eintrag. Die Zeile geht NUR in die
       gespeicherte Fassung, nicht in die Anzeige (serialize.rs filtert sie).
       Logs ohne solche Zeilen (alles vor dem 2026-08-18, Arena-Logs, und der
@@ -213,6 +213,33 @@ SECONDARY_LINE_CATEGORIES = {"MARKER", "DOME_RETURN_TO_STACK"}
 #
 # Der naechste Marker gehoert HIERHIN, nicht in einen neuen Sonderweg.
 DIAGNOSTIC_LINE_MARKERS = ("[moon_order]", "[rt_leaf]")
+
+# WEG A / R3 (2026-09-18, PREREG_moon_stack_order.md par.12.6,
+# PREREG_dome_return_order.md par.12.7): die beiden neuen Entscheidungsknoten
+# (`Action::ChooseMoonTop`, `Action::ChooseReturnFirst`) brauchen HIER KEINE
+# neue Kategorie -- und das ist eine Bauentscheidung, kein Vergessen.
+#
+# Der Grund, am Code geprueft: die Knoten schreiben KEINE eigene Logzeile. Ein
+# Sonnenzug aus einer kleinen Fabrik loggt weiter erst seine Aktionszeile
+# (`☀️ ...`, execution.rs::execute_move), dann etwaige Strafleisten-/Turm-
+# Warnungen, und die Mond-Stapel-Zeile kommt vom LETZTEN Teilzug
+# (execution.rs::finish_moon_placement schreibt genau die Zeilen, die
+# `execute_take_with_moon` ohne Knoten geschrieben haette, in derselben
+# Reihenfolge). Der Rueckgabeknoten sitzt zwischen zwei Stufen, die beide schon
+# heute stumm sind. Der Log-BLOCK einer Partie mit Knoten ist damit Zeile fuer
+# Zeile derselbe wie ohne -- genau die Voraussetzung dafuer, dass der Replayer
+# unten unveraendert bleibt.
+#
+# Der Replayer selbst setzt ohnehin ATOMAR auf: `apply_stone(..., moon_order=…)`
+# (py.rs) nimmt die Reihenfolge als Parameter und geht NICHT durch den Knoten --
+# die GUI-/Replay-Seite setzt `GameState::extended_action_nodes` nie. Die
+# tatsaechlich gespielte Reihenfolge holt sich `resolve_stone` weiter aus der
+# naechsten `Mond-Stapel:`-Zeile (Permutations-Kandidaten, s.u.).
+#
+# WENN das je anders wird (eigene Logzeile je Teilzug, oder das Tor auch im
+# GUI-Pfad), gehoert die neue Zeile in PATTERNS plus -- je nach Bauform -- in
+# PRIMARY_CATEGORIES oder in DIAGNOSTIC_LINE_MARKERS, und der Replayer braucht
+# einen `py.rs`-Einstieg fuer den Teilzug.
 
 
 def is_diagnostic_log_line(text: str) -> bool:

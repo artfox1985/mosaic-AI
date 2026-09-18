@@ -42,7 +42,7 @@ FILES = [
 # DEFAULT-Schluessel bewegt und damit jeden Bestandscache entwertet -- das
 # darf nur absichtlich passieren, mit Eintrag in der Prereg.
 #
-# ABSICHTLICH BEWEGT am 2026-09-17: "bea417f31e0e" -> "5fd616444e86"
+# ABSICHTLICH BEWEGT am 2026-09-17: "bea417f31e0e" -> "41b98a5d3890"
 # (Nutzer-Entscheid, PREREG_rust_data_layer.md par.9b, Weg (1) aus par.9a).
 # Der Fenster-Schluessel traegt seither UNBEDINGT die Merkmals-Formelversion
 # (`config.FEATURE_FORMULA_VERSION`, Marker "+featfmt_a2phantom-20260912") und
@@ -54,7 +54,9 @@ FILES = [
 # Bewegt 2026-09-17 (zweiter Zug desselben Tags): INPUT_SIZE 794 -> 884 durch Abschnitt 17
 # (Tiling-Projektion, Variante C, Arm v29-b07, PREREG_round_transition_search_sampling.md
 # par.18/18.9); INPUT_SIZE steht im Block- und damit im Fenster-Schluessel. Vorher ba128e934a4a.
-KEY_WITH_SWITCH_OFF = "5fd616444e86"
+# Bewegt 2026-09-18: INPUT_SIZE 884 -> 888 durch Abschnitt 18 (geordnete eigene Designs, R2/P.16,
+# PREREG_dome_return_order.md par.12.6/12.8/12.10); vorher 5fd616444e86 (884), davor ba128e934a4a (794).
+KEY_WITH_SWITCH_OFF = "41b98a5d3890"
 
 
 class WindowCacheKeyPlanesAblationTest(unittest.TestCase):
