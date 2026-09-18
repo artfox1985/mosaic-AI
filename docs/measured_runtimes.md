@@ -315,3 +315,34 @@ wirklich. Eine Zahl auf die andere Runde hochzurechnen geht deshalb schief.
 **Planungsgroesse:** rund 3,3 s je R4-Stellung und rund 11,7 s je R3-Stellung; das Angebot des
 v29-Fensters ist bei `--max-per-file 2` ueber 400 Dateien auf rund 800 Stellungen je Runde
 begrenzt (in R4 gemessen: 800 aus 1.106 gescannten, der Rest ist eindeutig).
+
+## Generation v30, gemessen ab 2026-09-18 (Erzeugung)
+
+Generator `v29-b11` (888 Eingaenge, 414 Aktionen, Vertragshash `6ef829e564c58bd5`), je 4.000
+Partien @100, threads 11, Cache-Waechter mit 3 Arbeitern daneben, Spec
+`models/v30_generation.spec.json`, `MOSAIC_STACK_DRAW_RESEARCH=1`.
+
+**Namensfalle beim Bezug** (beim Nachtragen am 2026-09-18 fast falsch etikettiert): Dateien und
+Manifeste heissen nach dem GENERATOR, nicht nach der Generation. `manifest_v27-b01-policy_*`
+traegt die v28-Erzeugung, `manifest_v28-b02-policy_*` die v29-Erzeugung, `manifest_v29-b11-*`
+diese hier. Wer "gegen v28" schreibt, muss sagen, welche der beiden Zahlen er meint.
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Erzeugung Traeger** (policy, Seed 20260930) | **18.984,2 s = 5h 16m** | 4,746 s je Partie, n = 4.000 Partien, 790.970 Zuege, 400 Dateien (`manifest_v29-b11-policy_20260918_145006.json`); `cpu_s` nicht messbar, `os.times()` fuehrt auf dieser Plattform keine Kinderzeiten |
+
+**Kostenvergleich je Partie, Grundmenge jeweils die Policy-Klasse einer vollen Erzeugung mit
+4.000 Partien @100 und threads 11, Einheit Sekunden je Partie:**
+
+| Erzeugung | Generator | s je Partie | gegen v30 |
+| --- | --- | --- | --- |
+| v28 | `v27-b01` | 3,183 | v30 ist **+49,1 Prozent** teurer |
+| v29 | `v28-b02` | 3,943 | v30 ist **+20,4 Prozent** teurer |
+| **v30** | **`v29-b11`** | **4,746** | – |
+
+Die 20-Partien-Stichprobe der Abnahme-Kette hatte 3,98 s je Partie und daraus +25 Prozent gegen
+die v28-Erzeugung geschaetzt (`PREREG_minimal_strength_core.md` 10.17). Auf voller Strecke liegt
+der Aufschlag gegen dieselbe Bezugslinie bei +49,1 Prozent, gegen die naeherliegende v29-Linie
+bei +20,4 Prozent. **Beide Lesarten liegen ueber der 15-Prozent-Schwelle**, an der STATUS
+Abschnitt 6 Punkt 2 die v31-Wiedervorlage des Budget-Knopfs fuer die Hilfsknoten faellig macht;
+die Wahl der Bezugslinie aendert den Entscheid also nicht.
