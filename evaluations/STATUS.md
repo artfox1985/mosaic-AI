@@ -19,82 +19,75 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**Generationswechsel v29 -> v30 im Gang** (`/mosaic-generation-turnover`). v29 ist
-abgeschlossen: Champion `v29-b09` promoviert und eingefroren (2026-09-18, 14:32,
-`PREREG_minimal_strength_core.md` 10.18), Generator `v29-b11` abgenommen (10.17). Der
-Generationsbericht steht im Archiv.
+**UEBERGABE 2026-09-18, 18:10 (Sitzungswechsel per /mosaic-handover; Anlass: Kontext der alten Sitzung voll,
+die v30-Erzeugung laeuft bis in die Nacht).** Generationswechsel v29 -> v30 nach Skill DURCH bis Schritt 7:
+Champion v29-b09 promoviert und eingefroren (Abschnitt 2), Generator v29-b11 abgenommen (10.17), Snapshot
+`af420224`, Loeschungen nach Freigabe ausgefuehrt und committet (`1d619a0d`), STATUS neu gefasst, Preregs
+nachgezogen (4 OFFEN, Abschnitt 5). Push-Stand 0 um 18:10 (der Nutzer hat gepusht). Unkommittiert bei der
+Uebergabe: nur die Prereg-Kopf-Schliessungen, `docs/knobs.md`, `docs/pitfalls.md` (werden mit der Uebergabe committet).
 
-**Stand des Ablaufs (2026-09-18, 14:50):** Schritt 1 Einfrieren DURCH (Promotion b09). Schritt 2 daily-Snapshot
-**`af420224`** (14:35, 6.154 Dateien, `verify_backup.ps1` gruen); `restic find --snapshot af420224`: die 28
-Ketten-Skripte der Loeschliste 28 von 28, `selfplay_v26-b01-*` 1.201 von 1.201, `manifest_v26-b01-*` 3 von 3;
-Bloecke und Monolithe (`*.h5`) sind planmaessig NICHT in der Sicherung (`docs/backup_restore.md`, rekonstruierbar).
-Schritte 3-5 DURCH (Nutzer 2026-09-18, 15:0x: "Loeschfreigabe erteilt"; Ausfuehrung 15:05-15:10): 28 Ketten-Skripte per
-`git rm` (restic af420224: 28 von 28); 60 Modelldateien ohne Rolle (685 MB; Klassen wie vorgelegt, die Zahl 54 war
-ein Ueberschlag; je Arm `run:`-Snapshot im Repo); Korpus `selfplay_v26-b01-*` 1.201 Dateien plus 3 Manifeste
-(1,14 GB; restic 1.201 von 1.201 und 3 von 3); alle 10 Monolithe (6,13 GB) und alle 20.446 Alt-Bloecke (9,19 GB)
-plus 382 vom Waechter schon gebaute v26-Bloecke (Waisen), `*.h5` planmaessig nicht in der Sicherung
-(rekonstruierbar). `cache_inventory.py --orphans`: 0 Bloecke, 0 Waisen. Verbleibend: 12 Modelldateien
-(Champion b09, Generator b11, Vorgaenger v28-b02, b07, v27-b01, engine_test), 2.427 Korpusdateien (v28-b02,
-v27-b01, v29-b11 wachsend). Cache-Waechter 15:12 neu gestartet (baut die 888er-Bloecke fuer alle Fensterdateien).
-Skill-Vorlage auf `night_v30_chain.sh` umgestellt. Die Loeschungen sind noch NICHT committet (kein Commit neben
-dem laufenden Self-Play; Commit heute Abend oder morgen frueh). Schritt 6 (diese Neufassung) DURCH. Schritt 7: Prozessliste vor dem Start geprueft, Erzeugung startet mit
-`MOSAIC_V30_GENERATOR=models/alphazero_v29-b11.onnx MOSAIC_V30_GEN_NAME=v29-b11 bash tools/night_v30_generate.sh`,
-daneben der Cache-Waechter (Kopf der Kette). **ERZEUGUNG GESTARTET 2026-09-18, 14:50:04** (Sockel `v29-b11-policy`, 4.000 Partien @100, Manifest
-`data/manifest_v29-b11-policy_20260918_145006.json`; Wheel-Vertrag 888/414 geprueft). **Vorfall 14:53:** die Kette
-haette nach 10 Minuten den ersten Record mit `pickle.load` auf einer gzip-Datei geprueft (derselbe Fehler wie in der
-Abnahme-Kette) und das Self-Play bei Exit ungleich 0 getoetet; der Ketten-Wrapper (bash) wurde deshalb beendet,
-das Self-Play (python, PID 27628) laeuft verwaist weiter und schreibt nach `data/`. `tools/night_v30_generate.sh`
-ist repariert (gzip), und `tools/night_v30_generate_rest.sh` wartet auf das Ende des Sockels, prueft den ersten
-Record (gzip) und faehrt Klassen 2 und 3 (Seeds 20260931/32). Cache-Waechter (3 Worker, 888-Schluessel) daneben.
-Commit `3d2550a7` vor dem Start (Push-Stand 18).
+### LAEUFT (Stand 18:10, gezaehlt)
 
-**Wiedervorlage am ersten Record der v30-Erzeugung GRUEN (2026-09-18, 14:54; `data/selfplay_v29-b11-policy_20260918_1450_g10.pkl`,
-1.952 Records aus 10 Partien, gzip-gelesen, IDs ueber `neural_net.action_to_id`):** P.12 `designs` 577 Records,
-P.16 `designs_ordered` 577 Records (nur wo ein eigener Block liegt), Mondknoten 406-410 in `valid_actions` 478 / in
-`policy` 424, Rueckgabeknoten 411-413 11 / 11, Rotation 640 / 640, Slot 8.132. Der v30-Korpus traegt die neuen
-Merkmale und Knoten mit Lernziel; nichts faellt nach v31.
+1. **Self-Play Sockel `v29-b11-policy`** (verwaist, Wrapper am 14:53 bewusst beendet; python PID 27628, Start
+   14:50:04, `--games 4000 --sims 100 --seed 20260930`, Spec `models/v30_generation.spec.json`,
+   `MOSAIC_STACK_DRAW_RESEARCH=1`): **227 von 400 Dateien** in `data/selfplay_v29-b11-policy_*.pkl` (je 10 Partien),
+   rund 5,3 s je Partie neben dem Waechter, **Ende gegen 20:45**. Manifest
+   `data/manifest_v29-b11-policy_20260918_145006.json` (traegt am Ende den laufzeit-Block). Liest: Modell
+   `models/alphazero_v29-b11.onnx`, die Spec, das installierte Wheel -- nichts davon anfassen.
+2. **Rest-Kette `tools/night_v30_generate_rest.sh`** (bash PID 28120, Umgebung `MOSAIC_V30_GENERATOR=models/alphazero_v29-b11.onnx
+   MOSAIC_V30_GEN_NAME=v29-b11`): wartet auf das Ende des Sockels (Prozessfilter `self_play.py`), prueft den ersten
+   Sockel-Record (gzip), faehrt dann **Klasse 2 `v29-b11-value-tempc`** (Seed 20260931, 4.000 Partien) und
+   **Klasse 3 `v29-b11-value-excursion`** (Seed 20260932); Erwartung je Klasse 3-4 h (v28: 3,2 h ohne Nebenlast),
+   **Ende gegen 03:00-05:00**. Ihre Ausgabe steht in der Hintergrundaufgabe der ALTEN Sitzung; die neue Sitzung
+   zaehlt Dateien: `ls data | grep -c '^selfplay_v29-b11-value-tempc_'` (Ziel 400) und `...-excursion_` (Ziel 401).
+3. **Cache-Waechter** (`tools/build_cache_incremental.py --watch`, PIDs 32460/38800, 3 Worker, Umgebung
+   `MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_FEATURES_FROM_RUST=1`): 2.629 Bloecke unter dem 888er-Schluessel
+   gebaut, baut jede neue Datei nach; laeuft bis `--leerlauf-abbruch` oder Stopp. Erlaubte Nebenlast neben der
+   Erzeugung (Kopf von `tools/night_v30_generate.sh`).
 
-### Als naechstes, in dieser Reihenfolge
+### ERSTE AUFGABE DER NEUEN SITZUNG, in dieser Reihenfolge
 
-1. **Rest des Generationswechsels:** restic-Tagesschnappschuss mit Beleg, obsolete
-   Ketten-Skripte, tote Self-Plays/Bloecke/Monolithe und Modelle -- alles nur mit
-   `restic find`-Beleg und pfadgenauer Nutzer-Freigabe (Abschnitt 6).
+1. **WATCHER auf die Erzeugung**, nichts sonst mit Rechenlast: Bedingung "400 policy-Dateien UND laufzeit-Block im
+   Manifest", dann "400 tempc", dann "401 excursion UND Rest-Kette-Prozess weg". Stillstand = keine neue Datei in
+   30 min bei laufendem Prozess -> Nutzer informieren, nicht eingreifen. Zwischenstaende hier in Abschnitt 1
+   nachtragen (Dateizahl, Uhrzeit).
+2. **Nach jeder fertigen Klasse Tor 0 / Tor 2a** (`tools/corpus_sanity_check.py`, Form und Bezugswerte in
+   `PREREG_v30_window.md` par.3; Bezug `sp_voll` 0,843 aus v29, Betriebsart-Hinweis dort). Ergebnis in
+   `PREREG_v30_window.md` par.9 (neu anlegen) und hier. Reisst Tor 2a: Vorlage an den Nutzer mit beiden Zahlen,
+   keine stille Fortsetzung (par.8 Punkt 5).
+3. **Nach dem Ende der Erzeugung** (alle drei Klassen, Waechter fertig, Maschine frei per Prozessliste): dem
+   Nutzer den Start von `tools/night_v30_chain.sh` vorlegen (Freigabe des Kettenstarts ist `PREREG_v30_window.md`
+   par.8 Punkt 4; die Erzeugung selbst war freigegeben, die Kette noch nicht ausdruecklich). Die Kette baut
+   Traeger-Manifest v30, `data/window_v30.txt` (v29-b11 neu, v28-b02, v27-b01; Pinning `MOSAIC_DATA_EXCLUDE` fuer
+   `selfplay_v29-b11-probe_*`), Bloecke/Monolith unter 888, **Training v30-b01 KALT** (Rezept par.6, rund 2,3 h),
+   Tor 1 gegen `models/alphazero_v29-b09_brierbest.onnx` (Seeds 20261300/20261301, je 200 Paare, rund 3,5 h mit
+   den neuen Knoten). Danach: Manifest-Diff, Netz-Gesundheit (Spaltennormen 0..755 / 755..794 / 794..884 /
+   884..888 und der 414er-Policy-Kopf), sechs Standard-Kennzahlen, Verdikt nach par.3 (Marge 5 Prozentpunkte gegen
+   b09; Rueckfall 1 Afterburner, Rueckfall 2 Warmstart von b09, Abschnitt 4).
+4. **Registrieren**: Laufzeiten der Erzeugung aus den drei Manifesten nach `docs/measured_runtimes.md`
+   (Planungsgroesse hier Abschnitt 3), Prereg-Kopf `PREREG_v30_window.md` im selben Zug,
+   `python tools/generate_prereg_index.py`, dann Commit (nicht pushen).
 
-2. **v30-ERZEUGUNG** (Freigabe des Nutzers vom 2026-09-17, STATUS-Archiv Punkt 21;
-   `PREREG_v30_window.md` par.5). Start als DATEI, nicht per Heredoc:
+### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
-   ```
-   MOSAIC_V30_GENERATOR=models/alphazero_v29-b11.onnx MOSAIC_V30_GEN_NAME=v29-b11 \
-     bash tools/night_v30_generate.sh
-   ```
+* Nutzer 2026-09-17: *"du hast auch die freigabe mit den self plays fuer v30 loszulegen"* -- die Erzeugung laeuft;
+  der Start der Trainingskette ist NICHT ausdruecklich freigegeben (vorlegen).
+* Nutzer 2026-09-18: *"Loeschfreigabe erteilt"* -- ausgefuehrt und verbraucht; jede weitere Loeschung braucht
+  restic-Beleg UND neue pfadgenaue Freigabe (Kandidat spaeter: `models/frozen_champions/v27-b01` nach der
+  v30-Promotion).
+* Kein Push ohne Anweisung. Kein Commit waehrend eines Wanduhr-Messlaufs (Kostentor, Tor 1); neben Self-Play
+  und Training ist der Sekunden-Hook hingenommen (Praezedenz 15:16).
+* Messungen exklusiv; GPU-Training plus EIN CPU-Auftrag erlaubt; Builds zaehlen als Last. Ketten als DATEI
+  starten, gehaertete Warteschleife, keine Pipes hinter langen Laeufen.
+* Keine neuen Preregs, keine neuen Netzkoepfe. Arme nur aus offenen Preregs, Aufnahme ins Rezept per
+  Nutzer-Entscheid. Nie den Projektordner verlassen. Laufzeiten ins Artefakt; sechs Standard-Kennzahlen.
+* Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
 
-   Die Kette prueft selbst `input_size` 888 und `return_order_mode` im Manifest-Export,
-   wartet auf eine freie Maschine und faehrt dann die drei Klassen @100 Sims
-   (Seeds 20260930 / 20260931 / 20260932, Spec `models/v30_generation.spec.json`,
-   `MOSAIC_STACK_DRAW_RESEARCH=1`, `--start-slot-random-p 0.15`).
+### OFFENE NUTZER-ENTSCHEIDE (Fundstellen in Abschnitt 6)
 
-   **Daneben gehoert der Cache-Waechter** unter der Trainings-Umgebung, sonst entstehen die
-   Bloecke erst nach der Erzeugung:
-
-   ```
-   MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_FEATURES_FROM_RUST=1 python -X utf8 -u \
-     tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv \
-     --workers 3 --watch --wartezeit 60 --leerlauf-abbruch 100000
-   ```
-
-   **WIEDERVORLAGE nach dem ersten Record** (`feedback_record_field_must_precede_generation`):
-   `designs` (P.12), `designs_ordered` (P.16) und die neuen Knoten-IDs 406-413 mit
-   `policy`-Eintrag muessen darin stehen. Die Kette prueft `designs_ordered` selbst und STOPPT
-   bei Fehlen; die Knoten prueft der Koordinator. Fehlt etwas, fallen die Merkmale eine
-   Generation zurueck. Alle Bloecke sind ohnehin neu zu bauen (888 plus Formel-Version im
-   Schluessel).
-
-3. **Danach `tools/night_v30_chain.sh`** (geschrieben 2026-09-18, `bash -n` gruen, NICHT
-   gestartet, startet nur auf Anweisung): Tor 0 / Tor 2a je Klasse, Traeger-Manifest,
-   G-2-Auswahl (Ausflug-Haelfte von `v27-b01`), Fenster `data/window_v30.txt` (Seed 20260945),
-   Bloecke, Monolith mit Stempel-Pruefung, **Training `v30-b01` KALT**, Tor 1 gegen den
-   Champion `v29-b09` (zwei Seeds), Spaltensonde, Plattenpunkte. Zuschnitt und Lesart:
-   `PREREG_v30_window.md`.
+Start der Trainingskette v30 (par.8 Punkt 4); zweiter Arm `v30-b02` zur Zerlegung Kaltstart/Warmstart (par.8
+Punkt 2, par.4 laesst einen Arm zu); Budget-Knopf fuer die Hilfsknoten als v31-Wiedervorlage (Kostentor +35
+Prozent, 10.14); Vorgehen bei Tor-2a-Riss; Loeschung `frozen_champions/v27-b01` nach der v30-Promotion.
 
 ## 2. CHAMPION UND LEITER
 
@@ -200,7 +193,14 @@ b03 mit 416:384 von 800 (52,0 Prozent, Block-z +1,03; 10.10). Ungedeckt ist alle
 Kaltstart -- das ist die bewusst eingegangene Wette (Nutzer 2026-09-17: "dann gehen wir die
 wette fuer v30 und kaltstart ein", 18.11).
 
-## 5. PREREG-BESTAND (11 OFFEN laut Index 2026-09-18, Ziel rund 7)
+## 5. PREREG-BESTAND (4 OFFEN laut Index 2026-09-18, 15:25; Ziel rund 7 UNTERSCHRITTEN)
+
+**Nachzug 2026-09-18, 15:25 (Nutzer: "sollten jetzt nicht mehr viele offen sein"):** sieben Koepfe auf ENTSCHIEDEN
+gesetzt, weil ihre Fragen mit den Entscheiden vom 17./18.09. beantwortet sind (`minimal_strength_core`,
+`round_transition_search_sampling`, `v29_window`, `special_tile_yield`, `moon_stack_order`, `dome_return_order`,
+`stack_top_feature`; Wirkungen, die erst im v30-/v31-Training messbar sind, verweisen auf die jeweilige
+Fenster-Prereg). **OFFEN bleiben 4:** `v30_window` (aktiv), `code_cleanup_closeout` (Stufen 2/3 nach v30),
+`difficulty_levels` (Leiter auf den Schluss-Champion vertagt), `claude_play_interface` (P1 vertagt).
 
 `python tools/generate_prereg_index.py` haelt `evaluations/PREREG_INDEX.md` aktuell; Stand
 **121 Dateien = 11 OFFEN + 98 ENTSCHIEDEN + 12 UEBERHOLT**.
