@@ -250,14 +250,18 @@ b03 mit 416:384 von 800 (52,0 Prozent, Block-z +1,03; 10.10). Ungedeckt ist alle
 Kaltstart -- das ist die bewusst eingegangene Wette (Nutzer 2026-09-17: "dann gehen wir die
 wette fuer v30 und kaltstart ein", 18.11).
 
-## 5. PREREG-BESTAND (4 OFFEN laut Index 2026-09-18, 15:25; Ziel rund 7 UNTERSCHRITTEN)
+## 5. PREREG-BESTAND (5 OFFEN laut Index 2026-09-18, 23:35; Ziel rund 7 weiter unterschritten)
 
 **Nachzug 2026-09-18, 15:25 (Nutzer: "sollten jetzt nicht mehr viele offen sein"):** sieben Koepfe auf ENTSCHIEDEN
 gesetzt, weil ihre Fragen mit den Entscheiden vom 17./18.09. beantwortet sind (`minimal_strength_core`,
 `round_transition_search_sampling`, `v29_window`, `special_tile_yield`, `moon_stack_order`, `dome_return_order`,
 `stack_top_feature`; Wirkungen, die erst im v30-/v31-Training messbar sind, verweisen auf die jeweilige
-Fenster-Prereg). **OFFEN bleiben 4:** `v30_window` (aktiv), `code_cleanup_closeout` (Stufen 2/3 nach v30),
-`difficulty_levels` (Leiter auf den Schluss-Champion vertagt), `claude_play_interface` (P1 vertagt).
+Fenster-Prereg). **OFFEN sind 5:** `v30_window` (aktiv), `code_cleanup_closeout` (Stufen 2/3 nach v30),
+`difficulty_levels` (Leiter auf den Schluss-Champion vertagt), `claude_play_interface` (P1 vertagt)
+und **wieder OFFEN seit 2026-09-18, 23:30: `dome_return_order`** -- der Streu-Knopf ist in der
+Erzeugung wirkungslos, der Bauplan fuers v31-Self-Play steht in ihrem Abschnitt 12.12
+(Nutzer-Auftrag 23:20: *"dann schau dass wir es ins self play fuer v31 bekommen"*). Stand des
+Index danach: **121 Dateien = 5 OFFEN + 104 ENTSCHIEDEN + 12 UEBERHOLT**.
 
 `python tools/generate_prereg_index.py` haelt `evaluations/PREREG_INDEX.md` aktuell; Stand
 **121 Dateien = 11 OFFEN + 98 ENTSCHIEDEN + 12 UEBERHOLT**.
@@ -348,7 +352,15 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
    Knoten-Weg die Aktion selbst zufaellig ist; (2) tau-argmax an den Hilfsknoten aussetzen --
    trifft auch den Sockel und damit den Policy-Traeger, ohne Not nicht zu empfehlen; (3) nichts
    aendern. Heimat des Entscheids ist die v31-Fenster-Prereg (so schon im Kopf von
-   `PREREG_dome_return_order.md` vorgesehen), keine neue Prereg noetig.
+   `PREREG_dome_return_order.md` vorgesehen), keine neue Prereg noetig. **ENTSCHIEDEN
+   2026-09-18, 23:20 (Nutzer: "dann schau dass wir es ins self play fuer v31 bekommen"):
+   Option 1 wird gebaut.** Bauplan mit vier Schritten, Zwaengen und den zwei offenen Dosis-Fragen:
+   `PREREG_dome_return_order.md` 12.12. **Noch NICHTS gebaut** -- Erzeugung und v30-Kette laufen,
+   ein `cargo`-Build zaehlt als Last; `corpus_dataset.py` darf ausserdem nicht angefasst werden,
+   solange Cache-Waechter oder Kette laufen. **Tragender Befund fuer den Bau:**
+   `policy_target_valid` taugt NICHT als Maske fuer den gestreuten Entscheid, weil beide Ketten
+   `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` fahren (`corpus_dataset.py` Z.1635); zu kopieren ist
+   das Muster der gestreuten Startkuppel, das an einer eigenen Bedingung haengt (Z.1593-1595).
 
 4. **Vorgehen, wenn Tor 2a reisst** (`PREREG_v30_window.md` par.8 Punkt 5, Hypothese H4):
    nach `docs/generation_loop.md` Vorlage an den Nutzer mit beiden Zahlen, keine stille
