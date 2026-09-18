@@ -1242,6 +1242,50 @@ Restplatten und damit genau der Knopf-Schwelle, gibt es **89 = 0,2225 je Partie*
 **0,19 Abweichungen je Partie** (150 Partien, Modus 1) mit Serienlaengen 4 bis 12 -- dieselbe
 Groessenordnung wie 0,22, nicht wie 11.
 
+### 12.12a DOSIS NEU GERECHNET (Nutzer 2026-09-18, 23:55: "es bleibt bei den 15%")
+
+Der Zielwert bleibt: **in 15 Prozent der Partien mindestens einmal streuen** (par.11b Punkt 2). Die Zahl
+dahinter wird neu gerechnet, und zwar diesmal ueber die VERTEILUNG der Gelegenheiten je Partie, nicht ueber
+ihren Mittelwert -- der Unterschied ist hier gross, weil die Verteilung stark schief ist.
+
+**Gemessen** (n = 400 Partien der Sockel-Klasse `v29-b11-policy`, 40 Dateien, Grundmenge Partien, Einheit
+Gelegenheiten mit mindestens drei Restplatten je Partie):
+
+| Gelegenheiten in der Partie | Partien | Anteil |
+| --- | --- | --- |
+| 0 | 329 | 82,2 % |
+| 1 | 55 | 13,8 % |
+| 2 | 14 | 3,5 % |
+| 3 | 2 | 0,5 % |
+
+**Nur 17,75 Prozent der Partien haben ueberhaupt eine Gelegenheit.** Das ist die OBERGRENZE der erreichbaren
+Partie-Rate: selbst bei `p = 1,0` (immer streuen) kaeme man nicht ueber 17,75 Prozent. Die
+Mittelwert-Rechnung aus 12.12 (`p = 0,52`) liefert in Wahrheit nur 10,29 Prozent -- sie unterstellt, jede
+Partie haette 0,2225 Gelegenheiten, waehrend in Wirklichkeit vier Fuenftel der Partien gar keine haben.
+
+| Dosis p | Partie-Rate (exakt ueber die Verteilung) |
+| --- | --- |
+| 0,0146 (registriert) | 0,32 % |
+| 0,52 (Mittelwert-Rechnung) | 10,29 % |
+| **0,81** | **15,0 %** |
+| 1,0 (Maximum) | 17,75 % |
+
+**DOSIS: `MOSAIC_RETURN_ORDER_RANDOM_P = 0.81`.**
+
+**Was das bedeutet, damit es niemanden ueberrascht:** "15 Prozent der Partien" heisst bei dieser
+Gelegenheitsrate **"in 81 Prozent der Gelegenheiten streuen"**. Die Streuung ist an dieser Stelle also nicht
+mehr eine Beimischung, sondern der Normalfall -- schlicht deshalb, weil die Gelegenheit selbst so selten ist.
+Fuer den registrierten Zweck (ABDECKUNG des Zustandsraums, par.11c) ist das stimmig; wer "15 Prozent" als
+"selten" gelesen hat, sollte die zweite Zahl kennen.
+
+**Vorbehalt, ausdruecklich:** die Gelegenheitsrate ist VERHALTENSABHAENGIG, nicht strukturell. Gemessen wurde
+sie an einem Sockel, der an den Knoten argmax spielt und selten tief zieht (80,4 Prozent der Stapelzuege
+ziehen nur eine Platte, `PREREG_v30_window.md` par.9). Lernt das Netz, oefter tief zu ziehen -- genau die
+Wirkung, die der Nutzer sich erhofft --, steigt die Zahl der Gelegenheiten und mit ihr die Partie-Rate bei
+gleicher Dosis. Die 0,81 sind daher an der v30-Erzeugung geeicht und gehoeren nach der v31-Erzeugung
+nachgerechnet. Zweiter Vorbehalt: gemessen nur an der Sockel-Klasse; die temperierte Klasse zieht moeglicher-
+weise anders tief, UNGEPRUEFT.
+
 **Folge, gerechnet:** mit `p = 0,0146` wuerde in **0,33 Prozent der Partien** gestreut statt in 15 Prozent,
 das sind **13 Streuungen je 4.000-Partien-Klasse**. Fuer das registrierte Ziel "in 15 Prozent der Partien
 mindestens einmal" waere **p = 0,52** noetig (463 Streuungen je Klasse). **NUTZER-VORLAGE:** die Dosis ist
