@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: par.9 NULL ist Arithmetik (12.5), R1 gemessen (12.4). R2 (designs_ordered, INPUT_SIZE 888) und R3 (Rueckgabeknoten, IDs 411-413) GEBAUT, die Schleife entscheidet Slot/Rueckgabe/Rotation als Suchknoten (12.9), kompiliert und abgenommen (12.10); return_order_mode 1 unter dem Research-Knopf wirkungslos. v30-Korpus traegt P.16 und den Knoten (12.11). Wirkung im Training: v31-Fenster-Prereg. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: R1-R3 gebaut und abgenommen (12.4-12.11), der Knoten (411-413) ist im v30-Korpus. WIEDER OFFEN 2026-09-18: der Streu-Knopf sitzt im verdraengten Aufloeser, wirkt in der Erzeugung nicht; Ersatz nur in der temperierten Klasse. Bauplan fuers v31-Self-Play in 12.12, mit dem Befund, dass policy_target_valid als Maske ausfaellt (MOSAIC_IGNORE_POLICY_TARGET_VALID=1). Nichts gebaut. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -1151,3 +1151,71 @@ zaehlt die Rueckgabe-Knoten (IDs 411-413) und ihre `policy`-Eintraege -- das ist
 P.16 `designs_ordered` 577 Records (nur wo ein eigener Block liegt), Mondknoten 406-410 in `valid_actions` 478 / in
 `policy` 424, Rueckgabeknoten 411-413 11 / 11, Rotation 640 / 640, Slot 8.132. Der v30-Korpus traegt die neuen
 Merkmale und Knoten mit Lernziel; nichts faellt nach v31.
+
+### 12.12 BAUPLAN: die Streuung in den Knoten-Weg holen, fuer das v31-Self-Play (2026-09-18, 23:30)
+
+**Nutzer-Auftrag 2026-09-18, 23:20:** *"dann schau dass wir es ins self play fuer v31 bekommen."* Vorlauf:
+par.9 der `PREREG_v30_window.md` (die Streuung ist in der v30-Erzeugung unwirksam, weil sie im verdraengten
+Aufloeser sitzt; Ersatz nur in der temperierten Klasse). **Nichts gebaut, nichts kompiliert** -- auf der
+Maschine laufen Erzeugung und v30-Kette, ein `cargo`-Build zaehlt als Last (CLAUDE.md).
+
+**Warum der naheliegende Weg NICHT funktioniert, und das ist der tragende Befund dieses Abschnitts.** Im
+Aufloeser blieb `policy_target_valid` unberuehrt, weil dort nur ein Nebenaspekt der Aktion gestreut wurde. Im
+Knoten-Weg IST die Rueckgabe die Aktion; ein gestreuter Entscheid braucht also eine Maske, sonst lernt der
+Policy-Kopf Zufall. Die naheliegende Loesung waere `policy_target_valid = false` wie bei der gestreuten
+Startkuppel -- **sie greift hier aber nicht**: `engine/py/corpus_dataset.py` Z.1635 maskiert nur
+`if step.get("policy_target_valid") is False and not _IGNORE_PTV`, und die Erzeugungs- wie die Trainingskette
+fahren `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` (par.6 der v30-Fenster-Prereg). Das Flag waere also
+wegignoriert, und zwar genau in den Laeufen, fuer die es gedacht ist.
+
+**Das Muster, das stattdessen zu kopieren ist**, steht zwei Bildschirme darueber: die gestreute Startkuppel
+haengt NICHT am Ignore-Knopf, sondern an einer eigenen Bedingung (`corpus_dataset.py` Z.1593-1595,
+`start_by_search and policy_target_valid is not False`). Ein gestreuter Rueckgabe-Entscheid braucht dieselbe
+Bauform: eine eigene Regel, die unabhaengig von `_IGNORE_PTV` greift.
+
+**Bauplan in vier Schritten, in dieser Reihenfolge:**
+
+1. **Rust, Streuung im Knoten-Weg.** Angriffspunkt ist die Schleife nach dem Entscheid (`self_play.rs`
+   Z.3979 `decide`, Ersetzung wie Weg B/C an Z.4095) oder die Auswahl-Rangfolge in `net_drafting_policy`
+   (Z.5754-5815). Die Abgrenzung ist billig, weil die Aktionsliste am Rueckgabeknoten sortenrein ist
+   (`game.rs` Z.767-769). Zufallsstrom nach dem Bestandsmuster mit EIGENEM Distinguisher
+   (`derive_search_seed(game_seed ^ <neu>, move_number)`, Vorbild Z.892/4177); Reichweite nur im
+   aufzeichnenden Zweig, Vorbild `MOSAIC_START_SLOT_RANDOM_P` (Z.1890-1905).
+2. **Rust, Markierung.** Das Record-Feld `return_order_randomized` EXISTIERT bereits (`self_play.rs` Z.1071
+   Feldbau, Z.4297 Schreibstelle), wird aber heute nur vom Aufloeser gesetzt (Z.1052). Der Knoten-Weg muss
+   die Zelle selbst setzen. **Kein neues Feld noetig.**
+3. **Python, Maske.** `corpus_dataset.py`: `pol_w = 0.0`, wenn der Record `return_order_randomized` traegt --
+   als EIGENE Bedingung neben Z.1635, NICHT unter `_IGNORE_PTV`. **Geprueft 2026-09-18: das Feld wird heute
+   von keinem Python-Verbraucher gelesen** (Grep ueber `corpus_dataset.py`, `train.py`, `file_cache_key.py`
+   ohne Treffer), es ist also ein rein additiver Eingriff.
+4. **Cache-Schluessel.** Schritt 3 aendert den Datensatz bei gleichem Korpus -- die Regel MUSS in den
+   Schluessel, sonst zieht der naechste Lauf still den alten Monolithen
+   (`feedback_feature_knob_belongs_in_both_cache_keys`, Praezedenz b03: mit Kanaelen trainiert, ohne
+   validiert). Betrifft Fenster- UND Val-Schluessel.
+
+**Zeitliche Zwaenge, die den Bau binden:**
+
+* **Der Knopf muss VOR der v31-Erzeugung im Wheel sein** (`feedback_record_field_must_precede_generation`);
+  sonst faellt das Merkmal wieder eine Generation zurueck -- genau der Fehler, den P.12 schon einmal gekostet hat.
+* **`corpus_dataset.py` darf nicht angefasst werden, solange Cache-Waechter oder Kette laufen**
+  (`feedback_watcher_workers_reimport_config`, Vorfall 2026-09-11: 24 Bloecke unter falschem Schluessel).
+  Schritt 3 wartet also bis nach der v30-Kette.
+* **Engine-Aenderung heisst Anker-Invarianz** (`/mosaic-anchor-invariance`, 22,4 s + 16,6 s) und
+  `cargo test --release --no-run` wegen `examples/` und `benches/`.
+
+**Offen und vom Nutzer zu entscheiden, BEVOR gebaut wird:**
+
+* **Dosis und Reichweite:** p je Rueckgabe-Entscheid, und in WELCHEN Klassen. Der Sockel ist der
+  Policy-Traeger; streut man dort, verliert man die betroffenen Policy-Ziele (nach Schritt 3 gewollt), das
+  sind nach der Zaehlung vom 2026-09-18 aber nur 0,18 Prozent der Records -- der Verlust ist vernachlaessigbar.
+* **Ob die Streuung ueberhaupt noch noetig ist**, wenn die temperierte Klasse schon rund 22 Prozent
+  abweichende Rueckgabe-Entscheide liefert (Herleitung, `PREREG_v30_window.md` par.9). Die Zahl, die das
+  entscheiden wuerde, ist UNGEMESSEN.
+
+**Was fuer den Bau spricht, unabhaengig von der Dosis** (Nutzer-Hinweis 2026-09-18, 23:10 -- der tiefe
+Stapelzug wird durch die Rueckgabewahl attraktiver, und in fruehen Runden ist das keine falsche Taktik):
+gemessen an 1.778 Stapelzuegen aus 400 Partien der Sockel-Klasse ziehen **80,4 Prozent nur EINE Platte**;
+tiefe Zuege (>= 3 Platten) machen **8,0 Prozent** aus und sitzen fast vollstaendig in **Runde 2 (18,4 Prozent,
+mittlere Tiefe 1,99)**, waehrend Runde 4 **keinen einzigen** tiefen Zug zeigt (mittlere Tiefe exakt 1,00) --
+passend zum Rundenfenster `return_order_round_allowed`. Gemessen wurde das an einem Sockel, der an diesen
+Knoten argmax spielt; es zeigt also den IST-Zustand des Netzes, nicht das Optimum.

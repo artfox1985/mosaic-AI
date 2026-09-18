@@ -77,21 +77,22 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 121 Dateien = 4 OFFEN + 105 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 121 Dateien = 5 OFFEN + 104 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (4)
+## OFFEN (5)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_claude_play_interface.md` | Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | 7 Partien (par.7), 5:2 fuer Claude; das Netz punktet aus Platzierungen statt aus den Wertungsplatten. Sichtgleichheit gilt in KEINE Richtung, Angleich ENTSCHIEDEN mit v29. **Zugklassen-Differential GEMESSEN (par.12): KEIN Knopf** -- die roh auffaellige Kuppelplatzierung (53 von 53) ist nach Normierung auf die Optionszahl nicht von blinder Wahl unterscheidbar; bei 7 Partien ohne Ausgangs-Varianz nicht aufloesend. |
 | `PREREG_code_cleanup_closeout.md` | Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | STUFE 1 GEBAUT (par.8: acht Punkte, 585 Tests gruen, Paritaets-Fixture wegen A2 bewusst neu, Kontrakt-Hash 39648b95bbba1acf). ANKER-DRIFT ROT durch A2 (Phantom-Abzug bewegt den lebenden hv1 ab Schritt 99) mit Entscheid (a) ERLEDIGT: Neuverankerung auf hv4_anchor, Leitersegment 2 (par.7a). Stufen 2/3 nach der letzten Generation. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
+| `PREREG_dome_return_order.md` | Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | R1-R3 gebaut und abgenommen (12.4-12.11), der Knoten (411-413) ist im v30-Korpus. WIEDER OFFEN 2026-09-18: der Streu-Knopf sitzt im verdraengten Aufloeser, wirkt in der Erzeugung nicht; Ersatz nur in der temperierten Klasse. Bauplan fuers v31-Self-Play in 12.12, mit dem Befund, dass policy_target_valid als Maske ausfaellt (MOSAIC_IGNORE_POLICY_TARGET_VALID=1). Nichts gebaut. |
 | `PREREG_v30_window.md` | Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm `v30-b01` mindestens auf Champion-Niveau `v29-b09`? | Erzeugung laeuft; Klasse 1 (policy) fertig 2026-09-18 20:07, 400 Dateien, 4,746 s je Partie (+20,4 Prozent gegen die v29-Linie, par.9). Tor 0 und **Tor 2a GRUEN**: `sp_voll` 0,90087 gegen 0,84275, n = 8.000 Seiten je Klasse. Wiedervorlage erster Record, Manifest-Diff und Stack-Draw-Kontrolle ebenfalls gruen (par.9). Klassen 2/3, Training und Tor 1 stehen aus. |
 
-## ENTSCHIEDEN (105)
+## ENTSCHIEDEN (104)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -112,7 +113,6 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_corpus_dose.md` | Hilft mehr Self-Play-Korpus (900 vs 450 Dateien) bei unveraenderter Suchtiefe der Netzqualitaet (Vorstudie Task #14)? | Orakel 6/6 UND Arena bestaetigt (479:321, p<0,0001); `archive/history.md` Z. ~6746-6821 |
 | `PREREG_denial_tiebreak.md` | Verbessert ein Denial-Tie-Break an der Wurzel (ε-Fenster, niedrigste Gegner-Punktprognose) das Spiel ohne Schaden? | Eigener Ergebnis-Abschnitt in der Datei ("ERGEBNIS ... E3 GESCHEITERT") |
 | `PREREG_deterministic_labels.md` | Werden die Trainingsziel-Felder (bootstrap/round_transition) maschinenlast-unabhängig, wenn die Task-#71-Not-Deckel bei Feuern auf deterministischen Fallback degradieren statt still zu kappen? | ENTSCHIEDEN 2026-08-14 (Details Datei-§4): Stufe 1 gemessen, Stufe 2 gebaut, Stress-Abnahme byte-identisch bestanden, 0 Not-Deckel-Feuerungen; der Gate-B-Retest ist seit 2026-08-21 gegenstandslos (Async-Strang geschlossen, §4.3). |
-| `PREREG_dome_return_order.md` | Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | par.9 NULL ist Arithmetik (12.5), R1 gemessen (12.4). R2 (designs_ordered, INPUT_SIZE 888) und R3 (Rueckgabeknoten, IDs 411-413) GEBAUT, die Schleife entscheidet Slot/Rueckgabe/Rotation als Suchknoten (12.9), kompiliert und abgenommen (12.10); return_order_mode 1 unter dem Research-Knopf wirkungslos. v30-Korpus traegt P.16 und den Knoten (12.11). Wirkung im Training: v31-Fenster-Prereg. |
 | `PREREG_dome_stack_information_sets.md` | Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | ABGESCHLOSSEN 2026-09-13 (par.16). Variante A GEBAUT (par.15): kein Mischen des Stapels je Suche, A/B 165:135, Fix bleibt; Ziehungen in den eigenen Block +0,69 je Partie, regelkonform (par.15e/f). Variante B (elf Merkmale, INPUT_SIZE 755) Nullbefund b02 gegen b01 (par.15h), bleibt als korrektere Fassung im Generator. Ziehsucht nicht behoben, Adresse v29-Begleitprogramm. |
 | `PREREG_floor_action_aversion.md` | Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche? | H1 BESTAETIGT (Prior schon asymmetrisch, Suche verschiebt kaum): das Strafleisten-Ziel bekommt nur etwa ein Sechzigstel der Prior-Masse der ueberlauferzeugenden Reihen-Ziele. Tragend ist die Nachmessung par.14 (240 Stellungen, Runde 2-4); das "exakt 0" aus par.6 war ein Runde-1-Stichprobenartefakt und ist gefallen. Arme R/A0/A1 entfallen nach par.7. |
 | `PREREG_frozen_trunk_head.md` | Loest ein eingefrorener Trunk (nur ownership_head trainiert, Auswahl ueber den Ownership-Val-Verlust) den Checkpoint-Zielkonflikt aus PREREG_ownership_corpus.md §10.3 -- oder ist der eingefrorene Trunk selbst die Decke fuer die Kopfguete? | ENTSCHIEDEN 2026-08-18, NEGATIV. F1 (§7): Zielkonflikt nur halb geloest, Decke real. Der Abschlusslauf v21-b22 liefert den SCHLECHTEREN Kopf als das gemeinsame Training (§8). Folge: fuer PREREG_ownership_coupling.md bleiben b18/b19 die Kandidaten; der Mittelweg aus §7.2 ist NICHT Teil des Verdikts. |
