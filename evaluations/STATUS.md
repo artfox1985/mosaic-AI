@@ -329,6 +329,27 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
    zweiter Arm bei sonst gleichem Rezept und Fenster. Kosten rund 1,2 h Training plus
    2 x rund 105 min Tor 1. Ohne diesen Entscheid laesst par.4 genau einen Arm zu.
 
+3a. **Rueckgabe-Exploration: der gebaute Knopf ist in dieser Erzeugung unwirksam** (Nutzer-Frage
+   2026-09-18, 22:00; Belege in `PREREG_v30_window.md` par.9). `MOSAIC_RETURN_ORDER_RANDOM_P`
+   sitzt im Stapelzug-Aufloeser, den `MOSAIC_STACK_DRAW_RESEARCH=1` nie betritt
+   (`self_play.rs` Z.1387) -- auch p > 0 wuerde nichts aendern. Ersatz gibt es nur in der
+   temperierten Klasse ueber `--action-temp 2`; Sockel und Ausflug spielen an den Knoten
+   argmax (`--tau-argmax-from-move 1`, Vorrang vor der Temperatur, `self_play.rs` Z.5767).
+   Weil die Suche an den Rueckgabeknoten fast unentschieden ist (Median-Anteil der staerksten
+   Option 0,572 bei n = 143 Entscheiden), streut die temperierte Klasse dort trotz T = 0,2
+   in rund 22 Prozent der Faelle (HERLEITUNG). **Entscheid noetig, falls mehr Streuung
+   gewollt ist:** den Knopf wirksam zu machen hiesse `MOSAIC_STACK_DRAW_RESEARCH` aus, und
+   damit NULL Slot-Datensaetze -- ein Tausch, kein Fix. Eine Aenderung an der dritten Klasse
+   ginge nur ueber Stoppen der laufenden Kette und getrennten Start. **Nutzer 2026-09-18, 22:15:
+   "das aktuelle self play kann so weiterlaufen"** -- fuer v30 erledigt. **Offen ist das
+   v31-Self-Play**: drei Optionen mit Prueffundstellen in `PREREG_v30_window.md` par.9
+   ("Optionen fuer das v31-Self-Play"). Kurz: (1) Streuung in den Knoten-Weg portieren, Bausteine
+   liegen, ABER `policy_target_valid` muss dort anders behandelt werden als im Aufloeser, weil im
+   Knoten-Weg die Aktion selbst zufaellig ist; (2) tau-argmax an den Hilfsknoten aussetzen --
+   trifft auch den Sockel und damit den Policy-Traeger, ohne Not nicht zu empfehlen; (3) nichts
+   aendern. Heimat des Entscheids ist die v31-Fenster-Prereg (so schon im Kopf von
+   `PREREG_dome_return_order.md` vorgesehen), keine neue Prereg noetig.
+
 4. **Vorgehen, wenn Tor 2a reisst** (`PREREG_v30_window.md` par.8 Punkt 5, Hypothese H4):
    nach `docs/generation_loop.md` Vorlage an den Nutzer mit beiden Zahlen, keine stille
    Fortsetzung. Die Alternative waere, den v29-Korpus weiterzufahren und v30 nur als
