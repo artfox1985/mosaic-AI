@@ -306,10 +306,23 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
      Vorgaenger, aktiver Anker, Generator.
 
 2. **Budget-Knopf fuer die Hilfsknoten** (Slot, Rotation, Rueckgabe, Mond) -- z.B. 25-50
-   Prozent der Sims, Praezedenz `moon_order_post_search` mit 256 Sims. **Wiedervorlage v31**
-   (Nutzer 2026-09-18, 10:05: Kosten fuer v30 hingenommen), auszuloesen, falls die
-   Erzeugungs-Stichprobe mehr als rund +15 Prozent zeigt -- sie zeigt heute +25 Prozent
-   (10.17), die Wiedervorlage ist also faellig, sobald die volle Erzeugung ihre Zahl liefert.
+   Prozent der Sims, Praezedenz `moon_order_post_search` mit 256 Sims. **ENTSCHIEDEN, aber
+   bedingt (Nutzer 2026-09-18, 20:25: "wenn es was bringt stoert mich der mehraufwand
+   nicht"):** der gemessene Aufschlag der v30-Erzeugung (+20,4 Prozent gegen die v29-Linie,
+   +49,1 Prozent gegen die v28-Linie, `PREREG_v30_window.md` par.9) ist als KOSTEN hingenommen;
+   der Knopf wird nicht aus Kostengruenden gezogen. Die Bedingung "wenn es was bringt" ist
+   damit die einzige offene Haelfte -- und sie ist in v30 konstruktionsbedingt NICHT sauber
+   beantwortbar: die Knoten sind mit 40,8 Prozent Fensterabdeckung vorregistriert als
+   unterbelegt, ein Nullbefund ist ausdruecklich KEIN Beleg gegen sie
+   (`PREREG_v30_window.md` par.1b, `moon_stack_order` 12.6, `dome_return_order` 12.7).
+   **Wiedervorlage bleibt v31**, dann aber als WIRKUNGS-Frage, nicht als Kostenfrage. Was
+   heute dazu messbar ist, ist der Lernstoff-Anteil der Knoten im Korpus (Nachzaehlung aus
+   par.1b, Ergebnis in par.9). **Gezaehlt am 2026-09-18, 20:35** (n = 78.917 Records aus 40 der
+   400 Sockel-Dateien, Einheit Records): der **Mondknoten traegt in 11,64 Prozent** der Records
+   ein Policy-Ziel, der **Rueckgabeknoten in 0,18 Prozent** (143 Entscheide in 400 Partien);
+   von 9.332 Records mit einer ID >= 406 in der Maske hat NULL ein leeres Ziel. Wer den
+   Budget-Knopf in v31 aufmacht, hat damit eine Trennung: fuer den Mondknoten gibt es
+   Lernstoff, fuer die Rueckgabe kaum.
 
 3. **Zerlegung Kaltstart gegen Warmstart als eigener Arm `v30-b02`**
    (`PREREG_v30_window.md` par.8 Punkt 2): Rueckfall 2 nicht als Rueckfall, sondern als
@@ -321,8 +334,8 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
    Fortsetzung. Die Alternative waere, den v29-Korpus weiterzufahren und v30 nur als
    Rezept-Umstellung zu trainieren.
 
-5. **Push.** Stand 2026-09-18 (gemessen `git rev-list --count origin/main..main`):
-   **17 Commits vor `origin/main`**. Kein Push ohne Anweisung; der Nutzer pusht selbst.
+5. **Push.** Stand 2026-09-18, 20:20 (gemessen `git rev-list --count origin/main..main`):
+   **2 Commits vor `origin/main`** (der Nutzer hat um 18:10 gepusht, Stand danach 0). Kein Push ohne Anweisung; der Nutzer pusht selbst.
 
 ### Aeltere, weiterhin offene Punkte (unveraendert uebernommen)
 
@@ -370,7 +383,7 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
 
 ## 7. VERBOTE UND STEHENDE REGELN
 
-- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden. Stand 2026-09-18: **17 Commits
+- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden. Stand 2026-09-18, 20:20: **2 Commits
   vor `origin/main`**, der Nutzer pusht selbst.
 - **Loeschung nur auf pfadgenaue Freigabe**, mit restic-Beleg je Gruppe. Frage ist keine
   Anweisung.
