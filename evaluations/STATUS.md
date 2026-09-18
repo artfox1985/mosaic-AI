@@ -368,7 +368,12 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
    `PREREG_moon_stack_order.md` par.9b, keine Kuppelplatten. Am v30-Korpus gemessen: **0,2225
    Gelegenheiten je Partie** (n = 1.778 Stapelzuege aus 400 Partien), Faktor 50. Mit 0,0146 faellt
    die Muenze in 0,33 statt in 15 Prozent der Partien; fuer das registrierte Ziel waere p = 0,52
-   noetig. **VORLAGE an den Nutzer, bevor gebaut wird.**
+   noetig -- **und das war noch die Mittelwert-Rechnung.** Exakt ueber die VERTEILUNG gerechnet
+   (n = 400 Partien): nur **17,75 Prozent der Partien haben ueberhaupt eine Gelegenheit**, das ist
+   die Obergrenze bei p = 1; p = 0,52 ergaebe 10,29 Prozent. **Nutzer-Entscheid 2026-09-18, 23:55:
+   "es bleibt bei den 15%" -> DOSIS 0,81** (`PREREG_dome_return_order.md` 12.12a). Das heisst
+   zugleich: in 81 Prozent der Gelegenheiten wird gestreut. Die Rate ist verhaltensabhaengig und
+   nach der v31-Erzeugung nachzurechnen.
 
 4. **Vorgehen, wenn Tor 2a reisst** (`PREREG_v30_window.md` par.8 Punkt 5, Hypothese H4):
    nach `docs/generation_loop.md` Vorlage an den Nutzer mit beiden Zahlen, keine stille
