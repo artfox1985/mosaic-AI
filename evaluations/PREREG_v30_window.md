@@ -467,6 +467,129 @@ ANNAHME. Die Erzeugung dominiert; sie laeuft ohnehin ueber Nacht.
 
 (noch leer -- nichts erzeugt, nichts trainiert, nichts gemessen)
 
+### Die gebaute Rueckgabe-Exploration ist in dieser Erzeugung UNWIRKSAM (2026-09-18, 22:05)
+
+**Anlass: Nutzer-Frage "hatten wir nicht eine eigene Rueckgabe-Exploration gebaut fuer die self plays?"** Ja --
+`MOSAIC_RETURN_ORDER_RANDOM_P` (Nutzer-Auftrag 2026-09-14, `PREREG_dome_return_order.md` par.11). Sie steht in
+dieser Erzeugung auf `0.0` (Manifest-Diff oben, dort als folgenlos abgehakt). **Das war zu kurz gesprungen:
+sie waere auch mit p > 0 wirkungslos.**
+
+**Am Code geprueft** (nicht aus der Knopf-Beschreibung uebernommen): `engine/src/self_play.rs` Z.1378-1392
+reicht den Streuungs-Parameter `random` ausschliesslich an `resolve_and_apply_stack_draw_with` weiter, und
+dieser Zweig haengt an `if !stack_draw_research() && !crate::game::stack_move_decided_by_loop(&game.state)`
+(Z.1387). Die v30-Erzeugung faehrt `MOSAIC_STACK_DRAW_RESEARCH=1` (Manifest: `stack_draw_research` True), der
+Aufloeser wird also nie betreten. Seit dem Knoten-Entscheid vom 2026-09-18 ("dann a") entscheidet die Schleife
+die Rueckgabe als eigenen Suchknoten -- und der Knopf sitzt im verdraengten Weg.
+
+**Ein ERSATZ existiert, aber aus einer anderen Quelle und nur in EINER der drei Klassen.** Die Knoten sind
+gewoehnliche Drafting-Aktionen und laufen durch `net_drafting_policy`; dort ist die Reihenfolge
+`deterministic` -> tau-argmax -> Temperatur (`self_play.rs` Z.5754 / Z.5767 / Z.5788, selbst gelesen).
+
+| Klasse | Schalter | Wahl an 406-413 |
+| --- | --- | --- |
+| `-policy` (Sockel) | `--tau-argmax-from-move 1` | **argmax**, keine Streuung |
+| `-value-tempc` | `--action-temp 2`, kein tau-argmax | **gesampelt** aus `visits^(1/T)` |
+| `-value-excursion` | `--tau-argmax-from-move 1` | **argmax**, keine Streuung |
+
+Die Temperatur haengt an der Aktionszahl: `ACTION_TEMP_SMOOTH_LO = 0.2` bei `N_LO = 2` Aktionen
+(`self_play.rs` Z.467-469), also **T = 0,200 bei zwei und 0,268 bei drei Kandidaten**, Exponenten 5,00 und
+3,73 (selbst nachgerechnet). Das ist scharf -- aber entscheidend ist, wie einig die Suche ueberhaupt ist.
+
+**Gemessen, und das ist der ueberraschende Teil: an den Rueckgabeknoten ist die Suche fast unentschieden.**
+n = 143 Rueckgabe-Entscheide, Grundmenge die 40 Sockel-Dateien der Stichprobe oben (400 Partien), Einheit
+Anteil der staerksten Option an der Zielverteilung: **Median 0,572**, Quartile 0,500 / 0,771, Minimum 0,334,
+Maximum 0,982; **67,1 Prozent der Entscheide liegen unter 0,70**. Plausibel, weil die Rueckgabe-Reihenfolge
+erst spaeter wirkt und die Suche sie kaum trennen kann.
+
+**Daraus (HERLEITUNG, nicht gemessen):** unter `--action-temp 2` wuerde in **22,3 Prozent** der
+Rueckgabe-Entscheide NICHT die staerkste Option gespielt; hochgerechnet rund **319 abweichende Entscheide je
+4.000-Partien-Klasse**. Die temperierte Klasse spielt die Knoten auch tatsaechlich: 55 Rueckgabe-Entscheide in
+20 Dateien (200 Partien) mit nicht-leerem Policy-Ziel trotz `--value-only`
+(`evaluations/artifacts/new_nodes_v29-b11-value-tempc.json`).
+
+**Lage, ohne Beschoenigung:** die Exploration der Rueckgabe ist nicht weg, aber sie kommt aus der
+Aktionstemperatur statt aus dem dafuer gebauten Knopf, wirkt in einer statt in drei Klassen und ist schwaecher
+als p = 1,0. **Vorlage an den Nutzer** (kein Alleingang, par.8 Punkt 5-Muster): den Knopf wieder wirksam zu
+machen hiesse, `MOSAIC_STACK_DRAW_RESEARCH` auszuschalten -- dann traegt der Korpus NULL Datensaetze fuer
+`choose_draw_stack_slot` (an der v28-Erzeugung nachgezaehlt: 0 von 13.145 Records, par.3 Punkt 4). Das ist ein
+TAUSCH zwischen zwei Merkmalen, kein Fix. Die dritte Klasse startet erst nach dem Ende der zweiten; eine
+Aenderung an ihr waere zudem ein Eingriff in `tools/night_v30_generate_rest.sh`, das die laufende Kette gerade
+liest (`feedback_dont_touch_files_read_by_running_runs`) -- sie ginge nur ueber Stoppen der Kette und
+getrennten Start.
+
+### Warum der Streu-Knopf gebaut wurde und was 12.9 dabei uebersah (2026-09-18, 22:20)
+
+**Nutzer-Frage:** *"warum haben wir ihn dann fuers self play gebaut. das war eigentlich ziemlich viel
+Aufwand."* -- **Nutzer-Entscheid im selben Zug: "das aktuelle self play kann so weiterlaufen."** Die
+Erzeugung laeuft unveraendert; nichts wird angefasst.
+
+**Chronologie, an den Dokumenten geprueft:**
+
+1. **2026-09-14** beauftragt der Nutzer die Streuung (`PREREG_dome_return_order.md` par.11). Zu diesem
+   Zeitpunkt ist der Sammelaufloeser der EINZIGE Weg, auf dem eine Rueckgabe zustande kommt -- der Knopf sitzt
+   also genau richtig. Gebaut wurden eigener RNG-Strom, Rundenfenster, Mindest-Restzahl und Record-Markierung.
+2. **2026-09-18** entscheidet der Nutzer "dann a": Slot, Rueckgabe und Rotation werden eigene Suchknoten
+   (12.9). Damit verliert der Aufloeser seine Rolle -- und mit ihm der Knopf.
+3. **Die Entwertung wurde NICHT uebersehen.** 12.9 traegt sie als "wichtigster Nebenbefund" ausdruecklich ein:
+   `MOSAIC_RETURN_ORDER_RANDOM_P` sitze ausschliesslich im Aufloeser und wirke fuer eine Seite mit Tor nicht
+   mehr. Die Begruendung, warum das hinnehmbar sei, steht dort auch: der Knopf stehe in keinem Skript und
+   keiner Spec, verliere also keinen lebenden Verbraucher, und *"wer die Abdeckungs-Absicht aus par.11 im
+   v30-Korpus haben will, bekommt sie jetzt ueber den Knoten (Temperatur der Besuchsverteilung)"*.
+
+**Was an dieser Begruendung fehlte, und das ist der heutige Fund:** die Temperatur greift nur, wo kein
+tau-argmax davorsteht (`self_play.rs` Z.5767 vor Z.5788). **Zwei der drei Erzeugungsklassen fahren
+`--tau-argmax-from-move 1`** und spielen an den Knoten argmax; die Abdeckung kommt also aus EINER Klasse statt
+aus allen dreien. Der Satz von 12.9 war nicht falsch, aber unvollstaendig -- er nennt den Ersatzmechanismus
+und prueft nicht, in welchen Klassen er ueberhaupt erreichbar ist. **Lehre in der Form von
+`feedback_backward_check_consumers_of_a_result`:** wer einen Mechanismus durch einen anderen ersetzt, prueft
+den Ersatz GEGEN DIE KONKRETEN LAEUFE, die ihn brauchen sollen, nicht nur gegen seine Existenz.
+
+**Der Aufwand ist nicht verloren, sondern liegt am falschen Ort.** Die Bausteine (eigener Zufallsstrom nach
+dem `derive_search_seed`-Muster, Rundenfenster, Mindest-Restzahl, Record-Feld `return_order_randomized`) sind
+gebaut und getestet; was fehlt, ist ein Angriffspunkt im Knoten-Weg. Ob und wie der sich herstellen laesst,
+ist die Frage fuer das v31-Self-Play (unten).
+
+### Optionen fuer das v31-Self-Play (2026-09-18, 22:30) -- VORLAGE, nichts entschieden
+
+Nutzer-Frage: *"wie sieht es dann mit dem self play fuer v31 aus"*. Heimat des Entscheids ist die
+v31-Fenster-Prereg, auf die der Kopf von `PREREG_dome_return_order.md` die Wirkungsfrage schon verweist --
+**keine neue Prereg noetig** (STATUS Abschnitt 6 Punkt 11).
+
+**Option 1: die Streuung in den Knoten-Weg portieren.** Angriffspunkt waere die Schleife nach dem Entscheid
+(`self_play.rs` Z.3979 `decide`, Z.4095 `d.chosen = a;` -- dort ersetzen Weg B und C die Wahl schon heute) oder
+die Auswahl-Rangfolge in `net_drafting_policy` (Z.5754-5815). Die Abgrenzung ist einfach, weil die
+Aktionsliste am Rueckgabeknoten sortenrein ist (`game.rs` Z.767-769 fuellt nur `ChooseReturnFirst` und kehrt
+zurueck). Vorhanden und wiederverwendbar: das Zufallsstrom-Muster (eigener Distinguisher XOR `game_seed`,
+Zaehler `move_number`, `self_play.rs` Z.892/4177), das Rundenfenster (Z.997), das Record-Feld
+(`return_order_randomized`, Z.1071/4297) und das Reichweiten-Vorbild `MOSAIC_START_SLOT_RANDOM_P`
+(einzige Wirkstelle `start_placement_step`, Z.1890-1905).
+
+**Der Haken, der beim Portieren als erstes zu entscheiden ist -- und der NICHT uebernommen werden darf:** im
+Aufloeser blieb `policy_target_valid` bewusst UNBERUEHRT, mit der Begruendung, nicht die Aktion sei zufaellig,
+sondern nur ein Nebenaspekt derselben Aktion (`knob_registry.rs` Z.116, `self_play.rs` Z.4293-4296). **Im
+Knoten-Weg ist die Rueckgabe die Aktion selbst.** Eine Streuung dort erzeugt also ein Policy-Ziel auf einer
+zufaellig gewaehlten Aktion -- genau der Fall, fuer den die Startkuppel `policy_target_valid = false` setzt.
+Wer portiert, muss das mitziehen, sonst lernt die Policy Zufall. **UNGEPRUEFT** ist, ob der Sockel als
+Traeger-Klasse damit ueberhaupt noch als Policy-Traeger taugt (`feedback_check_policy_carrier_status`).
+
+**Der Bestandstest ist kein Blocker, aber seine Zusicherung wird schief.**
+`loop_ownership_ignores_return_order_mode_and_the_randomizer` (`self_play.rs` Z.8131) ruft
+`apply_chosen_action_with` DIREKT; eine Streuung in der Schleife liesse ihn gruen. Seine Doku (Z.8128-8130)
+sagt aber "die Erzeugungs-Streuung greift nicht mehr" -- das muesste auf "greift an DIESER Stelle nicht"
+praezisiert werden, sonst steht im Baum eine Zusicherung, die groesser ist als das, was der Test prueft.
+
+**Option 2: `--tau-argmax-from-move` an den Hilfsknoten aussetzen.** Kleiner Eingriff an EINER Bedingung
+(`self_play.rs` Z.5767). Wirkt aber auf ALLE acht Knoten und in allen Klassen mit tau-argmax -- also auch im
+SOCKEL, und der ist die Policy-tragende Klasse. Dasselbe `policy_target_valid`-Problem wie oben, nur breiter.
+Ohne eigene Not nicht zu empfehlen.
+
+**Option 3: nichts aendern.** Die temperierte Klasse traegt die Streuung (rund 22 Prozent abweichende
+Rueckgabe-Entscheide, Herleitung oben), Sockel und Ausflug bleiben argmax. Das ist der heutige Zustand.
+
+**Was den Entscheid tragen sollte, liegt noch nicht vor:** ob rund 319 abweichende Entscheide je Klasse
+genug Varianz fuer ein A/B der Rueckgabe-Reihenfolge sind, ist UNGEMESSEN. Die Frage gehoert in dieselbe
+Vorlage wie der Budget-Knopf (STATUS Abschnitt 6 Punkt 2), weil beide dieselbe Wirkungsfrage betreffen.
+
 ### Nachzaehlung der neuen Knoten im Sockel (2026-09-18, 20:35) -- die in par.1b vorgemerkte Zahl
 
 par.1b hat diese Zaehlung ausdruecklich nach par.9 verwiesen ("am Fenster nicht nachgezaehlt, weil die neuen
