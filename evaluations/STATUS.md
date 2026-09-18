@@ -361,6 +361,14 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
    `policy_target_valid` taugt NICHT als Maske fuer den gestreuten Entscheid, weil beide Ketten
    `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` fahren (`corpus_dataset.py` Z.1635); zu kopieren ist
    das Muster der gestreuten Startkuppel, das an einer eigenen Bedingung haengt (Z.1593-1595).
+   **Dosis, Schwelle, Rundenfenster und Zweck sind NICHT offen** -- alles entschieden in
+   `PREREG_dome_return_order.md` par.11b/11c (Nutzer 2026-09-18, 23:45: "diese fragen sind sicher
+   nicht offen"). **Aber ihre ZAHL steht auf einer fremden Grundmenge:** die Dosis 0,0146 ist aus
+   "11,07 Gelegenheiten je Partie" hergeleitet, und diese 11,07 sind MONDSTAPEL-Dreierstapel aus
+   `PREREG_moon_stack_order.md` par.9b, keine Kuppelplatten. Am v30-Korpus gemessen: **0,2225
+   Gelegenheiten je Partie** (n = 1.778 Stapelzuege aus 400 Partien), Faktor 50. Mit 0,0146 faellt
+   die Muenze in 0,33 statt in 15 Prozent der Partien; fuer das registrierte Ziel waere p = 0,52
+   noetig. **VORLAGE an den Nutzer, bevor gebaut wird.**
 
 4. **Vorgehen, wenn Tor 2a reisst** (`PREREG_v30_window.md` par.8 Punkt 5, Hypothese H4):
    nach `docs/generation_loop.md` Vorlage an den Nutzer mit beiden Zahlen, keine stille
