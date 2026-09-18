@@ -45,6 +45,63 @@ Uebergabe: nur die Prereg-Kopf-Schliessungen, `docs/knobs.md`, `docs/pitfalls.md
    gebaut, baut jede neue Datei nach; laeuft bis `--leerlauf-abbruch` oder Stopp. Erlaubte Nebenlast neben der
    Erzeugung (Kopf von `tools/night_v30_generate.sh`).
 
+### FORTSCHRITT DER ERZEUGUNG (neue Sitzung, gezaehlt; fortlaufend nachgetragen)
+
+**Sitzung uebernommen 2026-09-18, 18:15.** Prozessliste geprueft (`Get-CimInstance Win32_Process`): alle drei
+Prozesse der Uebergabe laufen -- Sockel `self_play.py` PID 27628/31704 (Start 14:50:04), Rest-Kette
+`night_v30_generate_rest.sh` PID 28120, Cache-Waechter `build_cache_incremental.py` PID 32460/38800. Beobachter
+`tools/watch_v30_generation.sh` (neu, reine `ls`-Abfrage je 120 s, Prozess-Check nur bei Stillstand) laeuft je
+Klasse; Abbruchgruende: Ziel erreicht plus laufzeit-Block (0), Stillstand 30 min (10), Prozess weg bei
+unvollstaendiger Klasse (11).
+
+**Geprueft an der Rest-Kette** (`tools/night_v30_generate_rest.sh`, Z.72-84): ihre Wiedervorlage liest den ersten
+Sockel-Record mit `gzip.open` und faellt nur bei `OSError` auf `open` zurueck -- die Falle vom 2026-09-18
+(`docs/pitfalls.md`) ist dort repariert, der Sockel wird von der Pruefung nicht getoetet.
+
+**Bezugswert Tor 2a liegt bereits als Artefakt vor** (`evaluations/artifacts/corpus_sanity_v28-b02-policy.json`,
+gelesen 2026-09-18): `sp_voll` 0,84275 (+-0,01670), n = 8.000 Seiten, Grundmenge `selfplay_v28-b02-policy_*`
+(400 Dateien = 4.000 Partien), Einheit volle Spalten je Seite. Die Bezugsklasse muss also NICHT neu gefahren
+werden; das spart rund 4,5 min Nebenlast neben der Erzeugung.
+
+**Frage des Nutzers 18:35 ("kannst den validation cache auch schon parallel fahren?") -- geprueft, Antwort NEIN,
+aber der teure Teil LAEUFT bereits parallel:**
+
+* **Die Datei-Bloecke sind fensterunabhaengig und liegen vollstaendig.** `per_file_cache_key` kennt bewusst KEINE
+  Dateiliste und keinen Split (`tools/build_cache_incremental.py` Z.111-124, `corpus_dataset.py` Z.381-383).
+  Gezaehlt 18:34: **2.664 Bloecke zu 2.664 Korpusdateien** in `data/`, also aufgeschlossen; 41 neue Bloecke in den
+  letzten 30 min, das ist das Tempo der Erzeugung. Stichprobe unter dem AKTUELLEN Schluessel (888, Formel
+  `a2phantom-20260912`, 2d, nortv) neu gerechnet: **150 von 150 Bloecken liegen** (je 30 aus `v27-b01-policy`,
+  `v27-b01-value-excursion`, `v28-b02-policy`, `v28-b02-value-tempc`, `v29-b11-policy`). Schritt 5 der Kette
+  (Blockbau) faellt damit weitgehend weg.
+* **Monolith und Val-Cache haengen dagegen an der VOLLSTAENDIGEN Dateiliste.** `window_cache_key(data_dir, files,
+  ...)` hasht die Liste (`corpus_dataset.py` Z.366-385); der Val-Split zieht ausserdem aus dem Pool
+  `^selfplay_v29-` (`train.py` Z.1401-1440), und zwei der drei Klassen dieses Pools existieren noch nicht. Ein
+  jetzt gebauter Cache traegt einen anderen Schluessel und waere wertlos. Nach der Erzeugung bleiben Split
+  (Minuten) und Monolith-Merge aus liegenden Bloecken (gemessen 827 s, Abschnitt 3).
+* **Nebenbefund, VORLAGE an den Nutzer:** die Kette merged nur den TRAININGSANTEIL (`night_v30_chain.sh` Z.253-257,
+  `--merge-out "$CACHE"`). Der Val-Anteil (rund 147 Dateien) wird von `train.py` als eigenes `MosaicDataset` ohne
+  `cache_file` gebaut und dabei NEU kodiert, obwohl seine Bloecke liegen. Ein zusaetzlicher Merge des
+  Val-Anteils unter seinen eigenen Fenster-Schluessel waere ein Sekunden-Schritt; die Ersparnis ist UNGEMESSEN.
+
+| Zeit | policy (Ziel 400) | value-tempc (Ziel 400) | value-excursion (Ziel 401) |
+| --- | --- | --- | --- |
+| 18:14 | 232 | 0 | 0 |
+| 20:07 | **400 FERTIG** (18.984,2 s, 4,746 s je Partie) | 0 | 0 |
+
+**Klasse 1 durch, beide Tore gruen** (Belege und alle sechs Kennzahlen in `PREREG_v30_window.md` par.9):
+Tor 2a `sp_voll` **0,90087 (+-0,01700)** gegen den Bezug **0,84275 (+-0,01670)**, n = 8.000 Seiten je Klasse,
+Einheit volle Spalten je Seite, beide bei 100 Sims erzeugt. Der Generator baut mehr Spalten, nimmt weniger
+Strafsteine (-0,295) und holt +1,62 Punkte je Seite; volle Reihen gehen leicht zurueck (-0,0158). Kein
+Staerkebeleg (Self-Play, Margin per Konstruktion 0) -- das entscheidet Tor 1.
+
+**Kosten der Erzeugung, gemessen** (Grundmenge Policy-Klasse einer vollen Erzeugung, 4.000 Partien @100,
+threads 11, Einheit s je Partie): v28-Erzeugung 3,183 -> v29-Erzeugung 3,943 -> **v30-Erzeugung 4,746**.
+Das sind **+49,1 Prozent** gegen die v28-Linie und **+20,4 Prozent** gegen die v29-Linie; die Stichprobe hatte
++25 Prozent geschaetzt. **Beide Lesarten reissen die 15-Prozent-Schwelle aus Abschnitt 6 Punkt 2** -- die
+v31-Wiedervorlage des Budget-Knopfs ist faellig, die Bezugswahl aendert daran nichts. Eingetragen in
+`../docs/measured_runtimes.md` (neuer Abschnitt "Generation v30") samt Warnung vor der Namensfalle:
+Manifeste heissen nach dem GENERATOR, `manifest_v28-b02-*` ist die v29-Erzeugung.
+
 ### ERSTE AUFGABE DER NEUEN SITZUNG, in dieser Reihenfolge
 
 1. **WATCHER auf die Erzeugung**, nichts sonst mit Rechenlast: Bedingung "400 policy-Dateien UND laufzeit-Block im
@@ -270,9 +327,9 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
 ### Aeltere, weiterhin offene Punkte (unveraendert uebernommen)
 
 6. **Manifest meldet Spec-Felder falsch** (geprueft 2026-09-13): `engine_config` zeigt fuer
-   `envelope_search_c`, `envelope_projection_mode`, `envelope_hull_form` und `special_row6_w`
-   den Env-Default statt des wirksamen Spec-Werts (`lib.rs` Z.801/807/812/815 lesen
-   `SearchConfig::from_env()`). **Kein Belegverlust** -- jedes Manifest nennt den Spec-Pfad.
+   `envelope_search_c`, `envelope_projection_mode`, `envelope_hull_form`, `special_row6_w`
+   und -- neu am 2026-09-18 gefunden -- `return_order_mode` (`lib.rs` Z.834) den Env-Default statt des
+   wirksamen Spec-Werts (`lib.rs` Z.801/807/812/815 lesen `SearchConfig::from_env()`). **Kein Belegverlust** -- jedes Manifest nennt den Spec-Pfad.
    Vorschlag: Spec-Inhalt plus sha256 additiv ins Manifest. Nicht waehrend eines Laufs bauen.
 
 7. **Sichtluecke bei den gezogenen Stapelplatten** (`stack_top_feature` par.16/16a): die

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v30-Fenster zugeschnitten -- naechste Generation (v31 offen, Nutzer 2026-09-17), Generator `v29-b11` (b09 auf 414/888 gepolstert), ein Pflichtarm `v30-b01` im KALTSTART? | Beleg: par.1 Zuschnitt rund 2.947 Dateien (v29-b11 neu, v28-b02 als G-1, v27-b01 als G-2; v26-b01 rotiert heraus, Bestand am 2026-09-18 gezaehlt); par.6 Rezept = b03-Rezept mit `--moon-loss-weight 0`, `--ownership-weight 0`, ohne `--endgame-head`, ohne `--load` (STATUS Abschnitt 4); par.3 Tor 1 gegen Champion `v29-b09`. Nichts erzeugt, nichts trainiert. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm `v30-b01` mindestens auf Champion-Niveau `v29-b09`? | Beleg: Erzeugung laeuft; Klasse 1 (policy) fertig 2026-09-18 20:07, 400 Dateien, 4,746 s je Partie (+20,4 Prozent gegen die v29-Linie, par.9). Tor 0 und **Tor 2a GRUEN**: `sp_voll` 0,90087 gegen 0,84275, n = 8.000 Seiten je Klasse. Wiedervorlage erster Record, Manifest-Diff und Stack-Draw-Kontrolle ebenfalls gruen (par.9). Klassen 2/3, Training und Tor 1 stehen aus. -->
 
 # PREREG v30: Fensterzuschnitt der Generation v30 (v31 offen, Nutzer 2026-09-17)
 
@@ -455,6 +455,89 @@ ANNAHME. Die Erzeugung dominiert; sie laeuft ohnehin ueber Nacht.
 ## par.9 ERGEBNISSE
 
 (noch leer -- nichts erzeugt, nichts trainiert, nichts gemessen)
+
+### Klasse 1 `v29-b11-policy` fertig, Tor 0 und Tor 2a (2026-09-18, 20:07 / 20:15): BEIDE GRUEN
+
+**Erzeugung.** 400 Dateien, `laufzeit.wanduhr_s` 18.984,2 s = 5 h 16 min, **4,746 s je Partie**, n = 4.000
+Partien, 790.970 Zuege, threads 11 (`data/manifest_v29-b11-policy_20260918_145006.json`). `cpu_s` bleibt leer,
+`os.times()` fuehrt auf dieser Plattform keine Kinderzeiten. Nebenlast waehrend des ganzen Laufs: der
+Cache-Waechter mit 3 Arbeitern (erlaubt, Kopf von `night_v30_generate.sh`); der Sanity-Check unten lief erst
+NACH dem Klassenende und vor dem Start der zweiten Klasse, also nicht in diese Zahl hinein.
+
+**Kosten gegen die Vorgaenger** (Grundmenge je die Policy-Klasse einer vollen Erzeugung, 4.000 Partien @100,
+threads 11; Einheit Sekunden je Partie; Zahlen aus den `laufzeit`-Bloecken der Manifeste):
+v28-Erzeugung (Generator `v27-b01`) 3,183 -> v29-Erzeugung (Generator `v28-b02`) 3,943 -> **v30-Erzeugung
+(Generator `v29-b11`) 4,746**, also **+49,1 Prozent** gegen die v28-Linie und **+20,4 Prozent** gegen die
+v29-Linie. Die 20-Partien-Stichprobe hatte +25 Prozent geschaetzt (`minimal_strength_core` 10.17). **Beide
+Lesarten liegen ueber der 15-Prozent-Schwelle** aus STATUS Abschnitt 6 Punkt 2; die v31-Wiedervorlage des
+Budget-Knopfs ist damit faellig, unabhaengig von der Bezugswahl. ACHTUNG Namensfalle, beim Nachtragen fast
+falsch etikettiert: Manifeste heissen nach dem GENERATOR, `manifest_v28-b02-*` ist die v29-Erzeugung
+(`docs/measured_runtimes.md`, Abschnitt Generation v30).
+
+**Tor 2a ex post: HAELT.** `sp_voll` **0,90087 (+-0,01700)** fuer `v29-b11-policy` gegen **0,84275 (+-0,01670)**
+fuer `v28-b02-policy`, Differenz **+0,05812**; n = 8.000 Seiten je Klasse, Grundmenge die jeweilige
+Policy-Klasse, Einheit volle Spalten je Seite. Die Differenz ist groesser als die Summe beider Halbbreiten
+(0,0337). Betriebsart geprueft: beide Klassen sind bei 100 Sims erzeugt (der Manifest-Diff zeigt `sims` nicht
+als Abweichung), der Vergleich steht also nicht unter dem Suchtiefen-Effekt aus
+`PREREG_search_depth_column_optimum.md` par.8e. Artefakt
+`evaluations/artifacts/corpus_sanity_v29-b11-policy.json`, Laufzeit 446,4 s einkernig.
+
+**Tor 0, die sechs Standard-Kennzahlen** (CLAUDE.md; je Seite, n = 8.000 Seiten aus 4.000 Partien; Margin ist
+im Self-Play per Konstruktion 0):
+
+| Kennzahl | `v28-b02` (v29-Erzeugung) | `v29-b11` (v30-Erzeugung) | Differenz |
+| --- | --- | --- | --- |
+| 1 Reihen: volle Reihen | 0,1070 | 0,0912 | -0,0158 |
+| 1 Reihen: mittlerer Fuellstand von 6 | 2,8971 | 2,9097 | +0,0126 |
+| 2 Spalten: volle Spalten | 0,8427 | 0,9009 | +0,0581 |
+| 2 Spalten: Teilspalten >= 4 | 2,1665 | 2,1926 | +0,0261 |
+| 2 Spalten: Teilspalten >= 3 | 3,1307 | 3,1397 | +0,0090 |
+| 2 Spalten: hoechste Spalte von 6 | 5,5375 | 5,5691 | +0,0316 |
+| 3 Strafleiste: Steine | 5,5784 | 5,2832 | -0,2951 |
+| 5 Eigene Punkte | 48,6617 | 50,2821 | +1,6204 |
+| 6 Margin | 0,0000 | 0,0000 | 0,0000 |
+
+| 4 Punkte je Wertungsplatte | `v28-b02` | `v29-b11` | Differenz |
+| --- | --- | --- | --- |
+| k0 | +0,32 | +0,29 | -0,03 |
+| k1 | +6,29 | +6,65 | +0,35 |
+| k2 | +0,34 | +0,32 | -0,02 |
+| k3 | +3,30 | +3,29 | -0,02 |
+| k4 | +10,22 | +10,19 | -0,03 |
+| k5 | +7,62 | +8,08 | +0,46 |
+| k6 Spezialfelder | -9,54 | -9,39 | +0,15 |
+| k7 | +0,19 | +0,17 | -0,02 |
+
+**Lesart, vorsichtig:** der neue Generator baut mehr Spalten, nimmt weniger Strafsteine und holt 1,62 Punkte
+je Seite mehr, bei etwas weniger vollen Reihen. Das ist die Richtung der Kampagnenlinie
+(`project_long_row_avoidance_is_correct`). Es ist aber KEIN Staerkebeleg: hier spielt der Generator gegen sich
+selbst, der Margin ist per Konstruktion 0, und `v29-b11` unterscheidet sich von `v28-b02` um Generation,
+Wheel und Aktionsraum zugleich. Die Staerkefrage entscheidet Tor 1.
+
+### Manifest-Diff und Stack-Draw-Kontrolle (2026-09-18, 18:20, par.3 Punkte 3 und 4): GRUEN
+
+Gefahren wurde der Diff-Block aus `tools/night_v30_chain.sh` Schritt 0b, vorgezogen waehrend der Erzeugung
+(reines JSON-Lesen, keine nennenswerte Last): `data/manifest_v29-b11-policy_20260918_145006.json` gegen
+`data/manifest_v28-b02-policy_20260913_120816.json`.
+
+**`engine_config` wie vorregistriert:** `input_size` 888, `num_actions` 414, `contract_hash`
+`6ef829e564c58bd5`, `stack_draw_research` `True` (Punkt 4 erfuellt, der Korpus traegt Slot-Datensaetze).
+
+**`cli_args`-Abweichungen, alle erwartet:** `model` (`v28-b02_brierbest` -> `v29-b11`), `seed`
+(20260920 -> 20260930), `spec` (`start_by_search_on` -> `v30_generation`), `version`. Das Werkzeug meldet
+EINE unerwartete Abweichung, `return_order_random_p` `None` -> `0.0`; sie ist keine: der Knopf existierte zur
+v28-Referenz noch nicht (`None` = Flag unbekannt), `0.0` ist "aus" und zieht laut
+`engine/src/self_play.rs::sample_random_return_order` keine Zufallszahl (bitidentisch), und unter
+`MOSAIC_STACK_DRAW_RESEARCH=1` erreicht er den Aufloeser ohnehin nicht (`knob_registry.rs` Z.116,
+`PREREG_dome_return_order.md` par.12.9). **Kein Stopp.**
+
+**Ein Melde-Defekt mehr als in STATUS Abschnitt 6 Punkt 6 gelistet:** das Manifest zeigt
+`return_order_mode 0`, waehrend `models/v30_generation.spec.json` `1` traegt (beides am Dateiinhalt gelesen).
+Ursache ist dieselbe wie bei den vier dort genannten Feldern: `engine/src/lib.rs` Z.834 exportiert
+`SearchConfig::from_env().return_order_mode`, also den Env-Default statt des wirksamen Spec-Werts.
+**Folgenlos fuer diesen Korpus** -- unter dem Research-Knopf ist das Feld wirkungslos (par.3 Punkt 4), und das
+Manifest nennt den Spec-Pfad, es geht also kein Beleg verloren. Die Liste in STATUS Abschnitt 6 Punkt 6 ist um
+`return_order_mode` ergaenzt.
 
 ### Wiedervorlage erster Record (2026-09-18, 14:54): GRUEN
 
