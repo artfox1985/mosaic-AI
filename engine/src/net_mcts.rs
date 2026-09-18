@@ -50,8 +50,34 @@ use crate::tile::TileColor;
 
 /// Aktionsraum-Größe (= `config.NUM_ACTIONS`). Baustein B: 328 (Stone+Tiling)
 /// + 27 (choose_dome_slot) + 36 (choose_draw_stack_slot) + 4 (choose_dome_rotation)
-/// + 6 (use_chips) + 4 (bonus_chip) + 1 (dome_stack_peek) = 406.
-pub(crate) const NUM_ACTIONS: usize = 406;
+/// + 6 (use_chips) + 4 (bonus_chip) + 1 (dome_stack_peek) = 406;
+/// + 5 (choose_moon_top, Weg A) + 3 (choose_return_first, R3) = **414**
+/// (2026-09-18, EIN Kontraktwechsel fuer beide Knoten --
+/// `PREREG_moon_stack_order.md` par.12.6, `PREREG_dome_return_order.md`
+/// par.12.7).
+///
+/// DIESE KONSTANTE IST NICHT DIE POLICY-BREITE EINES GELADENEN NETZES. Sie ist
+/// die Breite des Aktionsraums, gegen den die Engine IDs bildet; welche Breite
+/// ein Netz hat, sagt `Net::policy_width()` (aus dem ONNX gelesen). Ein
+/// 406er-Netz bleibt spielbar: seine Policy hat fuer 406..413 keinen Eintrag
+/// (`logits.get(id)` -> `None` -> `NEG_INFINITY`), und es bekommt die beiden
+/// Knoten gar nicht erst (`GameState::extended_action_nodes`, gesetzt nur fuer
+/// Seiten mit `policy_width() >= NUM_ACTIONS`).
+pub(crate) const NUM_ACTIONS: usize = 414;
+/// Tor der beiden zusaetzlichen Entscheidungsknoten (Weg A / R3), an EINER
+/// Stelle: `true` genau dann, wenn das Netz einen Policy-Kopf mit mindestens
+/// [`NUM_ACTIONS`] Ausgaengen hat. Ein Bestandsnetz (406) und ein Netz, dessen
+/// Ausgangsform nicht lesbar war (`None`), bekommen die Knoten NICHT -- sie
+/// spielen bitidentisch weiter (kanonische Mondreihenfolge, Rueckgabe nach
+/// `return_order_mode`).
+///
+/// Die Schwelle ist `>=` und nicht `==`: ein spaeterer Kontraktwechsel haengt
+/// weitere IDs HINTEN an (additive Regel), ein breiterer Kopf kann die 406..413
+/// also weiter lesen.
+pub(crate) fn net_supports_extended_action_nodes(net: &Net) -> bool {
+    net.policy_width().is_some_and(|w| w >= NUM_ACTIONS)
+}
+
 /// Standard-PUCT-Konstante (= agents/mcts.py `_c_puct`).
 pub const DEFAULT_C_PUCT: f64 = 1.5;
 /// Dirichlet-Wurzel-Noise (AlphaZero-Standard).
@@ -2734,7 +2760,15 @@ fn build_untried_actions(
     for (act, id) in base_actions.into_iter().zip(ids.into_iter()) {
         let base_p = *p_base.get(&id).unwrap_or(&0.0);
         if let Action::Stone(m) = &act {
-            if moon_order_variants == MOON_ORDER_VARIANTS_DEFAULT
+            // Weg A (`PREREG_moon_stack_order.md` par.12.6): spielt diese Seite
+            // mit dem eigenen ENTSCHEIDUNGSKNOTEN, gibt es hier nichts
+            // aufzufaechern -- alle Permutationen wuerden auf denselben
+            // Folgezustand (offener Knoten) fuehren und nur Wurzelbreite
+            // fressen. Die Reihenfolge entscheidet dann der Knoten. Bei
+            // ausgeschaltetem Tor ist die Bedingung `true` und der Zweig exakt
+            // der Bestand.
+            if !crate::game::moon_order_node_applies(state, m)
+                && moon_order_variants == MOON_ORDER_VARIANTS_DEFAULT
                 && m.take.source == TakeSource::SmallFactorySun
                 && m.take.moon_order.len() >= 2
             {
@@ -6202,6 +6236,17 @@ pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
     if !moon_order_post_search_applies(search_config, action.as_ref()) {
         return action;
     }
+    // Weg A hat Vorrang vor Stufe 3: spielt diese Seite mit dem
+    // Entscheidungsknoten, ist die Reihenfolge in `action` ohnehin nur ein
+    // Platzhalter (`apply_drafting` verwirft sie und oeffnet den Knoten) -- eine
+    // Nachsuche darueber waere verworfenes Rechnen. Bei ausgeschaltetem Tor
+    // (Bestand, `moon_order_variants == 2`) ist die Bedingung `false` und der
+    // Zweig unveraendert.
+    if let Some(Action::Stone(m)) = action.as_ref() {
+        if crate::game::moon_order_node_applies(state, m) {
+            return action;
+        }
+    }
     // par.11 Weg C3: bei `moon_order_search_scale == 1` wird das Budget mit der
     // Rundenrestlaenge gewichtet (Faktor 0,5 bis 1,5, im Mittel rund 1) --
     // frueh in der Runde laenger rechnen, kurz vor Schluss kuerzer. Bei 0 ist
@@ -7143,7 +7188,8 @@ fn dirichlet<R: Rng + ?Sized>(n: usize, alpha: f64, rng: &mut R) -> Vec<f64> {
 //  2. **Heuristik-Seiten sind ausgenommen**, auch bei Knopf 1: der Elo-Anker
 //     ist eine Heuristik, und ein Anker, der sich bewegt, ist keiner
 //     (CLAUDE.md, Anker-Invarianz).
-//  3. **`NUM_ACTIONS` bleibt 406.** Die Startaktionen bekommen KEINE neuen
+//  3. **`NUM_ACTIONS` bleibt unberuehrt** (damals 406, seit Weg A/R3 414). Die
+//     Startaktionen bekommen KEINE neuen
 //     IDs; sie leihen sich die beiden Familien, die der Policy-Kopf fuer die
 //     zweistufige Kuppelwahl im Drafting schon hat (Slot 328..354, Rotation
 //     391..394). Damit bleibt auch der Vertragshash unveraendert.
@@ -7602,6 +7648,48 @@ mod tests {
 
     fn names() -> [String; 2] {
         ["P1".into(), "P2".into()]
+    }
+
+    /// Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 1): das Tor des
+    /// Mondknotens ist als "mindestens zwei VERSCHIEDENE Farben" gebaut
+    /// (`game::moon_order_has_real_choice`), die Prereg schreibt aber
+    /// `unique_moon_orders(remaining).len() >= 2`. Beide Formulierungen muessen
+    /// FUER JEDE Multimenge dasselbe sagen -- sonst haette der Knoten ein
+    /// anderes Tor als der Fan-out, den er ersetzt. Dieser Test ist der Beleg;
+    /// er steht hier, weil `unique_moon_orders` nur hier sichtbar ist.
+    #[test]
+    fn moon_order_choice_predicate_matches_unique_moon_orders() {
+        use TileColor::{Blau, Gelb, Rot, Schwarz, Tuerkis};
+        let cases: Vec<Vec<TileColor>> = vec![
+            vec![],
+            vec![Blau],
+            vec![Blau, Blau],
+            vec![Blau, Rot],
+            vec![Blau, Blau, Blau],
+            vec![Blau, Blau, Rot],
+            vec![Blau, Rot, Gelb],
+            vec![Blau, Blau, Blau, Blau],
+            vec![Blau, Blau, Rot, Rot],
+            vec![Schwarz, Tuerkis, Tuerkis],
+            vec![Rot, Gelb, Schwarz, Tuerkis],
+        ];
+        for rest in cases {
+            let per_permutation = unique_moon_orders(&rest).len() >= 2;
+            let per_colours = crate::game::moon_order_has_real_choice(&rest);
+            assert_eq!(
+                per_permutation, per_colours,
+                "Tor weicht ab fuer {:?}: Permutationen={} Farben-Praedikat={}",
+                rest.iter().map(|c| c.value()).collect::<Vec<_>>(),
+                per_permutation,
+                per_colours
+            );
+        }
+        // Und die Gegenprobe zur Wild-Sperre: `Wild` ist in den fuenf
+        // Aktions-IDs nicht kodierbar, also faellt das Praedikat auf `false`,
+        // obwohl es zwei Permutationen gaebe.
+        let mit_wild = vec![TileColor::Wild, Blau];
+        assert!(unique_moon_orders(&mit_wild).len() >= 2);
+        assert!(!crate::game::moon_order_has_real_choice(&mit_wild));
     }
 
     /// PREREG_search_rng_split.md §5-Vorlauf: `derive_search_seed` selbst muss

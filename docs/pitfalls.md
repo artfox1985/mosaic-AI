@@ -495,3 +495,20 @@ gegen das ARBEITSVERZEICHNIS auf, nicht gegen `data_dir`). Die
   offen und Nutzer-Entscheid. Die falsch gestempelte Datei `data/.cache_fd13f54061cd.h5`
   (1,15 GB, Stempel 4dd9f020b232) liegt zur Loeschung; der Ersatz heisst
   `data/.cache_fd13f54061cd_b06.h5`.
+
+## Modell-Lader: Policy-Breite aus dem Checkpoint, nicht aus config (2026-09-18)
+
+Nach dem Kontraktwechsel NUM_ACTIONS 406 -> 414 (Weg A + R3) scheiterte `tools/platt_fit.py` am
+Champion-Checkpoint b09 mit `size mismatch for policy_head.2.weight` (406 gegen 414):
+`neural_net.build_model_from_checkpoint` baute den Kopf mit `config.NUM_ACTIONS`. Seither wird die Breite
+aus dem Checkpoint abgeleitet (Standard `num_actions=None`), wie schon Eingangsbreite und Kanalzahl; die
+Engine liest sie ohnehin aus dem ONNX. Werkzeuge, die `num_actions=NUM_ACTIONS` EXPLIZIT uebergeben
+(`tools/offline_diagnosis.py`, `tools/oracle_metrics.py`, `tools/probes/*_gate.py`), laden Alt-Checkpoints
+weiterhin nicht -- dort den Parameter weglassen, sobald sie gebraucht werden.
+
+Zweiter Nachzuegler derselben Stunde: der Python-Zwilling liefert nach INPUT_SIZE 888 einen 888er-Vektor, ein
+884er-Netz (b09) rechnete damit `1x888 and 884x512`. Die Engine schneidet den Flachteil auf die MODELL-Breite
+(`net.rs::split_planes_flat_batch_src`), Python tat es nicht. Seither schneiden `Mosaic2DNet.forward` und
+`MosaicNet.forward` zu breite Eingaben auf `input_size` -- die additive Eingabe-Regel gilt damit in beiden
+Welten. Regel daraus: **nach jedem INPUT_SIZE- oder NUM_ACTIONS-Wechsel die Python-Werkzeuge einmal am
+Alt-Champion laufen lassen** (`platt_fit.py` ist der billigste Test, 12 s), bevor eine Kette sie braucht.

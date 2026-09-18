@@ -251,6 +251,17 @@ pub struct Net {
     /// Brauchbarkeit entscheidet der VERBRAUCHER
     /// (`net_mcts::ownership_leaf_shift`), nicht der Lader.
     own_head_index: Option<usize>,
+    /// Breite des Policy-Ausgangs (`out[0]`), beim Laden AUS DEM ONNX gelesen
+    /// (`detect_policy_width`) -- `None`, wenn die Fact des Ausgangs nicht
+    /// konkret ist (kein bekanntes Export-Modell, siehe `detect_policy_width`).
+    ///
+    /// WOFUER: Weg A / R3 (`PREREG_moon_stack_order.md` par.12.6 Bauvorgabe 1,
+    /// Regel `project_2d_encoder_must_be_additive`). Die Engine bildet IDs
+    /// gegen [`crate::net_mcts::NUM_ACTIONS`] (414); ein Bestandsnetz hat aber
+    /// nur 406 Ausgaenge. Statt Altnetze zu verwaisen, entscheidet DIESE Zahl,
+    /// ob eine Seite die beiden zusaetzlichen Entscheidungsknoten ueberhaupt
+    /// bekommt (`net_mcts::net_supports_extended_action_nodes`).
+    policy_width: Option<usize>,
     /// Dateipfad, unter dem dieses Netz geladen wurde (Weg B, `net_ort.rs`
     /// braucht ihn, um AUSSERHALB von tract eine eigene ORT-CUDA-Session auf
     /// derselben `.onnx`-Datei aufzubauen -- tract selbst haelt den Pfad
@@ -306,6 +317,13 @@ impl Net {
     /// additiv, keine bestehende Aufrufstelle betroffen.
     pub fn input_size(&self) -> usize {
         self.input_size
+    }
+
+    /// Breite des Policy-Ausgangs dieses Netzes (siehe Feld `policy_width`).
+    /// `None` = nicht aus dem ONNX bestimmbar; Aufrufer behandeln das wie ein
+    /// Altnetz (konservativ, also OHNE die zusaetzlichen Knoten).
+    pub fn policy_width(&self) -> Option<usize> {
+        self.policy_width
     }
 
     /// Dateipfad, unter dem dieses Netz geladen wurde (siehe `onnx_path`-
@@ -390,6 +408,7 @@ impl Net {
         // wird danach nicht mehr gebraucht).
         let plan = layout.apply_input_facts(base, EVAL_BATCH_MAX_N)?.into_optimized()?.into_runnable()?;
         model_batch.insert(EVAL_BATCH_MAX_N, plan);
+        let policy_width = detect_policy_width(&model);
         Ok(Net {
             model,
             model_pair,
@@ -398,6 +417,7 @@ impl Net {
             layout,
             opp_head_index,
             own_head_index,
+            policy_width,
             onnx_path: path.to_string(),
         })
     }
@@ -828,6 +848,23 @@ fn combine_layouts(inputs: &[InputLayout]) -> TractResult<InputLayout> {
             other.len()
         ))),
     }
+}
+
+/// Breite des ERSTEN ONNX-Ausgangs (`policy`, positionell gelesen wie in
+/// `eval`/`eval_pair`/`eval_batch`) aus dem bereits optimierten Plan. Der Plan
+/// ist auf Batch=1 fixiert, seine Ausgangs-Fact also `[1, N]` mit konkretem
+/// `N` -- anders als die Ausgangs-Facts des ROHEN `InferenceModel`, die vor der
+/// Analyse unbestimmt sein duerfen (deshalb HIER und nicht neben
+/// `detect_opp_head`).
+///
+/// `None` statt Fehler: eine unkonkrete Ausgangsform ist kein Ladefehler (das
+/// Netz laeuft weiter), sondern nur "Breite unbekannt". Der einzige Verbraucher
+/// (`net_mcts::net_supports_extended_action_nodes`) faellt dann auf das
+/// Bestandsverhalten zurueck.
+fn detect_policy_width(plan: &Model) -> Option<usize> {
+    let fact = plan.model().output_fact(0).ok()?;
+    let dims = fact.shape.as_concrete()?;
+    dims.last().copied()
 }
 
 fn detect_layout(model: &RawModel) -> TractResult<InputLayout> {

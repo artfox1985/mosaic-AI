@@ -100,6 +100,57 @@ pub enum PendingDomeChoice {
     },
 }
 
+/// Weg A (`PREREG_moon_stack_order.md` par.12.2/par.12.6): anhaengige Wahl
+/// der Mondstapel-Reihenfolge nach einem Sonnenzug aus einer KLEINEN Fabrik.
+/// Gebaut nach dem Vorbild von [`PendingDomeChoice`] -- der Stein-Zug ist
+/// ausgefuehrt, die Reststeine liegen aber noch "in der Hand" des Spielers
+/// (NICHT auf dem Mondstapel), bis er ihre Reihenfolge festgelegt hat. Kein
+/// `switch_player()` bis zum letzten Teilzug.
+///
+/// REIHENFOLGE-KONVENTION, am Code belegt: `Factory::place_on_moon`
+/// (factory.rs:62-67) legt den Vektor so ab, dass Index 0 UNTEN und der
+/// letzte Eintrag OBEN liegt; nur der oberste Stein ist nehmbar
+/// (`Factory::moon_top_colors`, factory.rs:74-84). `ChooseMoonTop` waehlt
+/// deshalb von OBEN nach unten, und [`PendingMoonOrder::top_down`] sammelt
+/// die Wahlen in genau dieser Richtung.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingMoonOrder {
+    /// `factory_id` (1..4) der kleinen Fabrik, auf deren Mondseite die Steine
+    /// gehen. Kein Index -- `find_factory_idx` (execution.rs) loest ihn auf.
+    pub factory_id: usize,
+    /// Noch NICHT zugeordnete Reststeine (Multimenge). Leer, sobald alles
+    /// entschieden ist; bei nur noch EINER Farbe darin ist der Rest bestimmt.
+    pub remaining: Vec<TileColor>,
+    /// Bereits gewaehlte Steine, OBERSTER ZUERST.
+    pub top_down: Vec<TileColor>,
+}
+
+impl PendingMoonOrder {
+    /// Die endgueltige Reihenfolge fuer `place_on_moon` (Index 0 = unten):
+    /// erst der bestimmte Rest (alles dieselbe Farbe), dann die gewaehlten
+    /// Steine von unten nach oben.
+    pub fn resolved_bottom_up(&self) -> Vec<TileColor> {
+        let mut out = self.remaining.clone();
+        out.extend(self.top_down.iter().rev().copied());
+        out
+    }
+}
+
+/// R3 (`PREREG_dome_return_order.md` par.12.1/par.12.7): anhaengige Wahl
+/// "welche Restplatte kommt zuerst wieder", eingehaengt ZWISCHEN
+/// `ChooseDrawStackSlot` und `ChooseDomeRotation`. Der Rest bleibt in
+/// Ziehreihenfolge -- entschieden wird allein `return_order[0]`, also die
+/// Platte, die von den zurueckgelegten als ERSTE wieder ans Tageslicht kommt
+/// (Herleitung im Kommentarblock vor `self_play.rs::RETURN_ORDER_MAX_PERMUTED`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingReturnOrder {
+    pub chosen_id: usize,
+    pub slot_row: usize,
+    pub slot_col: usize,
+    /// Nicht gewaehlte gezogene Platten in ZIEHREIHENFOLGE (`tile_id`s).
+    pub rest_in_draw_order: Vec<usize>,
+}
+
 /// Vereinheitlichter Drafting-Zug (ersetzt das Python-isinstance-Dispatch).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
@@ -122,6 +173,19 @@ pub enum Action {
     /// gespeicherte Stufe-1-Wahl -- EINE gemeinsame Aktion fuer beide Pfade
     /// (Display/Stapel), `pending_dome_choice` sagt welcher gemeint ist.
     ChooseDomeRotation(u32),
+    /// Weg A Teilzug (`PREREG_moon_stack_order.md` par.12.2 Punkt 2): "diese
+    /// Farbe liegt als naechste OBEN" auf dem Mondstapel der Fabrik aus
+    /// [`GameState::pending_moon_order`](crate::state::GameState). Bei drei
+    /// verschiedenen Farben zwei Entscheide hintereinander (oben, dann Mitte;
+    /// der Rest ist bestimmt), bei zwei verschiedenen einer. Dieselbe
+    /// ID-Familie fuer alle Stufen, wie die vier Rotations-IDs fuer beide
+    /// Kuppelpfade.
+    ChooseMoonTop(TileColor),
+    /// R3 Teilzug (`PREREG_dome_return_order.md` par.12.1): Position (in der
+    /// ZIEHREIHENFOLGE der nicht gewaehlten Platten) derjenigen Platte, die
+    /// als erste wieder gezogen wird. Gedeckelt auf
+    /// `self_play::RETURN_ORDER_MAX_PERMUTED` Kandidaten.
+    ChooseReturnFirst(usize),
     BonusChip(TakeBonusChipMove),
     Pass,
 }

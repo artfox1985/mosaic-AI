@@ -15,11 +15,12 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 884; // 794 + 90 Tiling-Projektion (Abschnitt 17, Arm v29-b07, 2026-09-17)
+pub const INPUT_SIZE: usize = 888; // 884 + 4 geordnete eigene Designs (Abschnitt 18, R2/P.16, 2026-09-18)
 // 714 + 8 Plattentyp-Sicht + 10 Strafleisten-Farben + 12 Phantom-Anteile = 744
 // (Abschnitte 12-14, v24-b04, 2026-09-05); + 11 Abschnitt 15 = 755;
 // + 39 Abschnitt 16 (Sicht-Anbau v29-b03) = 794;
-// + 90 Abschnitt 17 (Tiling-Projektion, Variante C, v29-b07) = 884.
+// + 90 Abschnitt 17 (Tiling-Projektion, Variante C, v29-b07) = 884;
+// + 4 Abschnitt 18 (geordnete eigene Designs, R2/P.16) = 888.
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -666,6 +667,90 @@ pub fn tiling_projection_values_from_json(v: &Value) -> Vec<f32> {
     f
 }
 
+// == Abschnitt 18: geordnete eigene Designs (R2 / Merkmal P.16) ==============
+//
+// `PREREG_dome_return_order.md` par.12.6 Bauvorgabe 2. Abschnitt 15 zeigt vom
+// obersten EIGENEN Rueckgabeblock die TYPFOLGE der obersten vier Positionen
+// (special/wild), Abschnitt 16 (P.12) die MENGE der eigenen Designs als 18
+// Bits. Was beiden fehlt: WELCHES Design an welcher Position liegt. Genau dort
+// ist die Value-Spannweite heute 0 (R1, par.12.4: 26,3 Prozent der Bloecke mit
+// mindestens drei Platten sind typgleich).
+//
+// Vier Werte, dieselben vier Positionen wie die Typfolge
+// ([`DOME_POOL_TOP_TYPES`]), damit beide Sichten dieselbe Tiefe haben.
+// Quelle ist das Record-Feld `dome_pool_view.blocks[].designs_ordered`
+// (`serialize.rs`), das nur am EIGENEN Block steht -- fremde Designs und erst
+// recht deren Reihenfolge hat der Betrachter nie gesehen.
+
+/// Laenge des Anhangs aus Abschnitt 18.
+pub const ORDERED_DESIGN_VALUES: usize = DOME_POOL_TOP_TYPES;
+
+/// Normierung der Design-Nummer: `tile_id / 17` (par.12.6 Bauvorgabe 2,
+/// wortgleich). 17 = groesste `tile_id` bei
+/// [`crate::dome::NUM_DOME_TILE_DESIGNS`] = 18 Designs, damit die Werte in
+/// [0, 1] liegen.
+///
+/// BEWUSSTE MEHRDEUTIGKEIT, so registriert: Design 0 und "Position fehlt"
+/// sind beide `0,0`. Die Prereg schreibt genau das vor; die Unterscheidung
+/// liefert der NACHBAR-Abschnitt 15, dessen Typwert an derselben Position `0`
+/// ist, wenn (und nur wenn) die Position fehlt.
+const ORDERED_DESIGN_NORM: f32 = 17.0;
+
+/// Haengt die vier Werte aus Abschnitt 18 an: Design-Nummer der Positionen
+/// 0..3 des obersten eigenen Blocks, `0` wenn die Position fehlt oder das Feld
+/// nicht da ist (Alt-Records lesen sich als "Merkmal aus").
+fn push_ordered_designs(f: &mut Vec<f32>, ids: &[Option<usize>; ORDERED_DESIGN_VALUES]) {
+    for slot in ids {
+        f.push(match slot {
+            Some(id) => *id as f32 / ORDERED_DESIGN_NORM,
+            None => 0.0,
+        });
+    }
+}
+
+/// Aus dem Record-Feld `dome_pool_view.blocks[].designs_ordered`, oberster
+/// EIGENER Block (dieselbe `own_seen`-Regel wie in
+/// [`dome_pool_knowledge_from_json`]).
+fn ordered_designs_from_json(v: &Value) -> [Option<usize>; ORDERED_DESIGN_VALUES] {
+    let mut out = [None; ORDERED_DESIGN_VALUES];
+    let Some(view) = v.get("dome_pool_view").filter(|x| x.is_object()) else { return out };
+    let Some(blocks) = view.get("blocks").and_then(|x| x.as_array()) else { return out };
+    for b in blocks {
+        if !b.get("own").and_then(|x| x.as_bool()).unwrap_or(false) {
+            continue;
+        }
+        if let Some(ids) = b.get("designs_ordered").and_then(|x| x.as_array()) {
+            for (i, slot) in out.iter_mut().enumerate() {
+                *slot = ids.get(i).and_then(|x| x.as_u64()).map(|x| x as usize);
+            }
+        }
+        break; // nur der OBERSTE eigene Block
+    }
+    out
+}
+
+/// Dieselbe Ableitung direkt aus dem `GameState` -- Sichtregel und
+/// Block-Zuschnitt wie in `serialize::dome_pool_view`, damit
+/// `direct_matches_json_path_*` Wert fuer Wert gleich bleibt.
+fn ordered_designs_from_state(state: &GameState) -> [Option<usize>; ORDERED_DESIGN_VALUES] {
+    let mut out = [None; ORDERED_DESIGN_VALUES];
+    let pool_len = state.dome_tile_pool.len();
+    let viewer = state.current_player;
+    let mut start = state.dome_pool_unknown_prefix_len().min(pool_len);
+    for b in &state.dome_pool_known_blocks {
+        let end = (start + b.len).min(pool_len);
+        if b.returner == viewer {
+            let slice = &state.dome_tile_pool[start..end];
+            for (i, slot) in out.iter_mut().enumerate() {
+                *slot = slice.get(i).map(|t| t.tile_id);
+            }
+            return out;
+        }
+        start = end;
+    }
+    out
+}
+
 /// Vollständiger Feature-Vektor aus dem State-Dict (`state_to_json`).
 pub fn state_to_features(v: &Value) -> Vec<f32> {
     let mut f: Vec<f32> = Vec::with_capacity(INPUT_SIZE);
@@ -1106,6 +1191,11 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
     // Record-Feld (Begruendung an `tiling_projection_from_json`).
     push_tiling_projection(&mut f, &tiling_projection_from_json(v));
 
+    // 18. Geordnete eigene Designs (R2/P.16) -- siehe `push_ordered_designs`.
+    // Quelle ist das Record-Feld `dome_pool_view.blocks[].designs_ordered`;
+    // fehlt es (Alt-Records bis v29), sind alle vier 0.
+    push_ordered_designs(&mut f, &ordered_designs_from_json(v));
+
     f
 }
 
@@ -1544,6 +1634,10 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     // Zustand; der JSON-Pfad rekonstruiert sich denselben Zustand erst.
     push_tiling_projection(&mut f, &tiling_projection_from_state(state));
 
+    // 18. Geordnete eigene Designs (R2/P.16) -- siehe JSON-Pfad. Hier direkt
+    // aus dem Zustand, mit derselben Sichtregel.
+    push_ordered_designs(&mut f, &ordered_designs_from_state(state));
+
     f
 }
 
@@ -1922,8 +2016,9 @@ pub(crate) const MAX_PENDING_STACK_TILES: i64 = 4;
 /// von `dome_stack_peek` -- eine ECHTE Aktion, deren Policy-Ziel dadurch
 /// stillschweigend fremde Masse bekam. 2 liegt in der ohnehin unbenutzten
 /// Luecke 2..9 zwischen `end_tiling` (1) und dem `stone`-Bereich (ab 10):
-/// keine Kollision mit einer echten Aktion, `NUM_ACTIONS` (406, Vertragshash)
-/// bleibt unberuehrt, weil die Luecke schon vorher innerhalb des Bereichs lag.
+/// keine Kollision mit einer echten Aktion, `NUM_ACTIONS` (414 seit Weg A/R3,
+/// damals 406; Vertragshash) bleibt unberuehrt, weil die Luecke schon vorher
+/// innerhalb des Bereichs lag.
 pub const UNKNOWN_ACTION_ID: usize = 2;
 
 /// Alle Aktionstypen, die die Engine im agent_env-Schema erzeugt -- also genau
@@ -1937,7 +2032,7 @@ pub const UNKNOWN_ACTION_ID: usize = 2;
 /// Oberflaeche, nie in `action_to_id` (geprueft 2026-09-12 an allen Aufrufern
 /// -- self_play.rs:5906/5982, net_mcts.rs:6600, corpus_dataset.py:1125/1314/
 /// 1326/1332; alle reichen `action_to_env_dict`- bzw. Record-Dicts herein).
-pub const KNOWN_ACTION_TYPES: [&str; 11] = [
+pub const KNOWN_ACTION_TYPES: [&str; 13] = [
     "pass",
     "end_tiling",
     "stone",
@@ -1949,6 +2044,12 @@ pub const KNOWN_ACTION_TYPES: [&str; 11] = [
     "use_chips",
     "bonus_chip",
     "dome_stack_peek",
+    // Weg A / R3, 2026-09-18: die zwei zusaetzlichen Entscheidungsknoten
+    // (`PREREG_moon_stack_order.md` par.12.6, `PREREG_dome_return_order.md`
+    // par.12.7). Sie erscheinen nur in Records von Seiten mit 414er-Policy;
+    // ein 406er-Netz erzeugt sie nie (`GameState::extended_action_nodes`).
+    "choose_moon_top",
+    "choose_return_first",
 ];
 
 /// Waechter gegen stille Aktions-ID-Kollisionen: ein Aktionstyp ohne Zweig in
@@ -2053,6 +2154,21 @@ pub fn action_to_id(a: &Value) -> usize {
         "bonus_chip" => (401 + geti("factory_index")) as usize,
         // Aktion A, Schritt 1 (verdeckt ziehen) -- parameterlos, eigene feste ID.
         "dome_stack_peek" => 405,
+        // Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 3): fuenf IDs, eine
+        // je Farbe, in der Reihenfolge von `TileColor::NORMAL`. EINE ID-Familie
+        // fuer ALLE Stufen des Knotens (oben, dann Mitte) -- genau wie die vier
+        // Rotations-IDs fuer beide Kuppelpfade. Unbekannte Farbe -> 0 wie im
+        // `stone`-Zweig (`max(0)`), also blau; `Wild` kann hier nicht stehen,
+        // der Knoten wird dafuer gar nicht geoeffnet
+        // (`game::moon_order_has_real_choice`).
+        "choose_moon_top" => (406 + color_idx(a.get("color").and_then(|x| x.as_str())).max(0)) as usize,
+        // R3 (`PREREG_dome_return_order.md` par.12.1): drei IDs nach
+        // ZIEH-POSITION der Platte, die zuerst wieder gezogen wird. Deckel 3 =
+        // `self_play::RETURN_ORDER_MAX_PERMUTED`, derselbe wie bei Modus 1.
+        "choose_return_first" => {
+            (411 + geti("draw_index").clamp(0, crate::self_play::RETURN_ORDER_MAX_PERMUTED as i64 - 1))
+                as usize
+        }
         // Kein stiller Rueckfall mehr (frueher `_ => 405`, also auf die ID von
         // `dome_stack_peek`): unbekannter Typ = Defekt, siehe
         // `unknown_action_type_id`.
@@ -2086,6 +2202,10 @@ mod tests {
     /// Werte nie sehen -- `Net::build_inputs` kuerzt auf die vom MODELL
     /// deklarierte Laenge.
     const LEN_BEFORE_TILING_PROJECTION: usize = 794;
+    /// Vektorlaenge VOR Abschnitt 18 (geordnete eigene Designs, R2/P.16); die
+    /// Champions v28-b02 (755) und die v29-Arme (794/884) duerfen die vier
+    /// neuen Werte nie sehen.
+    const LEN_BEFORE_ORDERED_DESIGNS: usize = 884;
 
     /// Spielt ab einem frischen Start bis zu `steps` zufällige, legale
     /// Drafting-Züge und sammelt den Zustand NACH jedem Zug (inkl. des
@@ -2633,8 +2753,10 @@ mod tests {
     /// weiter an den Indizes 755..794.
     #[test]
     fn tiling_projection_is_appended_after_794() {
+        // Seit Abschnitt 18 (R2/P.16, 2026-09-18) folgen 4 Werte hinter der
+        // Projektion: der 17er-Bereich endet bei LEN_BEFORE_ORDERED_DESIGNS.
         assert_eq!(
-            INPUT_SIZE - LEN_BEFORE_TILING_PROJECTION,
+            LEN_BEFORE_ORDERED_DESIGNS - LEN_BEFORE_TILING_PROJECTION,
             TILING_PROJECTION_VALUES,
             "Abschnitt 17 ist genau {TILING_PROJECTION_VALUES} Werte lang"
         );
@@ -2644,7 +2766,12 @@ mod tests {
                 let ctx = format!("seed={seed} step={i}");
                 let f = state_to_features_direct(&s);
                 assert_eq!(f.len(), INPUT_SIZE, "{ctx}: Laenge");
-                for (j, x) in f[LEN_BEFORE_TILING_PROJECTION..].iter().enumerate() {
+                // Nur der 17er-Bereich: Abschnitt 18 dahinter traegt
+                // normierte Design-Nummern, keine Bits.
+                for (j, x) in f[LEN_BEFORE_TILING_PROJECTION..LEN_BEFORE_ORDERED_DESIGNS]
+                    .iter()
+                    .enumerate()
+                {
                     assert!(
                         *x == 0.0 || *x == 1.0,
                         "{ctx}: Abschnitt-17-Wert {j} ist weder 0 noch 1: {x}"
@@ -2659,6 +2786,131 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Additivitaets-Regel fuer Abschnitt 18 (R2/P.16,
+    /// `PREREG_dome_return_order.md` par.12.6): vier Werte HINTER den 884, der
+    /// 90er-Block von Abschnitt 17 bleibt Wert fuer Wert an seinem Platz, und
+    /// die vier Werte liegen in [0, 1].
+    #[test]
+    fn ordered_designs_are_appended_after_884() {
+        assert_eq!(
+            INPUT_SIZE - LEN_BEFORE_ORDERED_DESIGNS,
+            ORDERED_DESIGN_VALUES,
+            "Abschnitt 18 ist genau {ORDERED_DESIGN_VALUES} Werte lang"
+        );
+        assert_eq!(ORDERED_DESIGN_VALUES, 4, "Zuschnitt laut Prereg par.12.6: vier Werte");
+        for seed in 0..4u64 {
+            for (i, s) in random_drafting_states(seed, 40).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let f = state_to_features_direct(&s);
+                assert_eq!(f.len(), INPUT_SIZE, "{ctx}: Laenge");
+                for (j, x) in f[LEN_BEFORE_ORDERED_DESIGNS..].iter().enumerate() {
+                    assert!(
+                        (0.0..=1.0).contains(x),
+                        "{ctx}: Abschnitt-18-Wert {j} liegt ausserhalb [0,1]: {x}"
+                    );
+                }
+                let mut proj = Vec::new();
+                push_tiling_projection(&mut proj, &tiling_projection_from_state(&s));
+                assert_eq!(
+                    &f[LEN_BEFORE_TILING_PROJECTION..LEN_BEFORE_ORDERED_DESIGNS],
+                    proj.as_slice(),
+                    "{ctx}: Abschnitt 17 ist verschoben"
+                );
+            }
+        }
+    }
+
+    /// Sichtgleichheit von Abschnitt 18 gegen die Wahrheitsquelle: die vier
+    /// Werte sind die Design-Nummern der obersten vier Positionen des obersten
+    /// EIGENEN Rueckgabeblocks, `/17`; `0`, wo die Position fehlt. Fremde
+    /// Bloecke tragen `designs_ordered = null` und dürfen nie einfliessen
+    /// (Netz-sieht-MEHR ausgeschlossen) -- geprueft in BEIDEN Encoder-Pfaden
+    /// und am Record-Feld selbst.
+    #[test]
+    fn ordered_designs_only_read_the_own_block_in_both_paths() {
+        let base = LEN_BEFORE_ORDERED_DESIGNS;
+        let mut checked = 0usize;
+        let mut saw_own_block = false;
+        let mut saw_foreign_block = false;
+        for seed in 0..12u64 {
+            for (i, s) in random_drafting_states(seed, 60).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let f = state_to_features_direct(&s);
+                let v = state_to_json(&s, true);
+                let via_json = state_to_features(&v);
+
+                // Erwartung aus dem Zustand heraus (dritte Rechnung, nicht der
+                // Encoder-Code): oberster Block mit `returner == current_player`.
+                let pool_len = s.dome_tile_pool.len();
+                let mut start = s.dome_pool_unknown_prefix_len().min(pool_len);
+                let mut want = [0.0f32; ORDERED_DESIGN_VALUES];
+                for b in &s.dome_pool_known_blocks {
+                    let end = (start + b.len).min(pool_len);
+                    if b.returner == s.current_player {
+                        saw_own_block = true;
+                        let slice = &s.dome_tile_pool[start..end];
+                        for (k, slot) in want.iter_mut().enumerate() {
+                            *slot = match slice.get(k) {
+                                Some(t) => t.tile_id as f32 / 17.0,
+                                None => 0.0,
+                            };
+                        }
+                        break;
+                    }
+                    saw_foreign_block = true;
+                    start = end;
+                }
+
+                for k in 0..ORDERED_DESIGN_VALUES {
+                    assert_eq!(f[base + k], want[k], "{ctx}: Abschnitt-18-Wert {k} (Direktpfad)");
+                    assert_eq!(via_json[base + k], want[k], "{ctx}: Abschnitt-18-Wert {k} (JSON-Pfad)");
+                }
+
+                // Das Record-Feld selbst: `designs_ordered` steht GENAU am
+                // eigenen Block, fremde haben `null` -- und es ist dieselbe
+                // Multimenge wie das sortierte `designs`.
+                if let Some(blocks) =
+                    v.get("dome_pool_view").and_then(|x| x.get("blocks")).and_then(|x| x.as_array())
+                {
+                    for b in blocks {
+                        let own = b.get("own").and_then(|x| x.as_bool()).unwrap_or(false);
+                        let ord = b.get("designs_ordered").expect("designs_ordered");
+                        assert_eq!(
+                            !own,
+                            ord.is_null(),
+                            "{ctx}: designs_ordered steht genau am eigenen Block"
+                        );
+                        if own {
+                            let mut a: Vec<u64> = ord
+                                .as_array()
+                                .expect("Liste")
+                                .iter()
+                                .map(|x| x.as_u64().expect("Design-Nummer"))
+                                .collect();
+                            let mut bb: Vec<u64> = b
+                                .get("designs")
+                                .and_then(|x| x.as_array())
+                                .expect("designs")
+                                .iter()
+                                .map(|x| x.as_u64().expect("Design-Nummer"))
+                                .collect();
+                            a.sort_unstable();
+                            bb.sort_unstable();
+                            assert_eq!(a, bb, "{ctx}: dieselbe Multimenge wie `designs`");
+                        }
+                    }
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked >= 300, "nur {checked} Zustaende geprueft, >= 300 gefordert");
+        assert!(saw_own_block, "die Fixtur muss eigene Rueckgabebloecke erzeugen");
+        // Fremde Bloecke sind in einer Zufallspartie haeufig, aber nicht
+        // garantiert -- die `null`-Pruefung oben greift fuer jeden, der
+        // auftritt. Der Zaehler bleibt als Diagnose stehen.
+        let _ = saw_foreign_block;
     }
 
     /// Sichtgleichheit gegen die WAHRHEITSQUELLE: jeder der 90 Werte ist genau
@@ -2713,8 +2965,10 @@ mod tests {
                 let full = state_to_features(&v);
                 let block = tiling_projection_values_from_json(&v);
                 assert_eq!(block.len(), TILING_PROJECTION_VALUES, "seed={seed} step={i}: Laenge");
+                // Seit Abschnitt 18 (R2/P.16, 2026-09-18) haengen 4 Werte HINTER der
+                // Projektion; verglichen wird darum der 17er-Bereich, nicht der Schwanz.
                 assert_eq!(
-                    &full[LEN_BEFORE_TILING_PROJECTION..],
+                    &full[LEN_BEFORE_TILING_PROJECTION..LEN_BEFORE_ORDERED_DESIGNS],
                     block.as_slice(),
                     "seed={seed} step={i}: Export weicht vom Vektor ab"
                 );
@@ -2851,6 +3105,24 @@ mod tests {
 
         record("dome_stack_peek", vec![action_to_id(&json!({"type": "dome_stack_peek"}))]);
 
+        // Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 3): fuenf Farben,
+        // EINE Familie fuer alle Stufen des Knotens.
+        let mut moon_top_ids = Vec::new();
+        for color in ["blau", "gelb", "rot", "schwarz", "türkis"] {
+            moon_top_ids.push(action_to_id(&json!({"type": "choose_moon_top", "color": color})));
+        }
+        record("choose_moon_top", moon_top_ids);
+
+        // R3 (`PREREG_dome_return_order.md` par.12.1): drei Zieh-Positionen,
+        // `draw_index` grosszuegig ueber den Deckel hinaus getestet (muss
+        // gedeckelt werden, nicht in die Nachbarfamilie laufen).
+        let mut return_first_ids = Vec::new();
+        for pos in 0..8 {
+            return_first_ids
+                .push(action_to_id(&json!({"type": "choose_return_first", "draw_index": pos})));
+        }
+        record("choose_return_first", return_first_ids);
+
         for i in 0..ranges.len() {
             for j in (i + 1)..ranges.len() {
                 let (name_a, lo_a, hi_a) = ranges[i];
@@ -2919,6 +3191,8 @@ mod tests {
                 Action::DrawStackPeek => "DrawStackPeek",
                 Action::ChooseDrawStackSlot(_) => "ChooseDrawStackSlot",
                 Action::ChooseDomeRotation(_) => "ChooseDomeRotation",
+                Action::ChooseMoonTop(_) => "ChooseMoonTop",
+                Action::ChooseReturnFirst(_) => "ChooseReturnFirst",
                 Action::BonusChip(_) => "BonusChip",
                 Action::Pass => "Pass",
             }
@@ -2952,6 +3226,9 @@ mod tests {
                 return_order: Vec::new(),
             }),
             Action::ChooseDomeRotation(180),
+            // Weg A / R3 (2026-09-18).
+            Action::ChooseMoonTop(TileColor::Rot),
+            Action::ChooseReturnFirst(1),
             Action::BonusChip(TakeBonusChipMove { factory_id: 1 }),
             Action::Pass,
         ];
@@ -2959,7 +3236,7 @@ mod tests {
         let labels: BTreeSet<&'static str> = samples.iter().map(variant_label).collect();
         assert_eq!(
             labels.len(),
-            7,
+            9,
             "jede Action-Variante braucht genau eine Beispielaktion (gefunden: {labels:?})"
         );
 
@@ -3004,6 +3281,8 @@ mod tests {
                 "slot_col": 0,
                 "rotation": 0,
                 "is_start": true,
+                // Weg A / R3: Parameter der beiden neuen Familien.
+                "draw_index": 0,
             })
         };
         for t in KNOWN_ACTION_TYPES {

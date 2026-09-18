@@ -2514,11 +2514,41 @@ mod contract_stamp_tests {
     /// KEIN Record-Feld an, und eine reine Encoder-Verlaengerung bewegt den
     /// Record-Hash nachweislich nicht (`PREREG_stack_top_feature.md` par.17a,
     /// dritter Beleg).
+    ///
+    /// **Neu gesetzt 2026-09-18** (vorher `cfd94509f0aab102`), Anlass: Weg A
+    /// und R3/R2 in EINEM Zug (`PREREG_moon_stack_order.md` par.12.6,
+    /// `PREREG_dome_return_order.md` par.12.7) -- `NUM_ACTIONS` 406 -> 414
+    /// (5 IDs `choose_moon_top` + 3 IDs `choose_return_first`, hinten
+    /// angehaengt) und `INPUT_SIZE` 884 -> 888 (+4 Flachwerte am ENDE:
+    /// Abschnitt 18 in `features.rs`, die geordneten Designs des obersten
+    /// eigenen Rueckgabeblocks). `NUM_PLANES_CHANNELS` bleibt 79, die
+    /// Kopf-Liste unveraendert.
+    ///
+    /// **Bestandsnetze bleiben spielbar, und zwar aus zwei getrennten
+    /// Gruenden** (additive Regel `project_2d_encoder_must_be_additive`):
+    /// eingangsseitig kuerzt `Net::build_inputs` auf die vom MODELL deklarierte
+    /// Breite (884 bzw. 755 bzw. 744), ausgangsseitig bekommt eine Seite die
+    /// beiden neuen Entscheidungsknoten nur, wenn ihr Netz mindestens
+    /// `NUM_ACTIONS` Policy-Ausgaenge hat (`net_mcts::
+    /// net_supports_extended_action_nodes` ueber `Net::policy_width`, gesetzt in
+    /// `self_play::unified_game_loop`). Ein 406er-Netz spielt also weiter die
+    /// kanonische Mondreihenfolge und die Rueckgabe nach `return_order_mode` --
+    /// Zug fuer Zug wie vorher.
+    ///
+    /// Auch dieser Wert ist NACHGERECHNET (Python, FNV-1a-64, 2026-09-18):
+    /// `INPUT_SIZE=888;NUM_PLANES_CHANNELS=79;PLANES_H=6;PLANES_W=6;NUM_ACTIONS=414;HEADS=policy,value,moon,points,opp_points,ownership`
+    /// ergibt `6ef829e564c58bd5`. Gegenprobe des Verfahrens im selben Lauf:
+    /// 884/406 reproduziert `cfd94509f0aab102`, 794/406 reproduziert
+    /// `39994362fba145a6`.
+    ///
+    /// Die **Netz-Paritaets-Fixture wechselt diesmal**: `designs_ordered`
+    /// (R2/P.16) ist ein neues RECORD-Feld, und die Fixture hasht Records
+    /// (dieselbe Lage wie bei Abschnitt 16). Verhaltensaenderung ist das keine.
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "cfd94509f0aab102",
+            "6ef829e564c58bd5",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );

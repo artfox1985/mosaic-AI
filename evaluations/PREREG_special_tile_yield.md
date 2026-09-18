@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7). par.4a GESCHLOSSEN (par.10a), par.4c VERWORFEN (par.12). **K6 GEBAUT und GEMESSEN (13.3-13.7): Kostentor +3,5 Prozent haelt, A/B Dosis 0,5 SCHADET (180:210 von 390, Block-z -2,57, Punkte -2,3, Spezialfelder belegt -0,15) -> Knopf bleibt 0, Drafting-Hebel GESCHLOSSEN (Ausgang c, K4-Falle: Zielkonflikt Vermeiden statt Belegen). Dosis 0,25 laeuft nur noch als Kurvenpunkt (13.8).** -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7). par.4a GESCHLOSSEN (par.10a), par.4c VERWORFEN (par.12). **K6 GEBAUT und GEMESSEN (13.3-13.8): Kostentor +3,5 Prozent haelt; A/B Dosis 0,5 SCHADET (180:210 von 390, Block-z -2,57), Dosis 0,25 flach (195:205, z -0,62), Kurve monoton fallend -> Knopf bleibt 0, Drafting-Hebel GESCHLOSSEN (Zielkonflikt Vermeiden statt Belegen).** -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -1203,3 +1203,23 @@ die Prereg verlangt sie aber, "wenn 0,5 schadet", und auf Block-Ebene schadet 0,
 `tools/night_k6_w025_ab.sh` (Seed 20261211, 200 Paare) nach Tor 1 von b09 exklusiv als letzte Messung der
 Nacht; Ergebnis in 13.8. Erwartung (Herleitung aus dem Zielkonflikt, keine Messung): flach bis leicht negativ;
 das Verdikt (c) aendert sich dadurch nicht, nur die Dosis-Kurve wird vollstaendig.
+
+### 13.8 A/B Dosis 0,25 GEMESSEN (2026-09-18, 00:25-01:48): flach, gleiche Richtung wie 0,5 -- Kurve vollstaendig
+
+Champion gegen sich selbst, `k6_w025` (A) gegen `k6_off` (B), 200 Paare (Deckel, kein SPRT-Entscheid, LLR -3,67),
+Blockgroesse 5, Seed 20261211, 10 Threads, exklusiv; 4.925,6 s, 12,3 s je Partie.
+
+| Groesse | Wert |
+| --- | --- |
+| Siege w0,25 : aus | 195 : 205 von 400 = 48,8 Prozent |
+| Sweeps w0,25 / aus | 20 / 25; Vorzeichentest p 0,55 |
+| Block-Ebene | 40 Bloecke, -0,25 je Block, SE 0,41, **z = -0,62** |
+| eigene Punkte | 51,16 / 51,67 (-0,51) |
+| Spezialfelder belegt je Partie / Kuppelbonus | 1,15 / 4,77 gegen 1,22 / 5,04 (**-0,07 / -0,27**) |
+| Kriterium Spezialfelder (Strafposten) | -10,15 gegen -11,34 (+1,19) |
+| volle Spalten / Strafleiste | 0,925 / 8,54 gegen 0,960 / 8,65 (-0,035 / -0,12) |
+
+**Lesart:** halbe Dosis, halber Effekt, dieselbe Richtung: der Strafposten fuer offene Spezialfelder sinkt (+1,19
+statt +1,33), aber es werden weniger Spezialfelder belegt und weniger Kuppelbonus geholt; Siege flach negativ.
+Die Dosis-Kurve (0 / 0,25 / 0,5 -> 50 / 48,8 / 46,2 Prozent) ist monoton fallend. **Verdikt 13.7 bleibt: Knopf 0,
+Drafting-Hebel GESCHLOSSEN; K6 ist als Kurve vollstaendig gemessen, keine weitere Dosis.** Fahrplan 36d zu.

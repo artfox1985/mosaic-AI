@@ -33,7 +33,7 @@ fn main() {
         moon.len(),
         points.len()
     );
-    assert_eq!(policy.len(), 406, "policy-Kopf muss NUM_ACTIONS=406 liefern");
+    assert_eq!(policy.len(), 406, "policy-Kopf dieses (406er-)Modells muss 406 liefern -- der Aktionsraum der Engine ist seit Weg A/R3 414, Altmodelle bleiben 406 (Net::policy_width)");
     assert_eq!(value.len(), 1, "value-Kopf muss 1 liefern");
     assert_eq!(moon.len(), 5, "moon-Kopf muss 5 liefern");
     assert_eq!(points.len(), 1, "points-Kopf muss 1 liefern");

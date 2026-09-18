@@ -58,6 +58,9 @@ EXAMPLES: list[tuple[dict, int]] = [
     ({"type": "use_chips", "pattern_row": 4}, 399),
     ({"type": "bonus_chip", "factory_index": 3}, 404),
     ({"type": "dome_stack_peek"}, 405),
+    # Weg A / R3 (2026-09-18): 406 + Farbindex (rot = 2), 411 + Ziehposition.
+    ({"type": "choose_moon_top", "color": "rot"}, 408),
+    ({"type": "choose_return_first", "draw_index": 2}, 413),
 ]
 
 
@@ -136,6 +139,34 @@ class ActionIdMirror(unittest.TestCase):
         )
         self.assertEqual(capped, 355 + 3 * 9 + 2 * 3 + 2)
         self.assertLess(capped, 391)
+
+    def test_new_node_families_fill_406_to_413(self):
+        """Weg A / R3: die acht neuen IDs liegen genau in 406..413, die
+        Farbreihenfolge ist die von `TileColor::NORMAL`, und `draw_index` wird
+        gedeckelt statt in die Nachbarfamilie zu laufen."""
+        for i, color in enumerate(["blau", "gelb", "rot", "schwarz", "türkis"]):
+            self.assertEqual(
+                neural_net.action_to_id({"type": "choose_moon_top", "color": color}),
+                406 + i,
+            )
+        for pos in range(neural_net.RETURN_ORDER_MAX_PERMUTED):
+            self.assertEqual(
+                neural_net.action_to_id({"type": "choose_return_first", "draw_index": pos}),
+                411 + pos,
+            )
+        gedeckelt = neural_net.action_to_id(
+            {"type": "choose_return_first", "draw_index": 99}
+        )
+        self.assertEqual(gedeckelt, 413)
+        self.assertEqual(neural_net.NUM_ACTIONS, 414,
+                         "config.NUM_ACTIONS muss zum Aktionsraum passen (414)")
+
+    def test_return_order_cap_matches_rust(self):
+        """Der Deckel der Rueckgabe-Kandidaten steht in `self_play.rs`."""
+        text = (REPO / "engine" / "src" / "self_play.rs").read_text(encoding="utf-8")
+        m = re.search(r"const RETURN_ORDER_MAX_PERMUTED: usize = (\d+);", text)
+        self.assertIsNotNone(m, "RETURN_ORDER_MAX_PERMUTED nicht in self_play.rs gefunden")
+        self.assertEqual(neural_net.RETURN_ORDER_MAX_PERMUTED, int(m.group(1)))
 
     def test_unknown_type_raises_instead_of_colliding(self):
         with self.assertRaises(neural_net.UnknownActionTypeError):

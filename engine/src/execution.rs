@@ -10,12 +10,36 @@ use crate::state::GameState;
 use crate::tile::TileColor;
 
 pub fn execute_move(state: &mut GameState, m: &Move) {
+    execute_move_with_moon(state, m, None)
+}
+
+/// Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 1): wie
+/// [`execute_move`], aber die Reststeine eines Sonnenzugs aus einer KLEINEN
+/// Fabrik wandern NICHT auf den Mondstapel -- sie landen in `defer_moon` und
+/// warten dort auf die Reihenfolge-Entscheidung
+/// (`Action::ChooseMoonTop`/[`finish_moon_placement`]).
+///
+/// Warum das so und nicht per Nachbearbeitung: `Factory::place_on_moon` legt
+/// EINEN Stapel ab (factory.rs:62-67), und `reveal_chip_if_empty` (unten)
+/// haengt an `is_fully_empty()` -- laege der Rest schon ab, waere die
+/// Reihenfolge nicht mehr aenderbar; laege er NICHT ab und wuerde trotzdem
+/// geprueft, deckte die Fabrik ihr Bonusplaettchen zu frueh auf. Beides
+/// verhindert dieser Weg: bei aktivem `defer_moon` bleibt die Chip-Pruefung
+/// ebenfalls aus und wird in `finish_moon_placement` nachgeholt.
+///
+/// Die Rueckgabe bleibt `()`; ob etwas zurueckgehalten wurde, sieht der
+/// Aufrufer an `defer_moon`.
+pub fn execute_move_with_moon(
+    state: &mut GameState,
+    m: &Move,
+    defer_moon: Option<&mut Vec<TileColor>>,
+) {
     if m.is_global_moon_take() {
         execute_moon_take(state, m.take.color, m.place.row_index);
         return;
     }
 
-    let (taken, got_marker, pending) = execute_take(state, m);
+    let (taken, got_marker, pending) = execute_take_with_moon(state, m, defer_moon);
     if got_marker {
         apply_first_player_marker(state);
     }
@@ -84,6 +108,32 @@ pub fn execute_move(state: &mut GameState, m: &Move) {
     }
 }
 
+/// Weg A, Abschluss: legt die (vom Knoten geordneten) Reststeine auf den
+/// Mondstapel von `factory_id` und schreibt GENAU die Logzeilen, die
+/// `execute_take_with_moon` ohne Zurueckhaltung geschrieben haette -- erst die
+/// Mond-Stapel-Zeile, dann die Chip-Aufdeckung.
+///
+/// Damit bleibt der Log-Block eines Sonnenzugs Zeile fuer Zeile derselbe wie
+/// im Bestand (Aktionszeile, Strafleisten-/Turm-Warnungen aus `execute_place`,
+/// dann Mond-Stapel) -- Voraussetzung dafuer, dass `tools/analyze_game_log.py`
+/// solche Partien weiter ohne Sonderweg nachspielt.
+///
+/// `ordered` ist bottom-up (Index 0 unten), wie `place_on_moon` es erwartet.
+pub fn finish_moon_placement(state: &mut GameState, factory_id: usize, ordered: Vec<TileColor>) {
+    let fidx = find_factory_idx(state, factory_id);
+    if !ordered.is_empty() {
+        state.factories[fidx].place_on_moon(ordered);
+        let line = format!(
+            "🌙 F{factory_id} Mond-Stapel: {}",
+            format_moon_stacks(&state.factories[fidx])
+        );
+        state.log_event(line);
+    }
+    if reveal_chip_if_empty(state, fidx) {
+        state.log_event(format!("🎴 F{factory_id}: Bonusplättchen aufgedeckt!"));
+    }
+}
+
 fn find_factory_idx(state: &GameState, factory_id: usize) -> usize {
     state
         .factories
@@ -141,7 +191,11 @@ fn src_label(m: &Move) -> String {
 /// Führt den Take-Teil aus. Gibt (genommene Steine, Marker, ausstehende Logs)
 /// zurück — die Logs (Mond-Stapel, Chip-Aufdeckung) werden nach dem Aktions-Log
 /// geschrieben.
-fn execute_take(state: &mut GameState, m: &Move) -> (Vec<TileColor>, bool, Vec<String>) {
+fn execute_take_with_moon(
+    state: &mut GameState,
+    m: &Move,
+    defer_moon: Option<&mut Vec<TileColor>>,
+) -> (Vec<TileColor>, bool, Vec<String>) {
     let mut pending: Vec<String> = Vec::new();
     match m.take.source {
         TakeSource::SmallFactorySun => {
@@ -150,6 +204,14 @@ fn execute_take(state: &mut GameState, m: &Move) -> (Vec<TileColor>, bool, Vec<S
             let (taken, remaining) = state.factories[fidx]
                 .take_from_sun(m.take.color)
                 .expect("validierter Zug");
+            if let Some(hold) = defer_moon {
+                // Weg A: der Rest bleibt "in der Hand" -- keine Ablage, keine
+                // Mond-Stapel-Zeile, KEINE Chip-Pruefung (die Fabrik ist noch
+                // nicht fertig). Beides holt `finish_moon_placement` nach, in
+                // derselben Reihenfolge wie hier.
+                hold.extend(remaining);
+                return (taken, false, pending);
+            }
             if !remaining.is_empty() {
                 state.factories[fidx].place_on_moon(m.take.moon_order.clone());
                 pending.push(format!(

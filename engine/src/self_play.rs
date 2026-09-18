@@ -267,6 +267,16 @@ pub(crate) fn action_to_env_dict(state: &GameState, a: &Action) -> Value {
             })
         }
         Action::ChooseDomeRotation(rot) => json!({ "type": "choose_dome_rotation", "rotation": rot }),
+        // Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 3): die Farbe ist
+        // der einzige Parameter -- welche Stufe des Knotens gerade laeuft,
+        // steht NICHT im Dict (dieselbe ID-Familie fuer alle Stufen, wie bei
+        // `choose_dome_rotation` fuer beide Kuppelpfade).
+        Action::ChooseMoonTop(c) => json!({ "type": "choose_moon_top", "color": c.value() }),
+        // R3 (`PREREG_dome_return_order.md` par.12.1): Position in der
+        // ZIEHREIHENFOLGE der zurueckzulegenden Platten.
+        Action::ChooseReturnFirst(pos) => {
+            json!({ "type": "choose_return_first", "draw_index": pos })
+        }
         Action::BonusChip(m) => json!({
             "type": "bonus_chip",
             "factory_index": factory_pos(state, m.factory_id),
@@ -316,6 +326,14 @@ pub(crate) fn action_to_id_direct(state: &GameState, a: &Action) -> usize {
             355 + p_idx * 9 + m.slot_row * 3 + m.slot_col
         }
         Action::ChooseDomeRotation(rot) => 391 + ((*rot / 90) as usize).min(3),
+        // Weg A / R3 -- Spiegel der beiden neuen Zweige in
+        // `features::action_to_id` (Paritaet bewacht von
+        // `action_to_id_direct_matches_json_path_across_random_games`).
+        Action::ChooseMoonTop(c) => {
+            let c_id = TileColor::NORMAL.iter().position(|x| x == c).unwrap_or(0);
+            406 + c_id
+        }
+        Action::ChooseReturnFirst(pos) => 411 + (*pos).min(RETURN_ORDER_MAX_PERMUTED - 1),
         Action::BonusChip(m) => (401 + factory_pos(state, m.factory_id)) as usize,
         Action::DrawStackPeek => 405,
     }
@@ -626,7 +644,7 @@ fn avg_remaining_type_value(state: &GameState) -> f64 {
 /// dort keine Wahl mehr, sondern ein Haenger. Permutiert wird der KOPF der
 /// Ziehreihenfolge, weil genau er zuerst wieder oben liegt; der Schwanz
 /// bleibt in Ziehreihenfolge.
-const RETURN_ORDER_MAX_PERMUTED: usize = 3;
+pub(crate) const RETURN_ORDER_MAX_PERMUTED: usize = 3;
 
 /// Alle Permutationen von `items`, lexikographisch nach INDEX -- die erste
 /// ist damit immer die Eingabereihenfolge (= Ziehreihenfolge), worauf sich
@@ -747,6 +765,12 @@ fn return_order_tile_score(state: &GameState, pi: usize, tile: &crate::dome::Dom
 /// `debug_assert_eq!(final_state.current_player, pi)` waere hier VERLETZT, weil
 /// der Stapelzug den Spieler wechselt (`switch_player` im letzten
 /// `DrawStack`-Aufruf) -- nach der Rueckgabe ist der GEGNER am Zug.
+///
+/// **Reichweite seit 2026-09-18** (`PREREG_dome_return_order.md` par.12.9):
+/// der Entscheider sitzt allein im Aufloeser. Eine Seite mit aktivem
+/// Knoten-Tor erreicht ihn nicht mehr -- dort waehlt der Rueckgabeknoten, und
+/// `return_order_mode` ist fuer sie ohne Wirkung. Unter
+/// `MOSAIC_STACK_DRAW_RESEARCH=1` gilt das schon fuer jede Seite.
 pub(crate) fn choose_return_order(
     state: &GameState,
     chosen_id: usize,
@@ -1213,9 +1237,37 @@ fn resolve_and_apply_stack_draw_with(
     // Aktion ist die Stufe-1-Wahl (traegt chosen_id/slot_row/slot_col, wie
     // von den Aufrufern/Tests unten gelesen), die Rotation ist zu diesem
     // Zeitpunkt bereits angewendet.
+    // R3-RUECKFALL (`PREREG_dome_return_order.md` par.12.1/12.7/12.9). Seit dem
+    // Nutzer-Entscheid 2026-09-18 ("dann a") erreicht dieser Aufloeser eine
+    // Seite mit aktivem Tor GAR NICHT MEHR: `apply_chosen_action_with`
+    // schickt sie ueber die Schleife, die den Rueckgabeknoten als eigenen
+    // Entscheid mit Besuchsverteilung spielt. Umgekehrt oeffnet
+    // `apply_drafting` den Knoten nur bei aktivem Tor -- der folgende Block ist
+    // ueber `apply_chosen_action_with` also unerreichbar und stand am
+    // 2026-09-18 nur noch fuer direkte Aufrufer des Aufloesers
+    // (`resolve_and_apply_stack_draw`, Tests). Er BLEIBT als Absicherung:
+    // schliesst den Knoten mit genau der Wahl des Entscheiders oben
+    // (`choose_return_order`), Endzustand identisch zum Weg ohne Knoten.
+    // Loeschen ist ein eigener Entscheid, keine Aufraeumarbeit im Vorbeigehen.
+    let return_head = return_order.first().copied();
     let mv = DrawFromStackMove { chosen_id, slot_row: sr, slot_col: sc, rotation: 0, return_order };
     let final_action = Action::ChooseDrawStackSlot(mv);
     game.apply_drafting(&final_action)?;
+    if let Some(pending) = game.state.pending_return_order.clone() {
+        // Position des vom Entscheider gewaehlten Kopfes in der
+        // Ziehreihenfolge. Modus 0 waehlt Position 0, Modus 1 permutiert genau
+        // den gedeckelten Kopf (`RETURN_ORDER_MAX_PERMUTED`) und ist damit immer
+        // ausdrueckbar; Modus 2 (Handregel ohne Netz, Diagnoseknopf) koennte
+        // theoretisch eine Platte JENSEITS des Deckels nach vorne ziehen -- dann
+        // bleibt es bei Position 0, dem kanonischen Kopf. Kein stiller
+        // Zustandsschaden: jede Position ergibt eine gueltige Reihenfolge.
+        let cand = crate::game::return_first_candidates(&pending);
+        let pos = return_head
+            .and_then(|id| pending.rest_in_draw_order.iter().position(|&x| x == id))
+            .filter(|p| cand.contains(p))
+            .unwrap_or(0);
+        game.apply_drafting(&Action::ChooseReturnFirst(pos))?;
+    }
     game.apply_drafting(&Action::ChooseDomeRotation(rotation))?;
     Ok(final_action)
 }
@@ -1304,6 +1356,25 @@ pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Result<Action, 
 /// `unified_game_loop` auf `Some`. Referee und `py.rs` geben `None` -- ein
 /// Erzeugungsknopf darf Arena, Gating und GUI nicht bewegen, dieselbe
 /// Abgrenzung wie bei `MOSAIC_START_SLOT_RANDOM_P`.
+///
+/// **ZWEITES Tor neben dem Knopf (Nutzer-Entscheid 2026-09-18 "dann a",
+/// `PREREG_dome_return_order.md` par.12.9):** spielt die Seite am Zug mit den
+/// zusaetzlichen Entscheidungsknoten
+/// ([`crate::game::stack_move_decided_by_loop`]), uebernimmt die SCHLEIFE den
+/// Stapelzug -- hier wird dann nur der eine Peek angewandt, und die naechste
+/// Runde der Schleife entscheidet `ChooseDrawStackSlot`, den Rueckgabeknoten und
+/// `ChooseDomeRotation` je mit eigener Suche, eigener Besuchsverteilung und
+/// eigenem Record. Wirkung wie [`stack_draw_research`], aber je SEITE und an
+/// die Policy-Breite des Netzes gebunden statt an eine Umgebungsvariable.
+/// Steht das Tor aus, ist die Zeile unveraendert der Bestand: derselbe
+/// Aufloeser-Aufruf, kein zusaetzlicher Lesevorgang im heissen Pfad ausser
+/// einem Bool-Zugriff.
+///
+/// Zwei Folgen, beide in par.12.9 registriert: `return_order_mode` (Modus 1/2)
+/// und die Erzeugungs-Streuung `random` wirken bei aktivem Tor NICHT mehr, weil
+/// beide ausschliesslich im Aufloeser sitzen -- an ihre Stelle tritt der
+/// Rueckgabeknoten selbst. Unter `MOSAIC_STACK_DRAW_RESEARCH=1` (v29- und
+/// v30-Erzeugung) gilt das schon heute fuer JEDE Seite.
 pub(crate) fn apply_chosen_action_with(
     game: &mut Game,
     a: Action,
@@ -1312,7 +1383,9 @@ pub(crate) fn apply_chosen_action_with(
     random: Option<ReturnOrderRandom<'_>>,
 ) -> Result<Action, String> {
     match a {
-        Action::DrawStackPeek if !stack_draw_research() => {
+        Action::DrawStackPeek
+            if !stack_draw_research() && !crate::game::stack_move_decided_by_loop(&game.state) =>
+        {
             resolve_and_apply_stack_draw_with(game, net, return_order_mode, random)
         }
         other => {
@@ -3721,6 +3794,26 @@ fn unified_game_loop<R: Rng + ?Sized>(
         Some(state) => Game { state },
         None => Game::start(names, first_player, scoring_ids, rng),
     };
+    // Weg A / R3 (`PREREG_moon_stack_order.md` par.12.6 Bauvorgabe 1,
+    // `PREREG_dome_return_order.md` par.12.7): die EINZIGE Stelle, an der die
+    // beiden zusaetzlichen Entscheidungsknoten eingeschaltet werden -- je Seite,
+    // abhaengig allein von der Policy-Breite IHRES Netzes (aus dem ONNX
+    // gelesen). `tiling_net` IST das Netz dieser Seite: jede Netz-Seite tragt es
+    // (`Some`), jede Heuristik-Seite `None` (geprueft an allen acht
+    // `PlayerLoopConfig`-Konstruktionsstellen). Damit gilt:
+    //
+    //   * Heuristik-Seite / Elo-Anker -> `false`, kein Knoten, bitidentisch;
+    //   * 406er-Netz (Champion v28-b02, Anker-Kader, v29-Arme, v27-b01)
+    //     -> `false`, kein Knoten, bitidentisch;
+    //   * 414er-Netz -> `true`, Knoten an.
+    //
+    // Auch bei `start_state` (Seeding) gesetzt: der Zustand kommt aus einem
+    // Record und traegt das Feld nicht (`json_to_state` setzt `false`).
+    for pi in 0..crate::state::NUM_PLAYERS {
+        game.state.extended_action_nodes[pi] = cfg.players[pi]
+            .tiling_net
+            .is_some_and(crate::net_mcts::net_supports_extended_action_nodes);
+    }
     // par.9g: der Diagnose-Zaehler der Mondstapel-Nachsuche ist thread-lokal und
     // ueberlebt die Partie. Hier verworfen, damit die Zahl unten GENAU zu dieser
     // Partie gehoert -- auch wenn ein anderer Pfad (Referee-Worker) ihn gefuellt
@@ -5728,7 +5821,8 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
     // keine Zufallszahl, `rng` unberuehrt), der Zufallsstrom dieser Schleife
     // verschiebt sich also nicht. Das TRAININGSZIEL bleibt unberuehrt:
     // `policy` kommt aus `completed_q_policy`, und die Aktions-ID kodiert die
-    // Reihenfolge ohnehin nicht (par.6, Aktionsraum bleibt 406).
+    // Reihenfolge ohnehin nicht (par.6; der Aktionsraum blieb damals 406 -- seit Weg A,
+    // par.12.6, hat die Reihenfolge eigene IDs, dann laeuft dieser Zweig aber gar nicht).
     let chosen = crate::net_mcts::moon_order_post_search(
         net,
         None,
@@ -7915,6 +8009,143 @@ pub(crate) mod tests {
         assert!(game.state.pending_stack_draw.is_empty(), "Zieh-Vorgang muss abgeschlossen sein");
         assert_eq!(game.state.players[0].player_tokens_used, 1, "genau 1 Token verbraucht");
         assert_eq!(game.state.current_player, 1, "Zug muss beendet sein (Spielerwechsel)");
+    }
+
+    /// Spielbereiter Zustand mit gefuelltem Kuppelstapel -- gemeinsame Fixture
+    /// der drei Stapelzug-Tests darunter (dieselbe Bauform wie
+    /// `resolve_and_apply_stack_draw_produces_valid_placement`).
+    fn stack_draw_ready_game(seed: u64) -> Game {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = ids;
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        assert!(state.dome_tile_pool.len() > 3, "Test braucht mehrere Kacheln im Stapel");
+        Game { state }
+    }
+
+    /// Test (a) aus dem Bauauftrag (`PREREG_dome_return_order.md` par.12.9):
+    /// OHNE Tor bleibt der Stapelzug beim Aufloeser -- EIN
+    /// `apply_chosen_action`-Aufruf beendet den ganzen Zug (Platte liegt,
+    /// `pending_stack_draw` leer, Spielerwechsel), und die zurueckgegebene
+    /// Aktion ist die Stufe-1-Wahl. Das ist Zeile fuer Zeile das Verhalten, das
+    /// `resolve_and_apply_stack_draw_produces_valid_placement` darueber fuer den
+    /// Bestand festschreibt; der Knoten-Bau darf es nicht verschieben.
+    #[test]
+    fn stack_move_stays_with_the_resolver_without_the_gate() {
+        let mut game = stack_draw_ready_game(42);
+        assert!(!game.state.extended_action_nodes[0], "Fixture-Annahme: Tor aus");
+
+        let resolved = apply_chosen_action(&mut game, Action::DrawStackPeek)
+            .expect("Aufloeser muss den Stapelzug hier abschliessen");
+        match resolved {
+            Action::ChooseDrawStackSlot(m) => assert!(
+                game.state.players[0].dome_grid.dome_slots[m.slot_row][m.slot_col].is_some(),
+                "gewaehlte Kachel muss im Raster liegen"
+            ),
+            other => panic!("erwartet Action::ChooseDrawStackSlot, bekommen {other:?}"),
+        }
+        assert!(game.state.pending_stack_draw.is_empty(), "Zug muss abgeschlossen sein");
+        assert!(game.state.pending_return_order.is_none(), "ohne Tor kein Rueckgabeknoten");
+        assert_eq!(game.state.current_player, 1, "Spielerwechsel gehoert zum Zugende");
+    }
+
+    /// Test (b): MIT Tor entscheidet die SCHLEIFE. `apply_chosen_action_with`
+    /// wendet nur den Peek an; Slot, Rueckgabe und Rotation sind danach eigene
+    /// Entscheide, die die Schleife als eigene Halbzuege sieht -- und weil sie
+    /// je Schleifendurchlauf genau EINEN Record mit `policy` und
+    /// `valid_actions` schreibt (self_play.rs, `recording`-Zweig von
+    /// `unified_game_loop`), traegt jeder Teilzug sein eigenes Policy-Ziel.
+    /// Der Spielerwechsel faellt erst am Ende.
+    #[test]
+    fn stack_move_is_decided_by_the_loop_with_the_gate() {
+        let mut game = stack_draw_ready_game(42);
+        game.state.extended_action_nodes = [true, true];
+
+        // Drei Peeks: der Rueckgabeknoten braucht mindestens zwei Restplatten,
+        // also mindestens drei gezogene.
+        for i in 0..3 {
+            let resolved = apply_chosen_action(&mut game, Action::DrawStackPeek)
+                .expect("Peek muss legal sein");
+            assert_eq!(resolved, Action::DrawStackPeek, "die Schleife bekommt nur den Peek zurueck");
+            assert_eq!(game.state.pending_stack_draw.len(), i + 1, "je Peek genau eine Platte");
+            assert_eq!(game.state.current_player, 0, "der Stapelzug wechselt den Spieler nicht");
+        }
+
+        // Stufe 1: der Slot ist ein eigener Entscheid der Schleife.
+        let actions = crate::game::drafting_actions(&game.state);
+        let slot = actions
+            .iter()
+            .find(|a| matches!(a, Action::ChooseDrawStackSlot(_)))
+            .cloned()
+            .expect("Slot-Wahl muss unter den legalen Aktionen stehen");
+        apply_chosen_action(&mut game, slot).expect("Slot-Wahl muss legal sein");
+        let pending = game
+            .state
+            .pending_return_order
+            .clone()
+            .expect("bei zwei Restplatten oeffnet der Rueckgabeknoten");
+        assert_eq!(pending.rest_in_draw_order.len(), 2, "zwei Restplatten");
+        assert_eq!(game.state.current_player, 0, "kein Wechsel vor der Rotation");
+
+        // Stufe 2: der Rueckgabeknoten -- NUR seine Kandidaten sind legal.
+        let actions = crate::game::drafting_actions(&game.state);
+        assert!(
+            actions.iter().all(|a| matches!(a, Action::ChooseReturnFirst(_))),
+            "am offenen Knoten ist nichts anderes erlaubt: {actions:?}"
+        );
+        assert_eq!(actions.len(), 2, "zwei Kandidaten (Deckel greift erst ab vier Restplatten)");
+        apply_chosen_action(&mut game, Action::ChooseReturnFirst(1))
+            .expect("zweite Position muss waehlbar sein");
+        assert!(game.state.pending_return_order.is_none(), "Knoten geschlossen");
+        assert_eq!(game.state.current_player, 0, "auch danach kein Wechsel");
+        match game.state.pending_dome_choice.clone().expect("Rotation steht aus") {
+            crate::moves::PendingDomeChoice::FromDrawStack { return_order, .. } => assert_eq!(
+                return_order[0], pending.rest_in_draw_order[1],
+                "die gewaehlte Platte kommt zuerst wieder"
+            ),
+            other => panic!("erwartet FromDrawStack, bekommen {other:?}"),
+        }
+
+        // Stufe 3: die Rotation beendet den Zug.
+        let actions = crate::game::drafting_actions(&game.state);
+        let rot = actions
+            .iter()
+            .find(|a| matches!(a, Action::ChooseDomeRotation(_)))
+            .cloned()
+            .expect("Rotation muss legal sein");
+        apply_chosen_action(&mut game, rot).expect("Rotation muss legal sein");
+        assert!(game.state.pending_stack_draw.is_empty(), "Zug abgeschlossen");
+        assert_eq!(game.state.current_player, 1, "erst jetzt wechselt der Spieler");
+    }
+
+    /// Test (d): der Arena-Loop uebergibt dieselbe Funktion mit Netz und
+    /// `return_order_mode` der Seite (self_play.rs, `apply_via_chosen_action`).
+    /// Bei aktivem Tor darf keiner dieser Nebenwege den Aufloeser
+    /// zurueckholen -- sonst spielte die Arena den Stapelzug anders als das
+    /// Self-Play. Zweite Zusicherung: die Erzeugungs-Streuung greift nicht mehr
+    /// (sie sitzt im Aufloeser), die Muenze bleibt also unberuehrt.
+    #[test]
+    fn loop_ownership_ignores_return_order_mode_and_the_randomizer() {
+        let mut game = stack_draw_ready_game(7);
+        game.state.extended_action_nodes = [true, true];
+        let randomized = std::cell::Cell::new(false);
+        let random = ReturnOrderRandom {
+            p: 1.0,
+            seed: 12345,
+            round_number: game.state.round_number,
+            randomized: &randomized,
+        };
+
+        let resolved =
+            apply_chosen_action_with(&mut game, Action::DrawStackPeek, None, 1, Some(random))
+                .expect("Peek muss legal sein");
+        assert_eq!(resolved, Action::DrawStackPeek, "Modus 1 holt den Aufloeser nicht zurueck");
+        assert_eq!(game.state.pending_stack_draw.len(), 1, "genau ein Peek angewandt");
+        assert_eq!(game.state.current_player, 0, "Zug laeuft weiter");
+        assert!(!randomized.get(), "die Rueckgabe-Streuung sitzt im Aufloeser und greift nicht mehr");
     }
 
     /// Wenn eine Kachel um ein Vielfaches wertvoller ist als alle anderen im

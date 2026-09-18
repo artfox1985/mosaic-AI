@@ -78,7 +78,17 @@ REPO = Path(__file__).resolve().parent.parent
 # --- Merkmalsgroesse, aus dem CODE (Fundstellen siehe feature_size_report) ---
 PLANES_C, PLANES_H, PLANES_W = 76, 6, 6   # engine/src/features.rs:767; neural_net.py:322/392
 FLAT_SIZE = 708                            # config.py:38; engine/src/features.rs:18
-POLICY_WIDTH = 406                         # config.py:43; engine/src/net_mcts.rs:42
+# 2026-09-18 (Weg A / R3): der Aktionsraum ist von 406 auf 414 gewachsen
+# (PREREG_moon_stack_order.md par.12.6). Statt eines zweiten Literals, das beim
+# naechsten Kontraktwechsel wieder still veraltet, wird `config.NUM_ACTIONS`
+# gelesen -- die Quelle, die auch `neural_net.py` benutzt; das Literal bleibt
+# nur als Rueckfall, wenn `config` nicht importierbar ist.
+try:  # pragma: no cover -- Teil-Checkout ohne config.py
+    import sys as _sys
+    _sys.path.insert(0, str(REPO))
+    from config import NUM_ACTIONS as POLICY_WIDTH  # config.py; engine/src/net_mcts.rs
+except Exception:
+    POLICY_WIDTH = 414
 VALUE_WIDTH = 1                            # neural_net.py:2418 Linear(...,1)+Tanh (out[1])
 MOON_WIDTH = 5                             # neural_net.py:2309 moon_order_head Linear(32,5); net.rs:4 "moon_logits[5]"
 POINTS_WIDTH = 1                           # neural_net.py:2363 (aktiv, da POINTS_DIST_BINS=0, config.py:134)

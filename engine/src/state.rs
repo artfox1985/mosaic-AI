@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::board::PlayerBoard;
 use crate::dome::{build_bonus_chip_pool, build_dome_tile_pool, BonusChip, DomeTile};
 use crate::factory::{Factory, LargeFactory};
-use crate::moves::PendingDomeChoice;
+use crate::moves::{PendingDomeChoice, PendingMoonOrder, PendingReturnOrder};
 use crate::supply::{Bag, Tower};
 use crate::tile::TileColor;
 
@@ -98,6 +98,40 @@ pub struct GameState {
     /// Kuppel-Zug im Gange ist. Reset bei `Action::ChooseDomeRotation`
     /// (Wahl abgeschlossen) und beim Rundenwechsel.
     pub pending_dome_choice: Option<PendingDomeChoice>,
+
+    /// Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 1): anhaengige
+    /// Mondstapel-Reihenfolge nach einem Sonnenzug aus einer kleinen Fabrik.
+    /// `None` = nichts anhaengig, und genau das ist der Bestand: das Feld
+    /// wird NUR gesetzt, wenn [`GameState::extended_action_nodes`] fuer den
+    /// ziehenden Spieler an ist (siehe `game::moon_order_node_applies`).
+    /// Reset beim letzten `Action::ChooseMoonTop`.
+    pub pending_moon_order: Option<PendingMoonOrder>,
+
+    /// R3 (`PREREG_dome_return_order.md` par.12.1): anhaengige Wahl der
+    /// Rueckgabe-Reihenfolge, eingehaengt zwischen `ChooseDrawStackSlot` und
+    /// `ChooseDomeRotation`. Gleiches Tor wie `pending_moon_order`; Reset beim
+    /// `Action::ChooseReturnFirst`.
+    pub pending_return_order: Option<PendingReturnOrder>,
+
+    /// Tor der beiden zusaetzlichen Entscheidungsknoten, JE SPIELER
+    /// (`PREREG_moon_stack_order.md` par.12.6 Bauvorgabe 1, Regel
+    /// `project_2d_encoder_must_be_additive`): `true` nur fuer eine Seite,
+    /// deren Netz einen Policy-Kopf mit mindestens
+    /// [`crate::net_mcts::NUM_ACTIONS`] Ausgaengen hat (414). Ein 406er-Netz
+    /// und JEDE Heuristik-Seite stehen auf `false` -- dort ist
+    /// `drafting_actions`/`apply_drafting` Zeile fuer Zeile der Bestand
+    /// (kanonische Mondreihenfolge, Rueckgabe nach `return_order_mode`).
+    ///
+    /// JE SPIELER und nicht global, weil eine Arena ein 414er- gegen ein
+    /// 406er-Netz stellen kann: der Knoten gehoert dem Spieler, der den Zug
+    /// macht, und in der Suche der Gegenseite wird der Gegner so modelliert,
+    /// wie er wirklich spielt.
+    ///
+    /// Gesetzt wird das Feld an GENAU EINER Stelle
+    /// (`self_play::unified_game_loop`, aus `PlayerLoopConfig::tiling_net`);
+    /// der GUI-/Referee-/Replay-Pfad setzt es nicht und bleibt damit
+    /// bitidentisch.
+    pub extended_action_nodes: [bool; NUM_PLAYERS],
 
     pub scoring_tile_ids: Vec<usize>,
 
@@ -535,6 +569,12 @@ pub fn setup_new_game<R: Rng + ?Sized>(
         bonus_chip_pool: bonus_pool,
         pending_stack_draw: Vec::new(),
         pending_dome_choice: None,
+        // Weg A / R3: zu Spielbeginn ist nichts anhaengig, und die beiden
+        // Knoten sind fuer BEIDE Spieler aus -- eingeschaltet wird nur in
+        // `self_play::unified_game_loop` je Seite mit 414er-Policy.
+        pending_moon_order: None,
+        pending_return_order: None,
+        extended_action_nodes: [false; NUM_PLAYERS],
         scoring_tile_ids: Vec::new(),
         round_number: 1,
         current_player: first_player,

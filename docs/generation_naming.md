@@ -148,6 +148,22 @@ und **`v28-b02`** (Variante B: Merkmale aus dem Record-Feld `dome_pool_view`, so
 gleicher Seed). Weitere Arme ab `v28-b03` nur mit eigener Registrierung. Kein Knopf-Suffix
 im Namen (Regel oben).
 
+## v30 (reserviert 2026-09-18, Abschlussgeneration)
+
+**Generator ist `v29-b11`** (Champion-Entscheid 2026-09-18, 10:05: `v29-b09` mit auf 414
+gepolstertem Policy-Kopf und 888er Eingang, ohne Training; `PREREG_minimal_strength_core.md`
+10.15). Die Klassen heissen damit `selfplay_v29-b11-policy_*`, `-value-tempc_*`,
+`-value-excursion_*` (Seeds 20260930 / 20260931 / 20260932, `PREREG_v30_window.md` par.5,
+Kette `tools/night_v30_generate.sh`). Trainingsarm:
+**`v30-b01`** (v30-Rezept im KALTSTART: b03-Rezept mit `--moon-loss-weight 0`,
+`--ownership-weight 0`, OHNE `--endgame-head`, `--opp-points-head` bleibt, INPUT_SIZE 888,
+NUM_ACTIONS 414, KEIN `--load`; Seed 20260945, Fenster `data/window_v30.txt`, Kette
+`tools/night_v30_chain.sh`; STATUS Abschnitt 4, `PREREG_v30_window.md` par.4/par.6).
+Tor 1 gegen den Champion `v29-b09`, zwei Seeds a 200 Paare (20261300 / 20261301).
+**Weitere Arme ab `v30-b02` nur mit eigenem Nutzer-Entscheid** (v30+-Regel: die
+Abschlussgeneration bekommt nur noch Rezept-Knoepfe, keine neuen Bauvorhaben; STATUS
+Abschnitt 6 Punkt 18/20). Kein Knopf-Suffix im Namen (Regel oben).
+
 ## v29 (reserviert 2026-09-11, Generator eingesetzt 2026-09-13)
 
 **Generator ist `v28-b02`** (Promotion 2026-09-12); die Klassen heissen damit
@@ -162,7 +178,22 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c). **INPUT_SIZE 794**
 (entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16: die 18 Design-Bits bleiben
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
-Weitere Arme ab `v29-b10` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+Weitere Arme ab `v29-b12` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+
+**Reserviert 2026-09-18 (Nutzer-Entscheid "ja nimm es so in die kette auf",
+`PREREG_minimal_strength_core.md` par.10.12):**
+**`v29-b11`** (KEIN Trainingsarm: `v29-b09_brierbest` mit auf 414 gepolstertem Policy-Kopf und 888er Eingang,
+ohne Training; Generator der v30-Erzeugung nach A/B gegen b09 und Record-Stichprobe. Reserviert 2026-09-18, 10:05,
+Nutzer "Weiter mit a und b09"; `PREREG_minimal_strength_core.md` 10.15. b10 = b07 gepolstert bleibt Kostentor-Artefakt.)
+
+**`v29-b10`** (KEIN Trainingsarm: `v29-b07_brierbest` mit auf 414 GEPOLSTERTEM Policy-Kopf --
+acht Nullzeilen plus Bias -- und auf 888 gepolstertem Flach-Eingang, ohne einen
+Trainingsschritt. Werkzeug `tools/pad_policy_head_export.py`, Abnahme
+`tools/night_v30_wheel_acceptance.sh`. Eigene Nummer, weil ein Champion Modell PLUS Spec ist
+und eine gemessene Entitaet nie nachtraeglich geaendert wird
+(`feedback_measured_identity_gets_own_bxx`). Vorgesehen als GENERATOR der v30-Erzeugung; die
+Tore sind das Kostentor gegen 12,0 s je Partie und das A/B gepolstert gegen ungepolstert,
+Marge 5 Prozentpunkte.)
 
 **Reserviert 2026-09-17 (Nutzer: "v29-b09 nehmen wir ebenfalls mit", `PREREG_minimal_strength_core.md` par.10.7):**
 **`v29-b09`** (das v30-Rezept auf dem v29-Fenster: b03 mit `--moon-loss-weight 0`, `--ownership-weight 0` und
