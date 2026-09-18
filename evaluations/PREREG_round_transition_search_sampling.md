@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche das Tiling sehen -- im Blatt (Variante B) oder als Encoder-Eingabe (Variante C)? | Beleg: B NEGATIV (17.9). Stufe-0-Sonde DURCH (16.9), Stichentscheid-A/B: Zweig traegt, bleibt an (16.12). Variante A draussen (16.10). **VARIANTE C TRAEGT (18.12): v29-b07 gegen b03 432:368 von 800, Block-z +2,40, 90 neue Spalten angekoppelt; 884 im v30-Rezept, v30 startet kalt (18.11). Champion-Kanten b07 gemessen (minimal_strength_core 10.11), Champion wurde b09.** Suchseite und Encoder-Seite damit beantwortet; offen nur die v30-Abnahme des Kaltstarts. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Soll die Suche das Tiling sehen -- im Blatt (Variante B) oder als Encoder-Eingabe (Variante C)? | Beleg: Blatt (Variante B) NEGATIV (17.9), Variante A draussen (16.10), Encoder (Variante C) TRAEGT (18.12: b07 gegen b03 432:368, Block-z +2,40) -> INPUT_SIZE 884 im v30-Rezept, v30 startet kalt (18.11). Stichentscheid-Zweig bleibt an (16.12), Sonde 16.9c ist Diagnostik. Abnahme des Kaltstarts: PREREG_v30_window. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 

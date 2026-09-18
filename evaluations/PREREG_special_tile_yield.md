@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7). par.4a GESCHLOSSEN (par.10a), par.4c VERWORFEN (par.12). **K6 GEBAUT und GEMESSEN (13.3-13.8): Kostentor +3,5 Prozent haelt; A/B Dosis 0,5 SCHADET (180:210 von 390, Block-z -2,57), Dosis 0,25 flach (195:205, z -0,62), Kurve monoton fallend -> Knopf bleibt 0, Drafting-Hebel GESCHLOSSEN (Zielkonflikt Vermeiden statt Belegen).** -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7), aber kein gepruefter Hebel hebt ihn: Kanaele 77/78 wirken auf den Posten, nicht auf die Siegquote (par.10a), par.4c verworfen (par.12), K6 schadet (13.7/13.8: 46,2 / 48,8 Prozent, Zielkonflikt Vermeiden statt Belegen). Drafting-Hebel GESCHLOSSEN; der Posten bleibt Diagnostik in den sechs Standard-Kennzahlen. -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 

@@ -512,3 +512,13 @@ Zweiter Nachzuegler derselben Stunde: der Python-Zwilling liefert nach INPUT_SIZ
 `MosaicNet.forward` zu breite Eingaben auf `input_size` -- die additive Eingabe-Regel gilt damit in beiden
 Welten. Regel daraus: **nach jedem INPUT_SIZE- oder NUM_ACTIONS-Wechsel die Python-Werkzeuge einmal am
 Alt-Champion laufen lassen** (`platt_fit.py` ist der billigste Test, 12 s), bevor eine Kette sie braucht.
+
+## Self-Play-Records sind gzip-komprimiert: `pickle.load` auf der Datei liefert `invalid load key, ''` (2026-09-18)
+
+Zweimal am selben Tag: die Abnahme-Kette (`night_v30_wheel_acceptance.sh` Stufe 7) und die Erzeugungskette
+(`night_v30_generate.sh`, `first_record_check`) oeffneten `data/selfplay_*.pkl` mit `open(...,'rb')` und
+`pickle.load` -- beide brachen mit dem gzip-Magic 0x1f ab; die Erzeugungskette haette daraufhin das Self-Play
+GETOETET (Wrapper rechtzeitig beendet, Self-Play lief verwaist weiter). Regel: Records IMMER mit `gzip.open`
+lesen (Muster in `tools/cache_inventory.py`, `engine/py/corpus_dataset.py`), und eine Pruefung, die einen
+laufenden Erzeuger stoppen darf, vorher an einer echten Datei trocken fahren -- ein Werkzeugfehler darf
+nie wie ein Befund wirken.

@@ -20642,3 +20642,11 @@ Modelldateien (`alphazero_v28-b01*`, `v29-b01*`, `v29-b02*`, `v29-b03*`, `v29-b0
 alle unter dem v30-Schluessel 888 unerreichbar). Behalten: `v29-b09_brierbest` (Champion), `v29-b11` (Generator),
 `v28-b02_brierbest` (Vorgaenger), `v29-b07_brierbest`, `v27-b01_brierbest`, `engine_test.onnx`, die Artefakte
 `frozen_champions/v29-b09`, `v28-b02`, `v27-b01` (letzteres bis zur v30-Promotion).
+
+
+## Uebergabe 2026-09-18, 18:10 (Sitzungswechsel waehrend der v30-Erzeugung)
+
+Seit dem letzten Kapitel: Loeschungen ausgefuehrt und committet (`1d619a0d`), sieben Prereg-Koepfe auf ENTSCHIEDEN
+(Bestand 4 OFFEN), `docs/knobs.md` frisch, gzip-Pickle-Falle in `docs/pitfalls.md`. Stand der Erzeugung: Sockel
+227 von 400 Dateien (18:10), Rest-Kette wartet, Cache-Waechter 2.629 Bloecke. Erste Aufgaben der neuen Sitzung in
+STATUS Abschnitt 1.
