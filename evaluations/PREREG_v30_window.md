@@ -438,6 +438,17 @@ ANNAHME. Die Erzeugung dominiert; sie laeuft ohnehin ueber Nacht.
 1. **G-2-Haelfte** (par.1a): Vorschlag ist die Ausflug-Haelfte von `v27-b01`, also dieselbe Regel
    wie v28 und v29. Kein Entscheid noetig, wenn der Nutzer nichts anderes sagt -- er steht hier
    nur, weil er in v28 und v29 ausdruecklich getroffen wurde.
+1a. **Kosten der Hilfsknoten: ENTSCHIEDEN am 2026-09-18, 20:25** (Nutzer: *"wenn es was
+   bringt stoert mich der mehraufwand nicht"*). Der auf voller Strecke gemessene Aufschlag
+   (+20,4 Prozent gegen die v29-Linie, +49,1 Prozent gegen die v28-Linie, par.9) ist als
+   Kosten hingenommen; der Budget-Knopf fuer Slot, Rotation, Rueckgabe und Mond wird NICHT aus
+   Kostengruenden gezogen. Offen bleibt allein die Bedingung: bringen die Knoten etwas? Diese
+   Prereg kann das nicht beantworten -- par.1b registriert die Knoten bei 40,8 Prozent
+   Fensterabdeckung VOR der Messung als unterbelegt, und ein Nullbefund in Tor 1 ist
+   ausdruecklich kein Beleg gegen sie. Die Wirkungsfrage bleibt bei v31
+   (`moon_stack_order` 12.6, `dome_return_order` 12.7); STATUS Abschnitt 6 Punkt 2 ist
+   entsprechend nachgezogen.
+
 2. **Zweiter Arm?** par.4 laesst genau einen zu. Wenn der Nutzer die Zerlegung des Buendels will
    (Kaltstart gegen Warmstart bei sonst gleichem Rezept und Fenster, das waere `v30-b02` =
    Rueckfall 2 als eigener Arm statt als Rueckfall), ist das ein eigener Entscheid, rund 1,2 h
@@ -455,6 +466,51 @@ ANNAHME. Die Erzeugung dominiert; sie laeuft ohnehin ueber Nacht.
 ## par.9 ERGEBNISSE
 
 (noch leer -- nichts erzeugt, nichts trainiert, nichts gemessen)
+
+### Nachzaehlung der neuen Knoten im Sockel (2026-09-18, 20:35) -- die in par.1b vorgemerkte Zahl
+
+par.1b hat diese Zaehlung ausdruecklich nach par.9 verwiesen ("am Fenster nicht nachgezaehlt, weil die neuen
+Dateien noch nicht existieren"). Anlass des Vorziehens: der Nutzer-Entscheid von 20:25 nimmt die KOSTEN hin und
+laesst allein die Wirkungsfrage offen; der Lernstoff-Anteil ist deren Grundmenge.
+
+**Werkzeug** `tools/count_new_nodes_in_corpus.py` (neu; Zaehlweise uebernommen aus
+`tools/night_v30_acceptance_b11.sh` Stufe 7, dieselben ID-Bereiche und dieselbe Ableitung ueber
+`neural_net.action_to_id`, aber mit `gzip.open` statt `open` -- die Falle vom 2026-09-18).
+**Grundmenge: 78.917 Records aus 40 der 400 Dateien** von `selfplay_v29-b11-policy_*` (seed-feste Stichprobe,
+Seed 20260945, entspricht 400 Partien = 800 Seiten), Einheit Records beziehungsweise Vorkommen. Laufzeit 89,8 s
+einkernig. Artefakt `evaluations/artifacts/new_nodes_v29-b11-policy.json`.
+
+| Knotenbereich | Records mit Policy-ZIEL | Anteil | Ziel-Vorkommen |
+| --- | --- | --- | --- |
+| Mond 406-410 | 9.189 | 11,64 % | 17.916 |
+| Rueckgabe 411-413 | 143 | 0,18 % | 375 |
+| Slot/Rotation Kuppel 328-354 | 22.505 | 28,52 % | 213.106 |
+| Slot/Rotation Stapel 355-390 | 2.540 | 3,22 % | 21.423 |
+| Rotation 391-394 | 6.400 | 8,11 % | 25.600 |
+| Stapel-Blick 405 | 26.078 | 33,04 % | 26.078 |
+
+P.12 `designs` und P.16 `designs_ordered` stehen in je **20.334 Records = 25,8 Prozent** (nur wo ein eigener
+Block liegt, wie in der Wiedervorlage um 14:54 mit 577 von 1.952 = 29,6 Prozent).
+
+**Gesundheitsbefund:** von den **9.332 Records (11,83 Prozent), die eine ID >= 406 in der Maske tragen, haben
+NULL ein leeres `policy`.** Wo die neuen Knoten auftreten, tragen sie auch ein Lernziel; in allen sechs
+Bereichen ist "Records mit Ziel" gleich "Records in der Maske".
+
+**Lesart fuer die Wirkungsfrage, getrennt nach Knoten:**
+
+* **Der Mondknoten hat Material.** 11,64 Prozent der Sockel-Records, 17.916 Ziel-Vorkommen in der Stichprobe.
+* **Der Rueckgabeknoten hat fast keines.** 143 Entscheide in 400 Partien sind **0,179 je Partie und Seite**
+  (Herleitung aus 143 / 400 / 2, nicht separat gemessen). Je Entscheid stehen 375/143 = **2,62 Aktionen** zur
+  Wahl, also fast immer der Deckel `RETURN_ORDER_MAX_PERMUTED = 3` (`game.rs` Z.717-720: die Kandidatenzahl ist
+  `min(Restplatten, 3)`).
+
+**Diese 0,179 sind NICHT die 0,62/0,65 aus `PREREG_dome_return_order.md` 12.5** -- die Grundmengen
+unterscheiden sich in drei Punkten, und der Vergleich waere ohne diesen Satz ein Grundmengen-Fehler: dort
+Arena-Partien @400 Sims OHNE Forschungsknopf, hier Self-Play @100 MIT ihm; dort gezaehlt werden Rueckgaben mit
+mindestens ZWEI Restplatten, hier Entscheide des Knotens; und `RETURN_ORDER_MIN_REST = 3`
+(`self_play.rs` Z.970) gilt fuer den Streuungs-Knopf, nicht belegt fuer die Knoten-Eroeffnung. **Wieviel des
+Abstands 0,179 gegen 0,62 auf welchen der drei Punkte faellt, ist UNGEPRUEFT** und waere die Wiedervorlage,
+falls jemand den Rueckgabeknoten in v31 messen will.
 
 ### Klasse 1 `v29-b11-policy` fertig, Tor 0 und Tor 2a (2026-09-18, 20:07 / 20:15): BEIDE GRUEN
 
