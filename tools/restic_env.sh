@@ -3,8 +3,9 @@
 #
 # Warum eine Sammelstelle und nicht drei Kopien: dieselbe Herleitung stand am
 # 2026-09-07 in drei Skripten, und der pre-push-Waechter hat sie zu Recht
-# dreimal angemeckert. Vorbild ist tools/hooks/python_dll_path.sh -- dieselbe
-# Lehre wie bei der Python-DLL (tools/hooks/README.md).
+# dreimal angemeckert. Vorbild war tools/hooks/python_dll_path.sh, dieselbe
+# Lehre wie bei der Python-DLL (tools/hooks/README.md); jene Sammelstelle ist
+# am 2026-09-20 mangels Aufrufern entfallen, diese hier hat welche.
 #
 # Reihenfolge der Quellen fuer das Repository, wie in tools/backup_common.ps1:
 #   1. MOSAIC_RESTIC_REPO   -- voller Pfad, gewinnt immer

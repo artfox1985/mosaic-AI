@@ -133,8 +133,12 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   **Pause auf Zuruf statt Kill:** `touch models/alphazero_<name>.stop` --
   train.py speichert nach der laufenden Epoche, loescht die Stopp-Datei und
   endet mit Exit-Code 75; ein Kill kostet dagegen die angefangene Epoche.
-  Test beider Wege: `tools/tests/train_resume_pause_test.sh` (Mini-Fenster,
-  rund 2 min GPU; NICHT neben einer laufenden CPU-Messung starten).
+  Test beider Wege war `tools/tests/train_resume_pause_test.sh` (Mini-Fenster,
+  rund 2 min GPU); der Treiber ist am 2026-09-20 entfallen, weil seine Fixtures
+  tot waren (Modell `v23-b01_brierbest` und der v23-Korpus sind geloescht,
+  `PREREG_code_cleanup_closeout.md` par.8f/8g). Das Ergebnis unten bleibt der
+  Beleg; wer die Wege neu pruefen will, verankert den Treiber aus der Historie
+  auf dem aktuellen Fenster.
   **GRUEN am 2026-09-06 02:00 (alle Faelle A-E):** Pause nach Epoche 1 per
   Testhaken `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH`, Exit 75, Stopp-Datei
   geloescht, `--resume` danach bitgleich zu A (max |dW| 0,0) -- wie B

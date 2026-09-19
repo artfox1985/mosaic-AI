@@ -2299,10 +2299,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # --no-epoch-checkpoint) und der Prozess endet geordnet mit
         # PAUSE_EXIT_CODE. Wiederaufnahme: derselbe Befehl plus --resume. So
         # kann die GPU ohne Verlust einer Teil-Epoche freigeraeumt werden.
-        # Testhaken (tools/tests/train_resume_pause_test.sh, Fall D): legt die
-        # Stopp-Datei nach der genannten Epoche selbst an, damit der Pause-Pfad
-        # unabhaengig vom Tempo des Laufs geprueft wird (2026-09-06: ein von
-        # aussen nach 20 s angelegter Stopp kam zu spaet, der Mini-Lauf war fertig).
+        # Testhaken: legt die Stopp-Datei nach der genannten Epoche selbst an,
+        # damit der Pause-Pfad unabhaengig vom Tempo des Laufs geprueft wird
+        # (2026-09-06: ein von aussen nach 20 s angelegter Stopp kam zu spaet,
+        # der Mini-Lauf war fertig). Der zugehoerige Testtreiber ist am
+        # 2026-09-20 entfallen (tote Fixtures); der gruene Lauf Fall A-E steht
+        # in docs/working_rules.md.
         _stop_at = os.environ.get("MOSAIC_PAUSE_TEST_STOP_AT_EPOCH")
         if _stop_at and int(_stop_at) == epoch + 1 and not _stop_file.exists():
             _stop_file.write_text("MOSAIC_PAUSE_TEST_STOP_AT_EPOCH\n", encoding="utf-8")
@@ -2891,7 +2893,7 @@ if __name__ == "__main__":
                         help="Batchweises Holen der Trainingsdaten (EIN Index-Tensor je Feld statt "
                              "256 x __getitem__ plus Collate; corpus_dataset.py::get_batch) und "
                              "pin_memory. Gleiche Batch-Folge und gleiche Zahlen wie der Bestand "
-                             "(Beleg: tools/tests/train_resume_pause_test.sh Fall E); Default AUS, "
+                             "(Beleg: Fall E des Resume-Tests vom 2026-09-06, docs/working_rules.md); Default AUS, "
                              "bis der Beleg fuer das Vollfenster steht. Anlass 2026-09-05: GPU beim "
                              "b04-Training zur Haelfte arbeitslos, Datenpfad auf einem Kern.")
     parser.add_argument("--no-epoch-checkpoint", action="store_true",

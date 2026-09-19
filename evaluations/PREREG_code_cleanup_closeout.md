@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten des Reviews 2026-09-11 werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 gebaut (par.8), Anker-Drift ROT durch A2 erledigt per Neuverankerung auf hv4_anchor (par.7a). GRUPPE A AUSGEFUEHRT 2026-09-19 (par.8d): 7 von 9 Punkten, alle Tore gruen, Kontrakt-Hash unveraendert, Anker-Drift 1.763 Schritte identisch; zwei Punkte von Toren gestoppt. Gruppe B traegt drei Punkte (Wrapper, Spec-Felder, Bonuschip-Kanonisierung par.8e, deren GUI-Haelfte gebaut ist), Gruppe C offen. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 (par.8) und GRUPPE A (par.8d, 7 von 9 Punkten) gebaut, Anker-Drift 1.763 Schritte identisch. Gruppe B: drei Punkte (par.8e Bonuschips, GUI-Haelfte gebaut). TEST- UND HAKEN-PRUEFUNG par.8f, ihre vier RAUS-Posten am 2026-09-20 AUSGEFUEHRT samt sieben nachgezogenen Verweisen (par.8g, Rust-Schnitt noch unuebersetzt). par.8g traegt die Abarbeitungsliste fuer nach dem Projektabschluss, 10 Punkte. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -983,3 +983,208 @@ wartet auf eine freie Maschine. Geprueft ist die Ersetzung an allen vier Stellen
 Muster genau 1) und die Farbfolge gegen das Enum; ein JS-Syntaxlauf war mangels `node` nicht
 moeglich. **Offen bleibt die Engine-Haelfte oben** (Poolbau oder Bitmaske, plus der
 Tiling-Schluessel); erst sie spart die Arbeit in `round5.rs` und im Cache.
+
+## par.8f PRUEFUNG DER TESTS UND HAKEN (2026-09-19, Nutzer-Auftrag)
+
+**Anlass:** Nutzer 2026-09-19, *"lass mal einen agent laufen ob alle tests und hooks so noch
+notwendig sind. ich denk da faellt einiges raus."* Zwei Agenten, rein lesend (Erzeugung und
+Cache-Waechter liefen, also kein `cargo`, kein Testlauf, keine Messung). **Nichts ausgefuehrt,
+nichts geloescht** -- das hier ist eine Vorlage.
+
+**Was davon der Koordinator SELBST nachgeprueft hat, ist unten je Zeile markiert.** Der Rest sind
+Agenten-Befunde, also Behauptungen (Regel 0).
+
+### Die vier Posten mit Verdikt RAUS oder nahe daran
+
+| Posten | Pruefstelle | Befund | geprueft |
+| --- | --- | --- | --- |
+| `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero` | `engine/src/net_mcts.rs:12253` | **laeuft leer gruen.** Z.12254 ist `let Some(net) = load_v18_legacy_test_net() else { return };`, und `models/alphazero_v18_best.onnx` gibt es nicht mehr. Dieselbe Zusicherung steht netzfrei in `blended_leaf_win_prob_with_w_zero_ignores_points_and_opp_entirely` (`:12291`) | **JA**, Code und fehlende Datei |
+| Hilfsfunktion `load_v18_legacy_test_net` | `engine/src/net_mcts.rs:12237` | genau zwei Vorkommen im Baum: Definition und der Aufruf darueber | **JA** |
+| `tools/hooks/python_dll_path.sh` | ganze Datei | **null Aufrufer.** `grep -c python_dll_path tools/hooks/pre-push` = 0, der Haken traegt die Herleitung inline (`pre-push:150-174`). Die vier Skripte, fuer die sie am 2026-09-06 extrahiert wurde, sind geloescht. Die Falle (`STATUS_DLL_NOT_FOUND`) bleibt durch die Inline-Kopie bewacht. `docs/tools_index.md:57` waere mitzuziehen | **JA** |
+| `tools/tests/train_resume_pause_test.sh` | `:15-17` | **Fixtures tot:** `--load v23-b01_brierbest` -- `models/` traegt nur noch v29- und v30-Gewichte; die aus `data/window_v24.txt` gezogenen `selfplay_v23-b01-*.pkl` fehlen. Der Lauf braechte sofort ab. **NICHT einfach loeschen:** `train.py:2302` und `:2894` sowie `docs/working_rules.md:136` berufen sich auf seine Faelle D und E. Also neu verankern (v31-Fenster) oder ausdruecklich stilllegen | **JA**, beide Fixture-Klassen |
+
+### Kandidaten, die einen Entscheid brauchen
+
+| Posten | Pruefstelle | Warum Kandidat |
+| --- | --- | --- |
+| `engine/examples/`, sieben Sonden als BLOCK: `net_determinism`, `latency_2d_vs_flat`, `probe_input_shape`, `net_load_time_probe`, `profile_clones`, `eval_batch_size_numeric_probe`, `interleave_concurrency_probe` | Verzeichnis | **Der groesste Posten, und zwar wegen der Kosten:** der pre-push kompiliert `examples/` und `benches/` mit (CLAUDE.md, Abschnitt "Push scheitert am pre-push-Hook"). Keiner der sieben wird von einem Werkzeug oder einer OFFENEN Prereg gerufen. Mehrere sind auf eine tote Aera genagelt: `interleave_concurrency_probe.rs:25` und `net_2d_probe_two_input.rs:33` tragen `INPUT_SIZE = 708`, `net_load_time_probe.rs:15` und `profile_clones.rs:31` zeigen auf geloeschte Modelle. Ihre letzten Beruehrungen waren mechanische "Push-Blocker: examples nachgezogen"-Commits |
+| `engine/examples/net_load_auto_backcompat.rs` | `:89-90` | beide geladenen Modelle (v17, v18) existieren nicht mehr, das Beispiel endet dann mit `exit(2)`. **Gegenlaeufig:** es ist der Nachweis der additiven Encoder-Regel, und die ist Architektur-Fixpunkt. Deshalb Entscheid, nicht RAUS |
+| `engine/examples/net_2d_probe.rs`, `net_2d_probe_two_input.rs` | dort | Default-Modelle sind Wegwerf-Exporte aus Task #11 und liegen nicht im Baum |
+| `tiling_cache_hit_rate_measurement` | `engine/src/tiling_solver.rs:3246` | laut eigenem Kopfkommentar (`:3243`) **kein Assert auf das Verhalten**, nur `plain_total >= 100` / `end_total >= 20`; trotzdem ohne `#[ignore]`, laeuft also in JEDEM pre-push mit 100 Rundenuebergaengen und 13 Suchen. Die Frage, die er beantworten sollte, ist entschieden. Er ist zugleich der einzige Aufrufer von `mcts::search_action`: loescht man ihn, wird produktiv toter Code sichtbar |
+| sieben Tests des Inversions-Pfads | `engine/src/round_transition_resample.rs:354` ff. | der Code-Review nennt den Pfad Altlast, der Modulkopf (`:39-41`) sagt ausdruecklich "BLEIBEN". **Das ist ein Entscheid ueber den CODE, nicht ueber die Tests** -- sie fallen mit ihm oder gar nicht |
+| `test_window_cache_key_planes_ablation.py::test_switch_off_keeps_the_legacy_key` | `tools/tests/test_window_cache_key_planes_ablation.py:88`, Literal in `:59` | der eingefrorene Schluessel wurde laut eigenem Kommentarblock in zwei Tagen DREIMAL absichtlich nachgezogen. Ein Stolperdraht, den man routinemaessig neu setzt, ist der Fall "Ein umgangenes Tor erzieht zum Umgehen" |
+| `test_tiling_geometry_probe.py` | dort | neun Methoden auf eine Sonde zu einer ENTSCHIEDENEN Frage. **Einschraenkung:** `test_catalog_has_18_designs_with_4_cells` (`:126`) sichert eine SPIELREGEL und gehoert bei einem Schnitt erhalten -- Praezedenz ist par.8d Punkt 2, wo ein Komplettloeschen die Abdeckung einer lebenden Funktion mitgenommen haette |
+| `engine/server_ai_test.py`, `engine/server_rust_test.py`, `engine/smoketest.py` | dort | **kein Laeufer**: der pre-commit sammelt nur `-s tools/tests -p "test_*.py"` ein. Seit 2026-06-26 nicht angefasst, dazwischen INPUT_SIZE 744 -> 888 und NUM_ACTIONS 406 -> 414. Entlastend: alle 15 von ihnen gerufenen Routen existieren noch in `server.py`. Ob sie gruen laufen, ist UNGEPRUEFT (Ausfuehrung war verboten) |
+| Konventions-Regel 4, Teile `missing_from_index` und Abschnitts-Zaehler | `check_conventions.py:419-437` und `:487-502` | von der Byte-Gleichheits-Pruefung darueber logisch subsumiert: ist der Index byte-gleich mit dem Generat, koennen beide nicht mehr anschlagen. Ihr Nutzen ist heute nur die bessere Fehlermeldung. **Nicht** subsumiert ist `stale_in_index` (`:434`) |
+
+### Was BLEIBT, und warum die Liste kurz ist
+
+Die Gegenprobe war Auflage an beide Agenten: **ein Test, der eine in `docs/pitfalls.md`
+beschriebene Falle bewacht, ist kein Loeschkandidat**, auch wenn er trivial aussieht. Das hat die
+Liste stark gekuerzt. Namentlich in `pitfalls.md` gefunden und damit gesetzt:
+`test_cache_key_feature_formula_version`, `test_cache_key_knobs_are_env_coupled`,
+`test_cache_key_path_form`, `test_cache_overwrite_guard`, `test_name_path_cache_key_guard`,
+`test_replayer_skips_diagnostic_lines`, `test_analyze_game_log_pass`, `test_train_manifest_flags`.
+Dazu auf der Rust-Seite die beiden Anker-Fixture-Tests (`mcts.rs:1622`, `:1714`), der Vertragshash
+(`lib.rs:2548`), die Netz-Paritaets-Fixture (`self_play.rs:8945`), die sechs Registratur-Waechter
+(`knob_registry.rs:364` ff.) und die Additivitaets-Tests mit den Alt-Breiten 714/744/755/794/884
+(`features.rs:2191`) -- letztere sind genau die Abwaertskompatibilitaet, die am 2026-09-19 drei
+Spec-Feld-Loeschungen gestoppt hat (par.8d Punkt 7).
+
+**Die Python-Seite ist sauber, was Gruppe A angeht.** 141 Testmethoden in 22 Dateien, gezaehlt mit
+`grep -h "def test_" tools/tests/test_*.py | wc -l` -- dieselbe Zahl, die par.8d als gruen
+registriert. Ein Test auf Entferntes waere rot gewesen oder beim Import gescheitert.
+**Koordinator-Gegenprobe: JA**, Zahl selbst nachgezaehlt.
+
+### Zwei Beifaenge, die nicht im Auftrag standen
+
+**1. Der Waechter gegen leer-gruene Tests sieht die haeufigste Form nicht.** Regel 5
+(`check_conventions.py:504-527`, Lauf `:579-613`) verlangt als Ausloeser `exists()`, `.is_err()`,
+`let Ok(` oder "uebersprungen" und als Rueckgabe ein `return;` ALLEIN auf der Zeile (`:528`). Die
+Form `let Some(x) = ... else { return };` faellt durch beide Raster -- und genau sie ist der
+Posten oben. Der Anlassfall der Regel (17 leer-gruene Tests im Inventar 2026-08-15) ist damit
+nicht geschlossen, sondern nur teilweise. **Koordinator-Gegenprobe: JA**, beide Muster gelesen.
+Das ist kein Loeschgrund, sondern ein Nachbesserungsgrund.
+
+**2. Eine Aussage in CLAUDE.md ist ueberholt.** Dort steht zum Prereg-Index: "waechst Zeile 1
+darueber hinaus, faellt die Datei STILL aus dem Index". Das stimmt heute nicht mehr:
+`tools/generate_prereg_index.py:162` gibt bei unparsebarem Kopf Exit 1 zurueck, und zwar BEVOR
+`INDEX_PATH.write_text` (`:174`) erreicht wird -- der Generator schreibt dann gar nichts. Die
+Falle ist also lauter geworden, als die Regel sie beschreibt. **Koordinator-Gegenprobe: JA**,
+Quelltext gelesen. Aenderung an CLAUDE.md ist Nutzer-Entscheid.
+
+### Eine Korrektur am Agenten-Befund
+
+Der Python-Agent meldet fuer die Groessen-Ratsche (Regel 1) "**7 von 7** Dateien ueber der
+Basislinie" und leitet daraus ab, sie habe ihren Anlass ueberlebt. **Der beobachtete Lauf zeigt
+etwas anderes:** `python tools/check_conventions.py` am 2026-09-19 druckte genau ZWEI Warnungen,
+fuer `engine/py/neural_net.py` und `tools/analyze_game_log.py`. Der Agent hat die Rohdifferenz
+gegen `tools/size_baseline.json` gerechnet, aber die Reduktions-Ausnahme (`:186-190`, Vergleich
+gegen `git cat-file -s HEAD:<datei>`) nicht nachgefahren und das selbst als ANNAHME markiert.
+**Die tragende Zahl ist 2, nicht 7.** Der Kern seines Arguments steht davon unberuehrt und ist am
+Regel-Kopf (`:15-26`) belegt: zehn Ausloesungen, null Zerlegungen -- eine Warnung, die nie zu
+einer Handlung fuehrt, ist eine Kandidatin. Aber sie ist kein Blocker und kostet 3,6 s im
+teuersten Modus.
+
+### Was NICHT beurteilt ist
+
+* **Die 707 `#[test]`-Attribute einzeln.** Gesucht wurde gezielt nach Bezuegen auf in Gruppe A
+  Entferntes, nach Alt-Kontrakt-Zahlen (884/794/755/744/406/708), geloeschten Modell- und
+  Ankerpfaden, `#[ignore]` und stillen Skips. **Inhaltliche Doppelabdeckung zwischen zwei
+  verschieden benannten Tests ist damit NICHT systematisch erfasst** -- der eine gefundene Fall
+  war ein Nebenprodukt. Zwei Namenskollisionen (`default_aus_liefert_ueberall_none` in
+  `column_build.rs:1284` und `plate_builder.rs:1365`; `env_knoepfe_defaults_sind_bestandsverhalten`
+  in `net_mcts.rs:7824` und `tiling_solver.rs:2634`) sind nicht Zeile fuer Zeile verglichen.
+* **`engine/examples/planes_parity.rs`** taucht in keiner der beiden Listen auf, weder als
+  Kandidat noch als BLEIBT. Luecke.
+* **Jede Laufzeitangabe.** Keine ist in dieser Pruefung gemessen worden; alle stammen aus
+  `tools/hooks/README.md` oder aus par.8d und sind dort datiert (die 97 s fuer `cargo test
+  --release` vom 2026-08-26, also vor rund 140 zusaetzlichen Tests). **Welcher Test die Laufzeit
+  dominiert, ist damit offen** -- und das ist die Zahl, die den Nutzen eines Schnitts an
+  `examples/` und am Messtest erst beziffern wuerde. Sie kostet einen exklusiven `cargo`-Lauf.
+* **Die Differenz 702 gegen 707** zwischen par.8d und der Attribut-Zaehlung: nicht aufgeloest
+  (vier davon sind `ort_cuda_probe`-feature-gated).
+* **Ob die drei Skripte unter `engine/` heute gruen laufen.** Nur ihre Routen sind gegengeprueft.
+
+## par.8g DIE VIER RAUS-POSTEN AUSGEFUEHRT (2026-09-20)
+
+**Nutzer-Auftrag:** *"loesch die vier raus-posten und halte alles in der aufraeum prereg fest,
+damit wir hier nach abschluss gleich sauber machen koennen."* Ausgefuehrt waehrend der laufenden
+v31-Erzeugung -- alle vier sind reine Loeschungen ohne Bau, es wurde keine Rechenlast erzeugt.
+
+### Was entfernt wurde
+
+| Posten | Art | Belegt in |
+| --- | --- | --- |
+| `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero` samt Doc-Kommentar | Testfunktion, `net_mcts.rs` | par.8f: lief leer gruen, weil `alphazero_v18_best.onnx` nicht mehr im Baum liegt |
+| `load_v18_legacy_test_net` samt Doc-Kommentar | Hilfsfunktion, `net_mcts.rs` | ihr einziger Aufrufer war die Zeile darueber |
+| `tools/hooks/python_dll_path.sh` | Datei, `git rm` | null Aufrufer; `pre-push` traegt die Herleitung inline (Z.150-174) |
+| `tools/tests/train_resume_pause_test.sh` | Datei, `git rm` | Fixtures tot: `v23-b01_brierbest` und der v23-Korpus sind geloescht |
+
+**Kein Folgeschnitt:** `net::test_model_path_opt` behaelt seinen zweiten Aufrufer
+(`net.rs:1096` in `test_model_path`), wird also nicht mit tot. Geprueft.
+
+### Sieben Verweise nachgezogen, und das war der eigentliche Aufwand
+
+Ein Loeschen ohne diesen Schritt haette sieben Stellen ins Leere zeigen lassen. Drei davon sind
+Belegverweise, also kein Formalkram: sie waren die Begruendung dafuer, dass ein Default so steht,
+wie er steht.
+
+| Stelle | was sie sagte | was jetzt dort steht |
+| --- | --- | --- |
+| `net_mcts.rs:11670` | nennt den geloeschten Test als Muster-Vorbild | Verweis auf den Alt-Pfad-Nachweis aus Task #28 ohne Testnamen |
+| `net_mcts.rs:12399` | zaehlt ihn unter den parallel laufenden Tests auf | Aufzaehlung gekuerzt |
+| `train.py:2302` | "Testhaken (train_resume_pause_test.sh, Fall D)" | Testhaken ohne Treibernamen, Ergebnis-Verweis auf `working_rules.md` |
+| `train.py:2894` (`--fast-loader`) | "Beleg: train_resume_pause_test.sh Fall E" | "Beleg: Fall E des Resume-Tests vom 2026-09-06, docs/working_rules.md" |
+| `engine/py/corpus_dataset.py:2087` | dieselbe Bitidentitaets-Begruendung, Fall E | dito |
+| `docs/working_rules.md:136` | Aufruf des Treibers als Anleitung | Treiber als entfallen markiert, das gruene Ergebnis A-E bleibt der Beleg, Hinweis auf Neuverankerung aus der Historie |
+| `tools/hooks/README.md` | ganzer Abschnitt zur Bibliothek plus eine Nennung des Shell-Tests | beide durch Entfallen-Notizen ersetzt |
+| `tools/restic_env.sh:6` | nennt die Bibliothek als Vorbild | Vorbild als entfallen markiert |
+
+**Methodischer Nebenbefund, der wiederverwendbar ist:** drei dieser Stellen
+(`corpus_dataset.py:2087`, `README.md:199`, `restic_env.sh:6`) standen in KEINER der beiden
+Agentenlisten. Sichtbar geworden sind sie erst, als `tools/generate_tools_index.py` nach der
+Loeschung neu lief. Der Index ist damit das bessere Instrument fuer die Frage "wer nennt diese
+Datei" als ein Grep von Hand -- er trennt Aufruf von Erwaehnung und zaehlt beides. **Wer kuenftig
+eine Datei loescht, laesst ihn danach laufen**, nicht nur davor.
+
+### Was NICHT geprueft ist, und das ist wichtig
+
+**Der Rust-Schnitt ist nicht uebersetzt.** `cargo test --release --no-run` waere Volllast neben
+der laufenden Erzeugung und ist deshalb unterblieben. Der Schnitt sitzt an Klammergrenzen und die
+verbliebene Datei ist gegengelesen, aber **belegt ist das erst durch einen Bau**. Vor dem
+naechsten Push gehoert `cargo test --release --no-run` gefahren -- sonst faellt es im pre-push
+auf, und zwar zusammen mit allem anderen, was dann ansteht.
+
+Ebenfalls offen: `tools/hooks/README.md` nennt fuer die Python-Tests des pre-commit weiterhin
+"rund 0,3 s" und drei Dateien; es sind heute 22 Dateien mit 141 Methoden (par.8f). Die
+Laufzeitangabe ist damit unbelegt, aber ihre Berichtigung braucht eine Messung.
+
+### NACH PROJEKTABSCHLUSS SOFORT ABARBEITEN
+
+Die Reihenfolge ist nach steigendem Entscheidungsbedarf sortiert; die Belege stehen je in par.8f.
+Jeder Block endet mit denselben Toren wie Gruppe A: `cargo test --release --no-run`, Lib-Tests,
+Wheel mit unveraendertem Vertragshash, Netz-Paritaets-Fixture, **Anker-Drift gegen `hv4_anchor`**.
+
+1. **`engine/examples/`, sieben Sonden als Block** (`net_determinism`, `latency_2d_vs_flat`,
+   `probe_input_shape`, `net_load_time_probe`, `profile_clones`, `eval_batch_size_numeric_probe`,
+   `interleave_concurrency_probe`). Groesster Posten, weil der pre-push sie bei JEDEM Push
+   mitkompiliert. Kein Aufrufer, mehrere auf `INPUT_SIZE = 708` oder geloeschte Modelle genagelt.
+   **Vorher klaeren:** `planes_parity.rs` ist in par.8f durch keine Liste abgedeckt, also
+   mitbeurteilen statt stillschweigend stehen lassen.
+2. **`net_2d_probe.rs` und `net_2d_probe_two_input.rs`** -- Default-Modelle sind Wegwerf-Exporte
+   aus Task #11 und liegen nicht im Baum.
+3. **`net_load_auto_backcompat.rs`** -- beide Modelle fehlen, das Beispiel endet mit `exit(2)`.
+   Gegenlaeufig: es ist der Nachweis der additiven Encoder-Regel, und die ist Architektur-Fixpunkt.
+   Entweder auf zwei LEBENDE Modelle umhaengen oder ausdruecklich aufgeben.
+4. **`tiling_cache_hit_rate_measurement`** (`tiling_solver.rs`). Zwei Wege: `#[ignore]` setzen
+   (billig, erhaelt die Messfaehigkeit) oder loeschen. **Beim Loeschen wird `mcts::search_action`
+   als produktiv tot sichtbar** -- das ist dann ein eigener Punkt, kein Nebeneffekt.
+5. **`test_window_cache_key_planes_ablation.py::test_switch_off_keeps_the_legacy_key`** -- der
+   eingefrorene Schluessel wurde in zwei Tagen dreimal nachgezogen. Entweder der Stolperdraht
+   wird ein echtes Tor (Aenderung nur mit Registrierung) oder er faellt.
+6. **`test_tiling_geometry_probe.py`** -- neun Methoden auf eine ENTSCHIEDENE Frage. **Nicht
+   komplett loeschen:** `test_catalog_has_18_designs_with_4_cells` (`:126`) sichert eine
+   SPIELREGEL. Praezedenz par.8d Punkt 2.
+7. **`engine/server_ai_test.py`, `server_rust_test.py`, `smoketest.py`** -- kein Laeufer, seit
+   2026-06-26 unberuehrt, dazwischen zwei Kontraktwechsel. **Vorher einmal laufen lassen**: sind
+   sie gruen, sind sie ein geschenkter E2E-Test und gehoeren in den pre-commit statt in den
+   Papierkorb; sind sie rot, ist die Entscheidung leicht.
+8. **Konventions-Regel 4**, Teile `missing_from_index` und Abschnitts-Zaehler -- von der
+   Byte-Gleichheit logisch subsumiert, Nutzen nur noch die bessere Fehlermeldung. `stale_in_index`
+   bleibt.
+9. **Konventions-Regel 1 (Groessen-Ratsche)** -- zehn Ausloesungen, null Zerlegungen laut eigenem
+   Kopf. Kein Blocker, 3,6 s. Entweder Schwelle hochsetzen oder abschaffen.
+10. **`round_transition_resample`** (Code plus seine sieben Tests) -- der Code-Review nennt den
+    Pfad Altlast, der Modulkopf sagt "BLEIBEN". **Entscheid ueber den CODE**, die Tests fallen mit
+    ihm oder gar nicht.
+
+### Zwei Punkte, die NICHT in diese Liste gehoeren, aber offen sind
+
+* **Regel 5 sieht die haeufigste Form leer-gruener Tests nicht** (par.8f, Beifang 1). Das ist
+  Nachbesserung, nicht Aufraeumen: der Ausloeser (`check_conventions.py:525-527`) und das
+  Rueckgabemuster (`:528`) muessten die `let ... else { return }`-Form kennen. Vorher lohnt ein
+  Inventar, wie viele solcher Stellen es heute gibt.
+* **CLAUDE.md beschreibt den Prereg-Index-Generator ueberholt** (par.8f, Beifang 2): "faellt die
+  Datei STILL aus dem Index" gilt nicht mehr, `generate_prereg_index.py:162` gibt Exit 1 vor dem
+  Schreiben. Aenderung an CLAUDE.md ist Nutzer-Entscheid.

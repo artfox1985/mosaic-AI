@@ -19,16 +19,39 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**Die v31-Erzeugung**, gestartet 2026-09-19 um 21:55 als `bash tools/night_v31_generate.sh`,
-drei Klassen nacheinander, Generator `v30-b02`, Seeds 20260934/35/36, `--return-order-random-p
-0.81` als CLI-Flag. Stand 22:10 gezaehlt: **168 von 1.201 Dateien**, Klasse 1 (Sockel).
+**Die v31-Erzeugung**, `bash tools/night_v31_generate.sh`, drei Klassen nacheinander, Generator
+`v30-b02`, Seeds 20260934/35/36, `--return-order-random-p 0.81` als CLI-Flag. **Start am Bestand
+abgelesen: die erste Datei traegt 20:24** (`selfplay_v30-b02-policy_20260919_2024_g10.pkl`), der
+Lauf begann also kurz davor. Stand 22:35 gezaehlt: **193 von 1.201 Dateien**, Klasse 1 (Sockel).
 Erwartete Dauer rund 14 h nach der v30-Messung.
+
+**Vorlaeufige Rate, HOCHGERECHNET und nicht aus einem Artefakt:** 1.900 Partien zwischen der
+ersten und der juengsten Datei in 131 min = rund 4,1 s je Partie, gegen 4,746 s der
+v30-Sockelklasse. Die belastbare Zahl steht erst im Manifest am Klassenende; seit 23:45 laeuft
+ausserdem der Cache-Waechter daneben, was sie ohnehin veraendert.
 
 **Wichtig zum Knopf:** die Dosis geht als CLI-Flag hinein, NICHT als Umgebungsvariable.
 `self_play.py` Z.236-240 setzt `MOSAIC_RETURN_ORDER_RANDOM_P` aus seinem eigenen CLI-Default
 (0.0) neu und ueberschreibt einen exportierten Wert stillschweigend; der erste v31-Anlauf ist
 daran 45 Dateien weit ohne eine einzige Streuung gelaufen und wurde verworfen. Gegenprobe am
 neuen Korpus: **15,0 Prozent der Partien mit gestreuter Rueckgabe** (Ziel 15, Obergrenze 17,75).
+
+**Daneben laeuft seit 2026-09-19, 23:45 der CACHE-WAECHTER** (drei Arbeiter), gestartet mit den
+Knoepfen der Trainings-Umgebung:
+
+```
+MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_FEATURES_FROM_RUST=1 python -X utf8 -u   tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv   --workers 3 --watch --wartezeit 60 --leerlauf-abbruch 100000
+```
+
+Er ist KEIN Teil des Erzeugungsskripts und muss eigens gestartet werden; beim Generationswechsel
+2026-09-19 ist er zunaechst vergessen worden (Nutzer-Frage "laeuft der cache watcher oder hast den
+uebersehen?"). Was er spart, ist gemessen: in v30 dauerte der Blockbau fuers Fenster **4 s** statt
+rund 35 min, weil er alles vorgebaut hatte. Seine Meldung "Traeger-Manifest: KEINS (jede Datei
+traegt)" ist harmlos -- der Block ist trageragnostisch, die Maske kommt erst beim Zusammenfuegen
+(`tools/build_cache_incremental.py:117-118` und `:198-199`).
+
+**Er endet nicht von selbst:** `--leerlauf-abbruch 100000` heisst rund 70 Tage Leerlauf. Nach dem
+Monolith-Merge des v31-Fensters gehoert er beendet.
 
 ### NACH DEM ENDE DER ERZEUGUNG, in dieser Reihenfolge
 
@@ -237,7 +260,10 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
   Profil-Dateien gezielt mit `git restore --staged` herausnehmen.
 - **Dateien laufender Laeufe nicht anfassen** -- auch nicht `self_play.py`,
   `selfplay_manifest.py`, `config.py`, `engine/py/neural_net.py`, `corpus_dataset.py`: die
-  Chunk-Prozesse importieren frisch.
+  Chunk-Prozesse importieren frisch. **Auch eine reine Kommentaraenderung zaehlt** (Verstoss
+  2026-09-20 am `corpus_dataset.py` waehrend des Cache-Waechters, folgenlos geblieben): das
+  Risiko ist das Schreibfenster, nicht der Inhalt -- ein Worker, der genau dann importiert,
+  sieht eine halbe Datei.
 - **Knoepfe, die self_play.py kennt, gehen als CLI-Flag hinein**, nicht ueber die Umgebung:
   `self_play.py` setzt die Variable aus seinem eigenen Default neu (Z.236-240).
 - **Kettenskripte als DATEI starten** (`bash tools/x.sh`), NIE Heredoc-schreiben-und-starten in
