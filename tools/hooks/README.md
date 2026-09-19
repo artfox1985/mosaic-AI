@@ -165,32 +165,15 @@ Testlaufzeit**, dazu die Kompilierung bei kaltem `target/`. Das Budget ist
 damit knapp gerissen; kein Handlungsbedarf, aber die Zahl steht hier, statt
 geschaetzt zu werden (CLAUDE.md "Laufzeiten messen, nicht schaetzen").
 
-## `python_dll_path.sh` -- gemeinsame Herleitung, kein Haken
+## `python_dll_path.sh` ENTFALLEN (2026-09-20)
 
-`tools/hooks/python_dll_path.sh` ist KEIN Git-Haken, sondern eine Bibliothek zum
-Einbinden per `.` (source). Sie liefert `mosaic_python_dll_dir` und
-`mosaic_prepend_python_dll_path`: das Verzeichnis mit der `python3*.dll`, ohne
-das `cargo test --release` mit `STATUS_DLL_NOT_FOUND` (0xc0000135) abbricht.
-
-```sh
-. "$(git rev-parse --show-toplevel)/tools/hooks/python_dll_path.sh"
-mosaic_prepend_python_dll_path || true
-```
-
-Anlass: dieselbe Herleitung (`sys.base_prefix`, dann `cygpath -u`, dann Test auf
-`python3*.dll`) stand am 2026-09-06 in SECHS Kopien im Baum -- `pre-push`,
-`tools/cpu_queue_after_b02.sh`, `tools/k3f_build_window.sh`,
-`tools/run_longrow_teacher_arena.sh`, `tools/run_lr_init_arena.sh`,
-`tools/run_v2_teacher_arena.sh`. Die beiden Stolperfallen (venv-Pfad, POSIX-PATH
-am Doppelpunkt) sind im Skript kommentiert. **Die Bestandsskripte sind bewusst
-NICHT umgestellt** (mehrere davon liefen zum Zeitpunkt der Anlage); der Umbau ist
-eine eigene Entscheidung des Koordinators.
-
-**Stand 2026-09-07:** mit der Loeschung der obsoleten Ketten-Skripte
-(Nutzer-Freigabe, `evaluations/cleanup_proposal_shell_scripts.md`) sind
-`cpu_queue_after_b02.sh` und `k3f_build_window.sh` weg -- die Duplikation ist
-damit auf VIER Kopien geschrumpft. Neu gebaute Skripte rufen die Sammelstelle auf
-(`tools/promote_v25_b01.sh` tut es), statt die Herleitung zu wiederholen.
+Die Sammelstelle fuer die Python-DLL-Herleitung ist geloescht: sie hatte zuletzt
+NULL Aufrufer. Die vier Skripte, fuer die sie am 2026-09-06 extrahiert wurde,
+sind mit den Generationswechseln weggefallen, und `pre-push` hat sie nie
+gesourct -- er traegt die Herleitung inline (Z.150-174). Die Falle selbst
+(`STATUS_DLL_NOT_FOUND`, 0xc0000135) bleibt damit bewacht; die Herleitung steht
+zusaetzlich in CLAUDE.md. Befund und Beleg: `PREREG_code_cleanup_closeout.md`
+par.8f/8g. Die Historie behaelt die Datei.
 
 ## Fehlalarm? `--no-verify`
 
@@ -214,4 +197,5 @@ ohne Wheel, Korpus oder Netz: `test_train_manifest_flags.py` (jedes argparse-Fla
 von train.py mit Verhaltenswirkung steht in `_cli_args`, Ausnahmen namentlich),
 `test_tiling_geometry_probe.py` (Reihen-Alter-Sonde, reine Logik),
 `test_spec_add_field.py`. Der Shell-Test `train_resume_pause_test.sh` (GPU,
-Minuten) bleibt Handstart.
+Minuten, Handstart) ist am 2026-09-20 entfallen -- seine Fixtures waren tot
+(`PREREG_code_cleanup_closeout.md` par.8f/8g).

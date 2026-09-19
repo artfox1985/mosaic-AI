@@ -2084,7 +2084,8 @@ class MosaicDataset(Dataset):
     # Feld in einer C-Operation. Ergebnis ist per Konstruktion dasselbe wie
     # `torch.stack([self[i] for i in indices])` (Fancy-Indexing stapelt in
     # Index-Reihenfolge, Dtype bleibt) -- die Bitidentitaet gegen den
-    # Bestandspfad belegt `tools/tests/train_resume_pause_test.sh` (Fall E).
+    # Bestandspfad belegt Fall E des Resume-Tests vom 2026-09-06
+    # (Ergebnis in docs/working_rules.md; der Treiber ist am 2026-09-20 entfallen).
     _BATCH_FIELDS = ("states", "policies", "values", "masks", "moon_order_targets",
                      "policy_weights", "points_forecast", "rounds", "ownership",
                      "opp_points_forecast", "opp_points_mask", "values_wdl", "wdl_outcome",

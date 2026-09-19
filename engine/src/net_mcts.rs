@@ -11666,9 +11666,10 @@ mod tests {
         // `apply_scoring_shaping`-Aufruf (Mover-/Gegner-Forward-Pass +
         // `blended_leaf_win_prob` + `apply_value_shrink`, alles unveraendert)
         // und vergleicht bit-genau gegen den TATSAECHLICHEN
-        // `net_leaf_eval`-Output. Gleiches Muster wie
-        // `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero`
-        // (Task #28) fuer den `blended_leaf_win_prob`-Blend.
+        // `net_leaf_eval`-Output. Gleiches Muster wie der Alt-Pfad-Nachweis
+        // aus Task #28 fuer den `blended_leaf_win_prob`-Blend (dessen
+        // netzgebundene Haelfte ist am 2026-09-20 entfallen, weil ihr Modell
+        // nicht mehr im Baum liegt; PREREG_code_cleanup_closeout par.8g).
         let net = load_test_net();
         assert_eq!(
             scoring_shaping_weight(),
@@ -12230,58 +12231,7 @@ mod tests {
     // Vertrag-Erkennung).
     // ═══════════════════════════════════════════════════════════════════
 
-    /// Laedt `alphazero_v18_best.onnx` -- flaches Legacy-Modell OHNE
-    /// `opp_points`-Kopf, lokal vorhanden (anders als `load_test_net()`s
-    /// `v10`, siehe dortiger Kommentar). Gleiches Skip-statt-Fail-Muster bei
-    /// Abwesenheit (frischer Klon ohne `models/`, `.gitignore`).
-    fn load_v18_legacy_test_net() -> Option<Net> {
-        let path = crate::net::test_model_path_opt("alphazero_v18_best.onnx")?;
-        Net::load_auto(path.to_str().unwrap()).ok()
-    }
-
     // ── Byte-Identitaet bei w=0 (Default) gegen den Alt-Pfad ──
-
-    /// `net_leaf_eval` muss bei `w=0` (Default, keine `MOSAIC_POINTS_UTILITY_
-    /// W`-Env-Var in dieser Test-Umgebung gesetzt) exakt denselben Blattwert
-    /// liefern wie der Alt-Pfad VOR Task #28: reiner `value_to_win_prob`-
-    /// Blend ohne jeden Punkte-Anteil (`POINTS_UTILITY_WEIGHT=0` machte
-    /// `blended_leaf_win_prob` schon vor diesem Task numerisch identisch zu
-    /// `value_to_win_prob`, siehe dortiger GETESTET-Kommentar) -- verglichen
-    /// gegen einen direkten `eval_pair`-Aufruf (nicht `eval_pair_ex`), der
-    /// ALT-Pfad-Code also unveraendert.
-    #[test]
-    fn net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero() {
-        let Some(net) = load_v18_legacy_test_net() else { return };
-        assert!(!net.has_opp_head(), "v18_best hat noch keinen opp_points-Kopf (Vertrag noch nicht exportiert)");
-        assert_eq!(points_utility_w(), 0.0, "Test-Voraussetzung: MOSAIC_POINTS_UTILITY_W darf hier nicht gesetzt sein");
-
-        let mut rng = StdRng::seed_from_u64(2801);
-        let mut checked = 0;
-        for seed_tag in 0..8u64 {
-            let Some(state) = random_drafting_state(seed_tag, 6, &mut rng) else { continue };
-            let actual = net_leaf_eval(&net, &state);
-
-            // Alt-Pfad: direkter `eval_pair` (kein `_ex`), reines
-            // `value_to_win_prob` je Perspektive, keine Punkte-Beteiligung.
-            let feats = crate::features::features_for_net(&net, &state);
-            let mut flipped = state.clone();
-            flipped.current_player = 1 - state.current_player;
-            let other_feats = crate::features::features_for_net(&net, &flipped);
-            let ((_l, value, _m, _p), (_ol, o_value, _om, _op)) =
-                net.eval_pair(&feats, &other_feats).expect("eval_pair (Alt-Pfad)");
-            let mover_val = value_to_win_prob(&value);
-            let other_val = value_to_win_prob(&o_value);
-            let expected =
-                if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
-
-            assert!(
-                (actual[0] - expected[0]).abs() < 1e-12 && (actual[1] - expected[1]).abs() < 1e-12,
-                "Spiel {seed_tag}: net_leaf_eval {actual:?} weicht vom Alt-Pfad {expected:?} ab"
-            );
-            checked += 1;
-        }
-        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
-    }
 
     /// Gleicher Nachweis auf `blended_leaf_win_prob`-Ebene direkt (ohne
     /// Netz/State) -- egal was in `points`/`opp_points` steht, bei `w=0`
@@ -12446,8 +12396,7 @@ mod tests {
     // `cargo test`s Standard-Parallelitaet (mehrere Tests im selben
     // Prozess/mehreren Threads) NICHT frei von Interferenz: ein anderer,
     // parallel laufender Test, der `points_utility_w()`/`aggr_lambda()`
-    // liest (z.B. `points_utility_w_and_aggr_lambda_default_to_zero` oben
-    // oder `net_leaf_eval_matches_legacy_value_to_win_prob_when_w_is_zero`),
+    // liest (z.B. `points_utility_w_and_aggr_lambda_default_to_zero` oben),
     // kann waehrend des Test-Fensters hier einen zwischenzeitlich gesetzten
     // Nicht-Default-Wert sehen. `AGGRESSION_TEST_LOCK` serialisiert
     // wenigstens die Tests IN DIESER GRUPPE untereinander, UND jeder Test
