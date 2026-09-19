@@ -3969,6 +3969,13 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     round_move_index += 1;
                     let player = game.state.current_player;
                     let pcfg = &cfg.players[player];
+                    // Markierung der Rueckgabe-Streuung. Je Halbzug frisch; gesetzt
+                    // entweder vom Knoten-Weg (unten, direkt nach dem Entscheid) oder
+                    // vom Aufloeser (`apply_return_order_random`). Sie landet als
+                    // Record-Feld `return_order_randomized` und ist die Grundlage der
+                    // Policy-Maske im Datensatzbau (PREREG_dome_return_order.md 12.12
+                    // Schritt 3): ein gestreuter Entscheid darf kein Policy-Ziel tragen.
+                    let return_order_randomized = std::cell::Cell::new(false);
                     let actions = drafting_actions(&game.state);
                     // PREREG_search_rng_split.md: EIN eigener, aus (game_seed,
                     // Zaehler) abgeleiteter RNG fuer den GESAMTEN Entscheid
@@ -4218,8 +4225,9 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // bleibt `random` `None`: keine Zufallszahl, kein
                     // Record-Feld, bitidentischer Bestand. Die `Cell` ist je
                     // Halbzug frisch und traegt die Nebenausgabe zum
-                    // Record-Bau unten.
-                    let return_order_randomized = std::cell::Cell::new(false);
+                    // Record-Bau unten. SEIT 2026-09-19 steht die Deklaration
+                    // WEITER OBEN (vor dem Entscheid), weil sie jetzt zwei
+                    // Schreiber hat: den Knoten-Weg dort und den Aufloeser hier.
                     let return_random = if recording && return_order_random_p() > 0.0 {
                         Some(ReturnOrderRandom {
                             p: return_order_random_p(),

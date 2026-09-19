@@ -1,0 +1,49 @@
+{
+  "champion": "v30-b02_brierbest",
+  "freeze_date": "2026-09-19",
+  "preliminary": false,
+  "name_dialect": "hv",
+  "model_file": "model.onnx",
+  "pth_file": "model.pth",
+  "spec_file": "spec.json",
+  "model_source": "models/alphazero_v30-b02_brierbest.onnx",
+  "spec_source": "models/frozen_champions/v29-b09/spec.json",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 2,
+    "special_row6_w": 1.0,
+    "heuristik_variante": "hv1"
+  },
+  "input_size": 888,
+  "num_actions": 414,
+  "model_contract_hash_at_training": "6ef829e564c58bd5",
+  "engine_input_size_live": 888,
+  "engine_num_actions_live": 414,
+  "contract_hash": "6ef829e564c58bd5",
+  "engine_version": "0.1.0",
+  "breiten_note": "Modell und Wheel sind hier DECKUNGSGLEICH (888/414) -- anders als bei v29-b09, das mit 884/406 auf einem 888/414-Wheel lief. v30-b02 ist auf dem neuen Kontrakt trainiert, es gibt keine Polsterung und keinen Breitenschnitt.",
+  "wheels": [
+    "mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl"
+  ],
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, angelegt 2026-09-18 per pip install --no-deps aus der Wheel-Kopie plus numpy/onnxruntime"
+  },
+  "training_manifest": "models\\manifest_train_v30-b02_20260919_082507.json",
+  "prereg": "evaluations/PREREG_v30_window.md"
+}

@@ -603,6 +603,17 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     cache_key_material += "+nopack_v1" if cache_nopack else "+bitpack_v1"
     if _IGNORE_PTV:
         cache_key_material += "+ignore_ptv_v1"
+    # KEINE Key-Komponente fuer die Rueckgabe-Streuungs-Maske (geprueft und
+    # verworfen 2026-09-19). Sie waere unbedingt und wuerde damit JEDEN
+    # vorhandenen Cache entwerten -- genau davor warnt
+    # `test_switch_off_keeps_the_legacy_key`. Sie ist auch nicht noetig: die
+    # Maske ist kein KNOPF, den man um- und abschalten kann, sondern gilt immer,
+    # sobald ein Record `return_order_randomized` traegt. Und ein Korpus MIT dem
+    # Feld hat ohnehin eigene Dateinamen, also ueber die Dateiliste schon einen
+    # eigenen Schluessel. Die Kollision, gegen die
+    # `feedback_feature_knob_belongs_in_both_cache_keys` gebaut ist (derselbe
+    # Korpus, zwei Lesarten), kann hier nicht entstehen: das Feld existiert erst
+    # ab dem 2026-09-19, ein davor gebauter Monolith kann es nicht enthalten.
     # MOSAIC_CACHE_F32 (Befund 2026-08-26): der Knopf entscheidet ueber den
     # gespeicherten dtype von states/policies (float32 statt float16, siehe
     # `_f` weiter unten) und der Kommentar dort sagt selbst "NICHT
@@ -1633,6 +1644,29 @@ class MosaicDataset(Dataset):
                         # bestandsidentisch; der Schalter steht im Cache-Key,
                         # sonst zoege der zweite Lauf still den ersten Cache.
                         if step.get("policy_target_valid") is False and not _IGNORE_PTV:
+                            pol_w = 0.0
+                        # Rueckgabe-Streuung (2026-09-19, PREREG_dome_return_order.md
+                        # 12.12 Schritt 3): ein Record, dessen Rueckgabe-Reihenfolge
+                        # GESTREUT wurde, traegt `return_order_randomized: true`
+                        # (self_play.rs). Seine gespielte Aktion ist Zufall, kein
+                        # Entscheid -- als Policy-Ziel waere sie Rauschen.
+                        #
+                        # EIGENE Bedingung, NICHT ueber `policy_target_valid`: beide
+                        # Ketten fahren MOSAIC_IGNORE_POLICY_TARGET_VALID=1, dort
+                        # waere die Maske wirkungslos (genau die Falle aus 12.12).
+                        # Vorbild ist die gestreute Startkuppel oben, die ebenfalls an
+                        # einer eigenen Bedingung haengt und den Schalter nicht
+                        # durchlaesst.
+                        #
+                        # Das VALUE-Ziel bleibt unberuehrt -- der gestreute Zustand ist
+                        # genau das, was der Value-Kopf sehen soll (par.11c: "ich will
+                        # ja nur dass das netz sieht das kuppelplatten auch einfach so
+                        # aus dem stapel gezogen werden koennen").
+                        #
+                        # Feld fehlt in JEDEM Korpus vor dem 2026-09-19 -> `.get`
+                        # liefert None, die Zeile ist dort wirkungslos und der
+                        # Datensatz byte-identisch.
+                        if step.get("return_order_randomized") is True:
                             pol_w = 0.0
                         polw_l.append(np.float32(pol_w))
                         # Schema 19 (RANKING_CACHE_FIELDS): finale Maske erst

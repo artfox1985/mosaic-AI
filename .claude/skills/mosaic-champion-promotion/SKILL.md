@@ -14,7 +14,7 @@ Stellen, an denen es in der Vergangenheit schiefging.
 
 1. `tools/set_champion.py <neu>`
 2. Elo-Kante **Gating** gegen Champion-1
-3. Elo-Kante **Anker** (`Heuristik_hv4_anchor`, Artefakt `models/frozen_heuristics/hv4_anchor` seit 2026-09-12), festes n=150 ohne Fruehstopp
+3. Elo-Kante **Anker** (`Heuristik_hv4_anchor`, Artefakt `models/frozen_heuristics/hv4_anchor` seit 2026-09-12), **festes n=50** ohne Fruehstopp (gesenkt 2026-09-19, Nutzer-Entscheid: die Kante ist bei rund 90 Prozent Siegquote ein Sanity-Check, kein Rangmass; als Fruehstopp gebaut waere sie NICHT, weil `frozen_referee_match` kein SPRT kennt und ein Stopp den Punktschaetzer nach oben zoege)
 4. Elo-Kante **Champion-2** (Vorvorgaenger, @400)
 5. Pflicht-Diagnostiken am Sieger, inklusive 5b Anzeige-Kalibrierung,
    5c sigma/Prior-Balance und 5d Netz-Paritaets-Fixture
