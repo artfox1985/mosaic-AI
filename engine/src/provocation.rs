@@ -456,17 +456,23 @@ pub(crate) fn preference_column() -> Option<usize> {
 /// 1..=4 -- in Runde 5 entscheidet dort `round5::choose_action` exakt, und
 /// der Vorzug darf die exakte Endrunden-Wahl nicht verdraengen.
 ///
-/// Auswahl unter mehreren Kandidaten, deterministisch:
-///  1. minimaler Ueberlauf auf die Strafleiste (der Zug soll bauen, nicht
-///     bezahlen),
+/// Auswahl unter mehreren Kandidaten, deterministisch (berichtigt 2026-09-19,
+/// A13 -- der fruehere Text nannte ein Ueberlauf-Kriterium, das es nicht gibt,
+/// und verschwieg das einzige echte Primaerkriterium):
+///  1. knappste Farbe zuerst (kleinster Restvorrat `verbleibend`) -- was knapp
+///     ist und JETZT angeboten wird, kommt vielleicht nie wieder,
 ///  2. dann die am weitesten gefuellte Musterreihe (naechste Lieferung
 ///     zuerst fertig),
 ///  3. dann kleinste Reihe (billig vor teuer), dann stabile Reihenfolge.
+/// KEIN Ueberlauf-Kriterium: die erste Stelle des Sortiertupels ist die
+/// Konstante `0usize` und ordnet nichts (Begruendung an der Fundstelle im
+/// Rumpf: `TakeAction` traegt keine Stueckzahl).
 ///
 /// Zwei Bedingungen je Kandidat, beide aus dem Brett ablesbar:
-///  - Zelle `(r, spalte)` fordert GENAU `m.take.color` (`required_color_for`)
-///    und ist noch nicht gefuellt -- eine gefuellte Zelle braucht keine
-///    Lieferung mehr.
+///  - Zelle `(r, spalte)` ist noch nicht gefuellt und nimmt die Farbe: ein
+///    `Wild`-Feld immer, ein `Normal`-Feld nur bei `required_color ==
+///    m.take.color`, ein `Special`-Feld nie (gelesen ueber `get_space`, NICHT
+///    ueber `required_color_for`; berichtigt 2026-09-19).
 ///  - Die Platzierung ist ohnehin legal (`generate_valid_moves` liefert nur
 ///    legale Zuege; Farb-/Kapazitaetsregeln der Musterreihe stecken dort).
 pub(crate) fn preference_move(state: &GameState) -> Option<crate::moves::Action> {

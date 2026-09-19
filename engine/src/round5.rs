@@ -1601,8 +1601,9 @@ mod tests {
 
     /// Paritaet: `player_total_exact` muss IMMER exakt der Referenzformel fuer
     /// den jeweils aktiven Toggle-Zustand entsprechen -- bei
-    /// `ROUND5_ENDSCORING_ENABLED=false` (Ist-Zustand) also byte-identisch zur
-    /// alten Rechnung. Manuell in BEIDEN Toggle-Zustaenden gebaut/getestet
+    /// `ROUND5_ENDSCORING_ENABLED=true` (Ist-Zustand, berichtigt 2026-09-19)
+    /// also gegen den endaware-Pfad, bei `false` byte-identisch zur alten
+    /// Rechnung. Manuell in BEIDEN Toggle-Zustaenden gebaut/getestet
     /// (siehe Konstanten-Kommentar in tiling_solver.rs) -- dieser Test prueft
     /// generisch gegen den JEWEILS aktiven Wert der Konstante, damit er in
     /// beiden Zustaenden gruen ist.

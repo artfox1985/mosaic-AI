@@ -438,8 +438,9 @@ def load_models(paths: list[str]) -> list[dict]:
     models = []
     for path in paths:
         ckpt = torch.load(str(path), map_location="cpu")
-        model, encoder = build_model_from_checkpoint(ckpt, input_size=None,
-                                                     num_actions=NUM_ACTIONS)
+        # Policy-Breite aus dem Checkpoint (2026-09-19): ein fester Wert sperrt
+        # Alt-Checkpoints aus, siehe docs/pitfalls.md.
+        model, encoder = build_model_from_checkpoint(ckpt, input_size=None)
         model.eval()
         # Breiten AUS DEM state_dict, nicht aus dem Modellobjekt: `MosaicNet`
         # legt `input_size` nicht als Attribut ab, ein `getattr`-Rueckfall

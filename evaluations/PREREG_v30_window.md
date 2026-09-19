@@ -264,6 +264,17 @@ Vorfall 2026-09-11, `feedback_watcher_workers_reimport_config`).
 | --- | --- | --- | --- |
 | **`v30-b01`** (Pflicht, einziger) | v30-Rezept KALT: b03-Rezept mit `--moon-loss-weight 0`, `--ownership-weight 0`, OHNE `--endgame-head`, `--opp-points-head` bleibt, INPUT_SIZE 888, NUM_ACTIONS 414, KEIN `--load` (par.6) | Champion `v29-b09`: Material des neuen Generators plus Kaltstart plus die acht neuen Knoten -- **nicht einfaktoriell**, und das steht hier VOR der Messung | 20260945 |
 
+| **`v30-b02`** (zweiter Arm, Nutzer-Entscheid 2026-09-19) | WARMSTART von `v29-b09_brierbest`, sonst rezeptgleich zu b01: gleicher Monolith `data/.cache_ec851c536ffd.h5`, gleiche Fensterliste, gleicher Val-Pool, gleiches Flag-Set | Champion `v29-b09` mit DENSELBEN Tor-1-Seeds wie b01 (20261300/20261301) -- dadurch ist b02 auch gegen b01 lesbar, ohne eine dritte Arena | 20260945 |
+
+**`v30-b02` REGISTRIERT am 2026-09-19** (Nutzer: *"ja mach mir einen zweiten arm"*; par.8 Punkt 2).
+**Was er zerlegt:** gegen b01 aendert sich GENAU EIN Faktor, der Start (warm statt kalt). Material, Eingang,
+Aktionsraum, Seed und Rezept sind identisch, weil b02 denselben Monolithen und dieselbe Fensterliste benutzt.
+Damit ist die Kaltstart-Wette trennbar, die par.4 fuer b01 ausdruecklich als nicht-einfaktoriell ausweist.
+**Kosten:** rund 1,2 h Training plus 2 x rund 95 min Tor 1 (gemessen an b01, nicht mehr die 105-110-min-Annahme).
+**Parallelitaet:** das Training laeuft neben der b01-Arena (GPU plus EIN CPU-Auftrag, `docs/working_rules.md`),
+seine Laufzeit ist dadurch GEBREMST und im Bericht so markiert; die b02-Arena wartet auf eine freie Maschine,
+weil zwei CPU-Messungen gegeneinander verboten bleiben. Kette `tools/night_v30_b02.sh`.
+
 **KEINE weiteren Arme ohne eigenen Nutzer-Entscheid.** Das ist die v30+-Regel
 (`project_material_only_freeze_v25_v27` in der Fassung fuer die Generation v30 (v31 offen, Nutzer 2026-09-17), STATUS
 Abschnitt 6 Punkt 18/20: *"v30 selbst bekommt nur noch Rezept-Knoepfe, keine neuen
@@ -516,6 +527,241 @@ TAUSCH zwischen zwei Merkmalen, kein Fix. Die dritte Klasse startet erst nach de
 Aenderung an ihr waere zudem ein Eingriff in `tools/night_v30_generate_rest.sh`, das die laufende Kette gerade
 liest (`feedback_dont_touch_files_read_by_running_runs`) -- sie ginge nur ueber Stoppen der Kette und
 getrennten Start.
+
+### Kette durchgelaufen bis Tor 1 (2026-09-19, 04:49 bis 06:21): alle Pflichtpruefungen GRUEN
+
+**Erzeugung komplett 04:46** (par.7-Abgleich): Sockel 18.984,2 s / 4,746 s je Partie, temperiert 16.183,5 s /
+4,046 s, Ausflug 14.744,0 s / 3,680 s je Identitaet; zusammen **49.911,7 s = 13,86 h**, Planungsannahme
+10,5-14 h am oberen Rand getroffen, gegen v28 +39,7 Prozent.
+
+**Tor 0 je Klasse und Tor 2a (Kette, Schritt 1):** `sp_voll` **0,901 (+-0,017)** gegen **0,843 (+-0,017)**,
+je 8.000 Seiten -- **HAELT**, identisch zur Vorabmessung um 20:15. Alle vier Klassen mit 4.000 bzw. 4.006
+Partien ausgewertet.
+
+**Fenster und Monolith (Schritte 2-6):** Traeger-Manifest **580 = 400 neu + 135 G-1 + 45 G-2** (Zusicherung
+der Kette erfuellt), G-2-Schwarm 145 von 401, Fensterliste `data/window_v30.txt` mit **2.947 Dateien** (Soll
+rund 2.947, par.1). **Blockbau 4 s** -- der Cache-Waechter hatte alles vorgebaut, wie am 2026-09-18 um 18:35
+vorhergesagt und an 150 von 150 Stichprobenbloecken belegt. Monolith-Merge **611 s**, Schluessel
+`ec851c536ffd`, Stempel-Pruefung bestanden; Traeger-Maske 2.271 von 2.800 Bloecken policy-maskiert.
+
+**Seed-Kontrolle, die kurz nach einem Fehler aussah:** die G-1-Teilauswahl meldet Seed **20261945** statt
+20260945. Das ist Absicht und kein Bruch der Vorregistrierung -- `tools/generate_carrier_manifest.py` Z.161
+zieht jede `--pick`-Klasse mit `seed + 1000 * (i + 1)`, damit die Teilauswahlen unabhaengig sind; die
+Hauptziehung und der G-2-Schwarm laufen auf 20260945.
+
+**Training `v30-b01` KALT (Schritt 7):** **3.652,4 s = 1,01 h**, 12 Epochen, 4.894.809 Samples, cuda,
+fast-loader, `cpu_s` 18.257,2 bei 6 Threads, Datenaufbau 39,7 s. **Die Annahme lag bei 2,3-2,6 h** (par.7,
+aus v23-b06 mit 4,72 Mio Samples) -- der Kaltstart war also **2,3-mal schneller als geplant**; die alte Zahl
+stammt aus einer anderen Encoder-Aera und taugte nicht als Bezug.
+
+**Manifest-Diff des Trainings (par.6 / Schritt 7b), von Hand gefahren:** gegen
+`models/manifest_train_v29-b09_20260917_200920.json` genau die sechs erwarteten Abweichungen
+(`cache_file`, `file_list`, `load`, `name`, `seed`, `val_pool`), **0 unerwartete**. `load` ist `None` --
+der Kaltstart ist am Artefakt belegt, nicht nur im Rezept.
+
+**Tor 1 laeuft seit 06:21:11**, Seed 20261300, beide Seiten Champion-Spec `frozen_champions/v29-b09/spec.json`,
+400 Sims, Blockgroesse 5, Deckel 200 Paare, kein Frueh-Stopp unter 150 Paaren.
+
+### Lesart des flachen Tor 1: die Kaltstart-Wette ist NICHT verloren (2026-09-19, 08:35)
+
+**Nutzer:** *"wir koennen es auch positiv sehen. v30 kaltstart ist gleichauf mit dem v29 champ."* Das trifft
+zu und ist der eigentliche Gehalt des Ergebnisses -- mit einer Praezisierung, die dazugehoert.
+
+**Warum es ein Ergebnis ist und nicht bloss ein Nullbefund.** `v30-b01` startete OHNE jedes Vorwissen (kein
+`--load`) und lernte in 12 Epochen auf einem Fenster. Sein Gegner `v29-b09` ist das Ende einer
+Warmstart-Kette ueber mehrere Generationen. Dass der Kaltstart daraus **keinen Rueckstand** mitbringt, war
+die Wette (STATUS Abschnitt 4: *"Ungedeckt ist allein der Kaltstart -- das ist die bewusst eingegangene
+Wette"*, Nutzer 2026-09-17: *"dann gehen wir die wette fuer v30 und kaltstart ein"*). Sie ist eingeloest in
+dem Sinne, auf den es ankommt: **der Neuanfang kostet nichts**, und die 90 Projektions-, 39 Sicht- und 4
+Design-Spalten haengen nicht mehr als Null-Polster hinter einem eingespielten Netz, sondern sind von Anfang
+an mitgelernt (par.1 Punkt 2).
+
+**Die Praezisierung: H0 heisst "kein Unterschied nachweisbar", nicht "gleich stark".** Aus dem Artefakt von
+Seed 20261300 (n = 400 Partien, Grundmenge gepaarte Arena-Partien @400, Einheit Siege je Paar):
+
+| Groesse | Wert |
+| --- | --- |
+| gepaarte Differenz je Paar | +0,030, KI95 [-0,171; +0,231] |
+| als Siegquoten-Differenz | +1,50 PP, KI95 [-8,57; +11,57] PP |
+| A-Anteil | 50,75 %, KI95 [45,72 %; 55,78 %] |
+| **Aufloesung dieses Laufs** | **+-5,03 Prozentpunkte** |
+
+Ein Unterschied bis rund fuenf Prozentpunkte ist damit NICHT ausgeschlossen -- in beide Richtungen. Das ist
+die bekannte Instrumentengrenze (`project_training_seed_variance`: 5,75 PP Streuung bei n = 400 fuer
+IDENTISCHE Konfiguration). Mit dem zweiten Seed sinkt sie auf erwartete **+-3,56 PP**.
+
+**Was daraus fuer die Generatorwahl folgt, und das ist der praktische Teil:** Stufe 1 der Regel
+(`docs/generation_loop.md`) schliesst nur aus, wer SIGNIFIKANT verliert. `v30-b01` verliert nicht -- er
+bleibt Kandidat, und die Wahl faellt damit auf Stufe 2, am Spaltenprofil. Genau dafuer laeuft die
+Spaltensonde je Seed mit.
+
+**Ein struktureller Unterschied bei gleichem Ergebnis**, als Punktschaetzer aus demselben Artefakt: `v30-b01`
+nimmt **7,10 Strafsteine** je Partie und Seite, `v29-b09` **8,56** -- **1,46 weniger** bei praktisch gleichem
+Punktestand (52,84 gegen 53,06). Dieselbe Richtung zeigte schon der Korpus (Tor 0: -0,295 Strafsteine gegen
+die Vorgaenger-Klasse). Ein Signifikanzurteil steht dazu aus; fuer Tor 2 sind Punktschaetzer zulaessig.
+
+### Die eigentliche Frage von v30: welcher Arm wird GENERATOR fuer v31 (2026-09-19, 08:30)
+
+**Nutzer-Zuspitzung:** *"nein die knoten sind in ordnung. eigentlich muessen wir jetzt nur klaeren welcher v30
+arm generator fuer v31 wird."* Damit ist das Ziel dieser Generation die GENERATORWAHL, nicht die
+Champion-Frage -- und die beiden sind ausdruecklich verschieden (`docs/generation_loop.md`, Falle 2:
+*"'Generator' ist NICHT 'Kandidat'"*).
+
+**Die Regel dafuer steht seit v24 fest** (`docs/generation_loop.md`, Abschnitt "Generatorwahl unter Armen",
+Nutzer-Entscheid 2026-09-02) und wird hier nicht neu verhandelt:
+
+1. **Staerke ist Ausschlusskriterium, kein Rangmass.** Ein Arm, der gegen den besten Stand signifikant
+   verliert (n >= 150 Paare oder Replikation), scheidet aus -- unabhaengig von seinem Spaltenprofil.
+2. **Unter den nicht unterscheidbaren Armen entscheidet der Punktschaetzer der Kampagnen-Groesse** am
+   argmax-Instrument, also das Mass von Tor 2 (Spaltenprofil). Punktschaetzer ohne Signifikanzforderung.
+3. **Liegt die Differenz unter der Block-SE, bleibt der Amtsinhaber.** Fuer v31 ist der Amtsinhaber
+   `v29-b11`.
+
+Dazu die Vorbedingung aus derselben Stelle: *"Jeder Arm bekommt sein Spaltenprofil am argmax-Instrument,
+bevor er als Generator ausscheidet. Ein Arm ohne Tor-2-Messung ist kein Kandidat und kein Ausgeschiedener,
+sondern ungemessen."*
+
+**Was dafuer laeuft, und es ist bereits alles angelegt:** beide Arme fahren Tor 1 gegen denselben Gegner
+(`v29-b09`) mit denselben zwei Seeds (20261300/20261301, je 200 Paare) -- das erfuellt die
+Entscheid-Schwelle "n >= 150 Paare ODER Replikation" doppelt und macht b01 und b02 auch gegeneinander lesbar,
+ohne eine dritte Arena. Die Spaltensonde und die Plattenpunkte laufen je Seed aus denselben Logs mit.
+
+**Ein Argument, das die Regel NICHT abdeckt und das in den Entscheid gehoert:** der Amtsinhaber `v29-b11` ist
+der auf 414 gepolsterte `v29-b09` OHNE Trainingsschritt -- seine Policy-Kopf-Zeilen 406-413 sind
+Null-Polster (par.1 Punkt 1). Er spielt die neuen Knoten also, bekommt an ihnen aber keinen gelernten Prior;
+die Besuchsverteilung entsteht dort allein aus der Suche. `v30-b01` und `v30-b02` haben diese Zeilen zum
+ersten Mal trainiert. Ob sie etwas gelernt haben, misst die Netz-Gesundheit (par.3 Punkt 7a, Zeilen 406-413);
+**diese Messung ist damit nicht nur Diagnostik, sondern Entscheidungsgrundlage** und gehoert vor die
+Generatorwahl.
+
+**Nicht noetig fuer diese Frage:** eine Champion-Promotion. Sie haengt an der Kante gegen den Champion und
+ist eine eigene Entscheidung (`docs/promotion_checklist.md`); ein Arm kann Generator werden, ohne Champion zu
+sein.
+
+### Replayer-Reparatur: zwei Hypothesen am Code AUSGESCHLOSSEN, die dritte braucht den Lauf (2026-09-19, 10:40)
+
+**Nutzer-Auftrag:** *"ja, replayer reparieren und sonde neu fahren"*. Stand: Ursache noch NICHT gefunden,
+zwei naheliegende Erklaerungen sind am Code widerlegt, das Diagnosewerkzeug steht.
+
+**Ausgeschlossen 1: "die Zugliste faechert die Rotation nicht auf".** Das stimmt fuer
+`game::generate_draw_stack_moves` (`game.rs:414-432`: ein Zug je Platte und Slot, `rotation: 0`), aber NICHT
+fuer die Serialisierung, aus der der Replayer liest: `serialize.rs:659-671` faechert lokal ueber
+`[0, 90, 180, 270]` auf und filtert mit `validate_draw_from_stack`. Der Kommentar dort nennt genau diesen
+Grund ("die UI erwartet weiterhin die volle Kachel x Slot x Rotation-Enumeration in EINEM Zug").
+
+**Ausgeschlossen 2: "die beiden Validierungspfade sind verschieden".** `draw_stack_slot_rotation_candidates`
+(`game.rs:377-395`, der Knoten-Weg) und die Serialisierung rufen BEIDE `validate_draw_from_stack`. Eine
+Rotation, die der Knoten anbietet, ist damit auch in der Zugliste gueltig -- bei gleicher `return_order`.
+
+**Offen bleibt der Zustand an der Bruchstelle.** Der Serialisierungs-Zweig greift nur, wenn
+`state.pending_stack_draw` NICHT leer ist (`serialize.rs:651`), der Replayer muss also mit genau so vielen
+Peeks dort ankommen wie die Arena. Ob das scheitert, und woran, sagt nur der Lauf.
+
+**Gebaut: `tools/probes/replay_divergence_diagnosis.py`** (neu, lastfrei geschrieben). Es spielt die Partien
+eines Gating-Artefakts nach und druckt je divergenter Partie, was GESUCHT wurde und was `valid_moves` dort
+ANBIETET, dazu die Zahl der Platten in `pending_stack_draw`. Die Log-Aufbereitung ist wortgleich aus
+`arena_column_probe.py::_replay_end_state` uebernommen (Header voranstellen, `agl.run` statt `Replayer`,
+weil dort die Chip-Plan-Reparatur sitzt und Divergenzen als Rueckgabe statt als Ausnahme kommen).
+
+**Warum es noch nicht gelaufen ist:** die b02-Arena laeuft, und eine Sonde neben einer Arena teilt dieselbe
+Ressource (`docs/working_rules.md`: zwei CPU-Messungen gegeneinander bleiben verboten). Der Lauf gehoert in
+dasselbe Fenster wie Gruppe A des Aufraeumens.
+
+### TOR 2b IST IN DIESER GENERATION NICHT VERWENDBAR -- der Replayer divergiert bei 16 bis 18 Prozent (2026-09-19, 10:20)
+
+**Befund beim Auswerten der Spaltensonde, nicht vorhergesehen.** `tools/probes/arena_column_probe.py` spielt
+die Arena-Logs nach, um volle Spalten zu zaehlen. In dieser Generation scheitert das massenhaft:
+
+| Seed | Partien mit Log | replayt | divergiert | Anteil |
+| --- | --- | --- | --- | --- |
+| 20261300 | 400 | 338 | **62** | **15,5 %** |
+| 20261301 | 400 | 329 | **71** | **17,8 %** |
+
+Fehlerbild einheitlich: `ReplayDivergence: kein passender Kuppel-Zug: tile=11 slot=(1,1) rot=90`
+(Artefakt `arme["(einarmig)"]["fehler_beispiele"]`). **Die bekannte Replayer-Grenze lag bei 4 von 400 und
+1 von 360** (STATUS Abschnitt 8, Chip-Vollendung) -- das ist ein Faktor 15 bis 18. Der naheliegende
+Verdacht ist der Kontraktwechsel: Slot, Rotation und Rueckgabe sind seit dem 2026-09-18 eigene Suchknoten,
+und der Replayer rekonstruiert den Kuppelzug anders. **UNGEPRUEFT**, das ist eine Vermutung, keine Messung.
+
+**Die Teilmenge ist NICHT repraesentativ, und das ist am selben Lauf belegbar** -- Gegenprobe gegen das
+Gating-Artefakt, das alle 400 Partien traegt (Grundmenge Partien, Einheit eigene Punkte je Seite):
+
+| Seed | Margin b01 minus b09, ALLE 400 | Margin in der replaybaren Teilmenge | Verschiebung |
+| --- | --- | --- | --- |
+| 20261300 | **-0,21** | **+1,61** | **+1,83** |
+| 20261301 | +1,12 | +2,24 | +1,12 |
+
+Bei Seed 20261300 dreht sich das Vorzeichen: ueber alle Partien liegt `v30-b01` bei den Punkten knapp
+HINTEN, in der replaybaren Teilmenge deutlich vorn. Die 62 ausgeschlossenen Partien sind also genau solche,
+in denen b01 schlechter abschnitt -- die Auswahl korreliert mit dem Messgegenstand.
+
+**Folge fuer die Generatorwahl, und die ist unangenehm:** Stufe 2 der Regel
+(`docs/generation_loop.md`) soll unter nicht unterscheidbaren Armen am SPALTENPROFIL entscheiden -- und
+genau dieses Profil kommt aus dem Replay. Die Zahlen "volle Spalten 0,8609 gegen 0,8846" (Seed 1) und
+"0,8693 gegen 0,8541" (Seed 2) stehen auf der verzerrten Teilmenge und widersprechen sich ausserdem
+zwischen den Seeds. **Sie taugen als Entscheidungsgrundlage nicht.**
+
+**Drei Wege, keiner davon vom Koordinator zu entscheiden:**
+
+1. **Replayer reparieren** (Ursache am Kuppelzug suchen), dann Tor 2b neu fahren -- die Logs liegen, es
+   kostet nur den Sonden-Lauf (81 bis 103 s je Seed).
+2. **Anderes Instrument fuer Stufe 2**: die Spaltenzahl aus einer eigenen Messung statt aus dem Replay;
+   `tools/corpus_sanity_check.py` kann es auf Records, aber Arena-Partien schreiben keine.
+3. **Stufe 3 ziehen** (`docs/generation_loop.md`: liegt die Differenz unter der Block-SE, bleibt der
+   Amtsinhaber) -- dann bliebe `v29-b11` Generator fuer v31, ohne dass ein Spaltenprofil je gemessen wurde.
+   Das widerspricht der Vorbedingung derselben Stelle: *"Ein Arm ohne Tor-2-Messung ist kein Kandidat und
+   kein Ausgeschiedener, sondern ungemessen."*
+
+### TOR 1 VERDIKT ueber beide Seeds (2026-09-19, 10:15): H0
+
+| Seed | Siege | Anteil | Block-z | SPRT | Punkte A/B | Strafleiste A/B | Laufzeit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261300 | 203:197 | 50,75 % | +0,279 | Deckel | 52,84 / 53,06 | 7,10 / 8,56 | 95 min, 14,30 s je Partie |
+| 20261301 | 201:199 | 50,25 % | +0,104 | Deckel | 53,26 / 52,14 | 7,78 / 8,38 | 124 min, 18,67 s (GEBREMST) |
+| **gepoolt** | **404:396** | **50,50 %** | **+0,278** (80 Bloecke) | – | – | – | – |
+
+**VERDIKT nach par.3 Punkt 5: H0.** Weder z >= +1,96 noch gepoolt >= 52,5 Prozent. Beide Seeds erreichten den
+Deckel von 200 Paaren ohne Frueh-Stopp, die Champion-Strenge ist also erfuellt. **Die Kaltstart-Wette ist
+damit nicht eingeloest, aber ausdruecklich auch nicht widerlegt** (par.3 Punkt 5 in genau diesem Wortlaut
+vorregistriert).
+
+**Die Laufzeit des zweiten Seeds ist NICHT mit der des ersten vergleichbar:** 18,67 gegen 14,30 s je Partie,
+weil ab 08:24 das b02-Training auf der GPU danebenlief (Markierungspflicht aus `docs/working_rules.md`). Last
+bremst, sie verfaelscht nicht -- die Suche ist sim-budgetiert, nicht zeitbudgetiert; das Ergebnis des Laufs
+ist davon unberuehrt.
+
+**Was ueber beide Seeds konsistent bleibt, als Punktschaetzer:** `v30-b01` nimmt weniger Strafsteine als der
+Champion (7,10 gegen 8,56 und 7,78 gegen 8,38, also -1,46 und -0,60), bei Punktestaenden, die einmal knapp
+darunter und einmal knapp darueber liegen (52,84 gegen 53,06; 53,26 gegen 52,14). Dieselbe Richtung zeigte
+Tor 0 im Korpus (-0,295 Strafsteine).
+
+**Fuer die Generatorwahl heisst H0: `v30-b01` ist NICHT ausgeschlossen.** Stufe 1 der Regel
+(`docs/generation_loop.md`) schliesst nur aus, wer signifikant VERLIERT; b01 verliert nicht. Die Wahl faellt
+damit auf Stufe 2, das Spaltenprofil -- und dafuer fehlt noch das Ergebnis des zweiten Arms.
+
+### Tor 1, Seed 20261300 (2026-09-19, 07:56): H0 -- kein Nachweis eines Vorsprungs
+
+`v30-b01_brierbest` gegen den Champion `v29-b09_brierbest`, beide Seiten Champion-Spec, 400 Sims, Blockgroesse
+5, Deckel 200 Paare erreicht (kein Frueh-Stopp). Laufzeit **5.719,1 s = 95 min**, 14,298 s je Partie, 10
+Threads, `cpu_s` 24.826,5 -- die Annahme lag bei 105-110 min (par.7), also schneller.
+
+| Groesse | Wert |
+| --- | --- |
+| Siege | **203 : 197** fuer v30-b01 = **50,75 Prozent** (Schwelle par.3: 52,5) |
+| Block-z (40 Bloecke a 5 Paare) | **+0,279** (Schwelle +1,96) |
+| Bloecke mit v30-b01 vorn | 15, Champion vorn 18, gleich 7 |
+| SPRT | `UNDECIDED_CAP_REACHED`, llr -4,023 (Schranken +-6,907) |
+| mittlere Paardifferenz | +0,030, KI95 [-0,171; +0,231] |
+| eigene Punkte | v30-b01 **52,84**, Champion **53,06** |
+| Strafleiste | v30-b01 **7,10**, Champion **8,56** |
+
+**Lesart:** flach. Der Kaltstart holt den Champion ein, aber ein Vorsprung ist nicht nachgewiesen. Auffaellig
+ist allein die Strafleiste: v30-b01 nimmt **1,46 Steine weniger** je Partie und Seite bei praktisch gleichem
+Punktestand. Der zweite Seed (20261301) laeuft; das Verdikt nach par.3 faellt erst ueber beide.
+
+**Rechenfalle, dabei gefunden und in `docs/pitfalls.md` eingetragen:** die Felder in `blocks[]` sind
+KUMULATIV. Wer sie als Blockergebnisse mittelt, bekommt hier **-0,600 (z = -0,614)** -- ein Vorzeichen gegen
+den Gesamtstand von 203:197. Richtig differenziert (mit Summenprobe) sind es +0,150 / z = +0,279.
 
 ### Warum der Streu-Knopf gebaut wurde und was 12.9 dabei uebersah (2026-09-18, 22:20)
 

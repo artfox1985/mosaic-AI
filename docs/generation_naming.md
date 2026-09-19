@@ -160,7 +160,14 @@ Kette `tools/night_v30_generate.sh`). Trainingsarm:
 NUM_ACTIONS 414, KEIN `--load`; Seed 20260945, Fenster `data/window_v30.txt`, Kette
 `tools/night_v30_chain.sh`; STATUS Abschnitt 4, `PREREG_v30_window.md` par.4/par.6).
 Tor 1 gegen den Champion `v29-b09`, zwei Seeds a 200 Paare (20261300 / 20261301).
-**Weitere Arme ab `v30-b02` nur mit eigenem Nutzer-Entscheid** (v30+-Regel: die
+**`v30-b02`** (WARMSTART von `v29-b09_brierbest` auf demselben Fenster, sonst rezeptgleich zu
+`v30-b01`: gleicher Monolith `data/.cache_ec851c536ffd.h5`, gleiche Fensterliste, gleicher Seed
+20260945, gleicher Val-Pool, gleiche Tor-1-Seeds 20261300/20261301 gegen denselben Gegner).
+Reserviert 2026-09-19 auf Nutzer-Entscheid *"ja mach mir einen zweiten arm"*; Zweck ist die
+Zerlegung des b01-Buendels auf GENAU EINEN Faktor, den Start (`PREREG_v30_window.md` par.4/par.8
+Punkt 2). Kette `tools/night_v30_b02.sh`.
+
+**Weitere Arme ab `v30-b03` nur mit eigenem Nutzer-Entscheid** (v30+-Regel: die
 Abschlussgeneration bekommt nur noch Rezept-Knoepfe, keine neuen Bauvorhaben; STATUS
 Abschnitt 6 Punkt 18/20). Kein Knopf-Suffix im Namen (Regel oben).
 

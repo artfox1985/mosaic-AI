@@ -916,22 +916,28 @@ pub fn ownership_occupancy(logits_half: &[f32]) -> Option<[[f64; 6]; 6]> {
 //
 // Jokerfeld-Regel (Anlass: Nutzerfrage 2026-09-11 zur Platte "Mehrfarbige
 // Felder", 2 Punkte je Jokerfeld nur bei Vollbelegung): eine Zelle AUSSERHALB
-// der Huelle, die zu einer BEREITS GELEGTEN Kuppelplatte gehoert, zaehlt im
-// Abzug "Steine ausserhalb" nur noch mit `(1 - out_wild_w)`; bei 1 ist sie
-// abzugsfrei. Umgesetzt als Gutschrift `+ out_wild_w * v * (r + 1) /
-// Gesamtkosten`, also genau der fehlende Anteil des Abzugs. "Gehoert zu einer
-// gelegten Platte" ist `DomeGrid::get_space(r, c).is_some()`: die vier
-// 2x2-Zellen eines Slots existieren genau dann, wenn dort eine Platte liegt
-// (`board.rs`, `get_space` ueber `dome_slots[sr][sc].as_ref()`).
+// der Huelle, die ein JOKERFELD (`SpaceType::Wild`) einer BEREITS GELEGTEN
+// Kuppelplatte ist, zaehlt im Abzug "Steine ausserhalb" nur noch mit
+// `(1 - out_wild_w)`; bei 1 ist sie abzugsfrei. Umgesetzt als Gutschrift
+// `+ out_wild_w * v * (r + 1) / Gesamtkosten`, also genau der fehlende Anteil
+// des Abzugs. Das Praedikat ist ZWEITEILIG (berichtigt 2026-09-19, A13 -- hier
+// stand nur die erste Haelfte): `DomeGrid::get_space(r, c)` liefert einen Space
+// (die vier 2x2-Zellen eines Slots existieren genau dann, wenn dort eine Platte
+// liegt, `board.rs` ueber `dome_slots[sr][sc].as_ref()`) UND dessen
+// `space_type` ist `Wild` (Fundstelle im Rumpf von `outside_wild_mass_in`).
+// Die weite Fassung ohne Farbfilter war die verworfene erste Fassung.
 //
 // GRENZE, ausdruecklich und am Code geprueft: Masse AUSSERHALB der Huelle
 // liegt in jeder Projektion auf Zellen mit gelegter Platte -- ein Stein
 // braucht eine Platte (`DomeGrid::place_tile`), die Musterreihen-Projektion
 // legt nur auf annehmende Zellen (`get_space(..).accepts`), und die
 // Platzhalter-Regel K3-P2 legt ausschliesslich INNERHALB der Huelle ab.
-// `out_wild_w = 1` schaltet den Aussen-Abzug damit praktisch ganz ab; der
-// Knopf ist eine Dosis zwischen "voller Abzug" (0, Bestand) und "kein Abzug
-// fuer Zellen gelegter Platten" (1), kein Filter auf Jokerplatten.
+// `out_wild_w = 1` nimmt den Aussen-Abzug fuer JOKERFELDER gelegter Platten
+// ganz zurueck; Normal- und Spezialfelder ausserhalb bleiben voll
+// abzugsbehaftet. Der Knopf ist eine Dosis zwischen "voller Abzug" (0,
+// Bestand) und "kein Abzug fuer Aussen-Jokerfelder" (1). Der frueher hier
+// stehende Zusatz "kein Filter auf Jokerplatten" war falsch (berichtigt
+// 2026-09-19, A13).
 
 /// `dead_cell_w` (par.12c, K3-D): Env-DEFAULT der `SearchConfig`
 /// (`MOSAIC_DEAD_CELL_W`, Default 0 = aus, bitidentisch). Spec-Feld je Seite
@@ -1005,9 +1011,11 @@ pub fn dead_hull_mass_in(
 }
 
 /// Jokerfeld-Regel (par.12c): kosten-gewichtete Masse der Belegung
-/// AUSSERHALB der Huelle, die auf einer bereits gelegten Kuppelplatte liegt
-/// (`get_space(..).is_some()`), normiert mit [`hull_total_cost`] -- genau
-/// der Teil des Aussen-Abzugs, den `out_wild_w` zurueckgibt.
+/// AUSSERHALB der Huelle, die auf einem JOKERFELD einer bereits gelegten
+/// Kuppelplatte liegt (`get_space(..)` vorhanden UND `space_type == Wild`;
+/// berichtigt 2026-09-19, A13 -- hier stand nur `is_some()`), normiert mit
+/// [`hull_total_cost`] -- genau der Teil des Aussen-Abzugs, den `out_wild_w`
+/// zurueckgibt.
 pub fn outside_wild_mass_in(
     occ: &[[f64; 6]; 6],
     board: &PlayerBoard,

@@ -300,6 +300,13 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
+0. **FREIGEGEBEN und WARTET auf die freie Maschine (Nutzer 2026-09-19): Gruppe A des Aufraeumens**,
+   neun Punkte mit Pruefstellen in `PREREG_code_cleanup_closeout.md` par.8b, Abarbeitungsplan mit
+   Toren in par.8c. Reihenfolge: Rust-Schnitte (Tor: `--no-run`, Wheel, Fixture, **Anker-Drift als
+   Probe aufs Exempel**), dann Python (Tor: 44 Werkzeug-Tests, Rauchtest), dann die eine
+   Dateiloeschung (git-getrackt, kein restic noetig). Nichts vorgezogen: `train.py` wird von der
+   laufenden b02-Kette benutzt.
+
 1. **Loeschfreigaben des Generationswechsels** (jede Gruppe nur mit `restic find`-Beleg und
    pfadgenauer Freigabe, `feedback_never_delete_without_confirmation`). Vier Klassen, Listen
    legt der Koordinator vor:
