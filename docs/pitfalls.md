@@ -565,3 +565,31 @@ richtig so, weil die Ziele aus den RECORDS kommen und der v30-Korpus 414 Aktione
 Champion `v29-b09` (884/406), sondern `v29-b11` (`models/alphazero_v29-b11.pth`, 888/414) -- der
 auf den neuen Kontrakt gepolsterte b09 ohne Trainingsschritt. Genau dafuer gibt es ihn. Wer
 `PREREG_v30_window.md` par.3 Punkt 7 liest ("gegen `v29-b09`"), muss das mitlesen.
+
+## Einen gestarteten Messlauf ANSEHEN, nicht nur auf seine Fertigmeldung warten (2026-09-19)
+
+Am 2026-09-19 liefen die Promotions-Kanten von `v30-b02`. Der Koordinator hat den Anlauf geprueft
+(erste acht Zeilen), danach bis zur Fertigmeldung nicht mehr hingesehen -- und in diesem Fenster
+zweimal `cargo build --release` gefahren. Ergebnis: **vier `panicked at ... failed to allocate`**
+in den Worker-Threads der Kante. Gemeldet hat es der NUTZER, nicht die Sitzung.
+
+**Zwei Fehler, die zusammengehoeren:**
+
+1. **Der Build waehrend der Messung.** Die Exklusivitaets-Regel (CLAUDE.md) nennt Builds
+   ausdruecklich als Last. Vor einem Commit hatte der Koordinator die Prozessliste geprueft, vor
+   dem Build nicht -- weil der Einbau als "Textarbeit" eingeordnet war und das Kompilat als
+   Nebensache mitlief. **Ein `cargo build` ist nie Nebensache.**
+2. **Das Nicht-Hinsehen.** Eine Hintergrundaufgabe meldet sich erst am ENDE. Wer nur darauf
+   wartet, erfaehrt von einem Absturz in Minute drei erst nach vierzig Minuten -- oder gar nicht,
+   wenn der Lauf trotzdem mit Exit 0 endet.
+
+**Handgriff, verbindlich:**
+
+* **Vor JEDEM `cargo`, `maturin`, `pip install` oder Sonden-Start:** Prozessliste pruefen, nicht
+  nur vor Commits.
+* **Bei laufender Messung mindestens einmal je Etappe in die Ausgabe sehen**, insbesondere nach
+  dem Start eigener Last. Ein `grep -ciE "panic|error|warn|abbruch"` ueber die Aufgabendatei
+  kostet einen Werkzeugaufruf.
+* **Ein Absturz in einem Worker macht den Lauf nicht automatisch rot, aber verdaechtig:** danach
+  zaehlen, ob das Artefakt die volle Partienzahl traegt. Fehlt eine, wird wiederholt -- ein
+  wiederholter Lauf ist billiger als ein stiller Messfehler (CLAUDE.md).

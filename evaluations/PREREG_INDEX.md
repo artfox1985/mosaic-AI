@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 121 Dateien = 5 OFFEN + 104 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 122 Dateien = 6 OFFEN + 104 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (5)
+## OFFEN (6)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -91,6 +91,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
 | `PREREG_dome_return_order.md` | Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | R1-R3 gebaut und abgenommen (12.4-12.11), der Knoten (411-413) ist im v30-Korpus. WIEDER OFFEN 2026-09-18: der Streu-Knopf sitzt im verdraengten Aufloeser, wirkt in der Erzeugung nicht; Ersatz nur in der temperierten Klasse. Bauplan fuers v31-Self-Play in 12.12, mit dem Befund, dass policy_target_valid als Maske ausfaellt (MOSAIC_IGNORE_POLICY_TARGET_VALID=1). Nichts gebaut. |
 | `PREREG_v30_window.md` | Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm `v30-b01` mindestens auf Champion-Niveau `v29-b09`? | Erzeugung laeuft; Klasse 1 (policy) fertig 2026-09-18 20:07, 400 Dateien, 4,746 s je Partie (+20,4 Prozent gegen die v29-Linie, par.9). Tor 0 und **Tor 2a GRUEN**: `sp_voll` 0,90087 gegen 0,84275, n = 8.000 Seiten je Klasse. Wiedervorlage erster Record, Manifest-Diff und Stack-Draw-Kontrolle ebenfalls gruen (par.9). Klassen 2/3, Training und Tor 1 stehen aus. |
+| `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten -- Generator `v30-b02` (888/414, ohne Polsterung), und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.1 Zuschnitt 2.947 Dateien (v30-b02 neu, v29-b11 als G-1, v28-b02 als G-2; v27-b01 rotiert heraus, Bestand am 2026-09-19 gezaehlt). par.5 Erzeugung mit der Rueckgabe-Streuung p = 0,81. Nichts erzeugt, nichts trainiert. |
 
 ## ENTSCHIEDEN (104)
 
