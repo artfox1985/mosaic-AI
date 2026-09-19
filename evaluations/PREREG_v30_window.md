@@ -638,6 +638,131 @@ Generatorwahl.
 ist eine eigene Entscheidung (`docs/promotion_checklist.md`); ein Arm kann Generator werden, ohne Champion zu
 sein.
 
+### NETZ-GESUNDHEIT beider Arme (par.3 Punkt 7), gemessen 2026-09-19, 13:40-14:10
+
+**Vergleichspartner ist `v29-b11`, nicht der Champion `v29-b09`** -- b09 ist 884/406 und auf einem 414er
+Korpus nicht auswertbar (`docs/pitfalls.md`, Nachtrag 2026-09-19). b11 ist derselbe Champion, auf den neuen
+Kontrakt gepolstert, also der einzig zulaessige Bezug.
+
+**(a) Spaltennormen von `flat_branch.0.weight` und die neuen Policy-Zeilen** (aus den Checkpoints gelesen):
+
+| Block | `v30-b01` (kalt) | `v30-b02` (warm) | `v29-b11` (Generator) |
+| --- | --- | --- | --- |
+| Basis 0..755 | 0,5007 | 3,0369 | 3,0173 |
+| Abschnitt 16 (755..794) | 0,5702 | 0,6137 | 0,2203 (Median **0**) |
+| Abschnitt 17 (794..884) | 0,4781 | 0,7004 | 0,4213 |
+| Abschnitt 18 (884..888) | 0,4642 | 0,4725 | **0,0000** |
+| Policy-Zeilen 0..405 | 0,6578 | 2,5702 | 2,4632 |
+| **Policy-Zeilen 406..413** | **0,6333** | **0,5055** | **0,0000** (alle acht) |
+
+**Der Befund, der die Generatorwahl stuetzt:** `v29-b11` hat an den acht neuen Knoten und im Abschnitt 18
+exakt NULL Gewicht -- er ist der gepolsterte Champion ohne Trainingsschritt, die Polster sind noch Polster
+(par.1 Punkt 1, jetzt gemessen statt vermutet). Beide v30-Arme haben dort gelernte Gewichte. Ein Generator
+`v29-b11` wuerde die Knoten also weiterhin ohne Prior spielen; `v30-b02` bringt einen mit.
+
+**Nebenbefund zum Kaltstart:** b01 traegt durchweg kleine, gleichmaessige Normen (0,46 bis 0,57), b02 und
+b11 dagegen 3,0 in der Basis und 2,5 bis 2,6 im Policy-Kopf. Zwoelf Epochen Kaltstart bauen die ueber
+Generationen akkumulierte Groesse nicht auf. Das ist die plausible Entsprechung zur flachen Arena-Kante --
+HERLEITUNG, nicht gemessen.
+
+**(b) Tote Einheiten** (`dead_unit_probe.py --reference v29-b11`, frozen_v3, 1.800 Zustaende): Referenz
+2,60 Prozent, Schwelle 5,21 (mehr als das Doppelte ist ROT). **`v30-b01` 0,07 Prozent GRUEN, `v30-b02`
+2,60 Prozent GRUEN.** b02 erbt die Quote des Generators exakt.
+
+**(c) Koepfe offline** (`offline_diagnosis.py --frozen`, je 900 Zustaende):
+
+| Korpus | Groesse | b01 | b02 | b11 |
+| --- | --- | --- | --- | --- |
+| v10b | Policy Top-1 | 31,4 % | **33,7 %** | 31,7 % |
+| v10b | Policy Top-3 | 57,7 % | **60,2 %** | 59,8 % |
+| v12 | Policy Top-1 | 39,1 % | 40,2 % | **40,8 %** |
+| v12 | Policy Top-3 | 63,6 % | **68,7 %** | 68,1 % |
+| v10b | Value R2 | **-1,2406** | -1,4759 | -1,3229 |
+| v12 | Value R2 | **-2,0279** | -2,4199 | -2,1622 |
+
+Die Policy von b02 ist auf beiden Alt-Korpora vorn, ihr Value-R2 ist das schlechteste. Die R2-Werte sind
+durchweg stark negativ -- diese Korpora stammen aus fremden Aeren, die Groesse ist hier ein
+Verteilungsabstand, kein Guetemass (Aufloesungsgrenze `project_offline_metric_resolution_limit`).
+
+**(d) Platt-Fit / Brier** (`platt_fit.py`, 1.440 Records, Runden 1-4):
+
+| Modell | Platt-B | A | **Brier** |
+| --- | --- | --- | --- |
+| `v30-b01` | 0,6067 | +0,4158 | **0,25433** |
+| `v30-b02` | 0,5442 | +0,4283 | **0,26196** |
+| `v29-b11` | 0,5934 | +0,4196 | **0,25507** |
+
+**Das ist der einzige gelbe Punkt der ganzen Gesundheitspruefung.** par.3 Punkt 7d verlangt: der Brier darf
+nicht ueber den Referenzwert steigen (Praezedenz v14, dort starb der Value-Kopf und die Arena sah es spaet).
+**`v30-b02` steigt: 0,26196 gegen 0,25507, also +0,0069 (+2,7 Prozent relativ).** `v30-b01` liegt mit
+0,25433 leicht darunter.
+
+**Wie das zu lesen ist, ohne es weg- oder hochzureden:** der Arm mit dem SCHLECHTEREN Brier ist der, der die
+Arena mit 59,86 Prozent gewinnt (par.9). Beides kann gleichzeitig stimmen, weil der Auswertungssatz
+`frozen_eval_set.pkl` aus einer aelteren Verteilung stammt, waehrend b02 auf dem v30-Fenster trainiert ist;
+dieselbe Klasse von Befund wie die negativen R2 oben. **Die Arena ist das haertere Kriterium**
+(`feedback_arena_when_resolution_too_low`), die Regel bleibt trotzdem gerissen und gehoert vor einer
+Promotion auf den Tisch: bei einer Champion-Promotion wird die Anzeige-Kalibrierung aus genau diesem Fit
+gezogen (STATUS Abschnitt 2, `_DISPLAY_CAL_A/_B`).
+
+### URSACHE der Replayer-Divergenz GEFUNDEN: Arena-Logs tragen keine Maschinenzeilen (2026-09-19, 13:30)
+
+**Diagnose gefahren** mit `tools/probes/replay_divergence_diagnosis.py` auf
+`gating_v30-b01_vs_v29-b09_s20261300.json` (400 Partien, exklusiv). Ergebnis: **31 Partien mit genau diesem
+Fehlerbild** (die Sonde zaehlt 62 Divergenzen insgesamt, der Rest hat andere Ursachen).
+
+**Der Zustand an der Bruchstelle widerlegt beide bisherigen Vermutungen:**
+
+* `pending_stack_draw: 0 Platten` -- der Replayer steht GAR NICHT in einem Stapelzug. Es geht also nicht um
+  die Rotationsauffaecherung und nicht um die Teilzug-Zerlegung.
+* Angeboten werden 49 Kuppel-Zuege, aber **alle mit `tile=8`**, waehrend `tile=11` gesucht wird (zweite
+  Partie: `tile=6` angeboten, `tile=12` gesucht). **Die gesuchte Platte liegt im Replay gar nicht in der
+  Auslage.** Der Kuppelstapel ist auseinandergelaufen, der Bruch ist nur die Stelle, an der es auffaellt.
+
+**Warum er auseinanderlaeuft, am Artefakt gezaehlt:** das Arena-Log der ersten Partie hat **355 Zeilen und
+NULL `#a`-Maschinenzeilen**. Genau daraus liest der Replayer die Rueckgabe-Reihenfolge
+(`analyze_game_log.py` Z.1062-1067: `hint_for(li, "dome_stack_choose")` -> Feld `return_order`); fehlt der
+Hinweis, nimmt er laut eigenem Kommentar (Z.1058-1061) **die kanonische Ziehreihenfolge, "die die KI ohnehin
+spielt"**. Dieser Satz stimmt seit dem Knoten-Umbau vom 2026-09-18 NICHT MEHR: die Rueckgabe ist ein eigener
+Suchknoten (IDs 411-413), und die Suche waehlt dort etwas anderes als kanonisch -- in 143 von 400 Partien
+(par.9, Nachzaehlung). Legt der Replayer kanonisch zurueck, liegen ab dem naechsten Nachfuellen andere
+Platten aus.
+
+**Die `#a`-Zeilen sind kein Schalter, sondern ein Pfad-Merkmal:** geschrieben werden sie in `py.rs:781`,
+also im PyGame-Pfad (Server und GUI). Der Arena-Pfad (`paired_gating.py` ueber `self_play.rs`) schreibt sie
+nicht. **Damit sind die vorhandenen Logs nicht reparierbar** -- die Sonde kann nicht einfach "neu laufen",
+ihr fehlt die Information in der Quelle.
+
+**Zwei Wege, beide Bauarbeit, Entscheid beim Nutzer:**
+
+1. **Die Arena die Rueckgabe mitloggen lassen** (Engine-Aenderung in `self_play.rs`, damit der
+   `ChooseReturnFirst`-Entscheid im Log erscheint). Danach kann der Replayer wie bisher arbeiten. Teurer
+   Eingriff in den Messpfad, und alle ALTEN Logs bleiben unbrauchbar.
+2. **Den Endzustand ins Arena-Artefakt schreiben** (`paired_gating.py`), statt ihn aus dem Log zu
+   rekonstruieren. Die Arena KENNT den Endzustand; das Replay existiert nur, weil das Artefakt ihn bisher
+   nicht mitfuehrt. Danach braucht Tor 2b gar kein Replay mehr, und die ganze Fehlerklasse verschwindet --
+   samt der bekannten Chip-Vollendungs-Grenze (STATUS Abschnitt 8). **Empfehlung des Koordinators.**
+
+**GEGENPROBE (Nutzer-Frage 2026-09-19 "sind die server logs wenigstens sauber?"): JA.** Das juengste
+Server-Log `static/log/game_20260918_214108_seed539365.log` -- eine Partie NACH dem Kontraktwechsel, sie
+traegt `choose_dome_slot`, `choose_dome_rotation`, `dome_stack_peek` und zwei `return_order`-Felder -- laeuft
+im Replay **vollstaendig durch: 324 von 324 Zeilen, keine Divergenz**, Report geschrieben.
+
+| Merkmal | Arena-Log | Server-Log |
+| --- | --- | --- |
+| Zeilen | 355 | 437 |
+| `#a`-Maschinenzeilen | **0** | **107** |
+| `return_order` im Log | nein | ja |
+| Replay | bricht bei rund 16 Prozent der Partien | laeuft durch |
+
+Damit ist die Ursache von BEIDEN Seiten belegt: wo die Maschinenzeilen da sind, bleibt der Stapel synchron.
+**Folge fuer den Bestand:** alle Partien aus der Oberflaeche -- also auch die Mensch-Partien aus
+`PREREG_claude_play_interface.md` -- bleiben auswertbar. Blind ist allein die Arena, und dort nur die Sonde,
+die auf dem Replay aufsetzt.
+
+**Beides gilt erst fuer KUENFTIGE Laeufe.** Fuer v30 bleibt Tor 2b blind; fuer die Generatorwahl ist das
+folgenlos, weil `v30-b02` schon auf Stufe 1 entscheidet (par.9).
+
 ### Replayer-Reparatur: zwei Hypothesen am Code AUSGESCHLOSSEN, die dritte braucht den Lauf (2026-09-19, 10:40)
 
 **Nutzer-Auftrag:** *"ja, replayer reparieren und sonde neu fahren"*. Stand: Ursache noch NICHT gefunden,
