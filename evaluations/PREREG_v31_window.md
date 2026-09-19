@@ -71,14 +71,31 @@ zwei Seeds a rund 95 min.
 
 ## par.5 OFFENE NUTZER-ENTSCHEIDE
 
-1. **Vorbedingung, nicht verhandelbar:** die Rueckgabe-Streuung muss VOR der Erzeugung im Wheel
-   sein (`feedback_record_field_must_precede_generation`), sonst faellt das Merkmal wieder eine
-   Generation zurueck. Stand 2026-09-19: Rust-Teil eingebaut, Uebersetzung offen; Python-Maske und
-   Cache-Schluessel stehen aus (12.12 Schritte 3 und 4).
+1. **ERLEDIGT 2026-09-19:** die Rueckgabe-Streuung war vor der Erzeugung im Wheel
+   (`feedback_record_field_must_precede_generation`). Knoten-Weg in `self_play.rs` mit eigenem
+   Seed-Unterscheider, Maske in `engine/py/corpus_dataset.py` als eigene Bedingung auf
+   `return_order_randomized`, Wheel uebersetzt und installiert. Ein Cache-Schluessel-Zusatz war
+   NICHT noetig und wurde nach einem roten Waechter-Test wieder zurueckgenommen.
 2. **Arme.** v30 fuhr zwei (kalt und warm), und der Warmstart gewann mit 9,36 Prozentpunkten
    Abstand. Ob v31 wieder zwei Arme bekommt oder nur den Warmstart, ist offen.
 3. **Start der Erzeugung** -- wie immer erst auf ausdrueckliche Anweisung.
 
 ## par.6 ERGEBNISSE
 
-(noch leer -- nichts erzeugt, nichts trainiert, nichts gemessen)
+### Erzeugung gestartet 2026-09-19, 21:55 (zweiter Anlauf)
+
+Kette `tools/night_v31_generate.sh`, Generator `v30-b02`, Seeds 20260934/35/36, Dosis als
+**CLI-Flag** `--return-order-random-p 0.81`.
+
+**Der erste Anlauf (20:15 bis 20:47) ist verworfen und geloescht.** Er lief 45 Dateien und 120
+Partien weit **ohne eine einzige Streuung**: die Kette exportierte
+`MOSAIC_RETURN_ORDER_RANDOM_P=0.81`, aber `self_play.py` Z.236-240 setzt dieselbe Variable aus
+seinem eigenen CLI-Wert neu, und dessen Default ist 0.0. Eine Wheel-Abfrage in einem SEPARATEN
+Prozess zeigte dabei korrekt 0.81, waehrend die Erzeugung mit 0.0 lief -- die Gegenprobe im
+falschen Prozess belegt also nichts. Eintrag in `docs/pitfalls.md`.
+
+**Gegenprobe am neuen Korpus, erste 20 Dateien:** 3 von 20 Partien mit gestreuter Rueckgabe =
+**15,0 Prozent** (Ziel 15 Prozent, Obergrenze 17,75). Die Dosis 0,81 trifft damit den
+registrierten Zielwert.
+
+(Tore, Training und Arena stehen aus.)

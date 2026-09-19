@@ -357,3 +357,32 @@ der Aufschlag gegen dieselbe Bezugslinie bei +49,1 Prozent, gegen die naeherlieg
 bei +20,4 Prozent. **Beide Lesarten liegen ueber der 15-Prozent-Schwelle**, an der STATUS
 Abschnitt 6 Punkt 2 die v31-Wiedervorlage des Budget-Knopfs fuer die Hilfsknoten faellig macht;
 die Wahl der Bezugslinie aendert den Entscheid also nicht.
+
+### Nachtrag 2026-09-19: die Kette nach dem Kaltstart-Training
+
+Alle Zahlen aus den Artefakten des Laufs, nicht geschaetzt. **GEBREMST** heisst: eine zweite
+Last lief daneben (GPU-Training neben CPU-Arena ist erlaubt, `working_rules.md`), die Zahl ist
+mit einer exklusiven nicht vergleichbar.
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Training v30-b02 WARMSTART**, 12 Epochen, 4.894.809 Samples, 888/414 | **5.573,2 s = 1,55 h** (GEBREMST) | `manifest_train_v30-b02_20260919_082507.json`; `cpu_s` 20.901,0, 6 Threads, cuda, fast-loader, Datenaufbau 98,9 s; lief neben der b01-Arena |
+| Tor 1 `v30-b01` Seed 20261300, 200 Paare @400 | **5.719,1 s = 95 min** | 14,298 s je Partie, 10 Threads, `cpu_s` 24.826,5; exklusiv |
+| Tor 1 `v30-b01` Seed 20261301 | **7.467,6 s = 124 min** (GEBREMST) | 18,669 s je Partie, 10 Threads, `cpu_s` 29.895,2; b02-Training auf der GPU daneben, also +30,6 Prozent gegen denselben Aufbau exklusiv |
+| Tor 1 `v30-b02` Seed 20261300 | **6.940,2 s = 116 min** (GEBREMST) | 17,35 s je Partie, 10 Threads, `cpu_s` 28.800,4 |
+| Tor 1 `v30-b02` Seed 20261301, SPRT-Stopp nach 170 Paaren | **4.808,3 s = 80 min** | 14,142 s je Partie, 10 Threads, `cpu_s` 20.964,3; exklusiv, 340 statt 400 Partien |
+| Anker-Kante `v30-b02` gegen `hv4_anchor`, **n = 50** | **429,5 s** | 8.290 Schritte, 0,0518 s je Schritt; neue Groesse der Promotionsliste seit 2026-09-19 (vorher n = 150 mit 1.246-1.281 s) |
+| Champion-2-Kante `v30-b02` gegen `v28-b02`, n = 150 | **2.489,1 s = 41,5 min** | 24.667 Schritte, 0,1009 s je Schritt; Wiederholungslauf nach vier Worker-Abstuerzen durch `cargo`-Nebenlast |
+| Spaltensonde (Tor 2b) je Seed | 81-103 s | auf der verzerrten Teilmenge, siehe Generationsbericht |
+| Netz-Gesundheit komplett (Spaltennormen, tote Einheiten, offline, Platt fuer drei Modelle) | rund 30 min | |
+| Aufraeumen Gruppe A samt Toren | 40 min | `--no-run` 55,9 s, 702 Lib-Tests, Wheel, Fixture, Anker-Drift, 141 Werkzeug-Tests |
+
+**Planungsgroesse fuer Tor 1 unter 888/414:** rund 95 min je Seed exklusiv (14,3 s je Partie),
+rund 116-124 min gebremst. Die alte ANNAHME "105-110 min aus dem Kostentor +35 Prozent" liegt
+dazwischen und ist damit ersetzt.
+
+**Zwei Luecken, benannt statt stillschweigend:** die beiden Referee-Kanten (Anker, Champion-2)
+tragen KEINEN `laufzeit`-Block mit `wanduhr_s`/`cpu_s`/`threads`/`s_je_partie`, sondern nur
+`elapsed_s`/`total_steps`/`s_per_step`. Ohne `threads` sind sie streng genommen nicht
+vergleichbar (CLAUDE.md, "Laufzeiten messen, nicht schaetzen"). Und fuer die Promotion nach
+Checkliste gibt es in dieser Generation keine Gesamtdauer im Baum; die 38 min stammen aus v29.

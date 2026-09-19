@@ -187,6 +187,17 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
 Weitere Arme ab `v29-b12` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
 
+**Reserviert 2026-09-19 (Generationswechsel v30 -> v31):**
+**`v31-b01`** (erster Arm der Generation v31 auf dem v31-Fenster, 2.947 Dateien, Seed 20260949,
+Val-Pool `^selfplay_v30-`; **WARMSTART von `v30-b02_brierbest`**, sonst v30-Rezept. Der Kaltstart
+ist in v30 einfaktoriell widerlegt: 404:396 kalt gegen 443:297 warm bei sonst gleichem Fenster,
+Monolith, Seed und Rezept, `PREREG_v30_window.md` par.9). Ein zweiter Arm `v31-b02` braucht einen
+ANDEREN Faktor als den Start und eine eigene Registrierung; die Kaltstart-Frage ist beantwortet.
+
+**Gemessen, aber ohne Leiterknoten war lange `v30-b01`** -- die beiden Tor-1-Kanten sind am
+2026-09-19 nachgetragen. Regel dazu: ein Arm, der ein Tor gefahren hat, bekommt seinen Knoten,
+auch wenn er nicht Champion wird (Praezedenz `v29-b03`, `v29-b07`).
+
 **Reserviert 2026-09-18 (Nutzer-Entscheid "ja nimm es so in die kette auf",
 `PREREG_minimal_strength_core.md` par.10.12):**
 **`v29-b11`** (KEIN Trainingsarm: `v29-b09_brierbest` mit auf 414 gepolstertem Policy-Kopf und 888er Eingang,
