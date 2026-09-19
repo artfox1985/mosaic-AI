@@ -891,6 +891,13 @@ pub(crate) fn choose_return_order(
 /// (verschiedener `move_number`) -- das ist die Streuung, um die es geht.
 const RETURN_ORDER_SEED_DISTINGUISHER: u64 = 0x2E70_2DE2_5EED_C0DE;
 
+/// Eigener Strom fuer die Streuung im KNOTEN-Weg (2026-09-19). MUSS von
+/// [`RETURN_ORDER_SEED_DISTINGUISHER`] verschieden sein: beide koennen im selben
+/// Halbzug nicht feuern, aber ein gemeinsamer Wert haette dieselbe Muenze fuer
+/// zwei verschiedene Entscheide -- die Auflage aus `net_mcts.rs` zu den
+/// Distinguishern ist "ein EIGENER Wert je Verbraucher".
+const RETURN_ORDER_NODE_SEED_DISTINGUISHER: u64 = 0x2E70_4E0D_5EED_C0DE;
+
 /// Alles, was die Rueckgabe-Streuung EINES Halbzugs braucht (par.11).
 ///
 /// `None` an der Aufrufstelle heisst "Bestand" -- so bei JEDEM Aufrufer
@@ -3977,6 +3984,50 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         None
                     };
                     let mut d = pcfg.agent.decide(&game.state, &actions, &mut search_rng, move_number);
+                    // ── Rueckgabe-Streuung im KNOTEN-Weg (2026-09-19) ──────────────
+                    // Der Knopf MOSAIC_RETURN_ORDER_RANDOM_P sass bis hierher
+                    // AUSSCHLIESSLICH im Sammelaufloeser (`apply_return_order_random`),
+                    // und den betritt seit dem Knoten-Entscheid vom 2026-09-18 keine
+                    // Seite mehr mit aktivem Tor -- unter MOSAIC_STACK_DRAW_RESEARCH=1
+                    // sogar gar keine. Er war damit in der Erzeugung wirkungslos
+                    // (PREREG_dome_return_order.md 12.12, gemessen in
+                    // PREREG_v30_window.md par.9). Hier steht er an der Stelle, an der
+                    // die Rueckgabe HEUTE entschieden wird.
+                    //
+                    // Reichweite wie beim Vorbild MOSAIC_START_SLOT_RANDOM_P: nur im
+                    // aufzeichnenden Zweig, nur wenn die Aktionsliste SORTENREIN aus
+                    // ChooseReturnFirst besteht (game.rs:767-770 fuellt sie so und kehrt
+                    // zurueck), nur in den Runden 1..4 und nur ab
+                    // RETURN_ORDER_MIN_REST Restplatten -- dieselben drei Bedingungen,
+                    // die par.11b fuer den Aufloeser-Weg festgelegt hat.
+                    //
+                    // Der Zufall kommt aus einem EIGENEN Strom (Muster
+                    // PREREG_search_rng_split): derive_search_seed ueber
+                    // game_seed ^ RETURN_ORDER_NODE_SEED_DISTINGUISHER und move_number.
+                    // Der Partie-RNG bleibt unberuehrt, die Partie also
+                    // seed-reproduzierbar, und bei p = 0 wird KEINE Zahl gezogen.
+                    if recording
+                        && return_order_random_p() > 0.0
+                        && actions.len() >= 2
+                        && actions.iter().all(|a| matches!(a, Action::ChooseReturnFirst(_)))
+                        && return_order_round_allowed(game.state.round_number)
+                    {
+                        if let Some(pending) = game.state.pending_return_order.as_ref() {
+                            if pending.rest_in_draw_order.len() >= RETURN_ORDER_MIN_REST {
+                                let mut rng = StdRng::seed_from_u64(
+                                    crate::net_mcts::derive_search_seed(
+                                        cfg.game_seed ^ RETURN_ORDER_NODE_SEED_DISTINGUISHER,
+                                        move_number,
+                                    ),
+                                );
+                                if rng.random::<f64>() < return_order_random_p() {
+                                    let idx = rng.random_range(0..actions.len());
+                                    d.chosen = actions[idx].clone();
+                                    return_order_randomized.set(true);
+                                }
+                            }
+                        }
+                    }
                     // Baustein 1 (par.5 "wie oft greift der Bauer"): additiv,
                     // NUR wenn der Aufrufer einen Zaehler bereitstellt. Zaehlt
                     // den ENTSCHEID des Agenten, steht deshalb VOR der
