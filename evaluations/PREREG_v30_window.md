@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm `v30-b01` mindestens auf Champion-Niveau `v29-b09`? | Beleg: Erzeugung laeuft; Klasse 1 (policy) fertig 2026-09-18 20:07, 400 Dateien, 4,746 s je Partie (+20,4 Prozent gegen die v29-Linie, par.9). Tor 0 und **Tor 2a GRUEN**: `sp_voll` 0,90087 gegen 0,84275, n = 8.000 Seiten je Klasse. Wiedervorlage erster Record, Manifest-Diff und Stack-Draw-Kontrolle ebenfalls gruen (par.9). Klassen 2/3, Training und Tor 1 stehen aus. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm mindestens auf Champion-Niveau `v29-b09`? | Beleg: NEIN. par.9: `v30-b01` kalt 404:396 = 50,50 %, Block-z +0,278, H0; der einfaktorielle Warmstart-Arm `v30-b02` 443:297 = 59,86 %, Block-z +5,360, TRAEGT (9,36 Punkte Unterschied bei gleichem Fenster, Monolith, Seed und Rezept). Tor 0 und Tor 2a gruen (sp_voll 0,90087 gegen 0,84275), Tor 2b blind (par.9). Generator fuer v31 ist `v30-b02` auf Stufe 1, seit 2026-09-19 auch Champion. -->
 
 # PREREG v30: Fensterzuschnitt der Generation v30 (v31 offen, Nutzer 2026-09-17)
 

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: STUFE 1 GEBAUT (par.8: acht Punkte, 585 Tests gruen, Paritaets-Fixture wegen A2 bewusst neu, Kontrakt-Hash 39648b95bbba1acf). ANKER-DRIFT ROT durch A2 (Phantom-Abzug bewegt den lebenden hv1 ab Schritt 99) mit Entscheid (a) ERLEDIGT: Neuverankerung auf hv4_anchor, Leitersegment 2 (par.7a). Stufen 2/3 nach der letzten Generation. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten des Reviews 2026-09-11 werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 gebaut (par.8), Anker-Drift ROT durch A2 erledigt per Neuverankerung auf hv4_anchor (par.7a). GRUPPE A AUSGEFUEHRT 2026-09-19 (par.8d): 7 von 9 Punkten, alle Tore gruen, Kontrakt-Hash unveraendert, Anker-Drift 1.763 Schritte identisch; zwei Punkte von Toren gestoppt. Gruppe B traegt drei Punkte (Wrapper, Spec-Felder, Bonuschip-Kanonisierung par.8e, deren GUI-Haelfte gebaut ist), Gruppe C offen. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -904,3 +904,82 @@ Schlussmodell "Tessa" (par.5a), STATUS-Neufassung als Abschlussbericht, letzter
 restic-Snapshot mit Beleg (`PREREG_v29_window.md` par.8 Punkt 3).
 Zum Begleitprogramm von `PREREG_v29_window.md` par.7 gehoert dieser Strang NICHT -- er ist der
 Abschluss danach.
+
+## par.8e GRUPPE B, Punkt 3: die Bonusplaettchen kanonisch fuehren (2026-09-19)
+
+**Nutzer-Befund 2026-09-19, 23:10:** *"ist dir bewusst dass es bei den bonusplaettchen dubletten
+gibt? sprich die anzahl ist korrekt, aber schwarz/blau ist zb gleich wie blau/schwarz."* Dazu die
+Einordnung des Nutzers: *"wird keinen grossen einfluss haben, sondern eher der vereinfachung
+dienen."* -- damit ist der Punkt als VEREINFACHUNG registriert, nicht als Defektbehebung.
+
+**Der Bestand, am Pool nachgezaehlt** (`engine/src/dome.rs:250-273`): 20 Chips, davon 10
+einfarbige (je zwei pro Farbe) und 10 zweifarbige aus fuenf Kombinationen zu je zwei Stueck. Bei
+drei Kombinationen stehen beide Eintraege zeichengleich, bei zweien ist die Reihenfolge
+vertauscht: `[Schwarz, Blau]` (idx 6) gegen `[Blau, Schwarz]` (idx 15) und `[Gelb, Schwarz]`
+(idx 7) gegen `[Schwarz, Gelb]` (idx 12). Die Vertauschung kommt aus der Quelle
+`docs/bonus_chips_colors.csv` (Zeilen 7 und 16 bzw. 8 und 13), einer Abschrift der echten
+Plaettchen; im Spiel traegt die Reihenfolge keine Bedeutung.
+
+**Wo sie folgenlos ist, geprueft 2026-09-19:**
+
+* Wertung: `round_end.rs:504` (`chip_sig`) faltet den Chip zu einer Farb-Bitmaske; der
+  Kopfkommentar dort nennt Chips gleicher Signatur ausdruecklich austauschbar.
+* Verbrauch: `round_end.rs:516`, `:596`, `:658` fragen `colors.contains(&color)`.
+* Netz-Eingabe: `features.rs:1349` setzt eine Fabrik-Maske je Farbe, `features.rs:1402` zaehlt die
+  Hand je Farbe. **Das Netz sieht die Reihenfolge nicht**, eine Umstellung aendert keine Eingabe.
+
+**Wo sie durchschlaegt, beide Male als Arbeit und nicht als Ergebnis:**
+
+1. `round5.rs:281` gruppiert die verdeckten Chips ueber Vec-Gleichheit (`*c == colors`). Liegen
+   die beiden vertauschten Zwillinge gleichzeitig verdeckt, entstehen zwei Zufallsaeste mit je
+   1/n statt einem mit 2/n. Die Kinder sind wertgleich (nur `chip_id` unterscheidet sie, und der
+   fliesst laut dem Audit in `tiling_solver.rs:266` nie in eine Wertung), die Erwartung bleibt
+   unverzerrt -- es ist ein Ast zu viel. Der Kopfkommentar `round5.rs:251-254` verspricht genau
+   das Gegenteil ("farbgleiche Chips ... fallen zusammen") und loest es in zwei von fuenf
+   Kombinationen nicht ein.
+2. `tiling_solver.rs:331` legt `bonus_chip_colors` UNSORTIERT in den `TilingKey`. Zwei identische
+   Bretter bekommen dadurch verschiedene Schluessel, also einen Fehlgriff statt eines Treffers.
+   Dieselbe Klasse trifft ohnehin die Reihenfolge der Chips in der Hand; die Farbvertauschung ist
+   ein weiterer Fall davon. Die Signaturfunktion `tiling_solver.rs:842` sortiert dagegen beides
+   sauber -- die Kanonisierung existiert also schon einmal im selben Modul.
+
+**Vorschlag (ein Entscheid, zwei Fassungen):** entweder die Farben beim Poolbau sortieren
+(`dome.rs:250`, kleinster Eingriff), oder den Chip gleich als Bitmaske statt als
+`Vec<TileColor>` fuehren; dann faellt die Vec-Gleichheit in `round5.rs` als Sonderfall weg und
+der Tiling-Schluessel wird stabiler. Im zweiten Fall waere `bonus_chip_colors` im `TilingKey`
+zusaetzlich zu sortieren, sonst bleibt der Handreihenfolge-Fall bestehen.
+
+**Zwei Zwaenge, die den Zeitpunkt bestimmen:**
+
+* `serialize.rs:219` schreibt die Farben in SPEICHERREIHENFOLGE ins Record. Eine Umstellung
+  aendert damit die Records und zieht die Netz-Paritaets-Fixture nach
+  (`feedback_record_field_must_precede_generation`: die Fixture hasht Records, nicht Eingaben).
+  Der richtige Zeitpunkt ist deshalb ein Generationswechsel, nicht mitten in einem Fenster.
+* Ein Wheel-Bau zaehlt als Last und geht nicht neben einer laufenden Erzeugung.
+
+**Tore wie in Gruppe A:** `cargo test --release --no-run`, Lib-Tests, Wheel mit unveraendertem
+Vertragshash, Netz-Paritaets-Fixture neu, **Anker-Drift gegen `hv4_anchor`** als Probe aufs
+Exempel. Die Drift ist hier der eigentliche Beleg: aendert sich ein einziger Zug, war die
+Reihenfolge eben doch irgendwo tragend.
+
+### GEBAUT 2026-09-19: die Anzeige-Haelfte (Nutzer: "fuers gui am server waer es aufjedenfall gut das richtig zu stellen")
+
+**Nur `static/js/app.js`, kein Engine-Code, kein Wheel, keine Records** -- deshalb neben der
+laufenden v31-Erzeugung zulaessig. Neuer Helfer `chipColors(chip)` (Z.813-822) gibt die Farben
+eines Plaettchens in der Enum-Reihenfolge der Engine zurueck (`engine/src/tile.rs:5-13`: Blau,
+Gelb, Rot, Schwarz, Tuerkis), damit Anzeige und Farb-Bitmaske dieselbe Konvention haben.
+Umgestellt sind die vier Stellen, an denen die Farbreihenfolge sichtbar wurde:
+
+| Stelle | Was vorher passierte |
+| --- | --- |
+| Handchips, Z.1317-1323 | die beiden Haelften wurden in Speicherreihenfolge gefaerbt: zwei gleiche Chips sahen GESPIEGELT aus |
+| Tooltip der Handchips und der Geister-Chips | las sich als "schwarz+blau" beim einen und "blau+schwarz" beim anderen |
+| Chip auf der Manufaktur, Z.1729-1731 | dieselbe Spiegelung |
+| Auswahl-Dialog beim Chip-Einsatz, Z.2493 | dieselbe Spiegelung in der Kostenvorschau |
+
+**NICHT geprueft am laufenden Bild:** ein Bonuschip wird erst sichtbar, wenn seine Manufaktur
+leer ist, die Gegenprobe braucht also eine gespielte Partie mit Netzzuegen -- das ist Last und
+wartet auf eine freie Maschine. Geprueft ist die Ersetzung an allen vier Stellen (Zaehlung je
+Muster genau 1) und die Farbfolge gegen das Enum; ein JS-Syntaxlauf war mangels `node` nicht
+moeglich. **Offen bleibt die Engine-Haelfte oben** (Poolbau oder Bitmaske, plus der
+Tiling-Schluessel); erst sie spart die Arbeit in `round5.rs` und im Cache.

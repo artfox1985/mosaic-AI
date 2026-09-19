@@ -593,3 +593,32 @@ in den Worker-Threads der Kante. Gemeldet hat es der NUTZER, nicht die Sitzung.
 * **Ein Absturz in einem Worker macht den Lauf nicht automatisch rot, aber verdaechtig:** danach
   zaehlen, ob das Artefakt die volle Partienzahl traegt. Fehlt eine, wird wiederholt -- ein
   wiederholter Lauf ist billiger als ein stiller Messfehler (CLAUDE.md).
+
+## `self_play.py` UEBERSCHREIBT die Knopf-Umgebung aus seinen CLI-Defaults (2026-09-19)
+
+Die v31-Erzeugung lief 32 Minuten und 45 Dateien weit, bevor auffiel, dass die
+Rueckgabe-Streuung nichts tat: **0 von 120 Partien** mit gestreuter Reihenfolge, erwartet
+waren rund 15 Prozent.
+
+**Ursache:** die Kette exportierte `MOSAIC_RETURN_ORDER_RANDOM_P=0.81`, aber `self_play.py`
+setzt dieselbe Variable in Z.236-240 aus seinem eigenen CLI-Wert NEU -- und dessen Default
+ist `0.0` (Z.1031-1032). Dasselbe gilt fuer `MOSAIC_START_SLOT_RANDOM_P` und
+`MOSAIC_EXCURSION_PROFILE` direkt daneben. Der Export wird stillschweigend ueberschrieben;
+es gibt keine Warnung.
+
+**Warum die Vorpruefung der Kette das nicht fing:** sie rief
+`mosaic_rust.engine_config_json()` in einem EIGENEN Python-Prozess auf, ohne `self_play.py`.
+Dort stand der exportierte Wert noch, die Abfrage meldete brav `return_order_random_p 0.81`
+-- und der eigentliche Lauf fuhr mit 0.0. **Eine Knopf-Abfrage ausserhalb des Laufs
+beweist nichts ueber den Lauf.**
+
+**Regel:** Knoepfe, die `self_play.py` als CLI-Flag kennt, gehoeren als FLAG in den Aufruf,
+nicht als `export`. Wer unsicher ist, ob ein Knopf ein Flag hat:
+`grep -n "os.environ\[\"MOSAIC_" self_play.py` zeigt jede Stelle, an der das Skript die
+Umgebung selbst setzt.
+
+**Und die Gegenprobe, die den Fund abschliesst:** mit `--return-order-random-p 1.0` greift
+die Streuung in 4 von 20 Partien (20 Prozent), passend zur gemessenen Obergrenze von 17,75
+Prozent. Die 45 Dateien des Fehlanlaufs liegen unter
+`data/_verworfen_v31_ohne_streuung/` -- nicht geloescht, weil sie denselben Namensstamm
+tragen wie die Neuerzeugung und den Korpus sonst still verunreinigt haetten.

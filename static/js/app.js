@@ -800,6 +800,26 @@ function normColor(c) {
   return low === 'türkis' ? 'tuerkis' : low;
 }
 
+// Farben eines Bonusplaettchens in FESTER Reihenfolge (Nutzer-Befund 2026-09-19:
+// "schwarz/blau ist zb gleich wie blau/schwarz"). Der Pool traegt fuenf
+// zweifarbige Kombinationen zu je zwei Stueck, und bei zweien davon ist die
+// Farbreihenfolge zwischen den Zwillingen vertauscht -- Herkunft ist die
+// Abschrift der echten Plaettchen in docs/bonus_chips_colors.csv (Zeilen 7/16
+// und 8/13). Im Spiel bedeutet die Reihenfolge nichts; ungeordnet angezeigt
+// sehen zwei gleiche Chips aber gespiegelt aus und lesen sich im Tooltip
+// verschieden. Sortiert wird nach der Enum-Reihenfolge der Engine
+// (engine/src/tile.rs:5-13), damit Anzeige und Farb-Bitmaske dieselbe
+// Konvention haben. NUR Anzeige: die Engine-Daten bleiben unberuehrt.
+const CHIP_COLOR_ORDER = ['blau', 'gelb', 'rot', 'schwarz', 'türkis'];
+function chipColors(chip) {
+  const cs = (chip && chip.colors) ? chip.colors.slice() : [];
+  return cs.sort((a, b) => {
+    const ia = CHIP_COLOR_ORDER.indexOf(String(a).toLowerCase());
+    const ib = CHIP_COLOR_ORDER.indexOf(String(b).toLowerCase());
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
 // Farbname fuer die ANZEIGE (Nutzer-Wunsch 2026-08-25: grosser
 // Anfangsbuchstabe). Bewusst getrennt von `normColor`, das den Schluessel fuer
 // CSS-Klassen und Datenattribute liefert -- die Kleinschreibung dort ist
@@ -1294,12 +1314,13 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
               return Array.from({length: 10}, (_, i) => {
                 const c = slots[i];
                 if (c && c.colors && c.colors.length > 0) {
+                  const cc = chipColors(c);
                   if (c.ghost) {
-                    return `<div class="bchip ghost" title="${c.colors.join('+')} (verbraucht)"></div>`;
+                    return `<div class="bchip ghost" title="${cc.join('+')} (verbraucht)"></div>`;
                   }
-                  const c1 = normColor(c.colors[0]);
-                  const c2 = c.colors.length > 1 ? normColor(c.colors[1]) : 'empty';
-                  return `<div class="bchip" title="${c.colors.join('+')}">
+                  const c1 = normColor(cc[0]);
+                  const c2 = cc.length > 1 ? normColor(cc[1]) : 'empty';
+                  return `<div class="bchip" title="${cc.join('+')}">
                     <div class="bchip-half ${c1}"></div>
                     <div class="bchip-half ${c2}"></div>
                   </div>`;
@@ -1705,8 +1726,9 @@ function renderCenter() {
     // Bonuschip-Groesse (.icon-chip ~ .bchip 20px) statt winzig.
     let chipContent = '<span class="icon-chip">🔒</span>';
     if (f.chip_revealed && f.bonus_chip && f.bonus_chip.colors) {
-      const c1 = normColor(f.bonus_chip.colors[0]);
-      const c2 = f.bonus_chip.colors.length > 1 ? normColor(f.bonus_chip.colors[1]) : 'empty';
+      const fcc = chipColors(f.bonus_chip);
+      const c1 = normColor(fcc[0]);
+      const c2 = fcc.length > 1 ? normColor(fcc[1]) : 'empty';
       
       chipContent = `<div class="bchip" style="cursor: pointer;">
         <div class="bchip-half ${c1}"></div>
@@ -2468,7 +2490,7 @@ function renderChipModal() {
     gDiv.innerHTML=confirmedGroups.map((g,gi)=>{
       const cchips=g.chip_ids.map(id=>availableChips.find(c=>c.id===id)).filter(Boolean);
       return `<div style="display:inline-flex;align-items:center;gap:2px;padding:3px 7px;background:#D1FAE5;border:1px solid #34D399;border-radius:5px;font-size:10px">
-        ${cchips.map(c=>c.colors.map(col=>`<div class="tile sm ${normColor(col)}"></div>`).join('')).join('<span style="color:var(--text3)">+</span>')}
+        ${cchips.map(c=>chipColors(c).map(col=>`<div class="tile sm ${normColor(col)}"></div>`).join('')).join('<span style="color:var(--text3)">+</span>')}
         <span style="color:#065F46;margin-left:3px">→ 1 Fliese</span>
         <span onclick="removeChipGroup(${gi})" style="cursor:pointer;color:var(--rot);margin-left:4px">✕</span>
       </div>`;
