@@ -64,6 +64,22 @@ Gedaechtnis:
 5. Pflicht-Diagnostiken am Sieger (Platt, R5, Alt-Set-Brier, R4b) +
    Eintrag in die #29-Buchfuehrung.
 
+   **BEFUND 2026-09-19: R5 und R4b werden seit v24-b06 NICHT mehr gefahren**,
+   die Zeile oben beschreibt insoweit einen Zustand, den seit fuenf
+   Generationen niemand herstellt. Beleg: das Promotions-Kapitel von v24-b06
+   sagt woertlich "Nicht gemessen: R5/R4b-Sonden" (`archive/history.md`), und
+   in `evaluations/artifacts/` ist das juengste `r5_value_calibration_*.json`
+   vom 2026-08-31 (v23-b01). Dazu sind beide Werkzeuge auf die Alt-Aera
+   voreingestellt: `tools/r5_value_calibration.py` hat
+   `--model-path-for-api models/alphazero_v18_best.onnx` als Default, und
+   `tools/r4b_zone_probe.py` liest einen festen `MODEL_KEY` aus einem
+   vorberechneten Referenz-JSON.
+
+   **Kein Entscheid des Koordinators, sondern eine Vorlage:** entweder die zwei
+   Sonden werden auf den aktuellen Kontrakt gezogen und wieder Pflicht, oder
+   die Zeile wird auf "Platt und Alt-Set-Brier" gekuerzt. Bis dahin gilt, was
+   seit v24 praktiziert wird -- aber jetzt sichtbar statt stillschweigend.
+
    5b. **Anzeige-Kalibrierung nachziehen**: Platt-Parameter A/B des NEUEN
    Champions in `server.py` (`_DISPLAY_CAL_A/_B`) eintragen -- sie sind
    modellspezifisch (gemessene Drift: v19 B=1,93 / t34 0,97 / v21 0,906).

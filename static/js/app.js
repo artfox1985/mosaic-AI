@@ -494,6 +494,13 @@ function renderHintHighlights() {
       mark(document.querySelector(`#board${humanPi} .dslot[data-row="${a.slot_row}"][data-col="${a.slot_col}"]`), cand);
     } else if (cand.type === 'choose_draw_stack_slot' || cand.type === 'dome_stack_peek') {
       mark(document.getElementById('stack-picker-btn'), cand);
+    } else if (cand.type === 'choose_moon_top' || cand.type === 'choose_return_first') {
+      // Die zwei Reihenfolge-Knoten des Stapelzugs (2026-09-19). Sie betreffen
+      // KEIN Feld auf dem Brett, sondern die Reihenfolge innerhalb eines Dialogs
+      // -- es gibt also nichts zu markieren. Der Zweig steht trotzdem hier, damit
+      // klar ist, dass die Faelle bedacht sind: die Klartextzeile im Hinweis-Panel
+      // traegt die Empfehlung ("Mondstapel: <Farbe> oben" bzw. "Rueckgabe:
+      // Ziehposition <n> zuerst"), und der Dialog zeigt dieselben Optionen.
     } else if (cand.type === 'bonus_chip') {
       mark(document.querySelector(`#factories-list-area [data-chip-fid="${a.factory_id}"]`), cand);
     }
@@ -2936,6 +2943,22 @@ function openReturnOrderPicker(rest) {
 // neu. Nur relevant bei ≥2 Restplatten (also >2 gezogenen Kuppelplatten
 // insgesamt) -- bei ≤1 Restplatte wird openReturnOrderPicker gar nicht erst
 // aufgerufen (siehe stackStopAndChoose).
+// Empfehlung fuer die Rueckgabe-Reihenfolge aus dem zuletzt geholten Tipp.
+// Gibt HTML zurueck oder '' -- der Aufrufer haengt es an die Hinweiszeile an.
+function returnOrderHint(rest) {
+  if (!hintCandidates || !hintCandidates.length || !Array.isArray(rest) || rest.length < 2) return '';
+  const ids = rest.map(x => x.id);
+  const gleich = (a, b) => a.length === b.length
+                        && [...a].sort().join('|') === [...b].sort().join('|');
+  const treffer = hintCandidates.find(c => c.action && Array.isArray(c.action.return_order)
+                                        && gleich(c.action.return_order, ids));
+  if (!treffer) return '';
+  const folge = treffer.action.return_order.map(id => `#${id}`).join(' → ');
+  return `<span style="display:block;margin-top:3px;font-weight:normal">`
+       + `<strong>Tipp #${treffer.rank}:</strong> ${folge} `
+       + `<span style="color:var(--text3)">(zuerst zurueckgelegt zuerst)</span></span>`;
+}
+
 function renderReturnOrderPicker() {
   document.getElementById('dome-confirm').disabled = true;
   const rest = domeModal.stack_draw.return_rest;
@@ -2947,6 +2970,14 @@ function renderReturnOrderPicker() {
                         <span id="return-order-status" style="font-size:10px; font-weight:normal;">${order.length}/${rest.length} platziert</span>
                         <span id="return-order-reset-btn" onclick="resetReturnOrder()" style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;white-space:nowrap;margin-left:6px">↺ Zurücksetzen</span>
                       </span>`;
+  // Lehrer-Hinweis im Rueckgabe-Schritt (2026-09-19, dieselbe Quelle wie im
+  // Mond-Dialog): der zuletzt geholte Tipp traegt beim Stapelzug seine
+  // `return_order` im rohen Aktions-Dict (serialize.rs::action_to_dict Z.565),
+  // der Server reicht sie in `action.return_order` durch. Kein zusaetzlicher
+  // Server-Aufruf. Gezeigt wird nur, wenn die Empfehlung dieselbe Menge an
+  // Platten betrifft wie die offene Auswahl.
+  const tipp = returnOrderHint(rest);
+  if (tipp) notice.innerHTML += tipp;
   notice.style.display = 'block';
 
   const pool = document.getElementById('dome-pool');
@@ -3236,8 +3267,39 @@ function openMoonOrderModal(remaining, callback) {
   const items = remaining.map((color, i) => ({uid: i, color}));
   moonModal = {items, ordered: [], callback};
   renderMoonModal();
+  renderMoonHint(remaining);
   document.getElementById('moon-confirm').disabled = true;
   document.getElementById('moon-overlay').style.display = 'flex';
+}
+
+// Lehrer-Hinweis IM DIALOG (2026-09-19, Nutzer: "das gui bleibt so wie es ist.
+// also kannst einen hinweis im dialog machen").
+//
+// Woher die Empfehlung kommt: der Tipp-Kanal liefert je Kandidat das rohe
+// Aktions-Dict, und ein Steinzug traegt darin seine `moon_order`
+// (serialize.rs::action_to_dict). Der Server reicht sie seit demselben Tag in
+// `action.moon_order` durch. Es wird also KEIN zusaetzlicher Server-Aufruf
+// gemacht -- der Dialog zeigt nur, was der zuletzt geholte Tipp ohnehin enthielt.
+//
+// Angezeigt wird nur, wenn die Empfehlung zur offenen Auswahl PASST (gleiche
+// Multimenge an Farben). Sonst gehoerte der Tipp zu einem anderen Zug, und eine
+// Reihenfolge daraus waere irrefuehrend.
+function renderMoonHint(remaining) {
+  const box = document.getElementById('moon-hint');
+  if (!box) return;
+  box.style.display = 'none';
+  box.textContent = '';
+  if (!hintCandidates || !hintCandidates.length) return;
+  const key = arr => arr.map(normColor).sort().join('|');
+  const ziel = key(remaining);
+  const treffer = hintCandidates.find(c => c.action && Array.isArray(c.action.moon_order)
+                                      && c.action.moon_order.length === remaining.length
+                                      && key(c.action.moon_order) === ziel);
+  if (!treffer) return;
+  const folge = treffer.action.moon_order.map(normColor).join(' → ');
+  box.innerHTML = `<strong>Tipp #${treffer.rank}:</strong> ${folge} `
+                + `<span style="color:var(--text3)">(unterste zuerst)</span>`;
+  box.style.display = 'block';
 }
 
 function renderMoonModal() {

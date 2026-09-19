@@ -492,6 +492,11 @@ def _teacher_describe_move(mv: dict) -> str:
     return desc
 
 
+# Beschriftungen der beiden Stapelzug-Knoten (engine/src/mcts.rs:802/808).
+_T_MOON_TOP_DESC_RE = _re.compile(r"Mondstapel:\s*(?P<color>\S+)\s+oben")
+_T_RETURN_FIRST_DESC_RE = _re.compile(r"Rueckgabe:\s*Ziehposition\s*(?P<pos>\d+)\s+zuerst")
+
+
 def _teacher_action_params(typ: str, desc: str) -> dict | None:
     """Strukturierte Parameter EINES Kandidaten für die Brett-Markierung im
     Frontend (Quell-Fabrik/Farbe/Zielreihe bzw. Kuppel-Slot). Funktioniert
@@ -524,6 +529,21 @@ def _teacher_action_params(typ: str, desc: str) -> dict | None:
         return {"slot_row": int(m.group("r")), "slot_col": int(m.group("c"))}
     if typ == "dome_stack_peek":
         return {}
+    # Die beiden Suchknoten des Stapelzugs (2026-09-19, Nutzer-Auftrag "bau die
+    # knoten auch fuer den lehrer modus ein"). Ihre Beschriftungen kommen aus
+    # engine/src/mcts.rs:800-811 und sind eindeutig -- anders als bei `stone`,
+    # wo die Mondreihenfolge im Text fehlt und Kandidaten gleich aussehen.
+    #
+    # ES GIBT NICHTS ZU MARKIEREN: beide Entscheide betreffen eine REIHENFOLGE,
+    # kein Feld auf dem Brett. Sie liefern deshalb ein leeres Parameter-Dict wie
+    # `dome_stack_peek` -- damit faellt das Frontend nicht mehr in seinen
+    # `if (!a) return;`-Ausstieg (static/js/app.js:471) und zeigt die Klartextzeile.
+    if typ == "choose_moon_top":
+        m = _T_MOON_TOP_DESC_RE.search(desc or "")
+        return {"color": m.group("color")} if m else {}
+    if typ == "choose_return_first":
+        m = _T_RETURN_FIRST_DESC_RE.search(desc or "")
+        return {"position": int(m.group("pos"))} if m else {}
     if typ == "bonus_chip":
         m = _T_BONUS_DESC_RE.search(desc or "")
         if not m:
@@ -1681,8 +1701,8 @@ def ai_start_tile():
 # A=-0.0539, B=0.6684, Brier 0.22537 (evaluations/artifacts/platt_fit_v28-b02_v3.json);
 # Trendmetrik frozen_v1: A=+0.3840, B=0.6074, Brier 0.25217. Vorgaenger v27-b01:
 # A=-0.0476, B=0.6853 (Brier 0.22379 auf frozen_v3).
-_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0513"))  # v29-b09, Platt frozen_v3 2026-09-18
-_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.6488"))  # v29-b09 (v28-b02: -0.0539 / 0.6684)
+_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0550"))  # v30-b02, Platt frozen_v3 2026-09-19
+_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.6141"))  # v30-b02 (v29-b09: -0.0513 / 0.6488)
 _DISPLAY_CAL_ON = os.environ.get("MOSAIC_DISPLAY_CAL", "1") != "0"
 
 
@@ -1827,6 +1847,23 @@ def ai_hint():
         br = mv.get("best_rotation")
         if params is not None and isinstance(br, dict) and br.get("rotation") is not None:
             params["rotation"] = int(br["rotation"])
+        # REIHENFOLGE-EMPFEHLUNG fuer die beiden Dialoge (2026-09-19, Nutzer:
+        # "das gui bleibt so wie es ist. also kannst einen hinweis im dialog
+        # machen"). Die Information liegt im ROHEN Aktions-Dict des Kandidaten
+        # (`serialize.rs::action_to_dict`: `moon_order` beim Steinzug Z.550,
+        # `return_order` beim Stapelzug Z.565) -- `_teacher_action_params` liest
+        # sie nicht, weil es nur die Beschreibung parst und die Reihenfolge dort
+        # gar nicht vorkommt (genau der Grund, warum Kandidaten im Panel
+        # identisch aussehen koennen).
+        #
+        # KEIN Umbau des Spielablaufs: die Oberflaeche fragt beide Reihenfolgen
+        # weiter im eigenen Dialog ab, sie bekommt jetzt nur die Empfehlung dazu.
+        raw = mv.get("action")
+        if params is not None and isinstance(raw, dict):
+            if raw.get("moon_order"):
+                params["moon_order"] = list(raw["moon_order"])
+            if raw.get("return_order"):
+                params["return_order"] = list(raw["return_order"])
         cand = {
             "rank":        i + 1,
             "description": _teacher_describe_move(mv),

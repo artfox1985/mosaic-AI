@@ -156,50 +156,58 @@ Prozent, 10.14); Vorgehen bei Tor-2a-Riss; Loeschung `frozen_champions/v27-b01` 
 
 ## 2. CHAMPION UND LEITER
 
-**Champion laut `models/champion.txt`: `v29-b09_brierbest`** (Promotion 2026-09-18, 14:32;
-Nutzer-Entscheid 10:05 "Weiter mit a und b09"; `minimal_strength_core` 10.15/10.18).
-**Elo 1366 [1329; 1408]** aus 1.100 Partien im LEITERSEGMENT 2 (Anker `hv4_anchor` fix 1000,
-Block-Bootstrap; Stand 2026-09-18, 09:40). Seine drei Aufhaengungen (10.13):
+**Champion laut `models/champion.txt`: `v30-b02_brierbest`** (Promotion 2026-09-19;
+Nutzer-Entscheid "Dann mach das"). **Elo 1436 [1395; 1479]** aus 940 Partien im
+LEITERSEGMENT 2 (Anker `hv4_anchor` fix 1000, Block-Bootstrap; Stand 2026-09-19).
+Seine drei Aufhaengungen:
 
 | Kante | Ergebnis |
 | --- | --- |
-| Gating gegen `v28-b02` (2 Seeds a 200 Paare, 800 Partien) | 423:377 = 52,9 Prozent |
-| Anker `hv4_anchor` @150 (150 Partien ohne Stopp) | 128:22 = 85,3 Prozent |
-| Champion-2 gegen `v27-b01` (150 Partien ohne Stopp) | 90:60 = 60,0 Prozent |
+| Gating gegen `v29-b09` (2 Seeds, 740 Partien) | 443:297 = 59,9 Prozent, Block-z +5,36 |
+| Anker `hv4_anchor` @150 (50 Partien, n gesenkt 2026-09-19) | 45:5 = 90,0 Prozent |
+| Champion-2 gegen `v28-b02` (150 Partien) | 96:54 = 64,0 Prozent |
 
-Eingefroren unter `models/frozen_champions/v29-b09/` (Wheel 414/888, sha256 `da24f156...`,
-Golden-Probe 10/10, Referee-Selbsttest gruen, Handshake `6ef829e564c58bd5`).
-Anzeige-Kalibrierung `_DISPLAY_CAL_A/_B` -0,0513 / 0,6488 (frozen_v3, Brier 0,255, in
-`server.py` eingetragen), sigma/Prior-Balance Median 1,83 (unter 3 -- die c_visit/c_scale-Familie
-bleibt geschlossen), Netz-Paritaets-Fixture `01e627ef5e520619`.
+**Was ihn vom Vorgaenger unterscheidet:** `v30-b02` ist der WARMSTART-Arm der Generation
+v30, trainiert auf dem v30-Fenster von `v29-b09` aus. Der Kaltstart-Arm `v30-b01` blieb
+mit 404:396 (50,5 Prozent) flach -- die Differenz von 9,36 Prozentpunkten bei sonst
+identischem Fenster, Monolith, Seed und Rezept ist die Antwort auf die Kaltstart-Wette:
+**der Kaltstart hat gekostet** (`PREREG_v30_window.md` par.9).
 
-**Vorgaenger und Champion-2-Kante: `v28-b02_brierbest`** (Promotion 2026-09-12),
-Elo 1349 [1315; 1385] aus 3.950 Partien.
+Eingefroren unter `models/frozen_champions/v30-b02/` (Wheel 414/888, Handshake GRUEN --
+Modell und Wheel sind deckungsgleich, keine Polsterung mehr; Golden-Probe 10/10,
+Referee-Selbsttest 2 Partien sauber). Anzeige-Kalibrierung `_DISPLAY_CAL_A/_B`
+**-0,0550 / 0,6141** (frozen_v3, Brier **0,22804** gegen 0,255 des Vorgaengers, in
+`server.py` eingetragen), sigma/Prior-Balance **2,156** (unter 3 -- die
+c_visit/c_scale-Familie bleibt geschlossen), Netz-Paritaets-Fixture `16208f49af911525`.
 
-**LEITER, Stand 2026-09-18 09:40** (Segment 2, `elo_history.csv`; Block-Bootstrap):
+**OFFEN aus der Promotion:** die Pflicht-Diagnostiken R5 und R4b wurden NICHT gefahren --
+sie werden seit v24-b06 nicht mehr gefahren, und ihre Werkzeuge sind auf die v18-Aera
+voreingestellt (Befund und Vorlage in `../docs/promotion_checklist.md` Punkt 5).
+
+**Vorgaenger und Champion-2-Kante: `v29-b09_brierbest`** (Promotion 2026-09-18),
+Elo 1365 [1330; 1405] aus 2.190 Partien.
+
+**LEITER, Stand 2026-09-19** (Segment 2, `elo_history.csv`; Block-Bootstrap):
 
 | Modell | Elo | KI95 | Spiele | Frueh-Stopp-Kanten |
 | --- | --- | --- | --- | --- |
-| v29-b03@400 | 1382 | [1342; 1431] | 640 | 3 von 4 (nach oben verzerrt) |
-| **v29-b09@400 (Champion)** | **1366** | **[1329; 1408]** | **1.100** | 0 von 4 |
-| v29-b07@400 | 1357 | [1318; 1401] | 1.100 | 0 von 4 |
-| v28-b02@400 | 1349 | [1315; 1385] | 3.950 | 6 von 17 |
-| v27-b01@400 | 1308 | [1272; 1344] | 1.580 | |
+| v29-b11@400 | 1440 | [1389; 1493] | 350 | 1 von 1 (EINE Kante, fruehgestoppt) |
+| **v30-b02@400 (Champion)** | **1436** | **[1395; 1479]** | **940** | 1 von 4 |
+| v29-b03@400 | 1380 | [1338; 1426] | 640 | 3 von 4 (nach oben verzerrt) |
+| v29-b09@400 | 1365 | [1330; 1405] | 2.190 | 2 von 7 |
+| v29-b07@400 | 1356 | [1317; 1394] | 1.100 | 0 von 4 |
+| v28-b02@400 | 1347 | [1314; 1384] | 4.100 | 6 von 18 |
+| v27-b01@400 | 1306 | [1270; 1345] | 1.580 | 2 von 7 |
 
-Alle Intervalle ueberlappen; die Leiter trennt b07 und b09 nicht. b03 fuehrt nominell, aber
-drei seiner vier Kanten sind Frueh-Stopps.
+`v29-b11` fuehrt nominell mit vier Punkten, steht aber auf EINER frueh gestoppten Kante
+ueber 350 Partien; der Champion steht auf vier Kanten und 940 Partien. Die Intervalle
+ueberlappen weit.
 
-**Generator `v29-b11`** (b09 mit auf 414 gepolstertem Policy-Kopf, ohne Trainingsschritt).
-Seine Kante **212:138 gegen v29-b09** ist am 2026-09-18 in `elo_history.csv` eingetragen
-(Segment 2, Spec `v30_generation.spec.json`); ein Elo-WERT fuer b11 ist damit noch NICHT
-gerechnet -- der Report von 09:40 liegt vor dieser Zeile. Wer ihn braucht, faehrt
-`tools/elo_tracker.py report` (Rechenlast, nicht neben einer Messung).
-
-**Eingefrorene Artefakte:** `frozen_champions/v29-b09` (amtierend) und `v28-b02` (Vorgaenger,
-Champion-2-Kante); `frozen_heuristics/hv4_anchor` (aktiver Anker), `hv2_generator` und
-`hv3_generator` (Sprossen, hv3 ist die Anfaenger-Stufe); `models/restored_v22` (Leiterknoten
-v22-b05). `frozen_champions/v27-b01` liegt noch im Baum und ist nach der Zwei-Champion-Regel
-Loeschkandidat (Abschnitt 6).
+**Eingefrorene Artefakte:** `frozen_champions/v30-b02` (amtierend) und `v29-b09`
+(Vorgaenger, Champion-2-Kante der naechsten Generation); `frozen_heuristics/hv4_anchor`
+(aktiver Anker), `hv2_generator` und `hv3_generator` (Sprossen); `models/restored_v22`
+(Leiterknoten v22-b05). `frozen_champions/v27-b01` UND `v28-b02` fallen nach der
+Zwei-Champion-Regel als Loeschkandidaten an (Abschnitt 6).
 
 ## 3. LAUFZEITEN (gemessen, Planungsgroessen; Details in `../docs/measured_runtimes.md`)
 

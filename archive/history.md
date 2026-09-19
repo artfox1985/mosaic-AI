@@ -20650,3 +20650,42 @@ Seit dem letzten Kapitel: Loeschungen ausgefuehrt und committet (`1d619a0d`), si
 (Bestand 4 OFFEN), `docs/knobs.md` frisch, gzip-Pickle-Falle in `docs/pitfalls.md`. Stand der Erzeugung: Sockel
 227 von 400 Dateien (18:10), Rest-Kette wartet, Cache-Waechter 2.629 Bloecke. Erste Aufgaben der neuen Sitzung in
 STATUS Abschnitt 1.
+
+## Promotion v30-b02 (2026-09-19)
+
+**Champion-Wechsel `v29-b09` -> `v30-b02`**, Nutzer-Entscheid "Dann mach das". Elo
+**1436 [1395; 1479]** aus 940 Partien, Leitersegment 2.
+
+**Die drei Kanten:** Gating gegen `v29-b09` 443:297 (zwei Seeds, 740 Partien, Block-z
++5,36; der zweite Seed stoppte per SPRT bei 170 Paaren, also UEBER der 150-Paare-Grenze
+und damit als Tor-Ergebnis); Anker `hv4_anchor` 45:5 bei n=50 (an diesem Tag von 150
+gesenkt, Nutzer-Entscheid: die Kante ist bei 90 Prozent ein Sanity-Check, kein Rangmass);
+Champion-2 gegen `v28-b02` 96:54.
+
+**Der Befund der Generation steckt im Vergleich der beiden Arme.** `v30-b01` (Kaltstart)
+und `v30-b02` (Warmstart) teilten Fenster, Monolith, Seed, Rezept und die beiden
+Tor-1-Seeds gegen denselben Gegner. Ergebnis: 50,50 gegen 59,86 Prozent, also **9,36
+Prozentpunkte fuer den Warmstart**. Die Kaltstart-Wette (STATUS Abschnitt 4, Nutzer
+2026-09-17 "dann gehen wir die wette fuer v30 und kaltstart ein") ist damit nicht nur
+uneingeloest, sondern widerlegt -- und zwar einfaktoriell, wofuer der zweite Arm am
+2026-09-19 eigens registriert wurde.
+
+**Diagnostiken:** Anzeige-Kalibrierung A -0,0550 / B 0,6141 (frozen_v3, Brier 0,22804
+gegen 0,255 des Vorgaengers); sigma/Prior-Balance 2,156 (Schwelle 3); Paritaets-Fixture
+`16208f49af911525` neu erzeugt und in frischem Prozess gruen. **Nicht gemessen: R5- und
+R4b-Sonden** -- sie werden seit v24-b06 nicht mehr gefahren, ihre Werkzeuge sind auf die
+v18-Aera voreingestellt; Befund und Vorlage stehen seit diesem Tag in
+`docs/promotion_checklist.md` Punkt 5.
+
+**Artefakt** `models/frozen_champions/v30-b02/`: Modell, Spec, Wheel samt sha256,
+Manifest, venv, Golden-Probe (10 Sonden). Referee-Selbsttest **Handshake GRUEN** --
+erstmals seit dem Kontraktwechsel sind Modell und Wheel deckungsgleich (888/414), es gibt
+keine Polsterung und keinen Breitenschnitt mehr. Golden-Selbsttest 10/10, zwei Echtpartien
+sauber.
+
+**Zwei Fehler des Koordinators an diesem Tag, beide gemeldet und behoben:** ein
+`cargo build` waehrend der laufenden Champion-2-Kante hat vier Worker-Prozesse durch
+Speichermangel abstuerzen lassen; die Kante lief in 50 von 150 Partien leer und hing, sie
+wurde komplett wiederholt (Regel dazu in `docs/pitfalls.md`). Und die erste Auszaehlung
+der Kanten lief ueber das Siegerfeld, das die BRETTSEITE angibt und mit der Orientierung
+wechselt -- die Artefakte tragen `wins_a`/`wins_b` selbst.

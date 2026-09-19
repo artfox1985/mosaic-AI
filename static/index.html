@@ -80,6 +80,10 @@
       Verbleibende Fliesen (klicke in gewünschter Reihenfolge unten→oben):
     </div>
     <div id="moon-tiles" style="display:flex;gap:5px;flex-wrap:wrap;min-height:32px;padding:6px;background:var(--bg);border-radius:6px;border:1px solid var(--border);margin-bottom:8px"></div>
+    <!-- Lehrer-Hinweis im Dialog (2026-09-19): die Empfehlung kommt aus dem
+         zuletzt geholten Tipp (hintCandidates[].action.moon_order) und wird nur
+         gezeigt, wenn ein Tipp vorliegt UND er zum offenen Dialog passt. -->
+    <div id="moon-hint" style="display:none;font-size:10px;margin-bottom:8px;padding:5px 7px;border-radius:5px;background:var(--bg);border:1px solid var(--border)"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-size:10px;color:var(--text2)">Stapel (oben=oberste/zuletzt geklickt, unten=unterste) - Fliese anklicken zum Entfernen:</span>
       <span id="moon-reset-btn" onclick="resetMoonStack()" style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;white-space:nowrap;margin-left:6px">↺ Zurücksetzen</span>
