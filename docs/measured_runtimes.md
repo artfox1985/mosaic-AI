@@ -330,6 +330,9 @@ diese hier. Wer "gegen v28" schreibt, muss sagen, welche der beiden Zahlen er me
 | Aufbau | Dauer | Bemerkung |
 | --- | --- | --- |
 | **Erzeugung Traeger** (policy, Seed 20260930) | **18.984,2 s = 5h 16m** | 4,746 s je Partie, n = 4.000 Partien, 790.970 Zuege, 400 Dateien (`manifest_v29-b11-policy_20260918_145006.json`); `cpu_s` nicht messbar, `os.times()` fuehrt auf dieser Plattform keine Kinderzeiten |
+| **Erzeugung Schwarm temperiert** (value-tempc, Seed 20260931) | **16.183,5 s = 4h 30m** | 4,046 s je Partie, n = 4.000 Partien, 792.342 Zuege, 400 Dateien (`manifest_v29-b11-value-tempc_20260918_201044.json`); 14,8 Prozent billiger als der Traeger, wie in v28 (dort 8,6 Prozent) |
+| **Erzeugung Schwarm Ausflug** (value-excursion, Seed 20260932) | **14.744,0 s = 4h 06m** | 3,680 s je Identitaet, n = 4.006 Identitaeten, 699.929 Zuege, 401 Dateien (`manifest_v29-b11-value-excursion_20260919_004031.json`) |
+| **zusammen** | **49.911,7 s = 13,86 h** | 2026-09-18 14:50 bis 2026-09-19 04:46, durchgehend mit Cache-Waechter (3 Arbeiter) daneben. Gegen v28 (35.726,1 s = 9,92 h) **+39,7 Prozent**; die Planungsannahme war 10,5-14 h (`PREREG_v30_window.md` par.7), getroffen am oberen Rand |
 
 **Kostenvergleich je Partie, Grundmenge jeweils die Policy-Klasse einer vollen Erzeugung mit
 4.000 Partien @100 und threads 11, Einheit Sekunden je Partie:**

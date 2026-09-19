@@ -87,6 +87,14 @@ aber der teure Teil LAEUFT bereits parallel:**
 | --- | --- | --- | --- |
 | 18:14 | 232 | 0 | 0 |
 | 20:07 | **400 FERTIG** (18.984,2 s, 4,746 s je Partie) | 0 | 0 |
+| 00:41 | 400 | **400 FERTIG** (16.183,5 s, 4,046 s je Partie) | 0, Klasse 3 laeuft an |
+| 04:46 | 400 | 400 | **401 FERTIG** (14.744,0 s, 3,680 s je Identitaet) |
+
+**ERZEUGUNG KOMPLETT 2026-09-19, 04:46.** 1.201 Dateien, zusammen **49.911,7 s = 13,86 h** (14:50 bis 04:46, durchgehend mit Cache-Waechter daneben); gegen v28 +39,7 Prozent, Planungsannahme 10,5-14 h am oberen Rand getroffen. Alle drei `laufzeit`-Bloecke stehen in ihren Manifesten und in `../docs/measured_runtimes.md` (Abschnitt Generation v30). Die Kette `night_v30_chain.sh` laeuft seit 2026-09-18 23:17 und uebernimmt selbsttaetig.
+
+**Tor 0 der beiden Value-Klassen faehrt die KETTE selbst** (`night_v30_chain.sh` Schritt 1, alle vier
+Klassen); ein zweiter Lauf von Hand waere doppelte Nebenlast ohne Erkenntnisgewinn -- Tor 2a ist nur auf
+der Policy-Klasse definiert und seit 20:15 gruen.
 
 **Klasse 1 durch, beide Tore gruen** (Belege und alle sechs Kennzahlen in `PREREG_v30_window.md` par.9):
 Tor 2a `sp_voll` **0,90087 (+-0,01700)** gegen den Bezug **0,84275 (+-0,01670)**, n = 8.000 Seiten je Klasse,
