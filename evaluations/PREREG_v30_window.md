@@ -705,6 +705,39 @@ dieselbe Klasse von Befund wie die negativen R2 oben. **Die Arena ist das haerte
 Promotion auf den Tisch: bei einer Champion-Promotion wird die Anzeige-Kalibrierung aus genau diesem Fit
 gezogen (STATUS Abschnitt 2, `_DISPLAY_CAL_A/_B`).
 
+### TOR 2b REPARIERT: die Arena schreibt den Endstand mit (2026-09-19, 14:40)
+
+**Nutzer-Entscheid:** *"Endzustand mitschreiben"* -- also Weg 2 von unten, nicht die Arena-Logs nachruesten.
+
+**Gebaut, drei kleine Eingriffe:**
+
+1. `engine/src/self_play.rs`: das Partie-JSON traegt jetzt `score_geo` (row_fill, col_fill) und `dome_grid`
+   je Seite. **Dieselbe Bauform und derselbe Grund wie die `long_rows_*`-Felder daneben**, deren Kommentar es
+   schon sagt: was aus dem Log nicht rekonstruierbar ist, gehoert ins Artefakt und NICHT in eine neue
+   Logzeile -- `state.log` ist das Vergleichsobjekt des Kernbeweises (`referee.rs::full_log`).
+2. `engine/src/serialize.rs`: `serialize_dome_tile` ist `pub(crate)`, damit beide Seiten dieselbe Form
+   schreiben.
+3. `tools/probes/arena_column_probe.py`: neue Funktion `_end_state_from_artifact`. Traegt der Record den
+   Endstand, wird **nicht mehr nachgespielt**; fehlt er (Alt-Artefakte), laeuft der Replay-Rueckfall
+   unveraendert weiter. Das Sonden-Artefakt fuehrt `direkt_aus_record` mit, damit sichtbar bleibt, ob eine
+   Auswertung noch auf der verzerrbaren Teilmenge steht.
+
+**Beide Wege geprueft:**
+
+| Lauf | Ergebnis |
+| --- | --- |
+| Alt-Artefakt `gating_v30-b01_..._s20261300` (ohne die Felder) | Rueckfall greift, **338 von 400**, Zahlen unveraendert zur Messung von 10:20 -- keine Regression |
+| Frischer Mini-Lauf (5 Paare, 10 Partien, 100 Sims) | **10 von 10 ausgewertet, 0 divergiert, `direkt_aus_record: 10`** |
+
+Der Mini-Lauf hat `col_fill: [6, 6, 4, 0, 0, 1]` und ein 3x3-`dome_grid` je Seite im Record; die Sonde rechnet
+daraus H, Spalten und Reihen ohne einen einzigen Replay-Schritt. **Damit ist die ganze Fehlerklasse weg** --
+einschliesslich der Chip-Vollendungs-Grenze, die STATUS Abschnitt 8 seit Langem als Replayer-Grenze fuehrt.
+
+**Was das NICHT repariert:** die schon gefahrenen v30-Kanten. Ihre Artefakte tragen die Felder nicht, Tor 2b
+bleibt fuer sie auf der verzerrten Teilmenge und damit unbrauchbar. Fuer die Generatorwahl ist das folgenlos
+(par.9: `v30-b02` entscheidet auf Stufe 1); die naechste Arena -- die drei Promotions-Kanten -- liefert das
+erste saubere Tor 2b.
+
 ### URSACHE der Replayer-Divergenz GEFUNDEN: Arena-Logs tragen keine Maschinenzeilen (2026-09-19, 13:30)
 
 **Diagnose gefahren** mit `tools/probes/replay_divergence_diagnosis.py` auf

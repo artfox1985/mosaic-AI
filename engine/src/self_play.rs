@@ -4459,6 +4459,44 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 "winner": determine_winner(&game.state),
                 "steps": steps,
                 "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
+                // Endstand-Geometrie je Seite (2026-09-19, Nutzer-Entscheid "Endzustand
+                // mitschreiben"). GRUND: Tor 2b (volle Spalten) wurde bisher aus dem
+                // Partie-LOG rekonstruiert, indem `arena_column_probe.py` die Partie
+                // nachspielte. Das ist seit dem Knoten-Umbau vom 2026-09-18 unmoeglich:
+                // Arena-Logs tragen keine `#a`-Maschinenzeilen (die schreibt nur der
+                // PyGame-Pfad, py.rs:781), also raet der Replayer die
+                // Rueckgabe-Reihenfolge kanonisch -- und die Suche waehlt sie seither als
+                // eigenen Knoten. Der Kuppelstapel laeuft auseinander, 16 bis 18 Prozent
+                // der Partien brechen ab, und die replaybare Teilmenge ist verzerrt
+                // (PREREG_v30_window.md par.9: das Vorzeichen des Punkte-Margins dreht).
+                // Dieselbe Bauform und derselbe Grund wie bei `long_rows_*` darunter:
+                // was aus dem Log nicht rekonstruierbar ist, gehoert ins Artefakt, nicht
+                // in eine neue Logzeile (`state.log` ist das Vergleichsobjekt des
+                // Kernbeweises, referee.rs::full_log).
+                "score_geo": [
+                    {
+                        "row_fill": crate::scoring::player_scoring_features(p0).row_fill,
+                        "col_fill": crate::scoring::player_scoring_features(p0).col_fill,
+                    },
+                    {
+                        "row_fill": crate::scoring::player_scoring_features(p1).row_fill,
+                        "col_fill": crate::scoring::player_scoring_features(p1).col_fill,
+                    },
+                ],
+                // Das Kuppelgitter dazu, in derselben Form wie `serialize.rs:296`:
+                // die Huellen-Deckung H der Spaltensonde rechnet darauf
+                // (`triangle_hull_coverage_probe.occupancy`). Ohne sie waere die
+                // Sonde zwar spaltenfaehig, aber nicht mehr vollstaendig.
+                "dome_grid": [
+                    p0.dome_grid.dome_slots.iter().map(|row| {
+                        row.iter().map(|slot| crate::serialize::serialize_dome_tile(slot.as_ref()))
+                            .collect::<Vec<_>>()
+                    }).collect::<Vec<_>>(),
+                    p1.dome_grid.dome_slots.iter().map(|row| {
+                        row.iter().map(|slot| crate::serialize::serialize_dome_tile(slot.as_ref()))
+                            .collect::<Vec<_>>()
+                    }).collect::<Vec<_>>(),
+                ],
                 "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
         // Lange Musterreihen (Index 4/5) -- Pflicht-Kennzahl von
         // PREREG_long_row_payoff.md par.3/B1. Die Vollendungsquote ist
