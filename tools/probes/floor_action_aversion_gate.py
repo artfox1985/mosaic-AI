@@ -164,7 +164,8 @@ def rebuild_model():
     # `size mismatch for flat_branch.0.weight`, sobald der Merkmalsvektor
     # gewachsen war. Den Zuschnitt der Eingaben macht
     # `crop_features_to_model` im Forward-Helfer.
-    model, encoder = build_model_from_checkpoint(ckpt, num_actions=NUM_ACTIONS)
+    # Policy-Breite aus dem Checkpoint (2026-09-19, docs/pitfalls.md).
+    model, encoder = build_model_from_checkpoint(ckpt)
     model.eval()
     return model, encoder
 

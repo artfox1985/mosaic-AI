@@ -98,8 +98,12 @@ pub const TILING_SHAPING_ENABLED: bool = false;
 pub const TILING_SHAPING_WEIGHT: f64 = 1.0;
 
 /// Task #21: exakte Endwertung in der Runde-5-Tiling-Zugwahl.
-/// Standard AUS bis gemessen ist, wie oft sie ueberhaupt einen anderen Zug
-/// waehlt -- dieselbe Disziplin wie bei TILING_SHAPING_ENABLED.
+/// STAND: AN. Der fruehere Kommentar ("Standard AUS bis gemessen ist") war seit
+/// dem Einschalten falsch und wurde am 2026-09-19 berichtigt
+/// (`PREREG_code_cleanup_closeout.md` par.5, A13). Die Messung, auf die er
+/// wartete, liegt vor: 5 von 100 Runde-5-Drafting-Stellungen (5,0 Prozent)
+/// waehlen einen anderen Zug, Laufzeit ON/OFF x1,08 (`archive/history.md`,
+/// Commit 3132b8c). Anders als `TILING_SHAPING_ENABLED` also nicht inert.
 pub const ROUND5_ENDSCORING_ENABLED: bool = true;
 
 /// Ein Tiling-Schritt im Solver. `Chips` trägt die konkrete Plättchen-Auswahl
@@ -1015,8 +1019,13 @@ fn best_first_step_round5(state: &GameState, pi: usize) -> Option<TilingStep> {
 /// Task #20: netz-geführter Stichentscheid unter punktgleichen (oder
 /// -ähnlichen) Tiling-Abschlüssen.
 ///
-/// STAND: AUS bis per Arena bestätigt -- gleiche Disziplin wie
-/// `TILING_SHAPING_ENABLED`/`ROUND5_ENDSCORING_ENABLED` oben.
+/// STAND: AN als Bestand ([`NET_TILING_TIEBREAK_DEFAULT`] = 1); seit dem
+/// 2026-09-17 ein Knopf je Seite statt der harten Konstante
+/// `NET_TILING_TIEBREAK_ENABLED` (Beschreibung unten). ACHTUNG, umgekehrte
+/// Polung gegenueber `TILING_SHAPING_ENABLED`/`ROUND5_ENDSCORING_ENABLED`
+/// oben: hier ist die `0` die Verhaltensaenderung, nicht die `1`. Der
+/// frueher hier stehende Satz ("AUS bis per Arena bestaetigt") war nach der
+/// Umstellung falsch, berichtigt am 2026-09-19 (A13).
 ///
 /// BEFUND (`evaluations/tiling_candidate_spread.json`, `v18_best`, k=12,
 /// 142 Runde-2-4-Tiling-Stellungen mit >1 Kandidat, 51/51 Faelle mit

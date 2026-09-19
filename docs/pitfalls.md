@@ -522,3 +522,46 @@ GETOETET (Wrapper rechtzeitig beendet, Self-Play lief verwaist weiter). Regel: R
 lesen (Muster in `tools/cache_inventory.py`, `engine/py/corpus_dataset.py`), und eine Pruefung, die einen
 laufenden Erzeuger stoppen darf, vorher an einer echten Datei trocken fahren -- ein Werkzeugfehler darf
 nie wie ein Befund wirken.
+
+## Gating-Artefakt: die Felder in `blocks[]` sind KUMULATIV, nicht je Block (2026-09-19)
+
+`tools/paired_gating.py` schreibt je Block einen Eintrag mit `a_wins_total`, `b_wins_total` und
+`done_pairs` -- diese Zahlen sind der Stand SEIT LAUFBEGINN, nicht das Ergebnis des einzelnen
+Blocks. Der letzte Eintrag traegt deshalb exakt die Gesamtzahlen des Artefakts.
+
+**Der Fehler, wenn man es uebersieht:** wer `a_wins_total - b_wins_total` je Eintrag als
+Blockdifferenz nimmt, mittelt lauter Zwischenstaende und bekommt eine Zahl, die dem Gesamtstand
+widersprechen kann. Am 2026-09-19 ergab das fuer Tor 1 von `v30-b01` eine mittlere Siegdifferenz
+von **-0,600 je Block (z = -0,614)**, waehrend der Lauf mit **203:197 fuer A** endete. Richtig
+differenziert sind es **+0,150 (z = +0,279)** -- dasselbe H0, aber mit umgekehrtem Vorzeichen.
+
+**Handgriff:** vor dem Mitteln differenzieren und mit einer Summenprobe absichern.
+
+```python
+pa = [b["a_wins_total"] for b in d["blocks"]]
+da = [pa[0]] + [pa[i] - pa[i-1] for i in range(1, len(pa))]
+assert sum(da) == d["a_wins_total"]
+```
+
+Die Block-Ebene bleibt die richtige Auswertungsebene (`feedback_arena_block_correlation`: der
+Seed faellt je Block, die Partien innerhalb eines Blocks sind korreliert) -- sie muss nur aus den
+kumulativen Feldern erst hergestellt werden.
+
+## Kontraktwechsel: die Ladebreite reparieren reicht nicht, die ZIELE haengen auch an `config` (2026-09-19)
+
+Nachtrag zum Eintrag vom 2026-09-18. Nach dem Wechsel NUM_ACTIONS 406 -> 414 wurde in sechs
+Werkzeugen der feste `num_actions=NUM_ACTIONS` aus `build_model_from_checkpoint` entfernt
+(`tools/offline_diagnosis.py`, `tools/oracle_metrics.py`, `tools/probes/policy_teacher_fidelity_probe.py`,
+`floor_action_aversion_gate.py`, `long_row_prior_gate.py`, `saturating_score_utility_gate.py`);
+die Breite kommt jetzt aus dem Checkpoint.
+
+**Das behebt das LADEN, nicht die Auswertbarkeit.** Die Ziel- und Maskenarrays derselben
+Werkzeuge werden weiterhin mit `np.zeros(NUM_ACTIONS)` gebaut (`offline_diagnosis.py` Z.186/194/
+270/278, `oracle_metrics.py` Z.335, `policy_teacher_fidelity_probe.py` Z.485) -- und das ist
+richtig so, weil die Ziele aus den RECORDS kommen und der v30-Korpus 414 Aktionen kodiert. Ein
+406er-Netz laedt danach zwar, liefert aber Logits, die nicht zur Zielbreite passen.
+
+**Folge fuer die Netz-Gesundheit:** der Vergleichspartner auf einem 414er-Korpus ist NICHT der
+Champion `v29-b09` (884/406), sondern `v29-b11` (`models/alphazero_v29-b11.pth`, 888/414) -- der
+auf den neuen Kontrakt gepolsterte b09 ohne Trainingsschritt. Genau dafuer gibt es ihn. Wer
+`PREREG_v30_window.md` par.3 Punkt 7 liest ("gegen `v29-b09`"), muss das mitlesen.

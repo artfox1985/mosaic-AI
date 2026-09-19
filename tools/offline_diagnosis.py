@@ -355,7 +355,11 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
     # `build_model_from_checkpoint` die Breite AUS DEM state_dict ableiten --
     # dasselbe Muster, mit dem es `planes_channels` schon immer ableitet
     # (neural_net.py::build_model_from_checkpoint, Zweig encoder == "2d").
-    model, encoder = build_model_from_checkpoint(ckpt, input_size=None, num_actions=NUM_ACTIONS,
+    # num_actions bewusst NICHT gesetzt (2026-09-19): die Policy-Breite kommt aus dem
+    # Checkpoint, sonst laedt dieses Werkzeug nach einem Kontraktwechsel keinen
+    # Alt-Checkpoint mehr -- also ausgerechnet den Champion nicht, gegen den es vergleicht
+    # (docs/pitfalls.md, 2026-09-18).
+    model, encoder = build_model_from_checkpoint(ckpt, input_size=None,
                                                   hidden_override=hidden_override)
     # Die Breite, die dieses Netz deklariert -- Quelle ist das gebaute Modell,
     # nicht der Dateiname und nicht `config.INPUT_SIZE`.

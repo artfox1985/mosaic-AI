@@ -202,7 +202,9 @@ def load_model(name: str):
     # gewachsen war (744/755 gegen heute 794) -- derselbe Defekt, der in
     # `tools/offline_diagnosis.py` am selben Tag behoben wurde. `None` laesst
     # `build_model_from_checkpoint` die Breite AUS DEM state_dict ableiten.
-    model, encoder = build_model_from_checkpoint(ckpt, input_size=None, num_actions=NUM_ACTIONS)
+    # num_actions bewusst NICHT gesetzt (2026-09-19, gleiche Begruendung wie input_size):
+    # nach dem Wechsel 406 -> 414 laedt ein fester Wert keinen Alt-Checkpoint mehr.
+    model, encoder = build_model_from_checkpoint(ckpt, input_size=None)
     model.eval()
     # Die Breiten, auf die der Aufrufer die Eingaben KUERZEN muss -- genau das,
     # was der Spielpfad tut (engine/src/net.rs:425 flach, :989 je Planes-Kanal).

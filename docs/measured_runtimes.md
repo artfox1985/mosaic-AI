@@ -334,6 +334,14 @@ diese hier. Wer "gegen v28" schreibt, muss sagen, welche der beiden Zahlen er me
 | **Erzeugung Schwarm Ausflug** (value-excursion, Seed 20260932) | **14.744,0 s = 4h 06m** | 3,680 s je Identitaet, n = 4.006 Identitaeten, 699.929 Zuege, 401 Dateien (`manifest_v29-b11-value-excursion_20260919_004031.json`) |
 | **zusammen** | **49.911,7 s = 13,86 h** | 2026-09-18 14:50 bis 2026-09-19 04:46, durchgehend mit Cache-Waechter (3 Arbeiter) daneben. Gegen v28 (35.726,1 s = 9,92 h) **+39,7 Prozent**; die Planungsannahme war 10,5-14 h (`PREREG_v30_window.md` par.7), getroffen am oberen Rand |
 
+**Kette danach** (Tor 0, Fenster, Monolith, Training; die Erzeugungssumme oben bleibt davon unberuehrt):
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| Blockbau fuers Fenster (2.947 Dateien) NACH einem mitlaufenden Cache-Waechter | **4 s** | der Waechter hatte alle Bloecke vorgebaut; die Kette fand nichts mehr zu tun |
+| Monolith-Merge 2.800 Bloecke unter 888 | **611 s = 10 min** | Schluessel `ec851c536ffd`, Stempel geprueft |
+| **Training v30-b01 KALTSTART**, 12 Epochen, 4,89 Mio Samples, 888/414 | **3.652,4 s = 1,01 h** | cuda, fast-loader, `cpu_s` 18.257,2 bei 6 Threads, Datenaufbau 39,7 s. **ANNAHME war 2,3-2,6 h** (aus v23-b06, 714 Eingaenge) -- die alte Kaltstart-Zahl taugt als Bezug NICHT mehr |
+
 **Kostenvergleich je Partie, Grundmenge jeweils die Policy-Klasse einer vollen Erzeugung mit
 4.000 Partien @100 und threads 11, Einheit Sekunden je Partie:**
 

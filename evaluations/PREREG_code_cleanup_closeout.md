@@ -474,6 +474,150 @@ Nebenbefund zur Erwartung aus Punkt 3: im Alt-Register lag v28-b02 gegen v28-b01
 Nullbefund (207:193, 209:191, `PREREG_v28_window.md` par.10); im Segment 2 tragen die beiden
 b01-Zahlen nur EINE Kante (Anker), das Intervall 1271-1458 ist entsprechend breit.
 
+## par.8a A13 ERLEDIGT: die vier widersprechenden Kommentare (2026-09-19, 09:40)
+
+**Nutzer-Auftrag 2026-09-19:** *"ja zieh die kommentare gerade"*, waehrend Arena und Training laufen --
+deshalb VORGEZOGEN aus Stufe 3 (par.5). Begruendung fuers Vorziehen: ein falscher Kommentar fuehrt aktiv in
+die Irre, und genau das hat im Projekt schon einmal Zeit gekostet (`evaluations/STATUS.md`: ein
+Code-Kommentar statt der Primaerquelle). Reine Kommentararbeit, kein Verhalten beruehrt, keine Rechenlast.
+
+**Jede Stelle am Code nachgeprueft** (nicht aus dem Bericht uebernommen), sechs statt vier Fundstellen:
+
+| # | Stelle | Kommentar behauptete | Code tut (Pruefstelle) |
+| --- | --- | --- | --- |
+| 1 | `tiling_solver.rs:100-102` | "Standard AUS bis gemessen ist" | `ROUND5_ENDSCORING_ENABLED = true` (`:103`) |
+| 1b | `round5.rs:1602-1605` | "`=false` (Ist-Zustand)" | dieselbe Konstante ist `true`; der Testkoerper liest generisch |
+| 2 | `tiling_solver.rs:1018-1019` | "STAND: AUS bis per Arena bestaetigt" | `NET_TILING_TIEBREAK_DEFAULT = 1` (`:1046`), seit 2026-09-17 Knopf statt Konstante |
+| 3 | `provocation.rs:459-464` | "1. minimaler Ueberlauf auf die Strafleiste" | Sortiertupel beginnt mit der Konstante `0usize` (`:540`), Primaerkriterium ist die knappste Farbe |
+| 3b | `provocation.rs:466-468` | "fordert GENAU `m.take.color` (`required_color_for`)" | `get_space` mit Fallunterscheidung `Wild`/`Normal`/`Special` (`:510-523`); `required_color_for` wird dort nicht gerufen |
+| 4 | `envelope.rs:917-925`, `:932-934`, `:1007-1010` | Praedikat sei `get_space(..).is_some()`, "kein Filter auf Jokerplatten" | zusaetzlich `space_type == SpaceType::Wild` (`:1031-1032`), also NUR Jokerfelder |
+
+**Die Zahl in der neuen Fassung von 1 ist belegt**, nicht uebernommen: 5 von 100 Runde-5-Drafting-Stellungen
+(5,0 Prozent) waehlen einen anderen Zug, Laufzeit ON/OFF x1,08 (`archive/history.md`, Commit 3132b8c,
+nachgelesen 2026-09-19).
+
+**OFFEN: der Build.** Geaendert sind ausschliesslich Kommentarzeilen, ein `cargo`-Lauf zaehlt aber als Last
+und die Maschine traegt Arena und Training. **Vor dem naechsten Wheel-Bau faellig:**
+`cargo test --release --no-run` (auch `examples/` und `benches/`). Bis dahin gilt die Aenderung als
+ungetestet -- Risiko gering (nur `//`- und `///`-Zeilen), aber nicht null: in 2 steht jetzt ein
+Intra-Doc-Link auf `NET_TILING_TIEBREAK_DEFAULT`.
+
+## par.8b KANDIDATENLISTE STUFE 2, am Code vom 2026-09-19 nachgeprueft (HEAD 7bbf54fc)
+
+**Nutzer-Richtung 2026-09-19:** *"ich denk wir koennen dann auch viel vereinfachen. alte legacy sachen weg,
+tote knoepfe weg usw"*. Das ist der Umfangs-Entscheid aus par.6 Punkt 3, aber noch keine pfadgenaue Freigabe --
+**entfernt wird nichts vor ihr**, und jeder Rust-Schnitt braucht danach Wheel, Paritaets-Fixture und
+Anker-Drift, also eine freie Maschine.
+
+**Beweislage bei Knoepfen, wichtig fuer die Lesart:** seit A9 erzwingt der Waechter
+`registered_non_dead_knobs_exist_in_code` (`knob_registry.rs:398`) fuer jeden nicht-`Tot`-Eintrag eine
+Lesestelle; `tools/` wird nicht gescannt (`:320-330`). Ob ein Knopf LEBT, entscheidet daher der SETZER, nicht
+die Lesestelle.
+
+### A. Sicherer Schnitt (nichts liest es, kein Artefakt, kein Test haelt es)
+
+| # | Kandidat | Pruefstelle |
+| --- | --- | --- |
+| 1 | vier Funktionen `is_row_complete`, `is_col_complete`, `completed_rows`, `completed_cols` | `board.rs:208-222`; **selbst nachgezaehlt 2026-09-19: 0 Treffer ausserhalb `board.rs`** |
+| 2 | `envelope::tiling_cost_delta` samt eigenem Test | `envelope.rs:1387`, Test `:1688-1693`; die Rechnung steht lebend in `tiling_solver.rs:1636-1645` |
+| 3 | Registratur-Zeilen ohne Lesestelle: `MOSAIC_ENDAWARE_W`, `MOSAIC_MUSTERREIHEN_W`, `MOSAIC_TORCH_IPC_PORT`, `_SHM_DIR`, `MOSAIC_GAME_TIMEOUT_SCALE` | `knob_registry.rs:203/204/206/207/196`; **selbst geprueft: `MOSAIC_ENDAWARE_W` hat nur zwei Kommentar-Treffer (`shaping.rs:543/546`), keine Lesestelle** |
+| 4 | toter Wrapper `resolve_and_apply_stack_draw` | `self_play.rs:1092-1095` (`#[allow(dead_code)]`), der `_with`-Aufruf ist der lebende |
+| 5 | `PyGame::net_eval_raw`, `clear_net`, `first_player` | `py.rs:204`, `:216`, `:260` -- kein Python-Aufrufer |
+| 6 | `tools/probes/phase_sweep.py` (ihr Kopf erklaert sie selbst fuer wirkungslos); damit fallen `MOSAIC_PHASE_STAGE/_AMP/_PEAK` | `phase_sweep.py:1-15`, `knob_registry.rs:123-125` |
+| 7 | drei Spec-Felder aus `KNOWN_FIELDS`, die KEINE Spec-Datei traegt: `special_unlock_beta`, `round_est_b_profile`, `moon_order_search_sims` | `net_mcts.rs:1260/1262/1266` |
+| 8 | `--encoder`-Default `flat` -> `2d` an sechs Stellen | `train.py:3141`, `:1084`; `tools/build_cache_{incremental:235,parallel:247,serial:35}.py`; `tools/window_train_split.py:52` (dessen eigene Doku schreibt `2d` vor) |
+| 9 | drei `server.py`-Endpunkte ohne Aufrufer | `/api/ai/suggest` `:1782` (abgeloest von `/api/ai/hint`), `/api/tiling/unplaceable` `:1173`, `POST /api/ai/config` `:1531` |
+
+**Zu Punkt 8 selbst nachgeprueft (der Bericht liess es offen):** KEIN Skript verlaesst sich auf den Default.
+Alle zehn `--encoder`-Vorkommen in `tools/*.sh` lauten `2d`; die zwei Skripte ohne Flag
+(`night_v30_acceptance_b11.sh`, `night_v30_wheel_acceptance.sh`) nennen `train.py` nur in einer
+`echo`-Zeile und rufen es nicht. Der Default-Wechsel ist damit fuer die Ketten folgenlos.
+
+### B. Braucht eine Entscheidung (ein Test, eine Doku oder eine offene Prereg haelt es)
+
+`envelope.rs`-Wrapper `X` gegen `X_in` (Test `:1545-1602` erst auf `_in` umstellen, dann schneiden);
+die `#[allow(dead_code)]`-Gruppe in `plate_builder.rs:171/610/751/1167`, `column_build.rs:789`,
+`provocation.rs:124/134`, `net.rs:990`; der Inversionspfad Runde 5 (`round_transition_resample.rs`,
+`lib.rs:2145-2171`, laut eigener Moduldoku fuer 87,6 Prozent der Faelle unbrauchbar und abgeloest);
+die drei PyO3-Diagnosen (`sibling_ranking`, `draw_stack_peek_impact`, `value_noise_floor` -- zwei davon
+stehen in lebender Doku, `docs/architecture_reference.md:114`); `MOSAIC_TILING_PUNKTE_W` (Status `Aktiv`,
+Text sagt selbst "gemessen wirkungslos", `knob_registry.rs:141`); `/api/stack/peek` (haengt an zwei
+Server-Tests); vier weitere Debug-Endpunkte; `tools/diagnosis.py` (reines Flach-Werkzeug); 29 verwaiste
+`models/*.spec.json` (Belegwert gegen Aufraeumen).
+
+### C. Sollte bleiben
+
+Die Knopf-Zweige im LEBENDEN Heuristik- und Merkmalspfad (`MOSAIC_SPALTENBAU_*`, `MOSAIC_PROVOKATION_SPALTE`,
+`MOSAIC_VORZUG_SPALTE`, `MOSAIC_ASYM_VORZUG`): `plate_builder::drafting_preference` haengt in der
+hv1-Zugkette, `achievable_column_fill` speist `col_f_max` (`features.rs:1553`), `cell_is_completable` speist
+K3-R/K3-D (`envelope.rs:438/1004/1159`) -- und **der Elo-Anker `hv4_anchor` IST hv1-Code**. Hoechstens
+Statuspflege. Ebenso bleiben die Stufen-Spec-Felder und `DIFFICULTY_PRESETS` (offene
+`PREREG_difficulty_levels.md`), `MosaicNet` selbst (Altmodelle ladbar) und die Fixture-Bauknoepfe.
+
+**Korrekturen am Review-Stand von par.2/par.4, die dabei herauskamen:** `run_net_vs_net_arena_hybrid` und
+`onnx_eval` sind NICHT tot (`tools/hybrid_paired_arena.py:89` bzw. vier Aufrufer); A7 ist erledigt (der
+stille Rueckfall `_ => 405` existiert nicht mehr, `features.rs:2172`); A6 steht noch (`game.rs:852-854`,
+sieben Aufrufer).
+
+## par.8c FREIGABE UND ABARBEITUNGSPLAN GRUPPE A (Nutzer 2026-09-19: "gruppe a komplett, sobald die maschine frei ist")
+
+**Freigabe erteilt fuer alle neun Punkte aus par.8b Gruppe A**, Ausfuehrung erst bei freier Maschine. Stand
+bei der Freigabe: vier Python-Prozesse aktiv (b01-Arena Seed 2 plus b02-Kette), Ende erwartet gegen 13:30-14:00
+(b02 faehrt nach seinem Training noch zwei eigene Arenen a rund 95 min).
+
+**Warum nichts vorgezogen wird, auch nicht der Python-Teil:** `train.py` wird von der laufenden b02-Kette
+benutzt, und die Chunk-Prozesse importieren frisch (`feedback_dont_touch_files_read_by_running_runs`,
+STATUS Abschnitt 7). Punkt 8 beruehrt genau diese Datei.
+
+**Reihenfolge, mit dem Tor nach jedem Block:**
+
+1. **Rust-Schnitte** (Punkte 1, 2, 3, 4, 5, 7): `board.rs:208-222`; `envelope::tiling_cost_delta` samt Test;
+   fuenf Registratur-Zeilen; Wrapper `self_play.rs:1092-1095`; drei `PyGame`-Methoden; drei Felder aus
+   `KNOWN_FIELDS`. **Tor:** `cargo test --release --no-run` (faengt `examples/` und `benches/`, siehe
+   CLAUDE.md), dann Wheel-Bau, Netz-Paritaets-Fixture, **Anker-Drift**.
+   **Der Anker-Drift ist hier mehr als Pflicht, er ist die Probe aufs Exempel:** alle sechs Schnitte
+   betreffen angeblich toten Code. Bleibt die Drift GRUEN, ist das der Beleg; wird sie ROT, war der Code
+   nicht tot, und der betroffene Schnitt geht zurueck (kein Anker-Neusetzen, CLAUDE.md).
+2. **Python-Schnitte** (Punkte 8 und 9): `--encoder`-Default auf `2d` an sechs Stellen; drei `server.py`-
+   Endpunkte. **Tor:** die 44 Werkzeug-Tests und ein Rauchtest der Ketten-Skripte mit `--limit`.
+   Vorab geprueft (2026-09-19): kein `tools/*.sh` verlaesst sich auf den Encoder-Default.
+3. **Dateiloeschung** (Punkt 6): `tools/probes/phase_sweep.py`. **Beleg:** die Datei ist git-getrackt
+   (`git ls-files --error-unmatch` geprueft 2026-09-19), Wiederherstellung also aus der Historie -- kein
+   restic-Beleg noetig, anders als bei Korpora und Modellen. Danach fallen `MOSAIC_PHASE_STAGE/_AMP/_PEAK`
+   aus der Registratur.
+
+**Tor, das leicht vergessen wird (Nachtrag 2026-09-19):** JEDE Aenderung an `knob_registry.rs` -- also die
+Punkte 3 und 6 -- verlangt `python tools/generate_knob_docs.py` und das Mitcommitten von `docs/knobs.md`,
+sonst faellt Regel 6 des Konventions-Checks. Am 2026-09-19 ist genau das einmal passiert, ausgeloest nicht
+von einem Schnitt, sondern davon, dass `PREREG_dome_return_order.md` wieder auf OFFEN gesetzt wurde: die
+generierte Uebersicht zaehlt Knoepfe nach dem Status IHRER Prereg (95 -> 93 beantwortet, 59 -> 57 mit
+Default aus). Die Knopf-Doku haengt also nicht nur an der Registratur, sondern auch an den Prereg-Koepfen.
+
+**Gegenprobe zu den Endpunkten (Nachtrag 2026-09-19), selbst nachgezaehlt:** zwei Treffer fuer
+`/api/ai/debug` waren Teilstring-Effekte von `/api/ai/debug_history` (`static/debug.html:416`,
+`engine/server_ai_test.py:124`). Eine exakte Suche mit Wortgrenze liefert NULL Aufrufer -- die Einstufung in
+Gruppe A Punkt 9 steht. Umgekehrt lebt `/api/log_info`, obwohl eine Pfadsuche ihn nur in `server.py` findet:
+`app.js` ruft ohne Praefix (`api('/log_info')`, aufgeloest in `static/js/app.js:88` zu `fetch('/api'+path)`).
+**Wer Endpunkte auf Aufrufer prueft, muss die `api('…')`-Form nehmen, nicht den vollen Pfad.**
+
+**Randbeobachtung, kein Kandidat:** unter `dist/Mosaic-AI/_internal/static/` liegt eine Kopie von `app.js`
+(Stand 2026-08-15) aus einem aelteren Bundle-Bau. Build-Ausgabe, kein Quellstand -- relevant nur, falls zum
+Projektabschluss ein frisches Bundle gebaut wird (dort haengt auch der Befund zu `/api/debug/replay_log`,
+`portable_build_audit_2026-09-13.md:49`).
+
+**Beleg-Korrektur zur Kandidatenliste (Nachtrag 2026-09-19):** Treffer von Knopfnamen unter `models/` sind
+RAUSCHEN und kein Halter -- es sind die sechs eingefrorenen Artefakt-Binaries
+(`frozen_champions/*/venv/.../mosaic_rust.*.pyd`, `frozen_heuristics/*/...`), die je eine einkompilierte
+Kopie der Registratur-Stringtabelle tragen. Sie sind eingefroren und von jeder Quelltextaenderung unberuehrt.
+Die echten Spec-Halter sind die Felder in den `spec.json`. Gruppe A bleibt davon unveraendert.
+
+**Nicht in dieser Freigabe:** Gruppe B (braucht je einen eigenen Entscheid) und Gruppe C (bleibt; der
+Elo-Anker ist hv1-Code).
+
+**Nachtrag zur Beleglage von Punkt 2 (2026-09-19):** ein zweiter Grep ueber `engine/` inklusive Build-Baum,
+`tools/` und die Root-`*.py` findet fuer `tiling_cost_delta` KEINEN Treffer ausserhalb von `envelope.rs`.
+Einziger Nutzer bleibt der eigene Test.
+
 ## par.8 Ergebnisse (leer bis zum Bau)
 
 **STUFE 1 GEBAUT (2026-09-11 abends bis 2026-09-12, 01:30), Tore gefahren im freien Fenster
