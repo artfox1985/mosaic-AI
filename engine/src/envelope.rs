@@ -1374,20 +1374,6 @@ pub fn search_shift(board0: &PlayerBoard, board1: &PlayerBoard, round: u32, c_hu
     c_hull * phi.tanh()
 }
 
-/// Tiling-Eingriff (d), par.8.3: `dH_kosten` eines Abschlusses in
-/// Zellenkosten-Einheiten = `56 * (H(nachher) - H(vorher))`. Fuer einen
-/// Abschluss ohne Orientierungswechsel ist das exakt "Summe `r + 1` der neu
-/// gefuellten Zellen innerhalb der Huelle minus Summe ausserhalb"; kippt die
-/// bestpassende Huelle durch den Abschluss, zaehlt die Umorientierung mit
-/// (gewollt: die Groesse ist die Fuellung der BESTPASSENDEN Huelle).
-///
-/// Bleibt auf dem DREIECK: der Knopf `envelope_hull_form` (par.8.15 Teil B)
-/// wirkt nur im Such-Term (e); der Nachzug des Tiling-Zweigs (d) ist dort als
-/// eigener Schritt vorgesehen, falls Teil B traegt.
-pub fn tiling_cost_delta(before: &PlayerBoard, after: &PlayerBoard) -> f64 {
-    HULL_TOTAL_COST * (envelope_score(after) - envelope_score(before))
-}
-
 /// Bereinigter Tiling-Score (par.8.3): `punkte + W_TILE * w_e * dH_kosten`.
 #[inline]
 pub fn adjusted_tiling_score(points: f64, w_tile: f64, w_e: f64, cost_delta: f64) -> f64 {
@@ -1682,15 +1668,15 @@ mod tests {
         assert!((s + mirrored).abs() < 1e-12, "Antisymmetrie beim Brett-Tausch");
     }
 
-    /// par.8.3: ohne Orientierungswechsel ist `dH_kosten` genau die Summe der
-    /// Zellenkosten neu gefuellter Zellen innerhalb minus ausserhalb.
+    /// par.8.3: der bereinigte Tiling-Score ist `punkte + w_tile * w_e * dH_kosten`.
+    ///
+    /// Frueher pruefte dieser Test zusaetzlich `tiling_cost_delta`; die Funktion ist
+    /// am 2026-09-19 als toter Code entfernt worden (einziger Nutzer war dieser Test,
+    /// die Rechnung steht lebend in `tiling_solver.rs`). Die Zeile fuer
+    /// `adjusted_tiling_score` BLEIBT -- diese Funktion lebt, und ihre Abdeckung haette
+    /// sonst still mit dem Kandidaten mit abgeraeumt werden koennen.
     #[test]
-    fn tiling_cost_delta_equals_new_cell_costs_inside_minus_outside() {
-        let before = board_with(&[(0, 0), (0, 1), (1, 0)]);
-        let after_inside = board_with(&[(0, 0), (0, 1), (1, 0), (2, 0)]);
-        let after_outside = board_with(&[(0, 0), (0, 1), (1, 0), (5, 5)]);
-        assert!((tiling_cost_delta(&before, &after_inside) - 3.0).abs() < 1e-9);
-        assert!((tiling_cost_delta(&before, &after_outside) + 6.0).abs() < 1e-9);
+    fn adjusted_tiling_score_is_points_plus_weighted_cost_delta() {
         assert_eq!(adjusted_tiling_score(4.0, 0.5, 0.92, 3.0), 4.0 + 0.5 * 0.92 * 3.0);
     }
 

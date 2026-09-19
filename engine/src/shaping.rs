@@ -540,7 +540,9 @@ pub fn scoring_floor_weight() -> f64 {
 ///   + projected_unplaceable_penalty(..)               <- MOSAIC_WERTUNG_FLOOR_W
 /// ```
 ///
-/// Warum meine beiden Eigenbauten (`MOSAIC_ENDAWARE_W`/`tiling_vorausschau`,
+/// Warum meine beiden Eigenbauten (frueher die Knoepfe `MOSAIC_ENDAWARE_W`/`tiling_vorausschau`,
+/// beide am 2026-09-19 aus der Registratur entfernt, weil sie seit 2026-08-13 keine Lesestelle
+/// mehr hatten -- die MESSUNG unten bleibt der Grund, warum der Traeger hier blieb:
 /// `MOSAIC_MUSTERREIHEN_W`/`crate::scoring::musterreihen_fortschritt`) INZWISCHEN
 /// entfernt sind (2026-08-13, PREREG_scoring_plate_injection.md Abschnitt N7):
 /// gemessen taten sie nichts. `MOSAIC_ENDAWARE_W` bei w=0,1 gab -0,07 Punkte

@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--val-frac", type=float, required=True)
     ap.add_argument("--val-pool", default=os.environ.get("MOSAIC_VAL_POOL"),
                     help="Regex der Val-Kandidaten (Default: MOSAIC_VAL_POOL aus der Umgebung)")
-    ap.add_argument("--encoder", default="flat", choices=["flat", "2d"])
+    ap.add_argument("--encoder", default="2d", choices=["flat", "2d"])
     ap.add_argument("--value-target-variant", default="default")
     ap.add_argument("--conjunction-head", action="store_true")
     ap.add_argument("--train-list-out", required=True)

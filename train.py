@@ -1081,7 +1081,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           lr_t_max=None,
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
-          points_dist_bins=None, reinit_points_head=False, encoder="flat",
+          points_dist_bins=None, reinit_points_head=False, encoder="2d",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
@@ -3138,7 +3138,7 @@ if __name__ == "__main__":
                              "Mit diesem Flag: Bestandsverhalten (formabweichende Tensoren werden "
                              "immer zufaellig neu gewuerfelt) -- fuer den A/B 'Warmstart gegen "
                              "Zufall'.")
-    parser.add_argument("--encoder", type=str, default="flat", choices=["flat", "2d"],
+    parser.add_argument("--encoder", type=str, default="2d", choices=["flat", "2d"],
                         help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
                              "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
                              "Conv-Zweig auf state_to_planes ([76,6,6]) + Flach-Zweig auf demselben "

@@ -521,7 +521,7 @@ die Lesestelle.
 | 1 | vier Funktionen `is_row_complete`, `is_col_complete`, `completed_rows`, `completed_cols` | `board.rs:208-222`; **selbst nachgezaehlt 2026-09-19: 0 Treffer ausserhalb `board.rs`** |
 | 2 | `envelope::tiling_cost_delta` samt eigenem Test | `envelope.rs:1387`, Test `:1688-1693`; die Rechnung steht lebend in `tiling_solver.rs:1636-1645` |
 | 3 | Registratur-Zeilen ohne Lesestelle: `MOSAIC_ENDAWARE_W`, `MOSAIC_MUSTERREIHEN_W`, `MOSAIC_TORCH_IPC_PORT`, `_SHM_DIR`, `MOSAIC_GAME_TIMEOUT_SCALE` | `knob_registry.rs:203/204/206/207/196`; **selbst geprueft: `MOSAIC_ENDAWARE_W` hat nur zwei Kommentar-Treffer (`shaping.rs:543/546`), keine Lesestelle** |
-| 4 | toter Wrapper `resolve_and_apply_stack_draw` | `self_play.rs:1092-1095` (`#[allow(dead_code)]`), der `_with`-Aufruf ist der lebende |
+| ~~4~~ | **GESTRICHEN 2026-09-19 vor der Ausfuehrung: der Wrapper ist NICHT tot.** `self_play.rs:7998` ruft ihn in einem Test auf (`resolve_and_apply_stack_draw(&mut game)`), und fuenf Kommentare plus der Knopf-Eintrag `knob_registry.rs:164` nennen ihn namentlich; sein eigener Kopfkommentar (`self_play.rs:1086-1091`) sagt ausdruecklich, Loeschen sei "ein eigener Entscheid, keine Aufraeumarbeit im Vorbeigehen". **Verschoben nach Gruppe B.** | – |
 | 5 | `PyGame::net_eval_raw`, `clear_net`, `first_player` | `py.rs:204`, `:216`, `:260` -- kein Python-Aufrufer |
 | 6 | `tools/probes/phase_sweep.py` (ihr Kopf erklaert sie selbst fuer wirkungslos); damit fallen `MOSAIC_PHASE_STAGE/_AMP/_PEAK` | `phase_sweep.py:1-15`, `knob_registry.rs:123-125` |
 | 7 | drei Spec-Felder aus `KNOWN_FIELDS`, die KEINE Spec-Datei traegt: `special_unlock_beta`, `round_est_b_profile`, `moon_order_search_sims` | `net_mcts.rs:1260/1262/1266` |
@@ -534,6 +534,8 @@ Alle zehn `--encoder`-Vorkommen in `tools/*.sh` lauten `2d`; die zwei Skripte oh
 `echo`-Zeile und rufen es nicht. Der Default-Wechsel ist damit fuer die Ketten folgenlos.
 
 ### B. Braucht eine Entscheidung (ein Test, eine Doku oder eine offene Prereg haelt es)
+
+**Neu hier seit 2026-09-19:** der Wrapper `resolve_and_apply_stack_draw` (ex-Gruppe A Punkt 4; Test `self_play.rs:7998`, fuenf namentliche Kommentarverweise, ein Registratur-Eintrag). **Lehre:** die Kandidatenliste eines Agenten ist eine Behauptung -- dieser Eintrag stand dort als "keiner" bei den Aufrufern, obwohl der Test zwei Bildschirme unter der Definition steht. Jeder Punkt wurde vor der Ausfuehrung einzeln nachgeprueft; die uebrigen acht haben gehalten.
 
 `envelope.rs`-Wrapper `X` gegen `X_in` (Test `:1545-1602` erst auf `_in` umstellen, dann schneiden);
 die `#[allow(dead_code)]`-Gruppe in `plate_builder.rs:171/610/751/1167`, `column_build.rs:789`,
@@ -617,6 +619,62 @@ Elo-Anker ist hv1-Code).
 **Nachtrag zur Beleglage von Punkt 2 (2026-09-19):** ein zweiter Grep ueber `engine/` inklusive Build-Baum,
 `tools/` und die Root-`*.py` findet fuer `tiling_cost_delta` KEINEN Treffer ausserhalb von `envelope.rs`.
 Einziger Nutzer bleibt der eigene Test.
+
+## par.8d GRUPPE A AUSGEFUEHRT (2026-09-19, 12:30-13:10): 7 von 9 Punkten, alle Tore gruen
+
+**Ausgefuehrt** nach dem Plan aus par.8c, sobald die Maschine frei war (b02-Kette durch um 12:10).
+
+| Punkt | Ergebnis |
+| --- | --- |
+| 1 vier Funktionen `board.rs:208-222` | entfernt |
+| 2 `envelope::tiling_cost_delta` | entfernt; **Test UMGEBAUT statt geloescht** (siehe unten) |
+| 3 fuenf Registratur-Zeilen | entfernt |
+| ~~4 Wrapper~~ | **VOR der Ausfuehrung gestrichen** (Test-Aufrufer, par.8b) |
+| 5 `PyGame::net_eval_raw`/`clear_net`/`first_player` | entfernt, **plus Folgeschnitt** (siehe unten) |
+| 6 `tools/probes/phase_sweep.py` + `MOSAIC_PHASE_*` | Datei per `git rm`, drei Registratur-Zeilen entfernt |
+| ~~7 drei Spec-Felder~~ | **ZURUECKGENOMMEN nach rotem Test** (siehe unten) |
+| 8 `--encoder`-Default auf `2d` | sechs Stellen umgestellt |
+| 9 drei `server.py`-Endpunkte | entfernt (44 Zeilen), Kommentarverweis nachgezogen |
+
+**Die Tore, in der Reihenfolge des Plans:**
+
+| Tor | Ergebnis |
+| --- | --- |
+| `cargo test --release --no-run` (inkl. `examples/`, `benches/`) | gruen, 55,9 s |
+| Lib-Tests | **702 passed, 0 failed** |
+| Wheel-Bau plus Installation | gruen, Vertragshash **unveraendert** `6ef829e564c58bd5` |
+| Netz-Paritaets-Fixture | gruen |
+| **Anker-Drift** | **GRUEN, 1.763 Schritte Feld fuer Feld identisch** |
+| Werkzeug-Tests `tools/tests` | **141 passed** |
+| Knopf-Doku neu erzeugt, Konventions-Check | gruen (130 -> **122 Knoepfe**) |
+
+**Der Anker-Drift ist der eigentliche Beleg:** alle sechs Rust-Schnitte betrafen angeblich toten Code, und
+der lebende Anker spielt danach Zug fuer Zug wie das eingefrorene Artefakt. Waere ein Schnitt in lebenden
+Code gegangen, haette genau dieser Lauf es gezeigt.
+
+**ZWEI Punkte haben die Pruefung NICHT ueberstanden, und beide wurden von einem Tor gefangen:**
+
+1. **Punkt 4 (Wrapper `resolve_and_apply_stack_draw`)** -- vor der Ausfuehrung gestrichen: `self_play.rs:7998`
+   ruft ihn in einem Test auf, fuenf Kommentare und ein Knopf-Eintrag nennen ihn namentlich, und sein eigener
+   Kopfkommentar sagt, Loeschen sei "ein eigener Entscheid". Die Kandidatenliste hatte "keiner" bei den
+   Aufrufern stehen.
+2. **Punkt 7 (drei Spec-Felder aus `KNOWN_FIELDS`)** -- ausgefuehrt, dann von drei roten Tests zurueckgeholt:
+   `search_config_from_spec_file_takes_moon_order_search_sims_as_optional_field` und zwei Geschwister pruefen,
+   dass Specs diese Felder tragen DUERFEN. Entfernen hiesse, Alt-Specs hart abzulehnen -- ein eigener
+   Entscheid, kein Aufraeumen. Nach der Ruecknahme wieder 702 gruen.
+
+**Zwei Folgefunde bei der Ausfuehrung, beide nur durch Hinsehen gefangen:**
+
+* **Punkt 2:** der Test des Kandidaten pruefte in seiner letzten Zeile zusaetzlich `adjusted_tiling_score` --
+  eine LEBENDE Funktion. Ein Loeschen des ganzen Tests haette ihre Abdeckung still mitgenommen. Der Test ist
+  jetzt auf sie zugeschnitten und heisst `adjusted_tiling_score_is_points_plus_weighted_cost_delta`.
+* **Punkt 5:** nach dem Entfernen der Methode `first_player` wurde das gleichnamige FELD nur noch gesetzt und
+  nie gelesen (Compiler-Warnung in Sicht). Feld und Struct-Initialisierung mit entfernt; der
+  Konstruktor-Parameter bleibt, er geht an `Game::start`.
+
+**Erhalten geblieben ist das Messwissen der entfernten Knoepfe:** der Kommentarblock in `shaping.rs:543-548`
+nennt weiterhin die gemessenen Werte (-0,07 und -0,84 Punkte bei w = 0,1), jetzt mit dem Vermerk, dass die
+beiden Knoepfe am 2026-09-19 aus der Registratur entfernt wurden.
 
 ## par.8 Ergebnisse (leer bis zum Bau)
 

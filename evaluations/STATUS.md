@@ -215,7 +215,7 @@ Loeschkandidat (Abschnitt 6).
 | Training KALTSTART 12 Epochen | **8.164 s = 2,27 h** (v23-b06, 4,72 Mio) | fuer 888 **ANNAHME 2,3-2,6 h** |
 | Tor 1 je Seed, 200 Paare @400, 10 Threads, mit Logs | 4.607 s (794) / 4.912-5.090 s (884) | 11,5 bzw. 12,3-12,7 s je Partie, exklusiv |
 | dito mit 414er-Netzen | **ANNAHME rund 105-110 min** | +35 Prozent aus dem Kostentor (10.14) |
-| Champion-Kanten je Kandidat (Gating 2 Seeds, Anker n=150, Champion-2 n=150) | **rund 3,7 h** | 2 x rund 4.800 s + 1.250-1.280 s + 2.340-2.390 s |
+| Champion-Kanten je Kandidat (Gating 2 Seeds, **Anker n=50 seit 2026-09-19**, Champion-2 n=150) | **rund 3,5 h** | 2 x rund 4.800 s + rund 420 s + 2.340-2.390 s; die Anker-Kante war bis dahin n=150 = 1.250-1.280 s |
 | Kostentor 2 x 20 Paare @400 | rund 22 min | 414/888-Wheel, 09:33-09:55 |
 | Promotion nach Checkliste (Punkte 1, 5b-5d, 7 inkl. Golden-Probe 22 min) | **38 min** | 10.18 |
 | Voller Build: Lib-Tests, `--no-run`, Fixtures, Wheel | rund 5 min | 146 s + 60 s + 72 s (2026-09-17) |
@@ -300,7 +300,11 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-0. **FREIGEGEBEN und WARTET auf die freie Maschine (Nutzer 2026-09-19): Gruppe A des Aufraeumens**,
+0. **AUSGEFUEHRT 2026-09-19, 12:30-13:10: Gruppe A des Aufraeumens**, 7 von 9 Punkten; alle Tore gruen
+   (702 Lib-Tests, 141 Werkzeug-Tests, Paritaets-Fixture, **Anker-Drift 1.763 Schritte identisch**,
+   Vertragshash unveraendert, 130 -> 122 Knoepfe). Zwei Punkte fielen durch die Tore und sind in Gruppe B:
+   der Wrapper (Test-Aufrufer) und die drei Spec-Felder (drei rote Tests). Herleitung, Folgefunde und
+   Belege: `PREREG_code_cleanup_closeout.md` par.8d. **Alte Fassung:**
    neun Punkte mit Pruefstellen in `PREREG_code_cleanup_closeout.md` par.8b, Abarbeitungsplan mit
    Toren in par.8c. Reihenfolge: Rust-Schnitte (Tor: `--no-run`, Wheel, Fixture, **Anker-Drift als
    Probe aufs Exempel**), dann Python (Tor: 44 Werkzeug-Tests, Rauchtest), dann die eine

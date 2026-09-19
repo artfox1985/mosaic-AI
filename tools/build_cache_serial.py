@@ -32,7 +32,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="data")
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--encoder", default="flat", choices=["flat", "2d"])
+    ap.add_argument("--encoder", default="2d", choices=["flat", "2d"])
     ap.add_argument("--value-target-variant", default="default")
     ap.add_argument("--conjunction-head", action="store_true")
     ap.add_argument("--out", required=True)

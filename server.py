@@ -678,7 +678,8 @@ def new_game():
     # tatsaechlich mal ein Feedback-Match gefunden wird (waere unnoetig
     # unklar: die Stufe wurde bewusst gewaehlt). Stufe 1/2 geben NUR auf
     # Klick Hinweise (derselbe /api/ai/hint-Kanal) -- kein automatischer
-    # Trigger hier. Das reine Debug-Panel (/debug, ai_debug_json/ai_suggest)
+    # Trigger hier. Das reine Debug-Panel (/debug, ai_debug_json; der Endpunkt
+    # /api/ai/suggest ist am 2026-09-19 als aufruferlos entfernt worden)
     # zaehlt bewusst NICHT: es zeigt Bewertungen/Analyse, aber liefert keine
     # Zugempfehlung im normalen Spielfluss und ist nur ueber die separate
     # Debug-Seite erreichbar, nicht Teil der Partie-UI.
@@ -1170,12 +1171,6 @@ def tiling_bonus_chips():
         return jsonify(err(str(e)))
 
 
-@app.route('/api/tiling/unplaceable', methods=['GET'])
-def tiling_unplaceable():
-    if (e := _require_game()) is not None:
-        return e
-    return jsonify({"ok": True, "unplaceable": _json.loads(_rust.unplaceable_json())})
-
 
 @app.route('/api/tiling/move_to_floor', methods=['POST'])
 def tiling_move_to_floor():
@@ -1528,26 +1523,6 @@ def ai_config():
     })
 
 
-@app.route('/api/ai/config', methods=['POST'])
-def ai_config_set():
-    """Setzt Schwierigkeit (Basis-Sims, Modell) während des Spiels."""
-    global _ai_sims, _ai_model
-    d = request.get_json(silent=True) or {}
-    preset = _resolve_difficulty(d.get('difficulty', 'medium'), d.get('model'), d.get('sims'))
-    _ai_sims = int(preset.get('sims') or 300)
-    if 'model' in d or 'difficulty' in d:
-        requested_model = preset.get('model')
-        model_path = _resolve_model_path(requested_model)
-        if model_path is not None and _rust is not None:
-            try:
-                _rust.load_net(str(model_path))
-                _ai_model = requested_model
-            except Exception as e:
-                return jsonify(err(f"Netz '{requested_model}' konnte nicht geladen werden: {e}"))
-        else:
-            _ai_model = None
-    return jsonify({"ok": True, "sims": _ai_sims, "model": _ai_model or "heuristic"})
-
 
 # ── Task #28 (PREREG_task28_aggression.md): Aggressivitäts-Regler ───────────
 # Setzt/liest die beiden Laufzeit-Parameter des Score-/Denial-Utility-Blends
@@ -1778,27 +1753,6 @@ def ai_last_log():
     except Exception as e:
         return jsonify(err(f"Log-Fehler: {e}"))
 
-
-@app.route('/api/ai/suggest', methods=['GET'])
-def ai_suggest():
-    """Mentor Mode: Top-3 KI-Züge nach Visits (aus der Rust-MCTS-Analyse)."""
-    if (e := _require_game()) is not None:
-        return e
-    try:
-        if _ai_model is not None:
-            analysis = _json.loads(_rust.ai_debug_net_json(_ai_sims, _ai_c_puct))
-        else:
-            analysis = _json.loads(_rust.ai_debug_json(_ai_sims))
-        moves = analysis.get("moves", []) if isinstance(analysis, dict) else []
-        top = sorted(moves, key=lambda m: m.get("mcts_visits", 0), reverse=True)[:3]
-        suggestions = [{
-            "action":  m.get("move"),
-            "visits":  m.get("mcts_visits", 0),
-            "win_pct": m.get("mcts_win_pct"),
-        } for m in top]
-        return jsonify({"ok": True, "suggestions": suggestions})
-    except Exception as e:
-        return jsonify(err(f"Suggest-Fehler: {str(e)}"))
 
 
 # ── Lehrer-Modus (Task #97) ──────────────────────────────────────────────────

@@ -57,7 +57,6 @@ pub struct PyGame {
     game: Game,
     rng: StdRng,
     seed: u64,
-    first_player: usize,
     scoring_confirmed: bool,
     /// Geladenes Netz für den Netz-KI-Modus (Server "Gegen KI spielen" mit
     /// Modell-Version statt "heuristic"). `None` = Heuristik-Modus (Standard).
@@ -110,7 +109,7 @@ impl PyGame {
         let ids = scoring_ids.unwrap_or_else(|| sample_valid_scoring_ids(3, &mut rng));
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
         PyGame {
-            game, rng, seed, first_player, scoring_confirmed: false,
+            game, rng, seed, scoring_confirmed: false,
             net: None, net_path: None, move_seq: 0,
             // s. Feld-Kommentar: from_env ist genau das Bestandsverhalten.
             search_config: net_mcts::SearchConfig::from_env(),
@@ -201,23 +200,6 @@ impl PyGame {
     /// Rust-Paritätstesten gegen `export_onnx.py`s `.onnx.ref.txt`
     /// (deterministischer Zufalls-Input+Referenz-Output je Modell-Export).
     /// Gibt `(policy, value, moon, points)` zurück.
-    fn net_eval_raw(
-        &self,
-        feats: Vec<f32>,
-    ) -> PyResult<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> {
-        let net = self.net.as_ref().ok_or_else(|| {
-            PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
-        })?;
-        net.eval(&feats).map_err(|e| PyValueError::new_err(format!("Netz-Fehler: {e}")))
-    }
-
-    /// Deaktiviert den Netz-Modus (zurück auf Heuristik), ohne das geladene
-    /// Netz zu verwerfen (erneutes `load_net` mit demselben Pfad bleibt billig).
-    fn clear_net(&mut self) {
-        self.net = None;
-        self.net_path = None;
-    }
-
     // ── Zustand ───────────────────────────────────────────────────────────────
 
     /// Vollständiges Frontend-JSON (als String; Python: json.loads).
@@ -256,9 +238,6 @@ impl PyGame {
     }
     fn seed(&self) -> u64 {
         self.seed
-    }
-    fn first_player(&self) -> usize {
-        self.first_player
     }
     fn scores(&self) -> (i32, i32) {
         (self.game.state.players[0].score, self.game.state.players[1].score)

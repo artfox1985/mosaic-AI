@@ -29,8 +29,18 @@ Gedaechtnis:
    Seed-Bloecke und den Frueh-Stopp: `elo_tracker.py add ...
    --units-from-paired-artifact <Artefakt-JSON> [--early-stop]` (paired_gating
    druckt den Zusatz am Ende); der Tracker zieht sein Intervall dann blockweise.
-3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=150 ohne
-   Fruehstopp** (Praezedenz v18/v19/v20-Verankerung). Seit der Kapselung:
+3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=50** (geaendert
+   2026-09-19, Nutzer: der Fruehstopp sei hier vertretbar, weil die Leiter
+   ueber die Sprossen mehrfach verbunden ist und das Gewicht einer einzelnen
+   Kante entsprechend klein bleibt). **Umgesetzt als kleineres festes n, nicht
+   als Fruehstopp:** `tools/frozen_referee_match.py` kennt kein SPRT (geprueft
+   2026-09-19, nur `--n-games` ueber eine feste Seed-Liste), ein Fruehstopp
+   waere dort Bauarbeit. Der Nebeneffekt ist erwuenscht: ein kleineres festes n
+   verbreitert nur das Intervall, waehrend ein Stopp den Punktschaetzer nach
+   oben zoege (`tools/elo_tracker.py` Z.117-120: "die Siegquote einer solchen
+   Kante ist nach oben verzerrt; der Fit kann das nicht korrigieren").
+   **Kosten:** rund 7 statt 21 min (gemessen 1.246/1.281 s fuer 150 Partien).
+   Vorher: festes n=150 (Praezedenz v18/v19/v20-Verankerung). Seit der Kapselung:
    Anker-Identitaet in der Zeile als `Heuristik_hv4_anchor` fuehren (seit der Neuverankerung 2026-09-12; davor `Heuristik_hv1_anchor`, seit der
    Umbenennung am 2026-08-28; aeltere CSV-Zeilen tragen `Heuristik_v2huelle`
    bzw. `Heuristik` und werden NICHT umgeschrieben -- seit dem 2026-08-31 faltet
