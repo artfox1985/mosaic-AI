@@ -198,7 +198,9 @@ fn serialize_space(sp: &DomeSpace) -> Value {
     })
 }
 
-fn serialize_dome_tile(tile: Option<&DomeTile>) -> Value {
+// `pub(crate)` seit 2026-09-19: das Arena-Artefakt schreibt das Kuppelgitter je Seite
+// mit (self_play.rs, Endstand-Geometrie fuer Tor 2b) und braucht dieselbe Form.
+pub(crate) fn serialize_dome_tile(tile: Option<&DomeTile>) -> Value {
     match tile {
         None => Value::Null,
         Some(t) => json!({

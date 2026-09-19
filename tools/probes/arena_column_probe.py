@@ -57,6 +57,30 @@ def _games_of(artifact: dict):
     return []
 
 
+def _end_state_from_artifact(game: dict):
+    """Endstand DIREKT aus dem Arena-Record, ohne Replay -- oder None.
+
+    Seit 2026-09-19 schreibt die Arena `score_geo` und `dome_grid` je Seite ins
+    Partie-JSON (self_play.rs, Nutzer-Entscheid "Endzustand mitschreiben").
+    GRUND: der Replay-Weg unten ist seit dem Knoten-Umbau vom 2026-09-18 kaputt --
+    Arena-Logs tragen keine `#a`-Maschinenzeilen, der Replayer raet die
+    Rueckgabe-Reihenfolge kanonisch, der Kuppelstapel laeuft auseinander, und
+    16 bis 18 Prozent der Partien brechen ab. Die replaybare Teilmenge ist dabei
+    NICHT zufaellig (`PREREG_v30_window.md` par.9: das Vorzeichen des
+    Punkte-Margins dreht sich gegenueber der Gesamtmenge).
+
+    Rueckgabe hat dieselbe Form wie `_replay_end_state`, damit die Aufrufer
+    unveraendert bleiben: ein `state`-dict mit `players[i].score_geo` und
+    `players[i].dome_grid`. Fehlen die Felder (ALT-Artefakte vor dem 2026-09-19),
+    gibt die Funktion None zurueck und der Aufrufer replayt wie bisher.
+    """
+    geo = game.get("score_geo")
+    grid = game.get("dome_grid")
+    if not geo or not grid or len(geo) < 2 or len(grid) < 2:
+        return None
+    return {"players": [{"score_geo": geo[i], "dome_grid": grid[i]} for i in (0, 1)]}
+
+
 def _replay_end_state(game: dict, tmp_dir, idx):
     """Replayt EINE Arena-Partie und gibt den Endzustand als dict zurueck.
 
@@ -180,14 +204,21 @@ def main() -> int:
             per_game: list[dict] = []
             ok = diverged = 0
             errors: list[str] = []
+            aus_artefakt = 0
             for i, g in enumerate(games):
-                try:
-                    state = _replay_end_state(g, tmp, i)
-                except Exception as e:                      # noqa: BLE001
-                    diverged += 1
-                    if len(errors) < 3:
-                        errors.append(f"{type(e).__name__}: {str(e)[:140]}")
-                    continue
+                # Seit 2026-09-19 zuerst der direkte Weg: traegt der Record den
+                # Endstand, wird NICHT nachgespielt (siehe `_end_state_from_artifact`).
+                state = _end_state_from_artifact(g)
+                if state is not None:
+                    aus_artefakt += 1
+                else:
+                    try:
+                        state = _replay_end_state(g, tmp, i)
+                    except Exception as e:                      # noqa: BLE001
+                        diverged += 1
+                        if len(errors) < 3:
+                            errors.append(f"{type(e).__name__}: {str(e)[:140]}")
+                        continue
                 ok += 1
                 # 2026-09-09: `names` ist im Engine-Record ein BRETT-Etikett
                 # ("NetzA"/"NetzB", self_play.rs:3708) und in beiden
@@ -209,10 +240,14 @@ def main() -> int:
                                  "names": names, "volle_spalten": cols,
                                  "kennzahlen": extras})
                 if (i + 1) % 25 == 0:
-                    print(f"  {arm}: {i + 1}/{len(games)} replayt "
-                          f"({time.time() - t_wall:.0f}s)", flush=True)
+                    print(f"  {arm}: {i + 1}/{len(games)} ausgewertet "
+                          f"({aus_artefakt} direkt aus dem Record, {time.time() - t_wall:.0f}s)", flush=True)
 
+            # `aus_artefakt` gehoert ins Artefakt: es unterscheidet den direkten Weg vom
+            # Replay-Rueckfall und macht sichtbar, ob eine Auswertung noch auf der
+            # verzerrbaren Teilmenge steht (2026-09-19).
             arm_out = {"partien_mit_log": len(games), "replayt": ok, "divergiert": diverged,
+                       "direkt_aus_record": aus_artefakt,
                        "fehler_beispiele": errors, "seiten": {}, "je_partie": per_game}
             for name, vals in sorted(per_name.items()):
                 mean = sum(vals) / len(vals)
