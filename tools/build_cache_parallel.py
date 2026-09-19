@@ -244,7 +244,7 @@ def main():
                          "-- Vorfall 2026-08-26. Default: so viele, dass ein Block rund 100k "
                          "Zustaende hat.")
     ap.add_argument("--out", required=True, help="Zieldatei des zusammengefuegten Caches")
-    ap.add_argument("--encoder", default="flat", choices=["flat", "2d"])
+    ap.add_argument("--encoder", default="2d", choices=["flat", "2d"])
     ap.add_argument("--value-target-variant", default="default")
     ap.add_argument("--conjunction-head", action="store_true")
     ap.add_argument("--limit", type=int, default=None, help="nur die ersten N Dateien (Test)")

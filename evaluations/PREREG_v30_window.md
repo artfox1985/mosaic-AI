@@ -712,6 +712,72 @@ zwischen den Seeds. **Sie taugen als Entscheidungsgrundlage nicht.**
    Das widerspricht der Vorbedingung derselben Stelle: *"Ein Arm ohne Tor-2-Messung ist kein Kandidat und
    kein Ausgeschiedener, sondern ungemessen."*
 
+### TOR 1 des ZWEITEN ARMS: `v30-b02` TRAEGT deutlich -- der Kaltstart hat gekostet (2026-09-19, 12:10)
+
+| Arm | Seed 20261300 | Seed 20261301 | gepoolt | Block-z | Verdikt par.3 |
+| --- | --- | --- | --- | --- | --- |
+| **`v30-b02`** (warm) | 236:164 = 59,00 % | 207:133 = **60,88 %** | **443:297 = 59,86 %** | **+5,360** | **TRAEGT** |
+| `v30-b01` (kalt) | 203:197 = 50,75 % | 201:199 = 50,25 % | 404:396 = 50,50 % | +0,278 | H0 |
+
+**Beide Schwellen weit ueberschritten** (52,5 Prozent gepoolt beziehungsweise z >= +1,96). Der zweite Seed
+hat per SPRT fuer `v30-b02` entschieden, und zwar bei **170 Paaren -- also UEBER der 150-Paare-Grenze**; nach
+`docs/generation_loop.md` ist das ein Tor-Ergebnis und kein bloss informativer Fruehstopp. Der erste Seed lief
+bis zum Deckel durch.
+
+**Der Punktvorsprung ist noch deutlicher als die Siegquote:** `v30-b02` erreicht **58,07** und **58,51** eigene
+Punkte gegen **52,89** und **52,69** des Champions, also rund **+5,2 und +5,8 Punkte je Seite**. Bei `v30-b01`
+lagen dieselben Werte praktisch gleichauf (52,84 gegen 53,06; 53,26 gegen 52,14).
+
+**Was der Arm zerlegt, und das war sein einziger Zweck:** b01 und b02 teilen Fenster, Monolith
+(`data/.cache_ec851c536ffd.h5`), Seed 20260945, Val-Pool, Rezept und die beiden Tor-1-Seeds gegen denselben
+Gegner. Sie unterscheiden sich in EINEM Faktor, dem Start. Die Differenz betraegt **9,36 Prozentpunkte**
+(59,86 gegen 50,50). **Die Kaltstart-Wette ist damit nicht nur uneingeloest, sondern widerlegt** -- der
+Kaltstart hat gekostet, und zwar messbar. Das ist das sauberste Ergebnis dieser Generation und genau das,
+wofuer der zweite Arm registriert wurde (par.8 Punkt 2, Nutzer-Entscheid 2026-09-19).
+
+**Damit ist `v30-b02` zweierlei:**
+
+1. **Generator-Kandidat fuer v31.** Stufe 1 der Generatorwahl (`docs/generation_loop.md`) schliesst aus, wer
+   gegen den besten Stand signifikant VERLIERT -- b02 gewinnt signifikant, b01 ist flach. Die Wahl faellt
+   damit bereits auf Stufe 1 zugunsten von b02; das Spaltenprofil (Stufe 2) wird nicht mehr gebraucht. **Das
+   entschaerft den Replayer-Befund fuer DIESEN Entscheid** -- Tor 2b bleibt trotzdem zu reparieren, weil es
+   in jeder Generation laeuft.
+2. **Champion-Kandidat.** Die Kante gegen den amtierenden Champion traegt mit n = 740 Partien ueber zwei
+   Seeds. Das ist die Voraussetzung fuer `docs/promotion_checklist.md`; die Promotion selbst ist ein eigener
+   Nutzer-Entscheid und braucht die drei Elo-Kanten (rund 3,7 h).
+
+**Laufzeiten:** 116 min (Seed 1, teils neben der b01-Kette) und 80 min (Seed 2, exklusiv, SPRT-Stopp nach 170
+Paaren). Die 197-Sekunden-Bloecke von Seed 1 waren voruebergehend; Seed 2 lag wieder bei rund 140 s.
+
+### Nebenbefund: der SPRT-Fruehstopp greift zwischen NACHBAR-Generationen nicht (2026-09-19, 12:00)
+
+**Gemessen an dieser Generation:** beide Tor-1-Laeufe von `v30-b01` endeten mit
+`UNDECIDED_CAP_REACHED` (llr -4,023 und -4,830 gegen Schranken +-6,907 bei alpha = beta = 0,001), und der
+erste b02-Lauf steht nach 180 von 200 Paaren bei +3,78. Kein Lauf hat gestoppt.
+
+**Die Einschraenkung gehoert dazu (Nutzer 2026-09-19): das gilt zwischen NACHBAR-Generationen, nicht
+allgemein.** Dort sind die Unterschiede kleiner als das, was die Schranken bei diesen Fehlerraten verlangen.
+Bei groesserem Abstand stoppt das Verfahren sehr wohl -- die Leiter zaehlt es mit: `v28-b02` traegt
+**6 Frueh-Stopps von 17 Kanten**, `v29-b03` **3 von 4** (und ist deshalb in STATUS Abschnitt 2 als "nach oben
+verzerrt" markiert).
+
+**Bei den drei Promotions-Kanten wird unterschiedlich verfahren, und das ist NICHT dasselbe** (Korrektur
+2026-09-19, Nutzer: *"Nein er ist nicht abgeschaltet. Er wird nur repliziert"* -- der Koordinator hatte beides
+pauschal als "abgeschaltet" zusammengefasst):
+
+* **Gating gegen Champion-1** (`docs/promotion_checklist.md` Punkt 2): der Fruehstopp bleibt AKTIV; faellt er
+  unter 150 Paaren, kommt eine **Replikations-Zeile** dazu. Die Elo-Zeile traegt den Stopp ausdruecklich mit
+  (`elo_tracker.py add --units-from-paired-artifact ... [--early-stop]`), der Tracker zieht sein Intervall
+  blockweise.
+* **Anker-Kante** (Punkt 3): **festes n = 150 OHNE Fruehstopp**, Praezedenz der v18/v19/v20-Verankerung.
+  Nur hier ist er wirklich abgeschaltet.
+* **Champion-2-Kante** (Punkt 4): @400, ohne Sonderregel an dieser Stelle.
+
+**Praktische Folge fuer die Gating-Laeufe dieser Kampagne:** die Entscheidung faellt ueber die gepoolte
+Quote und den Block-z, der Umfang ueber den Deckel -- nicht ueber das Verfahren. Wer die Regel
+"ein Fruehstopp unter 150 Paaren ist kein Tor-Ergebnis" (`docs/generation_loop.md`) liest, sollte wissen,
+dass sie fuer Nachbar-Generationen einen Fall beschreibt, der dort nicht eintritt.
+
 ### TOR 1 VERDIKT ueber beide Seeds (2026-09-19, 10:15): H0
 
 | Seed | Siege | Anteil | Block-z | SPRT | Punkte A/B | Strafleiste A/B | Laufzeit |

@@ -205,21 +205,6 @@ impl DomeGrid {
         v
     }
 
-    pub fn is_row_complete(&self, row6: usize) -> bool {
-        (0..6).all(|c| self.get_space(row6, c).map_or(false, |s| s.is_filled()))
-    }
-
-    pub fn is_col_complete(&self, col6: usize) -> bool {
-        (0..6).all(|r| self.get_space(r, col6).map_or(false, |s| s.is_filled()))
-    }
-
-    pub fn completed_rows(&self) -> Vec<usize> {
-        (0..6).filter(|&r| self.is_row_complete(r)).collect()
-    }
-
-    pub fn completed_cols(&self) -> Vec<usize> {
-        (0..6).filter(|&c| self.is_col_complete(c)).collect()
-    }
 }
 
 // ── Spielerbrett ─────────────────────────────────────────────────────────────
