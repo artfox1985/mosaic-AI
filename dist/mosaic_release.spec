@@ -43,14 +43,27 @@ datas = collect_static_datas()
 # 406 und INPUT_SIZE 708 sind zwischen dem v16-Tag und heute identisch
 # (git show v0.1-alpha16:config.py); v16 ist nur ein flaches, viel schwaecheres
 # Netz, kein unladbares.)
-# Champion-Stand 2026-09-13: v28-b02_brierbest (Elo 1353, Leitersegment 2). Ein Champion
-# ist seit 0e87ddd Modell PLUS Spec: server.py::_resolve_champion_spec sucht
+# Ein Champion ist seit 0e87ddd Modell PLUS Spec: server.py::_resolve_champion_spec sucht
 # models/<name>.spec.json und dann models/frozen_champions/<name ohne Suffix>/spec.json;
 # ohne die Spec gelten Env-Defaults und die Champion-Knoepfe (Huelle, K5) fehlen
 # (Audit evaluations/review/portable_build_audit_2026-09-13.md, Luecken 1 und 2).
-datas.append((os.path.join(PROJECT_ROOT, 'models', 'alphazero_v28-b02_brierbest.onnx'), 'models'))
-datas.append((os.path.join(PROJECT_ROOT, 'models', 'frozen_champions', 'v28-b02', 'spec.json'),
-              os.path.join('models', 'frozen_champions', 'v28-b02')))
+#
+# DER NAME KOMMT AUS champion.txt, NICHT aus einem Literal hier (2026-09-20).
+# Vorher stand er dreimal fest verdrahtet, zuletzt auf v28-b02 -- waehrend
+# champion.txt im selben Bundle laengst einen anderen Champion nannte. Das Bundle
+# haette sein eigenes Modell nicht gefunden. Wer den Champion wechselt, denkt an
+# tools/set_champion.py; an diese Datei denkt niemand.
+_champion = (open(os.path.join(PROJECT_ROOT, 'models', 'champion.txt'),
+                  encoding='utf-8').read().strip())
+_champ_dir = _champion.replace('_brierbest', '').replace('_best', '')
+_champ_onnx = os.path.join(PROJECT_ROOT, 'models', f'alphazero_{_champion}.onnx')
+_champ_spec = os.path.join(PROJECT_ROOT, 'models', 'frozen_champions', _champ_dir, 'spec.json')
+for _p in (_champ_onnx, _champ_spec):
+    if not os.path.exists(_p):
+        raise SystemExit(f'ABBRUCH: {_p} fehlt -- das Bundle waere ohne Champion. '
+                         f'champion.txt sagt {_champion!r}.')
+datas.append((_champ_onnx, 'models'))
+datas.append((_champ_spec, os.path.join('models', 'frozen_champions', _champ_dir)))
 datas.append((os.path.join(PROJECT_ROOT, 'models', 'champion.txt'), 'models'))
 # Elo-Historie mitliefern: ohne sie hat estimate_ai_anchor keine Arena-Kanten
 # und JEDES KI-Spiel waere ungewertet (Rauchtest-Befund 2026-08-15).

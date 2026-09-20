@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "mosaic_rust"
-version = "0.1.0"
+version = "1.0.0"
 description = "Rust engine + MCTS + self-play for Mosaic-AI"
 requires-python = ">=3.9"
 

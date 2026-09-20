@@ -1,6 +1,6 @@
 [package]
 name = "mosaic_rust"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Rust engine + MCTS + self-play for Mosaic-AI, exposed to Python via PyO3"
 
