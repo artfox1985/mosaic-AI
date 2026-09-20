@@ -169,9 +169,34 @@ Nutzer: "tessa passt, so machen wir das"). Umsetzung mit Stufe 3, NACH der letzt
 | 2 | zwei Literale in `static/js/app.js:227` und `:238` | mit Schritt 1 |
 | 3 | README "Current Status" | mit Schritt 1 |
 
-**Ein Caveat bleibt und gehoert vor den Bau geprueft:** Alt-Logs tragen `"KI"` im Kopf, neue
-`"Tessa"`. Kein heutiges Werkzeug wertet ueber den Namen aus, aber wer kuenftig eines baut, nimmt
-`ai_player` und nicht den Namen.
+**Ein Caveat bleibt:** Alt-Logs tragen `"KI"` im Kopf, neue `"Tessa"`. Kein heutiges Werkzeug
+wertet ueber den Namen aus, aber wer kuenftig eines baut, nimmt `ai_player` und nicht den Namen.
+
+### ALLE DREI SCHRITTE AUSGEFUEHRT (2026-09-20, nach der Promotion)
+
+Anlass fuer die Eile bei 2 und 3 war ein Nutzer-Befund: *"die umbenennung auf tessa hats nicht ins
+portable bundle geschafft. ich seh im gui noch ueberall KI stehen."* Schritt 1 war mit dem Artefakt
+erledigt, die beiden anderen lagen als Nutzer-Entscheid -- aber das Bundle war da schon gebaut.
+
+| Schritt | Umsetzung |
+| --- | --- |
+| 1 Manifestfeld | `display_name: "Tessa"` in `models/frozen_champions/v31-b01/manifest.json` |
+| 2 Frontend | **EINE Konstante statt zweier Literale**: `AI_DISPLAY_NAME` in `static/js/app.js`, benutzt an den zwei Stellen, die den Spielernamen setzen; dazu vier sichtbare Texte in `static/index.html` ("Gegen Tessa spielen", die Sims-Erklaerung, "Tessa / Spieler 2", "Tessa denkt") |
+| 3 README | Champion-Zeile nennt `v31-b01` und Tessa nebeneinander |
+
+**Die Konstante ist bewusst mehr als par.5a verlangte.** Am selben Tag haben zwei fest verdrahtete
+Werte gezeigt, was mit von Hand nachzuziehenden Angaben passiert: das README stand zwei
+Generationen zurueck, `dist/mosaic_release.spec` drei. Ein Name an EINER Stelle wandert nicht
+auseinander.
+
+**NICHT umbenannt, bewusst:** die drei GUI-Stellen im System-Sinn (Button "KI-Debugger", Abschnitt
+"KI-Einstellungen", das zugehoerige Label) und die Fehlertexte in `server.py` ("Nicht der Zug der
+KI", "KI-Fehler: ..."). Die beschreiben das System, nicht den Spieler. Offener Nutzer-Entscheid.
+
+**Am laufenden Bild geprueft**, nicht an der Datei: Server gestartet, `/api/champion` meldet
+`v31-b01_brierbest`, die Konsolenzeile "Champion-Spec ..." erscheint, die Oberflaeche zeigt an
+vier Stellen Tessa und an keiner mehr "KI" als Spielernamen. Das portable Bundle ist danach neu
+gebaut; die erste Fassung vom selben Tag trug die Umbenennung noch nicht.
 
 **Punkt 3 war unabhaengig vom Abschluss faellig und ist am 2026-09-20 ausgefuehrt:** das README
 stand zwei Generationen zurueck (Champion `v28-b02`, Elo 1394), waehrend `v30-b02` mit 1436

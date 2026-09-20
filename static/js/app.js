@@ -65,7 +65,12 @@ let skippedChipRows = {0: new Set(), 1: new Set()};
 // -- API -----------------------------------------------------------------------
 // KI-State
 let AI_ENABLED  = false;
-let AI_PLAYER   = 1;   // KI ist immer Spieler 2 (Index 1)
+let AI_PLAYER   = 1;   // die KI ist immer Spieler 2 (Index 1)
+// Anzeigename des Schlussmodells (PREREG_code_cleanup_closeout.md par.5a, Schritt 2).
+// EINE Stelle statt verstreuter Literale: der Name wandert ueber `names` in den
+// Log-Kopf, und die Auswertung nimmt ohnehin das strukturierte Feld `ai_player`,
+// nie den Namen -- Alt-Logs mit 'KI' bleiben damit lesbar.
+const AI_DISPLAY_NAME = 'Tessa';
 let AI_THINKING = false;
 
 // Lehrer-Modus (Task #97): 0=aus, 1=Kandidaten, 2=+Bewertungen, 3=+Coach-Feedback.
@@ -224,7 +229,7 @@ function ngUpdateStartLabels() {
   const p2nameEl = document.getElementById('ng-name-p2');
   const p2name  = (p2nameEl && p2nameEl.value.trim()) || 'Spieler 2';
   const p2label = document.getElementById('ng-start-p2-text');
-  if (p2label) p2label.textContent = aiOn ? 'KI' : p2name;
+  if (p2label) p2label.textContent = aiOn ? AI_DISPLAY_NAME : p2name;
   const p1label = document.getElementById('ng-start-p1-text');
   if (p1label) p1label.textContent = p1name;
 }
@@ -235,7 +240,7 @@ async function startNewGame() {
   const playerName = document.getElementById('ng-name').value.trim() || 'Spieler 1';
   const aiEnabled  = document.getElementById('ng-ai-toggle').checked;
   const p2NameEl   = document.getElementById('ng-name-p2');
-  const player2Name = aiEnabled ? 'KI' : ((p2NameEl && p2NameEl.value.trim()) || 'Spieler 2');
+  const player2Name = aiEnabled ? AI_DISPLAY_NAME : ((p2NameEl && p2NameEl.value.trim()) || 'Spieler 2');
   const model      = document.getElementById('ng-model').value.trim() || CURRENT_CHAMPION || 'v16_best';
   const sims       = parseInt(document.getElementById('ng-sims').value) || 400;
   const seedRaw    = document.getElementById('ng-seed').value.trim();
