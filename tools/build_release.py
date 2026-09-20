@@ -9,7 +9,8 @@ Ablauf:
   1. Alten dist/build-Output für "Mosaic-AI" entfernen.
   2. `pyinstaller mosaic_release.spec` ausführen.
   3. README_GAME.txt + docs/engine_manual.md ins Bundle kopieren.
-  4. dist/Mosaic-AI/ zu Mosaic-AI_<champion>_<datum>.zip packen (Name aus models/champion.txt).
+  4. dist/Mosaic-AI/ zu Mosaic-AI_v<paketversion>-alpha<generation>.zip packen
+     (Version aus engine/pyproject.toml, Generation aus models/champion.txt).
 
 Aufruf (im Projekt-Root, mit aktivierter Python-Umgebung, in der
 `pip install pyinstaller` bereits lief):
@@ -21,8 +22,8 @@ auf einem bereits vorhandenen dist/Mosaic-AI/ laufen zu lassen.
 """
 
 import argparse
-import datetime
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -82,11 +83,42 @@ def copy_docs() -> None:
         print(f"  Warnung: {manual_src} nicht gefunden -- übersprungen.")
 
 
+def release_name() -> str:
+    """Bundle-Name `Mosaic-AI_v<paketversion>-alpha<generation>` (Nutzer 2026-09-21).
+
+    Zwei Quellen, beide bereits im Baum gepflegt, keine dritte Stelle zum Nachziehen:
+
+    * die PAKETVERSION aus `engine/pyproject.toml` -- dieselbe, die im Wheel-Dateinamen
+      steht (maturin liest sie von dort, NICHT aus Cargo.toml; der Unterschied hat am
+      2026-09-20 einen Versionssprung stillschweigend verschluckt). Auf zwei Stellen
+      gekuerzt: 1.0.0 -> "1.0".
+    * die GENERATIONSNUMMER aus `models/champion.txt`: `v31-b01_brierbest` -> 31. Damit
+      folgt der Name dem Champion von selbst, statt bei jeder Promotion von Hand
+      nachgezogen zu werden -- genau die Fehlerklasse, an der die PyInstaller-Spec drei
+      Generationen lang vorbeigelaufen ist (`evaluations/PREREG_code_cleanup_closeout.md`
+      par.8f/8g).
+
+    KEIN Datum mehr im Namen: ein Release-Artefakt soll bei gleicher Version und gleicher
+    Generation DIESELBE Datei sein. Ein Neubau ueberschreibt darum in place.
+    """
+    champion = (PROJECT_ROOT / "models" / "champion.txt").read_text(encoding="utf-8").strip()
+    m = re.match(r"^v(\d+)-", champion)
+    if not m:
+        raise SystemExit(
+            f"ABBRUCH: aus champion.txt ({champion!r}) laesst sich keine Generationsnummer "
+            f"lesen; erwartet ist die Form 'v<zahl>-...'.")
+    generation = m.group(1)
+
+    pyproject = (PROJECT_ROOT / "engine" / "pyproject.toml").read_text(encoding="utf-8")
+    v = re.search(r'^version\s*=\s*"(\d+)\.(\d+)', pyproject, re.MULTILINE)
+    if not v:
+        raise SystemExit("ABBRUCH: keine Paketversion in engine/pyproject.toml gefunden.")
+    return f"Mosaic-AI_v{v.group(1)}.{v.group(2)}-alpha{generation}"
+
+
 def make_zip() -> Path:
     print("[4/4] Packe ZIP ...")
-    date_str = datetime.datetime.now().strftime("%Y%m%d")
-    champion = (PROJECT_ROOT / "models" / "champion.txt").read_text(encoding="utf-8").strip()
-    zip_path = PROJECT_ROOT / "dist" / f"Mosaic-AI_{champion}_{date_str}.zip"
+    zip_path = PROJECT_ROOT / "dist" / f"{release_name()}.zip"
     if zip_path.exists():
         zip_path.unlink()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
