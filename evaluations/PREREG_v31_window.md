@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v31-Fenster zugeschnitten -- Generator `v30-b02` (888/414, ohne Polsterung), und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | Beleg: par.1 Zuschnitt 2.947 Dateien (v30-b02 neu, v29-b11 als G-1, v28-b02 als G-2; v27-b01 rotiert heraus, Bestand am 2026-09-19 gezaehlt). par.5 Erzeugung mit der Rueckgabe-Streuung p = 0,81. Nichts erzeugt, nichts trainiert. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v31-Fenster zugeschnitten -- Generator `v30-b02` (888/414, ohne Polsterung), und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | Beleg: par.6 Erzeugung FERTIG 2026-09-20 (400/400/401 Dateien, 14,66 h, +5,7 Prozent gegen v30), Manifest-Diff 0 unerwartete Abweichungen, **Tor 2a HAELT** mit sp_voll 0,955 gegen 0,901. Streuung im Korpus 12,0 Prozent auf n = 200 (Ziel 15, nicht auffaellig). Fenster 2.947 Dateien, Training `v31-b01` WARM und Tor 1 gegen Champion `v30-b02` laufen. -->
 
 # PREREG v31: Fensterzuschnitt der Generation v31
 
@@ -98,4 +98,41 @@ falschen Prozess belegt also nichts. Eintrag in `docs/pitfalls.md`.
 **15,0 Prozent** (Ziel 15 Prozent, Obergrenze 17,75). Die Dosis 0,81 trifft damit den
 registrierten Zielwert.
 
-(Tore, Training und Arena stehen aus.)
+### Erzeugung ABGESCHLOSSEN 2026-09-20, 11:04
+
+**400 / 400 / 401 Dateien**, Exit 0, 20:23:47 bis 11:04. Laufzeiten aus den Manifesten, nicht
+geschaetzt: Sockel 16.944,3 s (4,236 s je Partie), temperiert 18.399,2 s (4,600), Ausflug
+17.434,6 s (4,353); zusammen **52.778,1 s = 14,66 h**, gegen v30 (13,86 h) +5,7 Prozent.
+Vollstaendig mit dem Vergleich je ZUG in `docs/measured_runtimes.md`, Abschnitt "Generation v31".
+
+**Offen und ausdruecklich unerklaert:** die Partielaenge ist gegen v30 auf ein Zehntel Zug gleich
+(197,7 gegen 197,7 im Sockel), trotzdem ist der Sockel 10,7 Prozent BILLIGER und beide
+Schwarm-Klassen 13,7 bzw. 18,4 Prozent TEURER je Zug. Cache-Waechter und `policy_mass_cutoff` sind
+als Ursachen geprueft und ausgeschlossen (Herleitung in `measured_runtimes.md`). Entscheiden wuerde
+es die Zahl der je Entscheidung expandierten Knoten -- eine Sonde ueber die Records, keine Partie.
+
+### Vorlauf der Kette, 2026-09-20 12:15 (tools/night_v31_chain.sh)
+
+| Pruefung | Ergebnis |
+| --- | --- |
+| Manifest-Diff gegen `manifest_v29-b11-policy_20260918_145006.json` | **0 unerwartete Abweichungen**; die einzige gemeldete ist `return_order_random_p` 0,0 -> 0,81 |
+| Stack-Draw-Kontrolle | `stack_draw_research` gesetzt, Slot-Datensaetze im Korpus |
+| Wiedervorlage der Streuung am Korpus | **24 von 200 Partien = 12,0 %** (20 Dateien) |
+| **Tor 2a** | `sp_voll` **0,955** (+-0,017) fuer `v30-b02` gegen **0,901** (+-0,017) fuer `v29-b11`, Differenz **+0,054** -- **HAELT** |
+
+**Zur Dosis:** 12,0 Prozent gegen das Ziel 15 Prozent. Auf n = 200 Partien betraegt eine
+Standardabweichung 2,5 Prozentpunkte, der Abstand also 1,2 sd -- kein auffaelliger Befund, aber die
+BESSERE Schaetzung als die 15,0 Prozent aus 20 Partien vom Vorabend. Die Rate ist
+verhaltensabhaengig (`PREREG_dome_return_order.md` 12.12a) und gehoert am vollen Korpus
+nachgerechnet, sobald die Maschine frei ist; erst dann ist sie eine tragende Zahl.
+
+**Die Referenzzahl aus par.2 ist am Korpus bestaetigt:** 0,90087 gegen gemessene 0,901.
+
+### Tor 2a im Reihenverlauf
+
+Die Reihe der Generatoren-`sp_voll` lautet damit 0,637 / 0,737 / 0,777 / 0,816 / 0,843 / 0,901 /
+**0,955**, die Zuwaechse +0,100 / +0,040 / +0,039 / +0,027 / +0,058 / **+0,054**. Der Zuwachs
+bleibt auf dem erhoehten Niveau der Vorgeneration. **Das ist kein Staerkebeleg** -- `sp_voll` ist
+eine Korpus-Kennzahl des Generators, kein Duell.
+
+(Training `v31-b01` und Tor 1 gegen den Champion laufen; Verdikt steht aus.)

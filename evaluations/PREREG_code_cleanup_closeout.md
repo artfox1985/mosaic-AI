@@ -145,6 +145,41 @@ Nutzer: "tessa passt, so machen wir das"). Umsetzung mit Stufe 3, NACH der letzt
 3. README "Current Status": Name und Generationsname nebeneinander; Schwierigkeitsleiter
    (`PREREG_difficulty_levels.md`): Stufe "Meister" = Tessa.
 
+### NACHTRAG 2026-09-20: Punkt 2 ist kleiner als hier beschrieben, Punkt 3 war ueberfaellig
+
+**Die Behauptung "die Log-Auswertung haengt heute an `KI`" stimmt nicht** (am Code geprueft):
+
+* `tools/analyze_game_log.py` nennt "KI" ausschliesslich in Kommentaren; eine Suche nach dem
+  Literal als WERT (`== "KI"`) liefert im ganzen Baum keinen Treffer.
+* Wer die KI-Seite braucht, nimmt das STRUKTURIERTE Feld `ai_player` aus dem JSON-Kopf des Logs
+  (`tools/claude_play.py:239`, `tools/game_log_report.py:68`) -- der Kopf traegt zusaetzlich
+  `ai_enabled` und `ai_model`.
+* Die Treffer auf `st.get("players", ...)` in `claude_play.py`, `corpus_sanity_check.py` und
+  `diagnosis.py` sind die SPIELERBRETTER im Zustand, nicht die Namensliste des Log-Kopfs. Zwei
+  verschiedene Dinge unter demselben Wort.
+
+**Der Name wird allein im Frontend gesetzt**, `static/js/app.js:227` und `:238`
+(`aiOn ? 'KI' : p2name`), und landet von dort ueber `names` in den Log-Kopf.
+
+**Damit ist die Umbenennung mechanisch und dreiteilig**, ohne Parser-Arbeit:
+
+| Schritt | Stelle | Zeitpunkt |
+| --- | --- | --- |
+| 1 | `display_name: "Tessa"` im Manifest des Schluss-Artefakts | nach der LETZTEN Promotion |
+| 2 | zwei Literale in `static/js/app.js:227` und `:238` | mit Schritt 1 |
+| 3 | README "Current Status" | mit Schritt 1 |
+
+**Ein Caveat bleibt und gehoert vor den Bau geprueft:** Alt-Logs tragen `"KI"` im Kopf, neue
+`"Tessa"`. Kein heutiges Werkzeug wertet ueber den Namen aus, aber wer kuenftig eines baut, nimmt
+`ai_player` und nicht den Namen.
+
+**Punkt 3 war unabhaengig vom Abschluss faellig und ist am 2026-09-20 ausgefuehrt:** das README
+stand zwei Generationen zurueck (Champion `v28-b02`, Elo 1394), waehrend `v30-b02` mit 1436
+amtiert. Das Repo ist oeffentlich; eine veraltete Champion-Zeile ist dort keine Kosmetik.
+Nachgezogen sind die Champion-Zeile, die drei tragenden Kanten, der Kaltstart-Befund und die
+Sprossenliste der Leiter (deren Zahlen sich mit dem Nachtrag der beiden `v30-b01`-Kanten
+verschoben hatten).
+
 ## par.6 Nutzer-Entscheide
 
 1. ~~A10 Kontrakt-Hash erweitern~~ ENTSCHIEDEN 2026-09-11 (Nutzer: "ja, nimm A4 und A10 mit

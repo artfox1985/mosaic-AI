@@ -23,10 +23,12 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1394** (95% CI [1350, 1445])
-from 1,410 rated games on the **second ladder segment**, anchored at the frozen
+Champion: **`v30-b02`** (promoted 2026-09-19), Elo **1436** (95% CI [1397, 1482])
+from 940 rated games on the **second ladder segment**, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 =
-1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
+1000, `tools/elo_tracker.py report`). It is also the generator of the v31
+replay window, and the first champion since the action-space change whose model
+and wheel match exactly (888 inputs, 414 actions, no padding). The ladder was re-anchored on 2026-09-12:
 a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
 moved the old anchor's moves, so the first segment (anchor `hv1_anchor`,
 `v27-b01` at 1405, `v26-b01` 1364, `v25-b01` 1336) now lives in
@@ -35,17 +37,19 @@ boundary; the same happened once before on 2026-08-21 with the round-5 solver
 fix (`archive/elo_history_pre_r5fix.csv`). Because every net since v23 beats the
 heuristic anchor at 84-90 % (saturated edges), the second segment carries
 intermediate rungs from frozen artifacts restored out of the backup
-(`v22-b05`@25 1103, `v22-b05`@100 1173, `v21_2d_brierbest` 1204, `v24-b07` 1207,
-`v22-b05` 1213, `v26-b01` 1255, `v27-b01` 1310, `v28-b01` 1326), the anchor
-heuristic at 600 simulations (`hv4_anchor`@600 1046, the rung between the anchor
-and the net block) and the two hull-teacher
-heuristics `hv2` (983, frozen before the phantom fix) and `hv3` (978, the same
+(`v22-b05`@25 1054, `v22-b05`@100 1143, `v22-b05` 1193, `v21_2d_brierbest` 1194,
+`v24-b07` 1199, `v26-b01` 1248, `v27-b01` 1306, `v28-b01` 1320, `v28-b02` 1347),
+the anchor heuristic at 600 simulations (`hv4_anchor`@600 1021, the rung between
+the anchor and the net block) and the two hull-teacher
+heuristics `hv2` (975, frozen before the phantom fix) and `hv3` (966, the same
 recipe rebuilt on the fixed engine; the fix does not change its strength). The anchor carries its own wheel:
 an engine change can no longer move the fixed point of the ladder, and every
 engine change is checked move by move against it (drift check,
-`/mosaic-anchor-invariance`). `v28-b02` beat `v27-b01` 133:97 (SPRT), 212:188 (to the
-cap, not significant) and 226:174 (third seed to the cap without early
-stopping, p 0.017), so the edge holds. The
+`/mosaic-anchor-invariance`). `v30-b02` rests on three edges: 443:297 (59.9 %) against the
+previous champion `v29-b09` over two seeds, 45:5 against the anchor, and 96:54
+against `v28-b02` two generations back. Its predecessor `v30-b01`, trained cold
+on the same window with the same seed and recipe, came out at 404:396: the warm
+start is worth 9.4 percentage points, and the cold-start bet is settled. The
 value head predicts a win *probability* (WDL); display probabilities are
 Platt-calibrated per champion.
 
