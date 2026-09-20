@@ -98,3 +98,55 @@ class UpwardTolerantDivergence(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ChipColorCanonicalisation(unittest.TestCase):
+    """Waechter fuer die Farb-Normalisierung (Nutzer-Entscheid 2026-09-20, Weg a).
+
+    Anlass: die Kanonisierung des Bonuschip-Vorrats aendert die SCHREIBWEISE der
+    Farben im serialisierten Zustand, nicht das Spiel. Die eingefrorenen Golden
+    Probes tragen die alte Schreibweise und meldeten deshalb ROT, obwohl ueber
+    1.763 Schritte alle Zugfelder gleich waren (par.8e).
+
+    Gemessen wird hier an BEIDEN Seiten, wie beim aufwaerts-toleranten Vergleich:
+    dass die Normalisierung greift, wo sie soll, UND dass sie nicht greift, wo die
+    Reihenfolge Bedeutung traegt. Der zweite Teil ist der wichtigere -- ein
+    Suffix-Kriterium haette `moon_top_colors` mitsortiert und damit einen der
+    neuen Suchknoten blind gemacht.
+    """
+
+    def _rec(self, state):
+        return {"game_id": "probe_1", "state": state, "policy": [0.5, 0.5]}
+
+    def test_chip_colors_are_order_insensitive(self):
+        a = [self._rec({"factories": [{"bonus_chip": {"id": 6, "colors": ["schwarz", "blau"]}}]})]
+        b = [self._rec({"factories": [{"bonus_chip": {"id": 6, "colors": ["blau", "schwarz"]}}]})]
+        self.assertIsNone(_first_divergence(a, b))
+
+    def test_unused_chip_colors_are_order_insensitive(self):
+        a = [self._rec({"players": [{"unused_chip_colors": ["schwarz", "gelb"]}]})]
+        b = [self._rec({"players": [{"unused_chip_colors": ["gelb", "schwarz"]}]})]
+        self.assertIsNone(_first_divergence(a, b))
+
+    def test_moon_top_colors_stay_order_sensitive(self):
+        """Die Reihenfolge der Mondstapel-Koepfe IST der Zug (Aktionen 406-410)."""
+        a = [self._rec({"moon_top_colors": ["rot", "blau"]})]
+        b = [self._rec({"moon_top_colors": ["blau", "rot"]})]
+        self.assertIsNotNone(_first_divergence(a, b))
+
+    def test_row_colors_stay_order_sensitive(self):
+        """`row_colors` ist die Farbe JE Musterreihe -- der Index traegt Bedeutung."""
+        a = [self._rec({"players": [{"row_colors": ["rot", "blau"]}]})]
+        b = [self._rec({"players": [{"row_colors": ["blau", "rot"]}]})]
+        self.assertIsNotNone(_first_divergence(a, b))
+
+    def test_a_different_chip_colour_is_still_red(self):
+        """Normalisiert wird die REIHENFOLGE, nicht der Inhalt."""
+        a = [self._rec({"factories": [{"bonus_chip": {"id": 6, "colors": ["schwarz", "blau"]}}]})]
+        b = [self._rec({"factories": [{"bonus_chip": {"id": 6, "colors": ["schwarz", "rot"]}}]})]
+        self.assertIsNotNone(_first_divergence(a, b))
+
+    def test_canonicalisation_is_limited_to_two_fields(self):
+        """Wer die Liste erweitert, faellt hier um -- und liest den Kopfkommentar."""
+        from generator_repro_probe import CHIP_COLOR_FIELDS
+        self.assertEqual(tuple(CHIP_COLOR_FIELDS), ("colors", "unused_chip_colors"))

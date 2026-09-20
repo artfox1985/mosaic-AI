@@ -93,6 +93,50 @@ def _strip_state(v):
     return v
 
 
+# Farblisten von BONUSCHIPS werden vor dem Vergleich sortiert, auf beiden Seiten.
+#
+# Anlass 2026-09-20: der Vorrat fuehrt seine Chipfarben seit der Kanonisierung
+# (`dome::build_bonus_chip_pool`) in fester Enum-Ordnung. Die eingefrorenen Golden
+# Probes tragen die alte Schreibweise der Abschrift, in der zwei von fuenf
+# Kombinationen verdreht stehen (`[Schwarz, Blau]` gegen `[Blau, Schwarz]`). Der
+# Vergleich meldete deshalb ROT an Schritt 0, obwohl derselbe Lauf ueber 1.763
+# Schritte dieselben Zuege, dieselbe Policy und dieselben Ergebnisse hatte
+# (Diagnose in `evaluations/PREREG_code_cleanup_closeout.md` par.8e). Im Spiel
+# bedeutet die Reihenfolge innerhalb eines Chips nichts; die Wertung liest ihn
+# ohnehin als Farb-Bitmaske (`round_end::chip_sig`).
+#
+# ENG BEGRENZT, und das ist der Punkt: NUR diese zwei Felder. Ein Suffix-Kriterium
+# ("endet auf colors") waere falsch -- im Zustand enden auch `row_colors` (Farbe je
+# Musterreihe) und `moon_top_colors` (Koepfe der Mondstapel) darauf, und DORT traegt
+# die Reihenfolge Bedeutung; bei den Mondstapeln ist sie sogar ein eigener Suchknoten
+# (Aktionen 406-410). Eine Sortierung haette genau den Unterschied geschluckt, den
+# dieser Waechter finden soll. Wer die Menge erweitert, weist vorher nach, dass die
+# Reihenfolge im betroffenen Feld bedeutungslos ist -- sonst lernt der Waechter,
+# Unterschiede zu schlucken ("ein umgangenes Tor erzieht zum Umgehen").
+CHIP_COLOR_FIELDS = ("colors", "unused_chip_colors")
+
+
+def _canonical_chip_colors(v):
+    """Chip-Farblisten kanonisch ordnen, rekursiv; alles andere unveraendert.
+
+    Greift nur auf Listen reiner Zeichenketten unter `CHIP_COLOR_FIELDS` --
+    `bag_colors`/`tower_colors` sind Zaehlungen je Farbe und damit ohnehin
+    ausgenommen, weil sie keine Zeichenketten enthalten.
+    """
+    if isinstance(v, dict):
+        out = {}
+        for k, x in v.items():
+            if (k in CHIP_COLOR_FIELDS and isinstance(x, list)
+                    and all(isinstance(e, str) for e in x)):
+                out[k] = sorted(x)
+            else:
+                out[k] = _canonical_chip_colors(x)
+        return out
+    if isinstance(v, list):
+        return [_canonical_chip_colors(e) for e in v]
+    return v
+
+
 def _values_equal(va, vb):
     """Blattvergleich, numpy-tolerant (Bestandsverhalten von `_first_divergence`)."""
     import numpy as np
@@ -170,7 +214,8 @@ def _first_divergence(a, b, ignore=IDENTITY_FIELDS, added=None):
                 continue
             va, vb = ra[f], rb[f]
             if f == "state":
-                va, vb = _strip_state(va), _strip_state(vb)
+                va = _canonical_chip_colors(_strip_state(va))
+                vb = _canonical_chip_colors(_strip_state(vb))
             path = _compare_upward_tolerant(va, vb, f"/{f}", added)
             if path is not None:
                 return i, path, repr(va)[:120], repr(vb)[:120]
