@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v31-Fenster zugeschnitten -- Generator `v30-b02` (888/414, ohne Polsterung), und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | Beleg: par.6 Erzeugung FERTIG 2026-09-20 (400/400/401 Dateien, 14,66 h, +5,7 Prozent gegen v30), Manifest-Diff 0 unerwartete Abweichungen, **Tor 2a HAELT** mit sp_voll 0,955 gegen 0,901. Streuung im Korpus 12,0 Prozent auf n = 200 (Ziel 15, nicht auffaellig). Fenster 2.947 Dateien, Training `v31-b01` WARM und Tor 1 gegen Champion `v30-b02` laufen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v31-Fenster zugeschnitten, und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | Beleg: par.6 -- Erzeugung 14,66 h, Tor 2a HAELT (sp_voll 0,955 gegen 0,901), Fenster 2.947 Dateien, Training `v31-b01` warm in 58 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT: 461:339 aus 800 = 57,62 %, Block-z +4,24 auf differenzierten Werten, beide Seeds einzeln signifikant.** Tor 2b erstmals wieder verwendbar, 800/800 ohne Replay. Promotion ist ein eigener Ablauf und offen. -->
 
 # PREREG v31: Fensterzuschnitt der Generation v31
 
@@ -135,4 +135,64 @@ Die Reihe der Generatoren-`sp_voll` lautet damit 0,637 / 0,737 / 0,777 / 0,816 /
 bleibt auf dem erhoehten Niveau der Vorgeneration. **Das ist kein Staerkebeleg** -- `sp_voll` ist
 eine Korpus-Kennzahl des Generators, kein Duell.
 
-(Training `v31-b01` und Tor 1 gegen den Champion laufen; Verdikt steht aus.)
+### TOR 1: `v31-b01` gegen den Champion `v30-b02` -- TRAEGT (2026-09-20)
+
+Beide Seiten Champion-Spec, 400 Sims, c_puct 1,5, Blockgroesse 5, Deckel 200 Paare,
+alpha = beta = 0,001, 10 Threads, `--log-games`. Training 3.490,4 s = 58 min, warm von
+`v30-b02_brierbest`, 5.211.996 Samples; **der automatische Manifest-Diff gegen das
+v30-b02-Rezept meldet 0 unerwartete Abweichungen** -- genau `cache_file`, `file_list`, `load`,
+`name`, `seed`, `val_pool`.
+
+| Seed | Stand | Anteil | **Block-z** | McNemar | SPRT |
+| --- | --- | --- | --- | --- | --- |
+| 20261400 | 237:163 | 59,25 % | **+3,54** | p = 0,0004 | Deckel, LLR +6,41 |
+| 20261401 | 224:176 | 56,00 % | **+2,42** | p = 0,0197 | Deckel, LLR +2,81 |
+| **gepoolt** | **461:339** aus 800 | **57,62 %** | **+4,24** | | |
+
+**Der Block-z ist auf DIFFERENZIERTEN Blockwerten gerechnet**, mit Summenprobe gegen
+`a_wins_total`/`b_wins_total`: die Felder in `blocks[]` sind kumulativ, und genau daran ist die
+Auswertung am 2026-09-19 schon einmal gescheitert (`docs/pitfalls.md`). 80 Bloecke zu 5 Paaren,
+Mittel 0,5763, sd 0,1609. Beide Seeds liegen EINZELN ueber der Schwelle 1,96.
+
+**Kein SPRT-Entscheid in beiden Laeufen** (LLR +6,41 und +2,81 gegen die Schranke +6,907): der
+Deckel wurde erreicht, die Fixed-n-Auswertung ist nach dem Werkzeugtext ein Notbehelf. Das ist
+die dritte Nachbar-Generation in Folge, in der der Frueh-Stopp nicht greift, und stuetzt den
+Befund aus `PREREG_v30_window.md` par.9.
+
+### Die sechs Standard-Kennzahlen (je Seite, n = 400 Bretter je Seed)
+
+| Kennzahl | Seed 20261400 A / B | Seed 20261401 A / B |
+| --- | --- | --- |
+| 1 Reihen (lange Reihen) | 3,13 / 2,96 | 3,08 / 3,03 |
+| 2 Spalten: volle Spalten | **1,0300 / 1,0000** (+-0,076) | **1,0425 / 0,9925** (+-0,077) |
+| 2 Spalten: Teilspalten >= 4 | 2,43 / 2,27 | 2,37 / 2,29 |
+| 3 Strafleiste | 7,13 / 7,56 | 7,36 / 7,01 |
+| 5 Eigene Punkte | **60,38 / 56,52** (+-1,6) | **59,03 / 57,57** |
+| 6 Margin | **+3,86** [+-1,88] | **+1,47** |
+
+Punkte je Wertungsplatte, Seed 20261400 (Mittel ueber die Bretter mit aktivem Kriterium):
+Diagonale 0,54 gegen 0,27; Eckplatten 9,33 gegen 8,58; Horizontale 0,58 gegen 0,25; Vertikale
+7,41 gegen 6,45; Aeussere Felder 10,77 gegen 10,29; Spezialfelder -9,48 gegen -9,74. **Gegenlaeufig
+in zwei Kriterien:** Farbenreiche Reihen 0,34 gegen 0,42 und Mehrfarbige Felder 3,80 gegen 4,40.
+
+**Was NICHT einheitlich ist, und das gehoert dazu:** die Strafleiste dreht zwischen den Seeds
+(-0,43 bzw. +0,35 zulasten des Kandidaten). Der Punktvorsprung ist dagegen in beiden Seeds
+positiv und traegt das Verdikt.
+
+### TOR 2b: erstmals seit der Reparatur wieder verwendbar
+
+**800 von 800 Partien ausgewertet, alle direkt aus dem Record, null Divergenzen** -- die Sonde
+braucht kein Replay mehr, seit die Arena den Endzustand mitschreibt (`score_geo`, `dome_grid`,
+2026-09-19). Zum Vergleich: in v30 divergierten 15,5 und 17,8 Prozent, und die auswertbare
+Teilmenge war nachweislich verzerrt. Volle Spalten **+0,030** und **+0,050** zugunsten des
+Kandidaten; beide Differenzen liegen unter einer Standardabweichung (+-0,076), sind also je
+einzeln nicht signifikant und stuetzen das Tor-1-Ergebnis nur der Richtung nach.
+
+### Verdikt
+
+**`v31-b01` schlaegt den amtierenden Champion `v30-b02`**, 461:339 aus 800 Partien, Block-z
++4,24, in beiden Seeds einzeln signifikant, mit hoeherem Punktestand und mehr vollen Spalten.
+Damit ist Tor 1 genommen. **Die Promotion selbst ist ein eigener Ablauf**
+(`/mosaic-champion-promotion`: Anker-Kante, Champion-2-Kante, Pflicht-Diagnostiken, Artefakt) und
+ein Nutzer-Entscheid -- zumal dieser Champion nach par.5a von `PREREG_code_cleanup_closeout.md`
+der Schluss-Champion waere und damit den Anzeigenamen **Tessa** bekaeme.

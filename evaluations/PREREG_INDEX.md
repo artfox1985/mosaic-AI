@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 122 Dateien = 5 OFFEN + 105 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 122 Dateien = 4 OFFEN + 106 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (5)
+## OFFEN (4)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -90,9 +90,8 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_code_cleanup_closeout.md` | Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Stufe 1 (par.8) und Gruppe A (par.8d) gebaut. par.8e Bonuschip-Kanonisierung KOMPLETT: 700 Lib-Tests gruen, Vertragshash unveraendert, Anker-Drift ROT aber aufgeklaert (alle Zugfelder ueber 1.763 Schritte gleich, nur Schreibweise); OFFEN ist die Behandlung der Anker-Golden-Probe. par.8f/8g: vier tote Posten entfernt, 10-Punkte-Liste fuer nach dem Abschluss. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
 | `PREREG_dome_return_order.md` | Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | R1-R3 gebaut und abgenommen (12.4-12.11), der Knoten 411-413 ist im v30-Korpus. Die Streuung sitzt seit 2026-09-19 im KNOTEN-Weg (12.12) und ist in der v31-Erzeugung wirksam. DOSIS p = 0,81 (12.12a): die alten 0,0146 standen auf einer fremden Grundmenge (Mondstapel statt Kuppelplatten, Faktor 50); 82,2 Prozent der Partien haben gar keine Gelegenheit, Obergrenze 17,75 Prozent, am Korpus gegengeprueft 15,0 Prozent. Wirkungsfrage offen. |
-| `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten -- Generator `v30-b02` (888/414, ohne Polsterung), und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.6 Erzeugung FERTIG 2026-09-20 (400/400/401 Dateien, 14,66 h, +5,7 Prozent gegen v30), Manifest-Diff 0 unerwartete Abweichungen, **Tor 2a HAELT** mit sp_voll 0,955 gegen 0,901. Streuung im Korpus 12,0 Prozent auf n = 200 (Ziel 15, nicht auffaellig). Fenster 2.947 Dateien, Training `v31-b01` WARM und Tor 1 gegen Champion `v30-b02` laufen. |
 
-## ENTSCHIEDEN (105)
+## ENTSCHIEDEN (106)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -199,6 +198,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_v28_window.md` | Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | ABGESCHLOSSEN 2026-09-13 (par.11). Erzeugung gefahren (par.10, 9,9 h), Tor 2a haelt; b01 Tor 1 bestanden gegen v27-b01; b02 (Variante B) Nullbefund gegen b01, als korrektere Fassung der beste Stand (Nutzer); b03/b04 gefahren; PROMOTION v28-b02 vollstaendig 2026-09-12, Elo 1394 [1350, 1445] (Segment 2, Stand 2026-09-13 nach den Sims-Kanten; bei der Promotion 1353). Reste in ihren eigenen Preregs. |
 | `PREREG_v29_window.md` | Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | par.9 komplett: Erzeugung, b01-b09, Tore; v29-b03 schlug den Champion (275:215), promoviert wurde am 2026-09-18 v29-b09 (Gating 423:377, Anker 128:22, Champion-2 90:60; PREREG_minimal_strength_core.md 10.13/10.18). Generator der v30-Erzeugung v29-b11. Generationsbericht in archive/history.md. |
 | `PREREG_v30_window.md` | Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm mindestens auf Champion-Niveau `v29-b09`? | NEIN. par.9: `v30-b01` kalt 404:396 = 50,50 %, Block-z +0,278, H0; der einfaktorielle Warmstart-Arm `v30-b02` 443:297 = 59,86 %, Block-z +5,360, TRAEGT (9,36 Punkte Unterschied bei gleichem Fenster, Monolith, Seed und Rezept). Tor 0 und Tor 2a gruen (sp_voll 0,90087 gegen 0,84275), Tor 2b blind (par.9). Generator fuer v31 ist `v30-b02` auf Stufe 1, seit 2026-09-19 auch Champion. |
+| `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten, und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.6 -- Erzeugung 14,66 h, Tor 2a HAELT (sp_voll 0,955 gegen 0,901), Fenster 2.947 Dateien, Training `v31-b01` warm in 58 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT: 461:339 aus 800 = 57,62 %, Block-z +4,24 auf differenzierten Werten, beide Seeds einzeln signifikant.** Tor 2b erstmals wieder verwendbar, 800/800 ohne Replay. Promotion ist ein eigener Ablauf und offen. |
 | `PREREG_value_rank_metric.md` | Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 |
 | `PREREG_value_scale_correction.md` | Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 |
 
