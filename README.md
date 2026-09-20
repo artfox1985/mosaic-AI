@@ -24,77 +24,36 @@ dome-building board game with hidden information.
 ## Current Status
 
 Champion: **`v30-b02`** (promoted 2026-09-19), Elo **1436** (95% CI [1397, 1482])
-from 940 rated games on the **second ladder segment**, anchored at the frozen
-heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 =
-1000, `tools/elo_tracker.py report`). It is also the generator of the v31
-replay window, and the first champion since the action-space change whose model
-and wheel match exactly (888 inputs, 414 actions, no padding). The ladder was re-anchored on 2026-09-12:
-a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
-moved the old anchor's moves, so the first segment (anchor `hv1_anchor`,
-`v27-b01` at 1405, `v26-b01` 1364, `v25-b01` 1336) now lives in
-`archive/elo_history_pre_phantomfix.csv` and is not comparable across the
-boundary; the same happened once before on 2026-08-21 with the round-5 solver
-fix (`archive/elo_history_pre_r5fix.csv`). Because every net since v23 beats the
-heuristic anchor at 84-90 % (saturated edges), the second segment carries
-intermediate rungs from frozen artifacts restored out of the backup
-(`v22-b05`@25 1054, `v22-b05`@100 1143, `v22-b05` 1193, `v21_2d_brierbest` 1194,
-`v24-b07` 1199, `v26-b01` 1248, `v27-b01` 1306, `v28-b01` 1320, `v28-b02` 1347),
-the anchor heuristic at 600 simulations (`hv4_anchor`@600 1021, the rung between
-the anchor and the net block) and the two hull-teacher
-heuristics `hv2` (975, frozen before the phantom fix) and `hv3` (966, the same
-recipe rebuilt on the fixed engine; the fix does not change its strength). The anchor carries its own wheel:
-an engine change can no longer move the fixed point of the ladder, and every
-engine change is checked move by move against it (drift check,
-`/mosaic-anchor-invariance`). `v30-b02` rests on three edges: 443:297 (59.9 %) against the
-previous champion `v29-b09` over two seeds, 45:5 against the anchor, and 96:54
-against `v28-b02` two generations back. Its predecessor `v30-b01`, trained cold
-on the same window with the same seed and recipe, came out at 404:396: the warm
-start is worth 9.4 percentage points, and the cold-start bet is settled. The
-value head predicts a win *probability* (WDL); display probabilities are
-Platt-calibrated per champion.
+from 940 rated games, anchored at the frozen heuristic artifact
+`models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
+`tools/elo_tracker.py report`). It beat the previous champion 443:297 over two
+seeds, the anchor 45:5, and `v28-b02` two generations back 96:54.
 
-**The material-only freeze is over.** For three generations (v25, v26, v27)
-the architecture, the training recipe, the value-target blend, the heads and
-their weights were frozen; only the replay window rotated
-(`evaluations/PREREG_v25_window.md` par.18). Each of the three passed its
-gates against its predecessor, so the material alone carries: v25-b01 1336,
-v26-b01 1364, v27-b01 1405 on the first ladder segment, and the champion completes more
-columns in the paired arena with every step (Gate 2b).
+**The cold-start question is settled.** `v30-b01` and `v30-b02` trained on the
+same replay window with the same seed and the same recipe and differed in a
+single factor, the start: 404:396 cold against 443:297 warm, a gap of 9.4
+percentage points.
 
-**v28 is the first generation after the freeze** (`evaluations/PREREG_v28_window.md`).
-Its first arm, `v28-b01`, keeps the recipe unchanged and passed Gate 1 against
-`v27-b01` on 2026-09-11 (166:124 by SPRT, replicated 221:179, first segment).
-The second arm, `v28-b02`, is the first architecture change since the freeze:
-eleven input features that encode what the acting player legitimately knows
-about the dome-plate stack (see below). Against `v28-b01` it measured level
-(207:193 and 209:191); it was chosen as champion and as the v29 generator
-because it is the more correct model (fuller feature picture), not because of
-a measured gain. Two ablations of the window composition (without the
-excursion class, without generation G-2) did not beat it.
+**Ratings live in segments.** Two engine corrections (the round-5 solver, then a
+hull-evaluation fix) moved the anchor's own moves, and ratings are not
+comparable across such a boundary; earlier segments are kept in
+`archive/elo_history_pre_*.csv`. Since the second segment the anchor ships its
+own wheel, so an engine change can no longer move the fixed point of the ladder,
+and every change is checked against it move by move.
 
-**The dome-stack defect is fixed.** Until 2026-09-10 the search reshuffled the
-whole dome-plate stack at the root of every search and therefore forgot the
-order it had chosen itself when returning plates under the stack
-(`evaluations/PREREG_dome_stack_information_sets.md`). Now the root
-determinization keeps the acting player's own returned blocks in order and
-shuffles only the unknown prefix and the opponent's blocks
-(`engine/src/state.rs::determinize_dome_pool`, variant A), and variant B feeds
-that knowledge to the net as input features 744..754. This class of defect is
-invisible to the entire measurement apparatus, because self-play, arena and
-gating compare two agents inside the *same* world model, where a shared
-modelling error cancels out; it was found by a human playing the GUI. The
-seam list that makes such defects findable lives in
-[`docs/architecture_reference.md`](docs/architecture_reference.md)
-("Wo der Code Information ABSICHTLICH vernichtet").
+**Some defects are invisible to the measurement apparatus.** Self-play, arena
+and gating compare two agents inside the *same* world model, so an error in the
+shared model cancels out and costs zero Elo at any sample size. The dome-stack
+bug found in September was of that kind, and a human playing the GUI found it,
+not the pipeline. The list of places where the code discards information on
+purpose is kept in
+[`docs/architecture_reference.md`](docs/architecture_reference.md).
 
-The project is approaching its end: one or two generations after v28 are
-planned, then a measured ladder of difficulty levels for the GUI
-(`evaluations/PREREG_difficulty_levels.md`, scheduled for v29) closes it.
+v31 is the last generation; its corpus is generated and the training runs.
 
-Full history, all measurements and the standing methodology rules:
-[`evaluations/STATUS.md`](evaluations/STATUS.md); rendered process diagrams:
-[`docs/diagrams.txt`](docs/diagrams.txt) (`game_flow`, `net_search`,
-`value_target`, `window_generation`, `selfplay_training`; render via
+Full history, all measurements and the methodology rules:
+[`evaluations/STATUS.md`](evaluations/STATUS.md); process diagrams:
+[`docs/diagrams.txt`](docs/diagrams.txt) (render via
 `python docs/render_diagrams.py`).
 
 ## Engine Core in Brief
@@ -167,10 +126,11 @@ the run, so a result cannot be reinterpreted afterwards.
    python -u self_play.py ... --value-only --version <gen>-value-excursion --seed <s3>        --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
    ```
 
-   Measured on the v28 production run: 3.2 s per game for the base class,
-   9.9 h for all three classes on one machine (`docs/measured_runtimes.md`). Note that
-   `--games` counts excursion identities as well, so the excursion half needs
-   the full number, not half of it.
+   Measured on the v31 production run: 4.24 s per game for the base class,
+   14.7 h for all three classes on one machine (`docs/measured_runtimes.md`);
+   the eight search nodes added in v30 are most of the growth against the 9.9 h
+   of v28. Note that `--games` counts excursion identities as well, so the
+   excursion half needs the full number, not half of it.
 
 2. **Replay window with generation rotation** (2,947 files, ~29,450 games):
    the new base class plus a seed-determined subset of the two previous
@@ -224,14 +184,15 @@ the run, so a result cannot be reinterpreted afterwards.
    the wheel it was measured with, a golden probe and a manifest. The wheel
    travels with the artifact so that an old champion still plays the way it did
    when its Elo was measured. The artifact set holds the reigning champion and
-   its predecessor (today `v27-b01` and `v26-b01`); older ones are retired once
+   its predecessor (today `v30-b02` and `v29-b09`); older ones are retired once
    their edges are in the register. The full list is `docs/promotion_checklist.md`.
 
-7. **Mandatory diagnostics on the winner**: Platt calibration
-   (`tools/platt_fit.py`), round-5 plate sensitivity
-   (`tools/r5_value_calibration.py`), Brier on a frozen legacy measurement
-   set (`tools/t36_curve_eval.py --snapshot-dir altmess_90files`), and a
-   structure watchlist against rated human games.
+7. **Diagnostics on the winner**: Platt calibration (`tools/platt_fit.py`),
+   Brier on a frozen legacy measurement set, the sigma/prior balance, and a
+   fresh net-parity fixture. Two further probes are on the checklist but have
+   not been run since v24 because their tooling still points at a retired model
+   era: that gap is recorded rather than quietly skipped
+   (`docs/promotion_checklist.md`).
 
 A failed gating does **not** trigger more self-play games ("no top-up
 valve"): a candidate that only wins with additional data is not evidence
@@ -303,36 +264,10 @@ it a leftover?** So the list is generated instead and lives in
 [`docs/tools_index.md`](docs/tools_index.md)
 (`python -X utf8 tools/generate_tools_index.py`, `--check` verifies it is
 current). Each entry carries its purpose, its last commit, and who names it,
-classified by evidence rather than opinion:
+classified by evidence rather than opinion: whether something *calls* it,
+only documents it, or no longer names it at all.
 
-| Class | Meaning |
-| --- | --- |
-| **VERDRAHTET** (wired) | code, a test, a hook, a skill or `CLAUDE.md` *calls* it, i.e. names it outside a comment |
-| **BESCHRIEBEN** (documented) | only `docs/` or a code comment names it: a tool with instructions, nothing invokes it automatically. The normal case for probes |
-| **CHRONIK** (chronicle) | only `evaluations/` names it, so a measurement report or a pre-registration. Typical for one-shot scripts whose run is over |
-| **UNGENANNT** (unnamed) | nobody names it. A candidate for review, but not automatically dead: a tool invoked by hand appears nowhere |
-
-The current counts stand in the generated file, not here: a number in this
-README would drift the moment a tool is renamed.
-
-The classification is deliberately a usage *signal*, not a deletion proposal:
-in this project nothing is removed without a path-exact go-ahead, and the
-retired scripts of each generation are proposed in
-`evaluations/cleanup_proposal_*.md` first.
-
-The entry points below are the ones worth knowing by name.
-
-| Script | Purpose |
-| --- | --- |
-| `arena.py`, `paired_gating.py` | matches: round-robin/anchor, and the paired gating with SPRT that decides a promotion |
-| `elo_tracker.py` | Bradley-Terry bookkeeping over `evaluations/elo_history.csv` (evaluation only, runs no matches) |
-| `analyze_game_log.py` | replays a human-vs-AI log exactly through its action IDs and evaluates every move against the net |
-| `offline_diagnosis.py`, `oracle_metrics.py` | the offline predictors, with their measured resolution limit |
-| `self_play.py`, `train.py`, `export_onnx.py` (repo root) | the production path: material, training, export |
-| `build_cache_incremental.py` | per-file cache blocks, also `--watch` while self-play is still writing |
-| `generate_carrier_manifest.py`, `window_train_split.py` | window assembly: policy carriers and the train/val split |
-| `mosaic_backup.ps1`, `snapshot_models.ps1`, `verify_backup.ps1` | restic backup: daily snapshot, per-training model snapshot, five-stage verification |
-| `generate_prereg_index.py`, `generate_knob_docs.py`, `generate_tools_index.py`, `check_conventions.py` | the generated documents and the convention check that guards them |
+---
 
 ## Playing & Debugging
 
@@ -361,36 +296,15 @@ the net; `tools/claude_play.py` drives the same engine from the command line.
 
 ---
 
-## Backup
-
-Backups go to a restic repository at `<OneDrive>\Backups\mosaic-AI`
-(content-defined chunking, so identical blocks are stored once). A daily
-scheduled task snapshots the whole project tree. In addition, `train.py`
-writes a named snapshot of `models/` after every training run, tagged
-`run:<version>` (event-driven, introduced after the model loss on
-2026-07-24; a failure is reported as a warning and never aborts the
-training itself).
-
-Until 2026-08-31 that per-run snapshot was a zip archive of the entire
-`models/` folder, 0.3 to 1.1 GB each. Archives are opaque to chunking --
-two zips differing in one file share almost no blocks -- so every run cost
-the full amount. As a snapshot it costs only the genuinely new weights.
-
-Restoring individual files, and the operational rules, are documented in
-`docs/backup_restore.md`. `tools/verify_backup.ps1` checks the repository
-before anything is deleted; it never deletes by itself.
-
----
-
 ## Architecture (Quick Reference)
 
 ### Neural Network (`Mosaic2DNet`, `engine/py/neural_net.py`)
 
 ```
 planes (79×6×6) → [Conv3×3(48) → BN → ReLU] ×2 → flatten ─┐
-state  (755)    → Linear(512) → BN → ReLU ────────────────┴→ concat
+state  (888)    → Linear(512) → BN → ReLU ────────────────┴→ concat
     → Fusion: Linear(512) → BN → ReLU → Linear(512) → ReLU
-       ┌→ Policy Head:      Linear(256) → ReLU → Linear(406)  (action logits)
+       ┌→ Policy Head:      Linear(256) → ReLU → Linear(414)  (action logits)
        ├→ Value Head (WDL): Linear(64)  → ReLU → Linear(2)    (logits → P(win))
        ├→ Moon-Order Head:  Linear(32)  → ReLU → Linear(5)    (Plackett-Luce scores)
        ├→ Points Heads:     own + opponent score forecast (aux, Tanh)
@@ -398,7 +312,7 @@ state  (755)    → Linear(512) → BN → ReLU ──────────�
        └→ Endgame Head:     round-5 solver root margin (aux, Tanh)
 ```
 
-The champion ONNX export (`alphazero_v27-b01_brierbest.onnx`, verified)
+The champion ONNX export (`alphazero_v30-b02_brierbest.onnx`)
 carries two inputs (`planes`, `state`) and eight outputs (`policy`,
 `value`, `moon`, `points`, `ownership`, `value_wdl_logits`, `opp_points`,
 `endgame_margin`). Aux heads are training signal only; the search reads
@@ -406,7 +320,7 @@ none of them. The legacy flat `MosaicNet` (708 -> 3×512 trunk, Tanh value)
 remains loadable: the input layout is detected from the model file
 (`detect_layout`, `engine/src/net.rs`), never assumed.
 
-### State Tensor (755 Features)
+### State Tensor (888 Features)
 
 Source of truth: `engine/src/features.rs` (the constant there is the single
 source, `config.py` mirrors it); global state, active scoring plates
@@ -419,9 +333,12 @@ positions) and the opponent's returned blocks. Features are only ever
 appended, never reordered: indices 0..743 are unchanged since 2026-09-05, so
 older ONNX models stay playable (`net.rs::build_inputs` truncates to the
 model width), and a warm start pads the input layer with zero columns
-(`train.py`).
+(`train.py`). Three blocks were appended after that: 39 values for what the
+acting player can see of the stacks (755..794), 90 values projecting which
+cells this round's tiling will fill and which slots it completes (794..884),
+and 4 for the player's own returned designs in order (884..888).
 
-### Action Space (406 Actions)
+### Action Space (414 Actions)
 
 | Type                   | IDs     | Description                                             |
 | ---------------------- | ------- | ------------------------------------------------------- |
@@ -435,6 +352,8 @@ model width), and a warm start pads the input layer with zero columns
 | use_chips              | 395-400 | Complete a pattern row using a bonus chip               |
 | bonus_chip             | 401-404 | Take a revealed bonus chip                              |
 | dome_stack_peek        | 405     | Pay 1 point, draw a hidden plate (repeatable)           |
+| choose_moon_top        | 406-410 | Order the moon stacks: which colour goes on top          |
+| choose_return_first    | 411-413 | Order of dome plates returned under the stack            |
 
 ---
 
@@ -442,8 +361,8 @@ model width), and a warm start pads the input layer with zero columns
 
 | Parameter                      | Value | Where                     | Description                                                 |
 | ------------------------------ | ----- | ------------------------- | ----------------------------------------------------------- |
-| `INPUT_SIZE`                   | 755   | `config.py`               | Size of the state tensor (744 + 11 dome-stack knowledge values since `v28-b02`) |
-| `NUM_ACTIONS`                  | 406   | `config.py`               | Size of the action space                                    |
+| `INPUT_SIZE`                   | 888   | `config.py`               | Size of the state tensor                                    |
+| `NUM_ACTIONS`                  | 414   | `config.py`               | Size of the action space                                    |
 | `HIDDEN_SIZE`                  | 512   | `config.py`               | Neurons per hidden layer                                    |
 | `TD_LAMBDA`                    | 0.5   | `engine/py/neural_net.py` | TD-bootstrap blend in the value target                      |
 | `VALUE_SCHEMA_VERSION`         | 20    | `engine/py/neural_net.py` | Value-target formula version (cache invalidation on change) |
