@@ -386,3 +386,37 @@ tragen KEINEN `laufzeit`-Block mit `wanduhr_s`/`cpu_s`/`threads`/`s_je_partie`, 
 `elapsed_s`/`total_steps`/`s_per_step`. Ohne `threads` sind sie streng genommen nicht
 vergleichbar (CLAUDE.md, "Laufzeiten messen, nicht schaetzen"). Und fuer die Promotion nach
 Checkliste gibt es in dieser Generation keine Gesamtdauer im Baum; die 38 min stammen aus v29.
+
+## Generation v31, gemessen ab 2026-09-19 (Erzeugung)
+
+Generator `v30-b02` (888/414, Vertragshash `6ef829e564c58bd5`), je 4.000 Partien @100, threads 11,
+Spec `models/v30_generation.spec.json`, `MOSAIC_STACK_DRAW_RESEARCH=1`, **neu: Rueckgabe-Streuung
+`--return-order-random-p 0.81`** als CLI-Flag. Der Cache-Waechter lief ab 22:35 daneben, also NICHT
+waehrend der ersten zwei Stunden der Sockel-Klasse.
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Erzeugung Traeger** (policy, Seed 20260934) | **16.944,3 s = 4h42** | 4,236 s je Partie, n = 4.000 Partien, 790.914 Zuege, 400 Dateien |
+| **Erzeugung Schwarm temperiert** (value-tempc, Seed 20260935) | **18.399,2 s = 5h07** | 4,600 s je Partie, n = 4.000 Partien, 792.163 Zuege, 400 Dateien |
+| **Erzeugung Schwarm Ausflug** (value-excursion, Seed 20260936) | **17.434,6 s = 4h50** | 4,353 s je Identitaet, n = 4.005 Identitaeten, 699.406 Zuege, 401 Dateien |
+| **zusammen** | **52.778,1 s = 14,66 h** | 2026-09-19 20:23:47 bis 2026-09-20 11:04. Gegen v30 (49.911,7 s = 13,86 h) **+5,7 Prozent** |
+
+**Der Vorzeichenwechsel zwischen den Klassen ist NICHT erklaert und ausdruecklich offen.** Je Zug
+gerechnet (die belastbarere Groesse, weil sie die Partielaenge herausrechnet):
+
+| Klasse | ms je Zug v30 | ms je Zug v31 | Differenz | Zuege je Partie |
+| --- | --- | --- | --- | --- |
+| Sockel | 24,00 | **21,42** | **-10,7 %** | 197,7 gegen 197,7 |
+| Schwarm temperiert | 20,42 | **23,23** | **+13,7 %** | 198,1 gegen 198,0 |
+| Schwarm Ausflug | 21,06 | **24,93** | **+18,4 %** | 174,7 gegen 174,6 |
+
+Die Partielaenge ist auf ein Zehntel Zug gleich, der Unterschied sitzt also in den Kosten eines
+einzelnen Zuges. **Zwei Erklaerungen sind geprueft und ausgeschlossen:** der Cache-Waechter nicht,
+weil die SCHNELLERE Klasse mit seiner geschaeftigsten Phase ueberlappte (er startete 22:35 mitten
+in der Sockel-Klasse, mit 190 Dateien Rueckstand); `policy_mass_cutoff` nicht, weil er bei aktiver
+Gumbel-Suche ueberall ausgesetzt ist (`net_mcts.rs:3552`, `skip_cutoff = parent.is_none() ||
+USE_GUMBEL_SEARCH`). Was es entscheiden wuerde, ist die Zahl der je Entscheidung expandierten
+Knoten; die steht in den Records und kostet nur eine Sonde, keine Partie.
+
+**Planungsgroesse fuer eine Erzeugung unter 888/414 mit den acht Suchknoten:** rund 14 bis 15 h
+fuer 3 x 4.000 Partien @100 bei threads 11.
