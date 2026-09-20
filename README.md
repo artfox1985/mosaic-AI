@@ -23,11 +23,15 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v30-b02`** (promoted 2026-09-19), Elo **1436** (95% CI [1397, 1482])
-from 940 rated games, anchored at the frozen heuristic artifact
-`models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
-`tools/elo_tracker.py report`). It beat the previous champion 443:297 over two
-seeds, the anchor 45:5, and `v28-b02` two generations back 96:54.
+Champion: **`v31-b01`**, shown in the game as **Tessa** (promoted 2026-09-20),
+Elo **1458** (95% CI [1414, 1510]) from 1,000 rated games, anchored at the frozen
+heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
+`tools/elo_tracker.py report`). None of its four edges was stopped early. It beat
+the previous champion 461:339 over two seeds, the anchor 45:5, and `v29-b09` two
+generations back 79:71 -- the last of those well below what the other two would
+predict, and recorded as such rather than smoothed over. `v31` is the final
+generation; the technical name stays in the ladder and the files, `Tessa` is the
+name the game shows.
 
 **The cold-start question is settled.** `v30-b01` and `v30-b02` trained on the
 same replay window with the same seed and the same recipe and differed in a
@@ -49,7 +53,7 @@ not the pipeline. The list of places where the code discards information on
 purpose is kept in
 [`docs/architecture_reference.md`](docs/architecture_reference.md).
 
-v31 is the last generation; its corpus is generated and the training runs.
+The engine ships as version 1.0.0 with this champion.
 
 Full history, all measurements and the methodology rules:
 [`evaluations/STATUS.md`](evaluations/STATUS.md); process diagrams:
