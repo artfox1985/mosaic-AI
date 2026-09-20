@@ -1479,3 +1479,32 @@ die der Schluessel laeuft.
 zaehlt Schluessel-Wiederkehr; ein kurzer Lauf je Klasse liefert Trefferquote und Zahl der
 Voll-Leerungen. Das ist billiger als die bisher vorgeschlagene Knotenzahl-Sonde und trifft eine
 ANDERE Vermutung -- beide bleiben offen. **HYPOTHESE, nicht Befund.**
+
+### NACHTRAG 2026-09-21: die fehlerhafte Fassung ist AUSGELIEFERT
+
+Nutzer: *"die zip mit dem fehlerhaften cache schluessel ist schon draussen. da koennen wir nur
+eine neue version machen."* `Mosaic-AI_v1.0-alpha31.zip` war weitergegeben, bevor der Fehler im
+Tiling-Cache-Schluessel auffiel. Zurueckholen geht nicht; der Weg ist eine neue Version.
+
+**Was der Empfaenger konkret hat:** einen Cache-Schluessel, der zwei Haende mit derselben
+Chip-Multimenge in anderer Reihenfolge zusammenwirft. Wirksam wird das erst ab mehr als
+`CHIP_ALLOC_CAP` (14) gehaltenen Chips, wo `chip_allocations` auf `greedy_chip_indices`
+zurueckfaellt; darunter ist die Aufzaehlung exakt und ordnungsfrei, der Schluessel also korrekt.
+Die Haeufigkeit dieses Regimes ist UNGEMESSEN -- belegt ist nur, dass es vorkommt
+(`referee.rs:791-795`, 24-Partien-Lauf am 2026-08-26). Es ist ein Fehler in der Memoisierung,
+nicht in der Spielregel: betroffen ist, welches Tiling-Ergebnis aus dem Cache kommt, nicht
+welche Zuege legal sind.
+
+**Folge fuer die Benennung, und sie hat meine eigene Entscheidung von vorhin umgedreht.** Beim
+Einbau des Schemas hatte ich das Ueberschreiben-in-place als Vorzug begruendet: gleiche Version
+plus gleiche Generation soll dieselbe Datei sein. Sobald eine Fassung DRAUSSEN ist, ist das
+falsch herum -- dann zirkulieren zwei Binaerstaende unter einem Namen. Dazu kam ein Schnitzer:
+die Version wurde hart auf zwei Stellen gekuerzt, `1.0.0` und `1.0.1` haetten denselben
+Dateinamen ergeben. Berichtigt (`tools/build_release.py::release_name`): ein abschliessendes
+`.0` faellt weg, jede andere Stelle bleibt stehen. `1.0.1` ergibt jetzt
+`Mosaic-AI_v1.0.1-alpha31.zip`.
+
+**Die naechste Auslieferung kommt nach dem Aufraeumen** (Nutzer: *"aber da warten wir noch bis
+du aufgeraeumt hast"*) und braucht einen Versionssprung in `engine/pyproject.toml` UND
+`engine/Cargo.toml` -- beide, das ist die Falle vom 2026-09-20 (maturin liest pyproject, der
+Rust-Code `CARGO_PKG_VERSION`).

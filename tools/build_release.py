@@ -110,10 +110,20 @@ def release_name() -> str:
     generation = m.group(1)
 
     pyproject = (PROJECT_ROOT / "engine" / "pyproject.toml").read_text(encoding="utf-8")
-    v = re.search(r'^version\s*=\s*"(\d+)\.(\d+)', pyproject, re.MULTILINE)
+    v = re.search(r'^version\s*=\s*"([0-9.]+)"', pyproject, re.MULTILINE)
     if not v:
         raise SystemExit("ABBRUCH: keine Paketversion in engine/pyproject.toml gefunden.")
-    return f"Mosaic-AI_v{v.group(1)}.{v.group(2)}-alpha{generation}"
+    # Ein abschliessendes ".0" faellt weg (1.0.0 -> "1.0"), jede andere Stelle bleibt
+    # STEHEN (1.0.1 -> "1.0.1"). Warum das wichtig ist: eine frueherere Fassung schnitt
+    # hart auf zwei Stellen, damit haetten 1.0.0 und 1.0.1 denselben Dateinamen ergeben --
+    # und eine bereits AUSGELIEFERTE Fassung waere beim naechsten Bau still durch einen
+    # anderen Binaerstand ersetzt worden. Genau dieser Fall ist am 2026-09-21 eingetreten
+    # (`Mosaic-AI_v1.0-alpha31.zip` war draussen, als der Tiling-Cache-Schluessel-Fehler
+    # auffiel, par.8h). Ein ausgeliefertes Artefakt darf seinen Inhalt nie wechseln.
+    version = v.group(1)
+    if version.endswith(".0"):
+        version = version[: -len(".0")]
+    return f"Mosaic-AI_v{version}-alpha{generation}"
 
 
 def make_zip() -> Path:
