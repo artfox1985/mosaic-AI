@@ -19,49 +19,31 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**NICHTS.** Die Maschine ist frei (Stand 2026-09-20, Prozessliste geprueft).
+**NICHTS.** Die Maschine ist frei (Stand 2026-09-20, 17:04, Kette beendet mit Exit 0).
 
-**Die v31-Erzeugung ist FERTIG**, 400 / 400 / 401 Dateien, Exit 0. Generator `v30-b02`,
-Seeds 20260934/35/36, `--return-order-random-p 0.81` als CLI-Flag. Laufzeiten aus den Manifesten,
-nicht geschaetzt:
+**Die v31-Kette ist vollstaendig durch** (`tools/night_v31_chain.sh`, 12:15 bis 17:04):
+Erzeugung, Tor 0, Tor 2a, Fenster, Monolith, Training, Tor 1, Tor 2b. Ergebnisse und Herleitung:
+`PREREG_v31_window.md` par.6.
 
-| Klasse | Start | Wanduhr | s je Partie | ms je Zug | v30 zum Vergleich |
-| --- | --- | --- | --- | --- | --- |
-| Sockel (policy) | 20:23:47 | 16.944,3 s = 4h42 | 4,236 | 21,42 | 24,00 (-10,7 %) |
-| Schwarm temperiert | 01:06:15 | 18.399,2 s = 5h07 | 4,600 | 23,23 | 20,42 (+13,7 %) |
-| Schwarm Ausflug | 06:12:58 | rund 4h50 | – | – | 21,06 |
+| Etappe | Ergebnis |
+| --- | --- |
+| Erzeugung (3 Klassen) | 400/400/401 Dateien, **14,66 h** |
+| Tor 2a | `sp_voll` **0,955** gegen 0,901 -- HAELT |
+| Fenster | 2.947 Dateien, Traeger 580, Monolith-Stempel `8da26a898040` |
+| Training `v31-b01` warm | **3.490,4 s = 58 min**, 5,21 Mio Samples, Rezept-Diff 0 unerwartete Abweichungen |
+| **Tor 1 gegen `v30-b02`** | **461:339 aus 800 = 57,62 %, Block-z +4,24** -- TRAEGT |
+| Tor 2b | 800/800 ohne Replay, volle Spalten +0,030 / +0,050 |
 
-**Offener Befund, nicht erklaert:** die Partielaenge ist zwischen v30 und v31 auf ein Zehntel Zug
-gleich (197,7 gegen 197,7), trotzdem ist der Sockel billiger und der temperierte Schwarm teurer
-geworden. Der Cache-Waechter scheidet als Ursache aus -- die SCHNELLERE Klasse ueberlappte mit
-seiner geschaeftigsten Phase. `policy_mass_cutoff` scheidet ebenfalls aus: bei aktiver
-Gumbel-Suche ist der Cutoff ueberall ausgesetzt (`net_mcts.rs:3552`). Was es entscheiden wuerde,
-ist die Zahl der expandierten Knoten je Entscheidung; die steht in den Records und kostet nur eine
-Sonde.
+### DER NAECHSTE SCHRITT IST EIN NUTZER-ENTSCHEID
 
-**Der Cache-Waechter ist beendet** (er endet nicht von selbst). Er hatte seinen Rueckstand
-vollstaendig aufgeholt, juengster Block 11:04. **Kein Teil des Erzeugungsskripts**, er muss eigens
-gestartet werden -- beim Generationswechsel 2026-09-19 zunaechst vergessen worden. Was er spart,
-ist gemessen: in v30 dauerte der Blockbau fuers Fenster 4 s statt rund 35 min. Aufruf:
+`v31-b01` hat Tor 1 genommen. Die Promotion ist ein eigener Ablauf
+(`/mosaic-champion-promotion`): Anker-Kante gegen `hv4_anchor` (n = 50, rund 7 min),
+Champion-2-Kante gegen `v29-b09` (n = 150, rund 42 min), Pflicht-Diagnostiken,
+Anzeige-Kalibrierung, Netz-Paritaets-Fixture, eingefrorenes Artefakt. Zusammen rund 3,5 h.
 
-```
-MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_FEATURES_FROM_RUST=1 python -X utf8 -u   tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv   --workers 3 --watch --wartezeit 60 --leerlauf-abbruch 100000
-```
-
-**Die Bonuschip-Kanonisierung ist komplett** (Anzeige und Engine), das Wheel ist neu gebaut und
-installiert, Vertragshash unveraendert `6ef829e564c58bd5`, Netz-Paritaets-Fixture neu
-(`bc1733c0f303f743`) und in frischem Prozess abgenommen. Zur roten Anker-Golden-Probe: Abschnitt 6
-Punkt 4.
-
-### NACH DEM ENDE DER ERZEUGUNG, in dieser Reihenfolge
-
-1. Wiedervorlage am ersten Record (traegt er `return_order_randomized`?), Manifest-Diff gegen
-   die Referenz, Stack-Draw-Kontrolle.
-2. **Tor 0** je Klasse (sechs Standard-Kennzahlen) und **Tor 2a**: `sp_voll` der neuen
-   Policy-Klasse gegen **0,90087** von `v29-b11` (`PREREG_v31_window.md` par.2).
-3. Fensterliste v31 bauen (par.1: 2.947 Dateien, Seed 20260949, Val-Pool `^selfplay_v30-`),
-   Traeger-Manifest 580, **`MOSAIC_DATA_EXCLUDE` beim Cache-Bau setzen**.
-4. Kette fuer v31 als Datei schreiben und vorlegen; der Start braucht eine Anweisung.
+**Besonderheit: das waere der SCHLUSS-Champion.** v31 ist laut Nutzer die letzte Generation,
+also bekaeme dieses Modell den Anzeigenamen **Tessa** (`PREREG_code_cleanup_closeout.md` par.5a,
+Nachtrag 2026-09-20: drei mechanische Schritte, keine Parser-Arbeit).
 
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
