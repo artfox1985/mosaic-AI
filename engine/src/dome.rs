@@ -271,9 +271,24 @@ pub fn build_bonus_chip_pool() -> Vec<BonusChip> {
         vec![Tuerkis],
         vec![Gelb],
     ];
+    // Die Farben werden KANONISCH sortiert (Enum-Reihenfolge ueber `as u8`, dieselbe
+    // Konvention wie die Farb-Bitmaske in `round_end::chip_sig`). Grund: der Vorrat
+    // enthaelt jede zweifarbige Kombination zweimal, und in zwei von fuenf Faellen
+    // steht sie in den beiden Eintraegen verdreht -- `[Schwarz, Blau]` gegen
+    // `[Blau, Schwarz]` und `[Gelb, Schwarz]` gegen `[Schwarz, Gelb]`. Das ist eine
+    // Eigenheit der Abschrift (`docs/bonus_chips_colors.csv`), im Spiel bedeutet die
+    // Reihenfolge nichts. Ungeordnet fielen zwei gleiche Plaettchen an jeder Stelle
+    // auseinander, die den Vektor als Ganzes vergleicht: die Gruppierung der
+    // verdeckten Chips in `round5::action_outcomes` machte aus einem Zufallsast zwei,
+    // und `tiling_solver::tiling_key` vergab fuer identische Bretter verschiedene
+    // Schluessel. Nutzer-Befund 2026-09-19, Herleitung in
+    // `evaluations/PREREG_code_cleanup_closeout.md` par.8e.
     defs.into_iter()
         .enumerate()
-        .map(|(i, colors)| BonusChip { chip_id: i, colors })
+        .map(|(i, mut colors)| {
+            colors.sort_by_key(|c| *c as u8);
+            BonusChip { chip_id: i, colors }
+        })
         .collect()
 }
 

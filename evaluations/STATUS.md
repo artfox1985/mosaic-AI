@@ -19,39 +19,39 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**Die v31-Erzeugung**, `bash tools/night_v31_generate.sh`, drei Klassen nacheinander, Generator
-`v30-b02`, Seeds 20260934/35/36, `--return-order-random-p 0.81` als CLI-Flag. **Start am Bestand
-abgelesen: die erste Datei traegt 20:24** (`selfplay_v30-b02-policy_20260919_2024_g10.pkl`), der
-Lauf begann also kurz davor. Stand 22:35 gezaehlt: **193 von 1.201 Dateien**, Klasse 1 (Sockel).
-Erwartete Dauer rund 14 h nach der v30-Messung.
+**NICHTS.** Die Maschine ist frei (Stand 2026-09-20, Prozessliste geprueft).
 
-**Vorlaeufige Rate, HOCHGERECHNET und nicht aus einem Artefakt:** 1.900 Partien zwischen der
-ersten und der juengsten Datei in 131 min = rund 4,1 s je Partie, gegen 4,746 s der
-v30-Sockelklasse. Die belastbare Zahl steht erst im Manifest am Klassenende; seit 23:45 laeuft
-ausserdem der Cache-Waechter daneben, was sie ohnehin veraendert.
+**Die v31-Erzeugung ist FERTIG**, 400 / 400 / 401 Dateien, Exit 0. Generator `v30-b02`,
+Seeds 20260934/35/36, `--return-order-random-p 0.81` als CLI-Flag. Laufzeiten aus den Manifesten,
+nicht geschaetzt:
 
-**Wichtig zum Knopf:** die Dosis geht als CLI-Flag hinein, NICHT als Umgebungsvariable.
-`self_play.py` Z.236-240 setzt `MOSAIC_RETURN_ORDER_RANDOM_P` aus seinem eigenen CLI-Default
-(0.0) neu und ueberschreibt einen exportierten Wert stillschweigend; der erste v31-Anlauf ist
-daran 45 Dateien weit ohne eine einzige Streuung gelaufen und wurde verworfen. Gegenprobe am
-neuen Korpus: **15,0 Prozent der Partien mit gestreuter Rueckgabe** (Ziel 15, Obergrenze 17,75).
+| Klasse | Start | Wanduhr | s je Partie | ms je Zug | v30 zum Vergleich |
+| --- | --- | --- | --- | --- | --- |
+| Sockel (policy) | 20:23:47 | 16.944,3 s = 4h42 | 4,236 | 21,42 | 24,00 (-10,7 %) |
+| Schwarm temperiert | 01:06:15 | 18.399,2 s = 5h07 | 4,600 | 23,23 | 20,42 (+13,7 %) |
+| Schwarm Ausflug | 06:12:58 | rund 4h50 | – | – | 21,06 |
 
-**Daneben laeuft seit 2026-09-19, 23:45 der CACHE-WAECHTER** (drei Arbeiter), gestartet mit den
-Knoepfen der Trainings-Umgebung:
+**Offener Befund, nicht erklaert:** die Partielaenge ist zwischen v30 und v31 auf ein Zehntel Zug
+gleich (197,7 gegen 197,7), trotzdem ist der Sockel billiger und der temperierte Schwarm teurer
+geworden. Der Cache-Waechter scheidet als Ursache aus -- die SCHNELLERE Klasse ueberlappte mit
+seiner geschaeftigsten Phase. `policy_mass_cutoff` scheidet ebenfalls aus: bei aktiver
+Gumbel-Suche ist der Cutoff ueberall ausgesetzt (`net_mcts.rs:3552`). Was es entscheiden wuerde,
+ist die Zahl der expandierten Knoten je Entscheidung; die steht in den Records und kostet nur eine
+Sonde.
+
+**Der Cache-Waechter ist beendet** (er endet nicht von selbst). Er hatte seinen Rueckstand
+vollstaendig aufgeholt, juengster Block 11:04. **Kein Teil des Erzeugungsskripts**, er muss eigens
+gestartet werden -- beim Generationswechsel 2026-09-19 zunaechst vergessen worden. Was er spart,
+ist gemessen: in v30 dauerte der Blockbau fuers Fenster 4 s statt rund 35 min. Aufruf:
 
 ```
 MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_FEATURES_FROM_RUST=1 python -X utf8 -u   tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv   --workers 3 --watch --wartezeit 60 --leerlauf-abbruch 100000
 ```
 
-Er ist KEIN Teil des Erzeugungsskripts und muss eigens gestartet werden; beim Generationswechsel
-2026-09-19 ist er zunaechst vergessen worden (Nutzer-Frage "laeuft der cache watcher oder hast den
-uebersehen?"). Was er spart, ist gemessen: in v30 dauerte der Blockbau fuers Fenster **4 s** statt
-rund 35 min, weil er alles vorgebaut hatte. Seine Meldung "Traeger-Manifest: KEINS (jede Datei
-traegt)" ist harmlos -- der Block ist trageragnostisch, die Maske kommt erst beim Zusammenfuegen
-(`tools/build_cache_incremental.py:117-118` und `:198-199`).
-
-**Er endet nicht von selbst:** `--leerlauf-abbruch 100000` heisst rund 70 Tage Leerlauf. Nach dem
-Monolith-Merge des v31-Fensters gehoert er beendet.
+**Die Bonuschip-Kanonisierung ist komplett** (Anzeige und Engine), das Wheel ist neu gebaut und
+installiert, Vertragshash unveraendert `6ef829e564c58bd5`, Netz-Paritaets-Fixture neu
+(`bc1733c0f303f743`) und in frischem Prozess abgenommen. Zur roten Anker-Golden-Probe: Abschnitt 6
+Punkt 4.
 
 ### NACH DEM ENDE DER ERZEUGUNG, in dieser Reihenfolge
 
@@ -82,7 +82,7 @@ Monolith-Merge des v31-Fensters gehoert er beendet.
 
 Ein oder zwei Arme fuer v31 (Abschnitt 6 Punkt 1); Budget-Knopf fuer die Hilfsknoten als
 WIRKUNGS-Frage (Punkt 2); Gruppe B des Aufraeumens (Punkt 3); R5/R4b-Sonden der
-Promotionsliste ziehen oder die Zeile kuerzen (Punkt 4); Push-Stand (Punkt 5).
+Anker-Golden-Probe nach der Kanonisierung (Punkt 4); R5/R4b-Sonden (Punkt 5); Push-Stand (Punkt 6).
 
 ## 2. CHAMPION UND LEITER
 
@@ -202,12 +202,21 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
    (`static/js/app.js`, Helfer `chipColors`); die Engine-Haelfte aendert Records und gehoert an
    einen Generationswechsel.
 
-4. **R5- und R4b-Sonden der Promotionsliste** werden seit v24-b06 nicht gefahren, ihre Werkzeuge
+4. **Die Golden Probe des Elo-Ankers meldet ab jetzt dauerhaft ROT** (`PREREG_code_cleanup_closeout.md`
+   par.8e). Sie traegt Records der alten Bonuschip-Schreibweise; die Kanonisierung vom 2026-09-20 aendert
+   den serialisierten Zustand, NICHT das Spiel -- belegt Feld fuer Feld ueber 1.763 Schritte, alle
+   Zugfelder gleich. Drei Wege: (a) der Pruefer normalisiert die Farblisten beidseits
+   (Koordinator-Empfehlung, Vorbehalt: eng begrenzen, sonst schluckt der Waechter kuenftig echte
+   Unterschiede), (b) Golden Probe neu erzeugen (verliert die Faehigkeit, aeltere Drift zu melden),
+   (c) nichts tun und das ROT dokumentieren (abgeraten). **Bis dahin: die Drift-Pruefung vom
+   2026-09-20 ist inhaltlich bestanden.**
+
+5. **R5- und R4b-Sonden der Promotionsliste** werden seit v24-b06 nicht gefahren, ihre Werkzeuge
    sind auf die v18-Aera voreingestellt. Entweder auf den aktuellen Kontrakt ziehen und wieder
    Pflicht, oder die Zeile auf "Platt und Alt-Set-Brier" kuerzen (`docs/promotion_checklist.md`
    Punkt 5).
 
-5. **Push.** Stand 2026-09-19 nach dem Generationswechsel: gemessen mit
+6. **Push.** Stand 2026-09-20: gemessen mit
    `git rev-list --count origin/main..main`. Kein Push ohne Anweisung; der Nutzer pusht selbst.
 
 ### Aeltere, weiterhin offene Punkte (unveraendert uebernommen)

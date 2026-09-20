@@ -328,7 +328,17 @@ fn tiling_key(player: &PlayerBoard) -> TilingKey {
         broken_tiles: player.broken_tiles.clone(),
         pattern_lines: player.pattern_lines.iter().map(|l| l.tiles.clone()).collect(),
         dome_slots,
-        bonus_chip_colors: player.bonus_chips.iter().map(|c| c.colors.clone()).collect(),
+        // Kanonisch SORTIERT, nicht in Handreihenfolge: Chips gleicher Farbmenge sind
+        // austauschbar (`round_end::chip_sig`), zwei Bretter mit denselben Chips in
+        // anderer Aufnahmereihenfolge sind also derselbe Zustand. Ungeordnet bekamen
+        // sie verschiedene Schluessel, also Fehlgriffe statt Treffer. Die Farben IN
+        // einem Chip sind seit der Kanonisierung des Vorrats (`dome::build_bonus_chip_pool`)
+        // schon sortiert; hier kommt die Ordnung UEBER die Chips dazu.
+        bonus_chip_colors: {
+            let mut cs: Vec<_> = player.bonus_chips.iter().map(|c| c.colors.clone()).collect();
+            cs.sort_by_cached_key(|v: &Vec<_>| v.iter().map(|c| *c as u8).collect::<Vec<u8>>());
+            cs
+        },
     }
 }
 

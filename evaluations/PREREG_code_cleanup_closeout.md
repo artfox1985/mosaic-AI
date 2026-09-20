@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 (par.8) und GRUPPE A (par.8d, 7 von 9 Punkten) gebaut, Anker-Drift 1.763 Schritte identisch. Gruppe B: drei Punkte (par.8e Bonuschips, GUI-Haelfte gebaut). TEST- UND HAKEN-PRUEFUNG par.8f, ihre vier RAUS-Posten am 2026-09-20 AUSGEFUEHRT samt sieben nachgezogenen Verweisen (par.8g, Rust-Schnitt noch unuebersetzt). par.8g traegt die Abarbeitungsliste fuer nach dem Projektabschluss, 10 Punkte. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 (par.8) und Gruppe A (par.8d) gebaut. par.8e Bonuschip-Kanonisierung KOMPLETT: 700 Lib-Tests gruen, Vertragshash unveraendert, Anker-Drift ROT aber aufgeklaert (alle Zugfelder ueber 1.763 Schritte gleich, nur Schreibweise); OFFEN ist die Behandlung der Anker-Golden-Probe. par.8f/8g: vier tote Posten entfernt, 10-Punkte-Liste fuer nach dem Abschluss. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -984,6 +984,88 @@ Muster genau 1) und die Farbfolge gegen das Enum; ein JS-Syntaxlauf war mangels 
 moeglich. **Offen bleibt die Engine-Haelfte oben** (Poolbau oder Bitmaske, plus der
 Tiling-Schluessel); erst sie spart die Arbeit in `round5.rs` und im Cache.
 
+### GEBAUT 2026-09-20: die Engine-Haelfte (Nutzer: "dann mach die engine haelfte gleich mit. es gibt kein v32")
+
+Ausgefuehrt, nachdem die v31-Erzeugung fertig war und der Cache-Waechter beendet: Maschine frei,
+also durfte gebaut werden. **Zeitpunkt bewusst hier**, weil eine Record-Aenderung an einen
+Generationswechsel gehoert und v31 laut Nutzer die letzte Generation ist.
+
+**Zwei Aenderungen, beide klein:**
+
+1. `dome::build_bonus_chip_pool` sortiert die Farben jedes Plaettchens beim Bau des Vorrats
+   (`colors.sort_by_key(|c| *c as u8)`, dieselbe Enum-Ordnung wie die Farb-Bitmaske in
+   `round_end::chip_sig`). Damit fallen `[Schwarz, Blau]` und `[Blau, Schwarz]` zusammen.
+   **Die beiden Vergleichsstellen sind dadurch OHNE eigene Aenderung geheilt:** die Gruppierung
+   der verdeckten Chips in `round5::action_outcomes` macht aus zwei Zufallsaesten wieder einen mit
+   Gewicht 2, und `tiling_solver::tiling_key` vergibt fuer identische Bretter denselben Schluessel.
+2. `tiling_solver::tiling_key` sortiert zusaetzlich UEBER die Chips, nicht nur in ihnen. Das war
+   der groessere Anteil derselben Fehlerklasse: zwei Bretter mit denselben Plaettchen in anderer
+   AUFNAHMEREIHENFOLGE bekamen bisher verschiedene Schluessel. Zulaessig, weil Chips gleicher
+   Farbmenge austauschbar sind (`round_end::chip_sig`-Kopfkommentar).
+
+**Die Tore, in der Reihenfolge des Laufs:**
+
+| Tor | Ergebnis |
+| --- | --- |
+| `cargo test --release --no-run` inkl. `examples/` und `benches/` | gruen, 1 min 19 s |
+| Lib-Tests | **700 gruen**, 19 uebersprungen, 93 s; einziger Fehlschlag die Netz-Paritaets-Fixture |
+| Anker-Fixtures `mcts.rs:1622` und `:1714` | gruen, die zweite deckt den R5-Pfad ab |
+| Wheel gebaut und installiert | 30 s |
+| **Vertragshash** | **`6ef829e564c58bd5` unveraendert**, 888/414 |
+| Kanonisierung am Wheel | 86 zweifarbige Chips ueber 40 Partien: **5 Farbmengen in 5 Schreibweisen** (vorher waeren es 7 gewesen) |
+| Netz-Paritaets-Fixture neu | `16208f49af911525` -> `bc1733c0f303f743`, Abnahme im FRISCHEN Prozess gruen |
+| **Anker-Drift** | **ROT, vollstaendig aufgeklaert -- siehe unten** |
+
+**Dass der Vertragshash steht, ist der tragende Nebenbefund:** er deckt `INPUT_SIZE`,
+`NUM_ACTIONS` und die Merkmalsformel ab. Die Farbordnung erreicht die Netz-Eingabe also nicht, und
+der bereits geschriebene v31-Korpus bleibt gueltig. Haette er sich bewegt, waere hier Schluss
+gewesen.
+
+### Die ROTE Anker-Drift, aufgeklaert (2026-09-20)
+
+`tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor` meldet
+**ROT: 0/1 Dateien Feld fuer Feld gleich**, erste Abweichung
+`/state/factories[1]/bonus_chip/colors[0]`. Das Werkzeug haelt beim ersten Unterschied an und kann
+darum nicht sagen, ob der Anker ANDERS SPIELT oder nur anders schreibt. Diagnose mit einer
+Wegwerf-Sonde (Wiederholungslauf desselben Rezepts, 10 Partien, 16 s, dreifacher Vergleich):
+
+| Vergleich | Ergebnis ueber alle 1.763 Schritte |
+| --- | --- |
+| roh, Feld fuer Feld | erste Abweichung `factories[1]/bonus_chip/colors[0]`: `'schwarz'` gegen `'gelb'` (reproduziert das ROT) |
+| Chip-Farblisten beidseits sortiert, aufwaerts-tolerant | **IDENTISCH** |
+| alle Record-Felder ausser `state` und `game_id` | **alle gleich**: `policy`, `valid_actions`, `winner`, `scores`, `scores_unclamped`, `completed`, `moon_order_target`, `player` |
+
+**Der Anker zieht Zug fuer Zug dasselbe.** Das ROT hat genau zwei Ursachen, beide ohne
+Verhaltensbezug: die kanonisierte Schreibweise der Chip-Farben (unter `colors` UND unter
+`unused_chip_colors`) und das Zustandsfeld `tiled_max_row`, das nach dem Einfrieren am 2026-09-12
+dazugekommen ist und vom aufwaerts-toleranten Vergleich abgedeckt wird. Die Elo-Leiter ist
+unberuehrt.
+
+**Zwei Lehren aus der Diagnose selbst**, beides eigene Fehler im ersten Anlauf: ein Normalisierer,
+der nur Felder namens `colors` sortiert, uebersieht `unused_chip_colors` -- Farblisten haengen
+unter mehreren Schluesseln. Und eine Verhaltenspruefung, die ihre Felder aus einer Kandidatenliste
+zieht, prueft, was sie zufaellig trifft: erst der Wechsel auf "alle Felder ausser `state`" hat
+`valid_actions` und `winner` ueberhaupt in den Vergleich genommen.
+
+### OFFENER NUTZER-ENTSCHEID: die Golden Probe des Ankers meldet ab jetzt dauerhaft ROT
+
+Sie enthaelt Records der alten Schreibweise. Jede kuenftige Drift-Pruefung wird daran scheitern,
+obwohl nichts driftet. Drei Wege:
+
+* **(a) Der Pruefer normalisiert die Farblisten** auf beiden Seiten, wie die Diagnose-Sonde. Das
+  Artefakt bleibt unangetastet, das Tor bleibt fuer alles andere scharf. **Empfehlung des
+  Koordinators** -- mit dem Vorbehalt, dass jede Normalisierung in einem Waechter kuenftig echte
+  Unterschiede schlucken kann; sie muesste eng auf Farblisten begrenzt sein und im Code begruendet
+  stehen.
+* **(b) Die Golden Probe neu erzeugen.** Sauber im Ergebnis, aber sie ist der eingefrorene
+  Bezugspunkt: neu erzeugt kann sie Drift, die VOR heute entstanden ist, nicht mehr melden. Das
+  widerspricht dem Zweck des Einfrierens.
+* **(c) Nichts tun, ROT dokumentieren.** Abgeraten: das ist der Fall "ein umgangenes Tor erzieht
+  zum Umgehen".
+
+Bis zum Entscheid gilt: die Drift-Pruefung vom 2026-09-20 ist inhaltlich BESTANDEN, belegt durch
+die Diagnose oben, nicht durch das Werkzeugverdikt.
+
 ## par.8f PRUEFUNG DER TESTS UND HAKEN (2026-09-19, Nutzer-Auftrag)
 
 **Anlass:** Nutzer 2026-09-19, *"lass mal einen agent laufen ob alle tests und hooks so noch
@@ -1061,10 +1143,22 @@ etwas anderes:** `python tools/check_conventions.py` am 2026-09-19 druckte genau
 fuer `engine/py/neural_net.py` und `tools/analyze_game_log.py`. Der Agent hat die Rohdifferenz
 gegen `tools/size_baseline.json` gerechnet, aber die Reduktions-Ausnahme (`:186-190`, Vergleich
 gegen `git cat-file -s HEAD:<datei>`) nicht nachgefahren und das selbst als ANNAHME markiert.
-**Die tragende Zahl ist 2, nicht 7.** Der Kern seines Arguments steht davon unberuehrt und ist am
-Regel-Kopf (`:15-26`) belegt: zehn Ausloesungen, null Zerlegungen -- eine Warnung, die nie zu
-einer Handlung fuehrt, ist eine Kandidatin. Aber sie ist kein Blocker und kostet 3,6 s im
-teuersten Modus.
+**NACHTRAG 2026-09-20, meine eigene Korrektur war zu kurz.** Der Commit-Haken derselben Nacht
+druckte Regel-1-Warnungen fuer `train.py` und `engine/py/corpus_dataset.py` -- also fuer ZWEI
+ANDERE Dateien als der volle Lauf. Direkt danach wiederholt: der volle Lauf
+(`python tools/check_conventions.py`) meldet weiterhin genau `engine/py/neural_net.py` und
+`tools/analyze_game_log.py`. Der Haken faehrt `--staged` und vergleicht die vorgemerkten Inhalte,
+der volle Lauf vergleicht gegen die Blobgroesse in HEAD; **welche Dateien drucken, haengt also am
+Modus**, und ueber beide Modi sind es mindestens vier verschiedene. Die Aussage "die tragende Zahl
+ist 2" galt damit nur fuer einen der beiden Wege; naeher an der Sache ist der Agent mit seiner
+Rohzaehlung von 7 ueber der Basislinie. **Der Mechanismus ist nicht aufgeloest** -- dazu muesste
+man `:186-190` gegen beide Modi durchrechnen.
+
+Der Kern des Arguments steht davon unberuehrt und ist am Regel-Kopf (`:15-26`) belegt: zehn
+Ausloesungen, null Zerlegungen -- eine Warnung, die nie zu einer Handlung fuehrt, ist eine
+Kandidatin. Sie ist kein Blocker und kostet 3,6 s im teuersten Modus. Dass sie je nach Modus
+verschiedene Dateien nennt, ist ein Argument mehr: ein Waechter, dessen Ausgabe davon abhaengt,
+wie man ihn ruft, erzieht niemanden.
 
 ### Was NICHT beurteilt ist
 
