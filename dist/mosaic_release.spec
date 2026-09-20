@@ -55,15 +55,28 @@ datas = collect_static_datas()
 # tools/set_champion.py; an diese Datei denkt niemand.
 _champion = (open(os.path.join(PROJECT_ROOT, 'models', 'champion.txt'),
                   encoding='utf-8').read().strip())
-_champ_dir = _champion.replace('_brierbest', '').replace('_best', '')
+# Suffix nur am ENDE streifen und die DIREKTE Spec zuerst suchen -- beides wie
+# server.py::_resolve_champion_spec. Eine fruehere Fassung nahm `.replace()` (trifft
+# das Muster ueberall im Namen) und kannte `models/<name>.spec.json` gar nicht; sie
+# haette abgebrochen, wo der Server laeuft. Genau dieser Fall ist in server.py:248-251
+# als Vorfall vom 2026-09-10 dokumentiert.
+_champ_base = _champion
+for _suffix in ('_brierbest', '_best'):
+    if _champ_base.endswith(_suffix):
+        _champ_base = _champ_base[: -len(_suffix)]
 _champ_onnx = os.path.join(PROJECT_ROOT, 'models', f'alphazero_{_champion}.onnx')
-_champ_spec = os.path.join(PROJECT_ROOT, 'models', 'frozen_champions', _champ_dir, 'spec.json')
+_direct_spec = os.path.join(PROJECT_ROOT, 'models', f'{_champion}.spec.json')
+if os.path.exists(_direct_spec):
+    _champ_spec, _spec_ziel = _direct_spec, 'models'
+else:
+    _champ_spec = os.path.join(PROJECT_ROOT, 'models', 'frozen_champions', _champ_base, 'spec.json')
+    _spec_ziel = os.path.join('models', 'frozen_champions', _champ_base)
 for _p in (_champ_onnx, _champ_spec):
     if not os.path.exists(_p):
         raise SystemExit(f'ABBRUCH: {_p} fehlt -- das Bundle waere ohne Champion. '
                          f'champion.txt sagt {_champion!r}.')
 datas.append((_champ_onnx, 'models'))
-datas.append((_champ_spec, os.path.join('models', 'frozen_champions', _champ_dir)))
+datas.append((_champ_spec, _spec_ziel))
 datas.append((os.path.join(PROJECT_ROOT, 'models', 'champion.txt'), 'models'))
 # Elo-Historie mitliefern: ohne sie hat estimate_ai_anchor keine Arena-Kanten
 # und JEDES KI-Spiel waere ungewertet (Rauchtest-Befund 2026-08-15).

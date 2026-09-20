@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 (par.8) und Gruppe A (par.8d) gebaut. par.8e Bonuschip-Kanonisierung KOMPLETT: 700 Lib-Tests gruen, Vertragshash unveraendert, Anker-Drift ROT aber aufgeklaert (alle Zugfelder ueber 1.763 Schritte gleich, nur Schreibweise); OFFEN ist die Behandlung der Anker-Golden-Probe. par.8f/8g: vier tote Posten entfernt, 10-Punkte-Liste fuer nach dem Abschluss. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 (par.8) und Gruppe A (par.8d) gebaut, par.8e Bonuschips komplett, par.8f/8g vier tote Posten entfernt. QUALITAETS-DURCHSICHT par.8h (2026-09-21): ein selbst eingebauter Korrektheitsfehler im Tiling-Cache-Schluessel behoben (Greedy-Rueckfall ab 14 Chips ist handreihenfolge-abhaengig), vier weitere Stellen berichtigt, 10 repo-weite Funde als Vorlage. Anker-Drift gruen, 701 Tests gruen. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1342,3 +1342,140 @@ Wheel mit unveraendertem Vertragshash, Netz-Paritaets-Fixture, **Anker-Drift geg
 * **CLAUDE.md beschreibt den Prereg-Index-Generator ueberholt** (par.8f, Beifang 2): "faellt die
   Datei STILL aus dem Index" gilt nicht mehr, `generate_prereg_index.py:162` gibt Exit 1 vor dem
   Schreiben. Aenderung an CLAUDE.md ist Nutzer-Entscheid.
+
+## par.8h QUALITAETS-DURCHSICHT (2026-09-21, `/simplify`, vier Winkel repo-weit)
+
+**Nutzer-Auftrag:** `/simplify` auf die Aenderungen der v31-Promotion, dann auf Zuruf
+(*"du kannst dem agent sagen dass er das ganze repo anschauen soll"*) auf den ganzen Baum.
+Vier Agenten, je ein Winkel: Wiederverwendung, Vereinfachung, Effizienz, Flughoehe. Rein lesend,
+keine Rechenlast. **Ein erster Anlauf am 2026-09-20 ist am Monatslimit gescheitert, nicht an der
+Aufgabe.**
+
+### BEHOBEN: ein Korrektheitsfehler, den ich selbst eingebaut hatte
+
+**Der Cache-Schluessel des Tiling-Solvers durfte nicht ueber die Chips sortiert werden.** Am
+2026-09-20 hatte ich `tiling_key` so erweitert, mit der Begruendung, Chips gleicher Farbmenge
+seien austauschbar (`round_end::chip_sig`). Das gilt fuer den exakten Aufzaehlungsweg, aber NICHT
+fuer den Deckel-Rueckfall: ab mehr als `CHIP_ALLOC_CAP` (14) Chips faellt `chip_allocations` auf
+`greedy_chip_indices` zurueck (`round_end.rs:574`), und das waehlt `same[0]`, `same[1]` bzw.
+`pool.iter().take(3)` in HANDINDEX-Reihenfolge. Zwei Haende mit derselben Chip-Multimenge in
+anderer Reihenfolge verbrauchen dort verschiedene Chips und lassen einen verschiedenen Rest --
+seit der Sortierung teilten sie sich einen Schluessel.
+
+**Das Regime ist nicht theoretisch:** `referee.rs:791-795` haelt fest, dass der Rueckfall am
+2026-08-26 in einem 24-Partien-Lauf auftrat und dort einen legalen Zug abwies. Der Fehler steckte
+im Bundle, das am 2026-09-20 ausgeliefert wurde.
+
+**Eine zweite Annahme fiel dabei mit.** Ich hatte angenommen, nach der Kanonisierung des Vorrats
+koenne der Schluessel keine verdrehten Farblisten mehr sehen. `serialize::bonus_chip_from_json`
+(`serialize.rs:999-1003`) uebernimmt die Farbliste aber WOERTLICH aus dem Record -- auf dem
+JSON-Weg (`features.rs:654`, `lib.rs:1828`) kommen weiterhin unsortierte Chips an, aus Records von
+vor dem 2026-09-20. Die Kanonisierung in `dome::build_bonus_chip_pool` deckt nur engine-gebaute
+Zustaende ab, nicht rekonstruierte.
+
+**Die Form, die beides loest, stand schon im Baum.** `TilingKey` fuehrt jetzt je Chip die
+Farb-MENGE als Bitmaske ueber `round_end::chip_sig` (dafuer von `fn` auf `pub(crate)` gehoben,
+kein Neubau), in HANDREIHENFOLGE:
+
+* gegen die Reihenfolge INNERHALB eines Chips immun -- auch auf dem JSON-Weg,
+* die Reihenfolge UEBER die Chips bleibt erhalten, der Greedy-Rueckfall ist wieder sauber,
+* und es faellt je Chip eine Allokation WEG statt einer dazuzukommen (vorher
+  `sort_by_cached_key` mit einem `Vec<u8>` je Chip).
+
+**Tore:** `cargo test --release --no-run` gruen ohne Warnung, **701 Lib-Tests gruen** samt
+Netz-Paritaets-Fixture (die Records aendern sich also nicht), Wheel neu gebaut,
+**Anker-Drift GRUEN** ueber 1.763 Schritte, 147 Werkzeug-Tests gruen.
+
+### BEHOBEN: vier weitere Stellen aus dem Diff
+
+| Stelle | Was war | Was jetzt |
+| --- | --- | --- |
+| `README.md` zweimal | "today `v30-b02` and `v29-b09`" und `alphazero_v30-b02_brierbest.onnx` -- eine Generation zurueck, EINEN Tag nach dem Nachziehen der Champion-Zeile | auf `v31-b01` gezogen |
+| `static/js/app.js::chipColors` | verglich gegen `String(a).toLowerCase()`, waehrend `CHIP_COLOR_ORDER` die Drahtform `'türkis'` fuehrte -- eine bereits ueber `normColor` normalisierte Farbe waere auf Position 99 sortiert worden | Schluessel sind die normalisierten Namen, Vergleich ueber `normColor` |
+| `dist/mosaic_release.spec` | eigene Aufloesung Champion -> Verzeichnis: `.replace()` statt `endswith` (trifft das Muster ueberall im Namen), und `models/<name>.spec.json` war unbekannt -- der Bau waere abgebrochen, wo der Server laeuft | dieselbe Reihenfolge und dieselbe Suffix-Regel wie `server.py::_resolve_champion_spec` |
+| `docs/architecture_reference.md` | kein Eintrag zu den zwei neuen Stellen, obwohl CLAUDE.md ihn ausdruecklich verlangt | zwei Zeilen mit beiden Pflichtfragen beantwortet |
+
+Dazu in `tools/probes/generator_repro_probe.py`: `CHIP_COLOR_FIELDS` traegt jetzt sein
+Verfallsdatum. Es ist **dauerhaft** noetig, nicht uebergangsweise -- am 2026-09-21 nachgezaehlt
+sind `hv4_anchor/golden_probe/` (vorkanonisch, eingefroren solange Leitersegment 2 laeuft) und
+`frozen_champions/v30-b02/` (traegt beide Schreibweisen) im Baum; `v31-b01` ist nachkanonisch.
+
+### NICHT BEHOBEN, mit Grund
+
+* **`greedy_chip_indices` ordnungsfrei machen** (`round_end.rs:509`) waere die tiefere Loesung --
+  dann waere die Austauschbarkeits-Behauptung wahr statt ueberwiegend wahr. Es ist aber eine
+  VERHALTENSAENDERUNG im Spielpfad und zieht Fixture, Golden Probes und Anker-Drift nach, fuer ein
+  Regime, dessen Haeufigkeit ungemessen ist. Nach dem Schluss-Champion nicht mehr angemessen.
+* **Farb-Bitmaske als Datentyp von `BonusChip`** statt `Vec<TileColor>`: waere die tiefste Form,
+  aendert aber den Record- und GUI-Vertrag (`serialize.rs:219` zeigt `colors` als Namensliste) und
+  damit wieder Fixture und Probes. Kein messbarer Gewinn, kein v32.
+* **Die toten Testhaken in `train.py`** (`:2308`, `:2367`, Env `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH`
+  und `MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH`): ihr Treiber ist am 2026-09-20 geloescht. Sie zu
+  entfernen wuerde die in par.8g registrierte Alternative "neu verankern" zunichtemachen -- das
+  ist ein offener Entscheid, kein Aufraeumen.
+* **Zwei der sechs neuen Tests** in `test_upward_tolerant_divergence.py` laufen laut Agent in
+  denselben Zweig, und `test_canonicalisation_is_limited_to_two_fields` prueft kein Verhalten.
+  Das stimmt -- und ist Absicht: der Test existiert, damit ein Erweitern der Zweierliste ein
+  BEWUSSTER Akt wird und den Kopfkommentar zu lesen zwingt. Behalten.
+
+### REPO-WEITE FUNDE -- Vorlage, nicht ausgefuehrt
+
+Alle ausserhalb des Diffs, alle mit Pruefstelle belegt, sortiert nach Kosten. **Nichts davon ist
+angefasst**; das waere weit ausserhalb dessen, was `/simplify` abdeckt.
+
+1. **16 Sonden laden Korpusdateien mit rohem `pickle.load`** statt ueber `corpus_io.load_records`
+   (`corpus_io.py:47`), obwohl Korpora seit `dump_records(..., compress=True)` gzip sind. Zwei
+   davon schlucken die Ausnahme und melden STILL ein leeres Ergebnis
+   (`tools/probes/bootstrap_horizon_cost_gate.py:91`, `conjunction_base_rates.py:72`). Drei
+   Fehlerpolitiken nebeneinander. **Der teuerste Fund.**
+2. **72 Werkzeuge schreiben den `laufzeit`-Pflichtblock von Hand**, 6 nehmen den Helfer
+   `tools/runtime_block.py:43`. Schon auseinandergelaufen: 25 Stellen rechnen auf `time.time()`,
+   14 auf `time.monotonic()`; drei lassen `cpu_s`/`threads`/`s_je_partie` ganz weg.
+3. **Blockmittel viermal mit drei verschiedenen Rest-Regeln** (`plate_points_from_arena.py:198`
+   zaehlt den angebrochenen Block ab halber Groesse mit, `env_ab_swap_eval.py:60` immer,
+   `arena_block_sd_probe.py:27` nie). Daran haengt laut CLAUDE.md die Entscheidungsmetrik JEDER
+   Arena-Auswertung.
+4. **Der exakte zweiseitige Binomialtest 15-mal gebaut**, unter zwei Namen (`mcnemar_exact_p`,
+   `sign_test_p`). Es gibt kein Statistik-Modul in `tools/`.
+5. **Die CPU-Warteschleife fuenfmal**, eine Kopie defekt: `tools/night_v31_generate.sh:55`
+   verundet `[c]argo|[m]aturin` mit `Name -match 'python'` -- ein `cargo.exe` wird damit NIE
+   gesehen, obwohl ein Build laut CLAUDE.md Messlast ist. `night_v31_chain.sh:68` hat genau
+   dafuer den Zusatz `-or Name -match '^(cargo|rustc)'`; die Erzeugungskette hat ihn nicht.
+6. **`_SPEC_TO_ENV` zweimal byte-gleich** (`server.py:205`, `tools/claude_play.py:80`) und beide
+   12 Felder hinter `net_mcts.rs::KNOWN_FIELDS`. Die aktuelle Champion-Spec traegt davon
+   `heuristik_variante` -- das Feld wird beim GUI-Laden still uebergangen.
+7. **Der `_TEST_`-Ausnahme des Knopf-Waechters** (`knob_registry.rs:294`) ist ein Substring-Test,
+   gemeint war das Praefix `MOSAIC_TEST_`. Dadurch rutschen zwei echte Laufzeit-Knoepfe an beiden
+   Waechtern vorbei (`MOSAIC_PAUSE_TEST_STOP_AT_EPOCH`, `MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH`).
+8. **Werkzeug-Defaults auf geloeschte Modelle**: `r4b_zone_probe.py:44`, `r5_value_calibration.py:338`,
+   `plate_rank_invariance.py:176`, `play_rule_cost.py:122`, `chance_node_pretest.py:119`,
+   `gpu_batch_throughput.py:99` und zwei `engine/examples`. Alle scheitern laut; es ist der
+   registrierte Grund, warum Punkt 5 der Promotionsliste seit v24-b06 nicht mehr laeuft.
+9. **`tiling_solver::apply_step` klont je Schritt den ganzen `GameState`**, obwohl der Solver nur
+   `players[pi]` liest -- rund 110 Heap-Allokationen je Klon, davon rund 75 Prozent tot
+   (HERLEITUNG des Agenten, nicht gemessen). Der Modul-Kommentar `:248-255` belegt die
+   Feld-Abhaengigkeit selbst.
+10. **`features.rs:1383` gegen `:1635`**: Abschnitt 5 und Abschnitt 17 fahren je Blatt und Spieler
+    DIESELBE Tiling-Rekursion zweimal; `tiling_solver.rs:563` sagt selbst, die Punkte seien
+    identisch. Vier Rekursionen je Blatt, zwei davon ableitbar.
+
+### EIN OFFENER BEFUND HAT EINE HYPOTHESE MIT PRUEFWEG BEKOMMEN
+
+Der ungeklaerte Kostenbefund der v31-Erzeugung (Sockel je Zug 10,7 Prozent BILLIGER, beide
+Schwarm-Klassen 13,7 und 18,4 Prozent TEURER, bei identischer Partielaenge -- `docs/measured_runtimes.md`,
+Abschnitt "Generation v31") hat jetzt einen benannten Kanal:
+
+**Die drei Tiling-Caches sind fadenlokal, ihr Schluessel ist ALLEIN das Spielerbrett
+(`tiling_solver.rs:294-303`), und bei Ueberlauf von `CACHE_CAP = 20_000` werden sie GANZ geleert
+(`:437-443`).** Die Kosten eines Zuges haengen damit nicht an der Zugzahl, sondern an der
+VIELFALT der Brettzustaende, die eine Klasse erzeugt. Der Sockel faehrt `--tau-argmax-from-move 1`
+(engste Verteilung, hoechste Trefferquote), die temperierte Klasse sampelt, die Ausflug-Klasse
+erzwingt eine Abweichung. Das passt in der RICHTUNG auf das beobachtete Vorzeichen. Dazu kommt,
+dass `--return-order-random-p 0.81` in v30 wirkungslos war und erst am 2026-09-19 in den
+Knoten-Weg gezogen wurde -- eine zufaellige Rueckgabereihenfolge streut genau die Groesse, ueber
+die der Schluessel laeuft.
+
+**Beantwortbar OHNE eine einzige Partie:** `MOSAIC_TILING_CACHE_STATS=1` (`tiling_solver.rs:389-393`)
+zaehlt Schluessel-Wiederkehr; ein kurzer Lauf je Klasse liefert Trefferquote und Zahl der
+Voll-Leerungen. Das ist billiger als die bisher vorgeschlagene Knotenzahl-Sonde und trifft eine
+ANDERE Vermutung -- beide bleiben offen. **HYPOTHESE, nicht Befund.**

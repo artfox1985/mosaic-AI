@@ -188,7 +188,7 @@ the run, so a result cannot be reinterpreted afterwards.
    the wheel it was measured with, a golden probe and a manifest. The wheel
    travels with the artifact so that an old champion still plays the way it did
    when its Elo was measured. The artifact set holds the reigning champion and
-   its predecessor (today `v30-b02` and `v29-b09`); older ones are retired once
+   its predecessor (today `v31-b01` and `v30-b02`); older ones are retired once
    their edges are in the register. The full list is `docs/promotion_checklist.md`.
 
 7. **Diagnostics on the winner**: Platt calibration (`tools/platt_fit.py`),
@@ -316,7 +316,7 @@ state  (888)    → Linear(512) → BN → ReLU ──────────�
        └→ Endgame Head:     round-5 solver root margin (aux, Tanh)
 ```
 
-The champion ONNX export (`alphazero_v30-b02_brierbest.onnx`)
+The champion ONNX export (`alphazero_v31-b01_brierbest.onnx`)
 carries two inputs (`planes`, `state`) and eight outputs (`policy`,
 `value`, `moon`, `points`, `ownership`, `value_wdl_logits`, `opp_points`,
 `endgame_margin`). Aux heads are training signal only; the search reads

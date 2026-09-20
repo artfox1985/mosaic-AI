@@ -815,12 +815,16 @@ function normColor(c) {
 // verschieden. Sortiert wird nach der Enum-Reihenfolge der Engine
 // (engine/src/tile.rs:5-13), damit Anzeige und Farb-Bitmaske dieselbe
 // Konvention haben. NUR Anzeige: die Engine-Daten bleiben unberuehrt.
-const CHIP_COLOR_ORDER = ['blau', 'gelb', 'rot', 'schwarz', 'türkis'];
+// Die Schluessel sind die NORMALISIERTEN Namen (`normColor`), nicht die Drahtform:
+// die Drahtform schreibt 'türkis' mit Umlaut (`TileColor::value`, tile.rs:32), und ein
+// Vergleich gegen die Rohform haette eine bereits normalisierte Farbe auf Position 99
+// sortiert. Reihenfolge wie das Enum der Engine (tile.rs:5-13).
+const CHIP_COLOR_ORDER = ['blau', 'gelb', 'rot', 'schwarz', 'tuerkis'];
 function chipColors(chip) {
   const cs = (chip && chip.colors) ? chip.colors.slice() : [];
   return cs.sort((a, b) => {
-    const ia = CHIP_COLOR_ORDER.indexOf(String(a).toLowerCase());
-    const ib = CHIP_COLOR_ORDER.indexOf(String(b).toLowerCase());
+    const ia = CHIP_COLOR_ORDER.indexOf(normColor(a));
+    const ib = CHIP_COLOR_ORDER.indexOf(normColor(b));
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
   });
 }

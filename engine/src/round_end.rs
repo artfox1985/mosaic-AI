@@ -500,7 +500,7 @@ const CHIP_ALLOC_CAP: usize = 14;
 /// String: TileColor hat nur 6 Varianten, passt locker in ein Byte — spart
 /// Allokation/Formatierung im heißen Pfad (`chip_allocations`, rekursiv oft
 /// aufgerufen, siehe tiling_solver.rs NODE_BUDGET-Kommentar).
-fn chip_sig(chip: &crate::dome::BonusChip) -> u8 {
+pub(crate) fn chip_sig(chip: &crate::dome::BonusChip) -> u8 {
     chip.colors.iter().fold(0u8, |acc, c| acc | (1 << (*c as u8)))
 }
 

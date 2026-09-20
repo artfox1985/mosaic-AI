@@ -113,6 +113,13 @@ def _strip_state(v):
 # dieser Waechter finden soll. Wer die Menge erweitert, weist vorher nach, dass die
 # Reihenfolge im betroffenen Feld bedeutungslos ist -- sonst lernt der Waechter,
 # Unterschiede zu schlucken ("ein umgangenes Tor erzieht zum Umgehen").
+#
+# WIE LANGE noch noetig, damit niemand raten muss: solange eine eingefrorene Golden
+# Probe von VOR dem 2026-09-20 im Baum liegt. Am 2026-09-21 nachgezaehlt sind das
+# `models/frozen_heuristics/hv4_anchor/golden_probe/` (vorkanonisch, und per Definition
+# eingefroren, solange Leitersegment 2 laeuft) und `frozen_champions/v30-b02/` (traegt
+# beide Schreibweisen). `frozen_champions/v31-b01/` ist bereits nachkanonisch. Diese
+# Normalisierung ist damit DAUERHAFT, nicht uebergangsweise -- der Anker ist der Grund.
 CHIP_COLOR_FIELDS = ("colors", "unused_chip_colors")
 
 

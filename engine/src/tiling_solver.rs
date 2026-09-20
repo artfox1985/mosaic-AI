@@ -299,7 +299,9 @@ struct TilingKey {
     broken_tiles: Vec<TileColor>,
     pattern_lines: Vec<Vec<TileColor>>,
     dome_slots: Vec<Option<(usize, Vec<SpaceKey>)>>,
-    bonus_chip_colors: Vec<Vec<TileColor>>,
+    /// Farb-MENGE je Chip als Bitmaske, in HANDREIHENFOLGE (`round_end::chip_sig`).
+    /// Warum Bitmaske und warum nicht sortiert: siehe `tiling_key`.
+    bonus_chip_sigs: Vec<u8>,
 }
 
 fn tiling_key(player: &PlayerBoard) -> TilingKey {
@@ -328,17 +330,28 @@ fn tiling_key(player: &PlayerBoard) -> TilingKey {
         broken_tiles: player.broken_tiles.clone(),
         pattern_lines: player.pattern_lines.iter().map(|l| l.tiles.clone()).collect(),
         dome_slots,
-        // Kanonisch SORTIERT, nicht in Handreihenfolge: Chips gleicher Farbmenge sind
-        // austauschbar (`round_end::chip_sig`), zwei Bretter mit denselben Chips in
-        // anderer Aufnahmereihenfolge sind also derselbe Zustand. Ungeordnet bekamen
-        // sie verschiedene Schluessel, also Fehlgriffe statt Treffer. Die Farben IN
-        // einem Chip sind seit der Kanonisierung des Vorrats (`dome::build_bonus_chip_pool`)
-        // schon sortiert; hier kommt die Ordnung UEBER die Chips dazu.
-        bonus_chip_colors: {
-            let mut cs: Vec<_> = player.bonus_chips.iter().map(|c| c.colors.clone()).collect();
-            cs.sort_by_cached_key(|v: &Vec<_>| v.iter().map(|c| *c as u8).collect::<Vec<u8>>());
-            cs
-        },
+        // Je Chip die Farb-MENGE als Bitmaske, in HANDREIHENFOLGE. Zwei Entscheidungen,
+        // beide gegen einen Fehlversuch vom 2026-09-20:
+        //
+        // (1) BITMASKE statt Farbvektor -- damit ist der Schluessel gegen die Reihenfolge
+        //     INNERHALB eines Chips immun, und zwar auch auf dem JSON-Weg:
+        //     `serialize::bonus_chip_from_json` uebernimmt die Farbliste WOERTLICH aus dem
+        //     Record, Records von vor der Vorrats-Kanonisierung tragen dort also weiter
+        //     verdrehte Paare. Die Kanonisierung in `dome::build_bonus_chip_pool` deckt nur
+        //     engine-gebaute Zustaende ab, nicht rekonstruierte. Nebeneffekt: keine
+        //     Allokation je Chip mehr.
+        //
+        // (2) NICHT ueber die Chips sortiert. Ein erster Anlauf tat das, mit der Begruendung,
+        //     Chips gleicher Farbmenge seien austauschbar. Das gilt fuer den exakten
+        //     Aufzaehlungsweg, aber NICHT fuer den Deckel-Rueckfall: ab mehr als
+        //     `round_end::CHIP_ALLOC_CAP` (14) Chips faellt `chip_allocations` auf
+        //     `greedy_chip_indices` zurueck (`round_end.rs:574`), und das waehlt `same[0]`,
+        //     `same[1]` bzw. `pool.iter().take(3)` in HANDINDEX-Reihenfolge. Zwei Haende mit
+        //     derselben Chip-Multimenge in anderer Reihenfolge verbrauchen dort verschiedene
+        //     Chips und lassen einen verschiedenen Rest -- ein gemeinsamer Schluessel haette
+        //     ihnen dasselbe Ergebnis gegeben. Der Rueckfall ist nicht theoretisch: gefunden
+        //     am 2026-08-26 in einem 24-Partien-Lauf (`referee.rs:791-795`).
+        bonus_chip_sigs: player.bonus_chips.iter().map(crate::round_end::chip_sig).collect(),
     }
 }
 
@@ -3358,7 +3371,7 @@ mod tests {
                 p.pattern_lines[1].add_tiles(&[Blau, Blau]);
                 p
             }),
-            ("bonus_chip_colors", {
+            ("bonus_chip_sigs", {
                 let mut p = base.clone();
                 p.bonus_chips.push(BonusChip { chip_id: 0, colors: vec![Rot] });
                 p

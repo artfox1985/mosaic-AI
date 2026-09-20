@@ -40,14 +40,15 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 * **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
   erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
   danach die Konsolenzeile "Champion-Spec ..." lesen.
-* **Umbenennung auf Tessa**, Schritte 2 und 3 (zwei Literale in `static/js/app.js:227` und `:238`,
-  README-Zeile). Schritt 1 ist im Artefakt-Manifest erledigt.
-* **`models/frozen_champions/v29-b09`** faellt unter die Zwei-Champion-Regel; Loeschvorlage
-  mit restic-Beleg steht aus.
 * **Die zehn Punkte der Aufraeumliste** (`PREREG_code_cleanup_closeout.md` par.8g), dazu neu:
   `tools/build_frozen_golden_probe.py` laeuft 22 Minuten OHNE jede Fortschrittszeile (kein `flush`
   im ganzen Werkzeug) -- Verstoss gegen die Regel aus CLAUDE.md.
 * **Letzter restic-Snapshot mit Beleg** und der Abschlussbericht.
+
+**Erledigt am 2026-09-20 nach der Promotion:** die Umbenennung auf Tessa in allen drei
+Schritten (Manifestfeld, Frontend ueber die Konstante `AI_DISPLAY_NAME`, README), das
+portable Bundle neu gebaut und am laufenden Bild geprueft, und die Loeschung von
+`frozen_champions/v29-b09`.
 
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
@@ -66,9 +67,10 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 
 ### OFFENE NUTZER-ENTSCHEIDE (Fundstellen in Abschnitt 6)
 
-Ein oder zwei Arme fuer v31 (Abschnitt 6 Punkt 1); Budget-Knopf fuer die Hilfsknoten als
-WIRKUNGS-Frage (Punkt 2); Gruppe B des Aufraeumens (Punkt 3); R5/R4b-Sonden der
-Anker-Golden-Probe nach der Kanonisierung (Punkt 4); R5/R4b-Sonden (Punkt 5); Push-Stand (Punkt 6).
+Budget-Knopf fuer die Hilfsknoten als WIRKUNGS-Frage (Abschnitt 6 Punkt 2); Gruppe B des
+Aufraeumens (Punkt 3); R5/R4b-Sonden ziehen oder die Checklisten-Zeile kuerzen (Punkt 5);
+die drei GUI-Stellen im System-Sinn ("KI-Debugger", "KI-Einstellungen") und die Fehlertexte in
+`server.py` -- mit umbenennen oder als System-Begriff stehen lassen.
 
 ## 2. CHAMPION UND LEITER
 
@@ -97,9 +99,13 @@ unveraendert `6ef829e564c58bd5`, 888/414. Die Version geht weder in den Hash noc
 Cache-Schluessel noch in den Handshake ein -- belegt am lebenden Objekt (Golden Probe 10/10 ueber
 den Versionswechsel, Anker-Drift gruen).
 
-**Eingefrorene Artefakte:** `models/frozen_champions/` traegt `v30-b02` und `v31-b01`.
-**`v29-b09` faellt mit dieser Promotion unter die Zwei-Champion-Regel** und ist damit
-Loeschkandidat -- Vorlage folgt, nicht nebenbei ausgefuehrt.
+**Eingefrorene Artefakte:** `models/frozen_champions/` traegt genau `v30-b02` und `v31-b01`
+(Zwei-Champion-Regel). **`v29-b09` ist am 2026-09-20 geloescht**, Beleg restic-Snapshot
+`cc0d2a15` (7 sicherungswuerdige Dateien; das `venv/` ist per `backup_excludes.txt` ausgenommen
+und aus dem mitgesicherten Wheel neu baubar). Seine zehn Kanten stehen unveraendert im Register,
+der Knoten bleibt bei 1364 [1328; 1404] aus 3.140 Partien. **Folge, bewusst in Kauf genommen:**
+die auffaellige Champion-2-Kante (52,7 Prozent) laesst sich ohne Rueckholung aus restic nicht mehr
+mit DEMSELBEN Wheel nachfahren.
 
 ## 3. LAUFZEITEN (gemessen, Planungsgroessen; Details in `../docs/measured_runtimes.md`)
 
@@ -202,8 +208,8 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
    Pflicht, oder die Zeile auf "Platt und Alt-Set-Brier" kuerzen (`docs/promotion_checklist.md`
    Punkt 5).
 
-6. **Push.** Stand 2026-09-20: gemessen mit
-   `git rev-list --count origin/main..main`. Kein Push ohne Anweisung; der Nutzer pusht selbst.
+6. **Push.** Stand 2026-09-21: **0 Commits vor `origin/main`** (der Nutzer hat gepusht),
+   Arbeitsbaum sauber. Kein Push ohne Anweisung; der Nutzer pusht selbst.
 
 ### Aeltere, weiterhin offene Punkte (unveraendert uebernommen)
 
