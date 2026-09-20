@@ -19,31 +19,35 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**NICHTS.** Die Maschine ist frei (Stand 2026-09-20, 17:04, Kette beendet mit Exit 0).
+**NICHTS** (Stand 2026-09-20, Prozessliste geprueft).
 
-**Die v31-Kette ist vollstaendig durch** (`tools/night_v31_chain.sh`, 12:15 bis 17:04):
-Erzeugung, Tor 0, Tor 2a, Fenster, Monolith, Training, Tor 1, Tor 2b. Ergebnisse und Herleitung:
-`PREREG_v31_window.md` par.6.
+**Die Promotion von `v31-b01` ist VOLLSTAENDIG** nach `docs/promotion_checklist.md`, alle sieben
+Punkte: Champion gesetzt, vier Elo-Kanten registriert, Diagnostiken gefahren, Artefakt eingefroren
+und per Referee-Selbsttest abgenommen, STATUS und Chronik nachgezogen. Herleitung und alle Zahlen:
+Kapitel "Promotion v31-b01" in `../archive/history.md`.
 
-| Etappe | Ergebnis |
-| --- | --- |
-| Erzeugung (3 Klassen) | 400/400/401 Dateien, **14,66 h** |
-| Tor 2a | `sp_voll` **0,955** gegen 0,901 -- HAELT |
-| Fenster | 2.947 Dateien, Traeger 580, Monolith-Stempel `8da26a898040` |
-| Training `v31-b01` warm | **3.490,4 s = 58 min**, 5,21 Mio Samples, Rezept-Diff 0 unerwartete Abweichungen |
-| **Tor 1 gegen `v30-b02`** | **461:339 aus 800 = 57,62 %, Block-z +4,24** -- TRAEGT |
-| Tor 2b | 800/800 ohne Replay, volle Spalten +0,030 / +0,050 |
+### ZWEI OFFENE PUNKTE AUS DER PROMOTION
 
-### DER NAECHSTE SCHRITT IST EIN NUTZER-ENTSCHEID
+1. **Brier-Regel gestreift** (par.3 Punkt 7d): 0,22919 gegen 0,22804 des Vorgaengers, +0,5 Prozent
+   relativ. Zweite Generation in Folge, aber deutlich weniger als die +2,7 Prozent bei `v30-b02`.
+   Ein Intervall dazu liegt NICHT vor.
+2. **R5 und R4b nicht gefahren** -- seit v24-b06 nicht mehr, Werkzeuge auf die v18-Aera
+   voreingestellt. Fuer den Schluss-Champion waere R5 die einzige Pruefung des Value-Kopfs gegen
+   eine EXAKTE Grundwahrheit. Nutzer-Entscheid: ziehen oder die Checklisten-Zeile kuerzen.
 
-`v31-b01` hat Tor 1 genommen. Die Promotion ist ein eigener Ablauf
-(`/mosaic-champion-promotion`): Anker-Kante gegen `hv4_anchor` (n = 50, rund 7 min),
-Champion-2-Kante gegen `v29-b09` (n = 150, rund 42 min), Pflicht-Diagnostiken,
-Anzeige-Kalibrierung, Netz-Paritaets-Fixture, eingefrorenes Artefakt. Zusammen rund 3,5 h.
+### WAS ALS NAECHSTES ANSTEHT
 
-**Besonderheit: das waere der SCHLUSS-Champion.** v31 ist laut Nutzer die letzte Generation,
-also bekaeme dieses Modell den Anzeigenamen **Tessa** (`PREREG_code_cleanup_closeout.md` par.5a,
-Nachtrag 2026-09-20: drei mechanische Schritte, keine Parser-Arbeit).
+* **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
+  erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
+  danach die Konsolenzeile "Champion-Spec ..." lesen.
+* **Umbenennung auf Tessa**, Schritte 2 und 3 (zwei Literale in `static/js/app.js:227` und `:238`,
+  README-Zeile). Schritt 1 ist im Artefakt-Manifest erledigt.
+* **`models/frozen_champions/v29-b09`** faellt unter die Zwei-Champion-Regel; Loeschvorlage
+  mit restic-Beleg steht aus.
+* **Die zehn Punkte der Aufraeumliste** (`PREREG_code_cleanup_closeout.md` par.8g), dazu neu:
+  `tools/build_frozen_golden_probe.py` laeuft 22 Minuten OHNE jede Fortschrittszeile (kein `flush`
+  im ganzen Werkzeug) -- Verstoss gegen die Regel aus CLAUDE.md.
+* **Letzter restic-Snapshot mit Beleg** und der Abschlussbericht.
 
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
@@ -68,34 +72,34 @@ Anker-Golden-Probe nach der Kanonisierung (Punkt 4); R5/R4b-Sonden (Punkt 5); Pu
 
 ## 2. CHAMPION UND LEITER
 
-**Champion laut `models/champion.txt`: `v30-b02_brierbest`** (Promotion 2026-09-19).
-**Elo 1436 [1397; 1482]** aus 940 Partien im Leitersegment 2, Anker `hv4_anchor` fix 1000,
-Bradley-Terry mit Block-Bootstrap. Er ist zugleich **Generator der v31-Erzeugung**.
+**Champion laut `models/champion.txt`: `v31-b01_brierbest`** (Promotion 2026-09-20), nach aussen
+**Tessa**. **Elo 1458 [1414; 1510]** aus 1.000 Partien im Leitersegment 2, Anker `hv4_anchor`
+fix 1000, Bradley-Terry mit Block-Bootstrap. **Keine seiner vier Kanten ist frueh gestoppt.**
 
-Drei Kanten tragen ihn: Gating gegen `v29-b09` 443:297 = 59,9 Prozent (Block-z +5,36),
-Anker `hv4_anchor` @150 mit n = 50 auf 45:5 = 90,0 Prozent, Champion-2 gegen `v28-b02`
-96:54 = 64,0 Prozent.
+Vier Kanten tragen ihn: Gating gegen `v30-b02` 461:339 = 57,62 Prozent ueber zwei Seeds
+(Block-z +4,24 auf differenzierten Werten), Anker `hv4_anchor` @150 mit n = 50 auf 45:5,
+Champion-2 gegen `v29-b09` 79:71. **Die Champion-2-Kante liegt unter der transitiven Erwartung**
+(52,7 statt rund 65 Prozent); unpaariertes Instrument, n = 150, nicht signifikant, Handshake
+GRUEN. Herleitung im Kapitel "Promotion v31-b01" in `../archive/history.md`.
 
 | Modell | Elo | KI95 | Spiele | Frueh-Stopp-Kanten |
 | --- | --- | --- | --- | --- |
-| v29-b11@400 | 1440 | [1384; 1500] | 350 | 1 von 1 |
-| **v30-b02@400 (Champion)** | **1436** | **[1397; 1482]** | **940** | 1 von 4 |
-| v29-b03@400 | 1380 | [1340; 1426] | 640 | 3 von 4 |
-| v30-b01@400 | 1369 | [1327; 1416] | 800 | 0 von 2 |
-| v29-b09@400 | 1365 | [1332; 1407] | 2.990 | 2 von 9 |
-| v29-b07@400 | 1356 | [1317; 1396] | 1.100 | 0 von 4 |
-| v28-b02@400 | 1347 | [1316; 1385] | 4.100 | 6 von 18 |
-| v27-b01@400 | 1306 | [1272; 1344] | 1.580 | 2 von 7 |
+| **v31-b01@400 (Champion, Tessa)** | **1458** | **[1414; 1510]** | **1.000** | **0 von 4** |
+| v29-b11@400 | 1439 | [1388; 1493] | 350 | 1 von 1 |
+| v30-b02@400 | 1420 | [1382; 1463] | 1.740 | 1 von 6 |
+| v29-b03@400 | 1378 | [1339; 1424] | 640 | 3 von 4 |
+| v30-b01@400 | 1368 | [1322; 1418] | 800 | 0 von 2 |
+| v29-b09@400 | 1364 | [1328; 1404] | 3.140 | 2 von 10 |
+| v28-b02@400 | 1345 | [1314; 1382] | 4.100 | 6 von 18 |
 
-`v29-b11` fuehrt nominell mit vier Punkten, steht aber auf EINER frueh gestoppten Kante ueber
-350 Partien und ist ein gepolsterter Champion ohne Trainingsschritt; die Intervalle ueberlappen
-weit. Die beiden Tor-1-Kanten von `v30-b01` sind am 2026-09-19 nachgetragen worden, der
-Kaltstart-Arm hatte bis dahin keinen Leiterknoten.
+**Engine-Stand:** Wheel **1.0.0** (mit dem Schluss-Champion von 0.1.0 gehoben), Vertragshash
+unveraendert `6ef829e564c58bd5`, 888/414. Die Version geht weder in den Hash noch in einen
+Cache-Schluessel noch in den Handshake ein -- belegt am lebenden Objekt (Golden Probe 10/10 ueber
+den Versionswechsel, Anker-Drift gruen).
 
-**Eingefrorene Artefakte:** `models/frozen_champions/` traegt nur noch `v29-b09` und `v30-b02`
-(Zwei-Champion-Regel). `v27-b01` und `v28-b02` sind am 2026-09-19 geloescht, Beleg
-restic-Snapshot `7157437d`; ihre Kanten stehen unveraendert im Register, die Artefakte kommen
-fuer eine spaetere Neuverankerung aus restic zurueck.
+**Eingefrorene Artefakte:** `models/frozen_champions/` traegt `v30-b02` und `v31-b01`.
+**`v29-b09` faellt mit dieser Promotion unter die Zwei-Champion-Regel** und ist damit
+Loeschkandidat -- Vorlage folgt, nicht nebenbei ausgefuehrt.
 
 ## 3. LAUFZEITEN (gemessen, Planungsgroessen; Details in `../docs/measured_runtimes.md`)
 

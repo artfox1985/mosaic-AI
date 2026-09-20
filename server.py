@@ -1701,8 +1701,8 @@ def ai_start_tile():
 # A=-0.0539, B=0.6684, Brier 0.22537 (evaluations/artifacts/platt_fit_v28-b02_v3.json);
 # Trendmetrik frozen_v1: A=+0.3840, B=0.6074, Brier 0.25217. Vorgaenger v27-b01:
 # A=-0.0476, B=0.6853 (Brier 0.22379 auf frozen_v3).
-_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0550"))  # v30-b02, Platt frozen_v3 2026-09-19
-_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.6141"))  # v30-b02 (v29-b09: -0.0513 / 0.6488)
+_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0261"))  # v31-b01, Platt frozen_v3 2026-09-20
+_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.6006"))  # v31-b01 (v30-b02: -0.0550 / 0.6141)
 _DISPLAY_CAL_ON = os.environ.get("MOSAIC_DISPLAY_CAL", "1") != "0"
 
 

@@ -21415,3 +21415,101 @@ K6-Dosis 0,25 "laeuft" (Ergebnis in 13.8). Danach `tools/generate_prereg_index.p
   `tools/oracle_metrics.py` und `tools/probes/*_gate.py` uebergeben `num_actions` noch
   explizit und laden Alt-Checkpoints darum nicht (`../docs/pitfalls.md`, 2026-09-18).
 - `player_profiles.json` im Arbeitsbaum veraendert (Server-Seite), nicht committet.
+
+# Promotion v31-b01 (2026-09-20): der Schluss-Champion
+
+**`v31-b01_brierbest` ist amtierender Champion**, Elo **1458 [1414; 1510]** aus 1.000 Partien im
+Leitersegment 2, Anker `hv4_anchor` fix 1000. **Null seiner vier Kanten ist frueh gestoppt** --
+der hoechste und zugleich am saubersten gestuetzte Knoten der Leiter. Nach Nutzer-Entscheid ist
+v31 die letzte Generation; dieses Modell traegt damit nach aussen den Namen **Tessa**
+(`PREREG_code_cleanup_closeout.md` par.5a).
+
+## Die vier Kanten
+
+| Kante | Ergebnis | Instrument |
+| --- | --- | --- |
+| Gating gegen `v30-b02`, Seed 20261400 | 237:163 = 59,25 %, Block-z **+3,54**, McNemar p = 0,0004 | paired_gating, Deckel ohne SPRT-Entscheid (LLR +6,41) |
+| Gating gegen `v30-b02`, Seed 20261401 | 224:176 = 56,00 %, Block-z **+2,42**, p = 0,0197 | dito (LLR +2,81) |
+| **gepoolt** | **461:339 aus 800 = 57,62 %, Block-z +4,24** | 80 Bloecke a 5 Paaren |
+| Anker `hv4_anchor` @150, n = 50 | **45:5 = 90,0 %** | frozen_referee_match, Handshake ROT (Cross-Aera, vorgesehen), Golden-Selbsttest gruen |
+| Champion-2 gegen `v29-b09`, n = 150 | **79:71 = 52,7 %** | frozen_referee_match, **Handshake GRUEN** (beide 6ef829e564c58bd5) |
+
+**Der Block-z ist auf DIFFERENZIERTEN Blockwerten gerechnet**, mit Summenprobe gegen
+`a_wins_total`/`b_wins_total`: die Felder in `blocks[]` sind kumulativ. Genau daran ist die
+Auswertung am 2026-09-19 schon einmal gescheitert (`docs/pitfalls.md`).
+
+**Die Champion-2-Kante ist die offene Stelle.** 52,7 Prozent liegen deutlich unter der transitiven
+Erwartung: aus 57,6 Prozent gegen `v30-b02` und dessen 59,9 Prozent gegen `v29-b09` waeren eher
+65 Prozent zu erwarten. Drei Einordnungen, keine davon eine Entwarnung: das Instrument ist
+UNPAARIERT (feste Seed-Liste, je eine Partie) und damit deutlich streuender als das gepaarte
+Gating; bei n = 150 ist das Intervall rund +-8 Punkte, das Ergebnis also nicht signifikant
+(Binomial p = 0,55); und der Handshake war GRUEN, es ist also KEINE Cross-Aera-Messung, die man
+wegerklaeren koennte. Nicht-Transitivitaet ist in diesem Projekt am Leiterboden schon
+dokumentiert; Bradley-Terry mittelt sie ueber den ganzen Graphen. Vermerkt in der Registerzeile.
+
+## Pflicht-Diagnostiken
+
+| Punkt | Ergebnis |
+| --- | --- |
+| 5b Anzeige-Kalibrierung | Platt A **-0,0261**, B **0,6006** (frozen_v3, 1.440 Records), in `server.py` eingetragen |
+| 5b Brier | **0,22919 gegen 0,22804** des Vorgaengers -- **die Regel aus par.3 Punkt 7d ist GESTREIFT** |
+| 5c sigma/Prior-Balance | **1,90** (Median, 300 Zustaende @400) -- unter der Schwelle 3, die c_visit/c_scale-Familie bleibt geschlossen |
+| 5d Netz-Paritaets-Fixture | neu `79a3b3b356f1fa6b`, in FRISCHEM Prozess abgenommen |
+| 5 R5 und R4b | **NICHT gefahren** -- Luecke, siehe unten |
+| Lib-Tests nach dem Wheel-Wechsel | **701 gruen**, 19 uebersprungen |
+| Anker-Drift nach dem Wheel-Neubau | **GRUEN**, 1.763 Schritte Feld fuer Feld gleich |
+
+**Der Brier steigt um 0,00115, also 0,5 Prozent relativ.** Das ist die zweite Generation in Folge,
+in der par.3 Punkt 7d gestreift wird -- bei `v30-b02` waren es +0,0069 und 2,7 Prozent, hier also
+deutlich weniger. Ob 0,5 Prozent auf 1.440 Records mehr als Rauschen sind, ist NICHT beziffert;
+ein Intervall liegt nicht vor. Eingetragen als gestreift, nicht als gruen. Die Arena ist mit
+57,6 Prozent das haertere Kriterium, was die Regel aber nicht aufhebt.
+
+**R5 und R4b bleiben die bekannte Luecke** (`docs/promotion_checklist.md` Punkt 5): seit v24-b06
+nicht gefahren, weil beide Werkzeuge auf die v18-Aera voreingestellt sind. Fuer den SCHLUSS-Champion
+haette R5 besonderes Gewicht -- es ist die einzige Stelle, an der der Value-Kopf gegen eine exakte
+Grundwahrheit geprueft wird (`round5.rs` loest das Endspiel ab Runde 5 exakt). Ausgewiesen statt
+stillschweigend uebersprungen; Entscheid steht beim Nutzer.
+
+## Das eingefrorene Artefakt
+
+`models/frozen_champions/v31-b01/`: `model.onnx`, `model.pth`, `spec.json` (die Spec, mit der Tor 1
+gemessen wurde), Wheel samt `wheel.sha256`, `manifest.json`, `golden_probe.json` (10 Sonden,
+Seed-Basis 916001), `venv/` aus dem Artefakt-Wheel.
+
+**Referee-Selbsttest gruen:** Handshake OK, **Golden-Selbsttest 10 Sonden, 0 Abweichungen**, zwei
+Echtpartien ueber die Prozessgrenze. Beide Manifest-Pflichtfelder sind gesetzt und per Assertion
+abgesichert: `name_dialect: "hv"` und `worker_python.interpreter_relative` -- ohne sie scheitert
+der Referee ohne Befund (Vorfall 2026-09-04, drei Anlaeufe, sichtbar nur als Broken Pipe).
+
+**Wheel-Beleg:** der sha256 im Artefakt ist byte-identisch mit dem live installierten
+(`direct_url.json`). Damit ist belegbar, auf welchem Wheel die Golden Probe entstand.
+
+**Manifestfeld `display_name: "Tessa"`** ist gesetzt -- Schritt 1 der Umbenennung aus par.5a. Der
+technische Name `v31-b01` bleibt in Register, Preregs und Dateinamen, damit Elo-Kanten eindeutig
+bleiben. Die beiden anderen Schritte (zwei Literale im Frontend, README-Zeile) sind Nutzer-Entscheid.
+
+## Wheel-Version 0.1.0 -> 1.0.0 (Nutzer-Auftrag)
+
+Mit dem Schluss-Champion ist die Paketversion gehoben. **Sie geht weder in den Vertragshash ein**
+(`lib.rs:694-702` bildet ihn allein aus INPUT_SIZE, NUM_PLANES_CHANNELS, PLANES_H, PLANES_W,
+NUM_ACTIONS und der Kopfliste) **noch in einen Cache-Schluessel noch in den Referee-Handshake**.
+Belegt ist das nicht nur aus dem Quelltext, sondern am lebenden Objekt: die Golden Probe wurde auf
+dem 0.1.0-Wheel aufgezeichnet und vom 1.0.0-Wheel **10 von 10 ohne Abweichung** nachgespielt, und
+die Anker-Drift blieb gruen.
+
+**Zwei Versionsquellen, und die erste allein reicht nicht:** `engine/Cargo.toml` speist
+`CARGO_PKG_VERSION` und damit `engine_version` im Manifest, `engine/pyproject.toml` speist den
+Wheel-Dateinamen -- maturin liest die zweite. Der erste Anlauf setzte nur `Cargo.toml` und baute
+kommentarlos wieder ein `0.1.0`-Wheel; aufgefallen ist es nur an der Gegenprobe ueber
+`engine_config_json()`, nicht am Exit-Code.
+
+## Nebenbefund: die Bundle-Spec war drei Generationen alt
+
+`dist/mosaic_release.spec` hatte Modell und Spec des Champions FEST VERDRAHTET, zuletzt auf
+`v28-b02` -- waehrend `champion.txt` im selben Bundle laengst einen anderen nannte. Das portable
+Bundle haette sein eigenes Modell nicht gefunden. Die Spec liest den Namen jetzt aus
+`champion.txt` und bricht mit klarer Meldung ab, wenn Modell oder Spec fehlen. Dieselbe
+Fehlerklasse wie beim README am selben Tag: was bei jeder Promotion von Hand nachgezogen werden
+muss, wird irgendwann nicht nachgezogen -- und an eine PyInstaller-Spec denkt beim Champion-Wechsel
+niemand.
