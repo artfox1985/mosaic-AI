@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: v20-Aera "kein Befund" (R2 negativ, Vorzeichen-Anker 9/24) -> R4b initiiert. AM SCHLUSS-CHAMPION NACHGEFAHREN 2026-09-21 (par.20, Nutzer-Auftrag): der alte Befund gilt fuer v31-b01 NICHT mehr -- Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt 50,0 Prozent. Neuer Befund: der Punkte-Kopf UEBERSCHIESST (Steigung 1,19, sd 40,2 gegen wahre 18,8), darum margin_scale_vs_expected -2,18 ohne Nachskalierung bei r=0,56. KEIN gepaarter Vergleich: anderes Substrat, andere Decke; n=72 nur indikativ. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: v20-Aera "kein Befund". AM SCHLUSS-CHAMPION NACHGEFAHREN 2026-09-21: par.20 Kalibrierung (Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt 50,0 Prozent; NEU: der Punkte-Kopf UEBERSCHIESST, Steigung 1,19, sd 40,2 gegen wahre 18,8). par.21 Zonen-Sonde: eindeutig Hypothese (b) -- der TRUNK traegt die Information fast vollstaendig (LOO-R2 0,940 gegen Decke 0,983), die Roh-Eingabe linear nicht (0,087), die Koepfe liefern -2,18. Der Engpass ist der AUSLESEPFAD, nicht Encoder oder Kapazitaet -- und das war bei v20 schon so (Trunk 0,912). Nicht gepaart, n=72 indikativ. -->
 
 # Vorregistrierung: Runde-4-Ende-Value-Kalibrierung gegen gesampelte exakte Ground Truth (Chance-Knoten-Erwartung)
 
@@ -402,3 +402,72 @@ Artefakt gezogen. Ihre Frage "wo geht die Information verloren" ist durch dieses
 verschoben: sie war fuer R2 ~ 0 gestellt, und der Value-Kopf liegt jetzt bei 0,414 gegen eine
 Decke von 0,914. Die schaerfere Frage waere die SKALA des Punkte-Kopfs (Faktor 2,1 zu weit), nicht
 mehr die Blindheit. Nicht gefahren, Nutzer-Entscheid.
+
+## par.21 ZONEN-SONDE AM CHAMPION (2026-09-21, Nutzer-Auftrag "dann fahr die zonen sonde")
+
+`tools/r4b_zone_probe.py` gegen das neue Artefakt aus par.20. Die Sonde fragt, WO die exakte
+R4-End-Information verloren geht: (a) der EINGANG traegt sie nicht, (b) der TRUNK traegt sie und
+die Koepfe nutzen sie nicht, (c) sie ist ueberhaupt nicht linear zugaenglich.
+
+**Laufzeit 44,4 s**, 72 Zustaende Feld fuer Feld reproduziert (`game_id`s identisch zum
+Kalibrierlauf), Trunk-Embedding (72, 512), Eingabe-Merkmale (72, 3.732).
+
+| LOO-Ridge-Probe | v20 (2026-08) | **v31-b01 (heute)** |
+| --- | --- | --- |
+| Trunk -> `true_margin` | 0,9115 | **0,9400** |
+| Trunk -> `true_winprob` | 0,9159 | **0,9270** |
+| Roh-Eingabe -> `true_margin` | -0,0085 | +0,0870 |
+| Roh-Eingabe -> `true_winprob` | -0,0266 | +0,0340 |
+| **Koepfe realisiert** win / margin | -0,3375 / +0,0309 | **+0,4104 / -2,1830** |
+| Decke win / margin | 0,9672 / 0,9742 | 0,9139 / 0,9827 |
+
+### Befund: Hypothese (b), und zwar unveraendert seit v20
+
+**Der Trunk traegt die Information fast vollstaendig.** 0,940 gegen eine Decke von 0,983 auf der
+Margen-Skala -- eine LINEARE Probe auf dem 512er-Embedding holt praktisch alles heraus, was
+ueberhaupt herauszuholen ist. **Die Roh-Eingabe gibt sie linear NICHT her** (0,087 / 0,034). Das
+Netz hat die Repraesentation also selbst gebaut; sie liegt nicht schon im Encoder bereit.
+
+Nach der vorab formulierten Lesart der Sonde ist das eindeutig **(b): Ziel-/Kopf-Problem.** Nicht
+(a) -- der Eingang traegt sie, sonst koennte der Trunk sie nicht bilden. Nicht (c) -- sie ist
+linear zugaenglich, nur eben erst NACH dem Trunk.
+
+**Und das war schon bei v20 so.** 0,9115 damals, 0,9400 heute: der Trunk war nie das Nadeloehr.
+Was sich zwischen den Generationen bewegt hat, ist der AUSLESEPFAD, nicht die Repraesentation.
+
+### Die Schere ist das eigentliche Ergebnis
+
+Trunk 0,940, Kopf -2,183 auf derselben Groesse. **Die Information ist da und wird beim Auslesen
+zerstoert** -- passend zu par.20: der Punkte-Kopf ueberschiesst um Faktor 2,1 in der Streuung
+(sd 40,2 gegen wahre 18,8). Auf der Gewinn-Skala hat der Auslesepfad zwischen v20 und v31
+deutlich aufgeholt (-0,338 -> +0,410), auf der Margen-Skala ist er ABSOLUT schlechter geworden
+(+0,031 -> -2,183), obwohl er relativ besser ordnet (R2 nach Anpassung 0,179 -> 0,312).
+
+**Was das fuer eine Fortsetzung hiesse** (nicht gebaut, keine Empfehlung ohne Messung): der Hebel
+sitzt nicht im Encoder und nicht in der Trunk-Kapazitaet, sondern in der SKALIERUNG des
+Margen-Ziels. Das deckt sich mit `feedback_value_head_capacity` ("Plateau erst auf
+Kapazitaets-Hunger pruefen") nur zur Haelfte: Kapazitaet ist hier nachweislich NICHT der Engpass.
+
+### Vorbehalte, ausdruecklich
+
+1. **Nicht gepaart.** Wie in par.20: der v20-Lauf sass auf Zustaenden aus dem geloeschten
+   v18-Korpus, dieser auf Zustaenden der v31-Erzeugung. Andere Stellungen, andere Decke. Die
+   Spalten stehen nebeneinander.
+2. **n = 72 bei 512 Merkmalen**, also p >> n. Die LOO-Ridge ist eine echte Kreuzvalidierung (exakt
+   ueber die Hut-Matrix, kein Refit je Sample), aber **das beste Alpha liegt in BEIDEN Laeufen am
+   unteren Rand des Suchgitters** (1,0 von 1,0/10/100/1.000/10.000). Ein Randwert heisst: das
+   Gitter hat das Optimum nicht eingeschlossen, noch weniger Regularisierung waere moeglicherweise
+   besser gewesen. Die Hoehe von 0,94 ist damit nach oben nicht abgesichert; die AUSSAGE (Trunk
+   >> Kopf) traegt trotzdem, weil zwischen 0,94 und -2,18 kein Gitterproblem liegt.
+3. Die Sonde war schon in der v20-Fassung als "bei n = 72 nur indikativ" markiert. Das gilt
+   unveraendert.
+
+### Werkzeug
+
+Die Sonde hing an zwei KONSTANTEN (`R4B_JSON`, `MODEL_KEY`) und war damit an einen Lauf genagelt,
+dessen Substrat nicht mehr existiert. Jetzt Argumente (`--r4b-json`, `--model-key`, `--out`) mit
+Default auf das Champion-Artefakt; der Modellschluessel wird, wenn nicht angegeben, aus dem JSON
+gelesen (bei mehreren Modellen bricht sie ab statt zu raten). Der Ausgabename war auf `_v20`
+genagelt -- er haette den naechsten Lauf still ueberschrieben oder falsch etikettiert und wird
+jetzt aus dem Modellnamen abgeleitet. Dazu Herkunftsfelder (`referenz_json`, `model_key`,
+`substrat`) und der `laufzeit`-Block.

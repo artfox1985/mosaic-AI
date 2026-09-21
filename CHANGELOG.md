@@ -1,5 +1,62 @@
 # Changelog
 
+## v1.1-alpha31 (2026-09-21)
+
+No engine behaviour change against `v1.0-alpha31`: the anchor still reproduces
+its reference run move for move, and the contract hash is unchanged.
+
+### The reason this release exists
+
+**The cache-key defect described under v1.0-alpha31 is fixed.** The key now
+carries each chip's colour set as a bitmask in hand order, which is immune to
+the order *within* a chip while keeping the order *across* chips that the
+greedy fallback depends on. That is the one behaviour-relevant change; it
+affects which memoised tiling result is returned, so a game may now follow a
+different line than under v1.0.
+
+### Everything else
+- Bundles are named `Mosaic-AI_v<version>-alpha<generation>.zip`, so a version
+  bump is visible in the file name instead of overwriting a shipped one.
+- Repository cleanup: 62 raw `pickle.load` sites in 61 tools moved to
+  `corpus_io` (43 of them were failing outright on gzip corpora); the exact
+  two-sided binomial test consolidated from 18 copies under four names into one
+  module, with all 126 recorded McNemar p-values reproducing exactly; spec
+  fields mapped to engine knobs in one place, guarded by a test that reads
+  `KNOWN_FIELDS` out of the Rust source; the "is the machine free" guard fixed
+  in the one of five copies that could not see a running `cargo` build.
+- Nine dead `engine/examples/` probes and three stale end-to-end scripts
+  removed. The HTTP routes of `server.py` have no automated coverage as a
+  result -- the scripts were red because their own move choice predates the
+  node types added in `v30`.
+- Tool tests 147 -> 206.
+
+### Measurements added after the tag
+
+Two probes that had not run since `v24-b06` were brought back and run against
+the final champion.
+
+- **Round-4-end calibration (R4b).** The old finding, "both heads blind to
+  exact round-4-end information, R2 ~ 0", no longer holds: the value head
+  reaches R2 = 0.414 against an exact ground truth, and the sign anchor hits
+  71.4% where it used to be a coin flip at 50.0%. New finding in its place: the
+  points head now *overshoots* -- it spreads with sd 40.2 against a true 18.8.
+- **A probe of where the information is lost** answers that cleanly: a linear
+  read-out of the 512-wide trunk recovers LOO-R2 = 0.940 against a ceiling of
+  0.983, while the same probe on the raw input recovers 0.087. The
+  representation is there and the read-out destroys it -- and that was already
+  true for the v20-era model (trunk 0.912). The bottleneck is neither the
+  encoder nor trunk capacity.
+- **Round-5 calibration (R5)**, and this one is a genuinely paired comparison:
+  same frozen eval set, same settings, and the fitted curve came out
+  bit-identical to the historical runs. The value head's damping shrank from
+  0.086 to 0.146 -- smaller, but nowhere near the unbiased 1.0. Its points head
+  moved from 0.973 to 1.088, the same sign change as in R4b.
+
+None of these changed a line of engine code; they are measurements of the
+shipped champion. Details and caveats (most of the comparisons are *not*
+paired) in `evaluations/PREREG_r4_value_calibration.md` and
+`PREREG_r5_value_calibration.md`.
+
 ## v1.0-alpha31 (2026-09-20)
 
 Compared to **v0.1-alpha21** (2026-08-15). 1,274 commits, ten generations
@@ -94,27 +151,3 @@ bonus chips in a different order as equal. It only bites above
 `CHIP_ALLOC_CAP` (14) held chips, where the exact enumeration falls back to a
 greedy one that picks by hand index; below that the key is correct. It affects
 which memoised tiling result is returned, not which moves are legal.
-
-## Unreleased (since v1.0-alpha31)
-
-Ten commits, no engine behaviour change; the anchor still reproduces its
-reference run move for move.
-
-- **The cache-key defect above is fixed.** The key now carries each chip's
-  colour set as a bitmask in hand order, which is immune to the order *within*
-  a chip while keeping the order *across* chips that the greedy fallback
-  depends on.
-- Bundles are named `Mosaic-AI_v<version>-alpha<generation>.zip`, so a version
-  bump is visible in the file name instead of overwriting a shipped one.
-- Repository cleanup: 62 raw `pickle.load` sites in 61 tools moved to
-  `corpus_io` (43 of them were failing outright on gzip corpora); the exact
-  two-sided binomial test consolidated from 18 copies under four names into one
-  module, with all 126 recorded McNemar p-values reproducing exactly; spec
-  fields mapped to engine knobs in one place, guarded by a test that reads
-  `KNOWN_FIELDS` out of the Rust source; the "is the machine free" guard fixed
-  in the one of five copies that could not see a running `cargo` build.
-- Nine dead `engine/examples/` probes and three stale end-to-end scripts
-  removed. The HTTP routes of `server.py` have no automated coverage as a
-  result -- the scripts were red because their own move choice predates the
-  node types added in `v30`.
-- Tool tests 147 -> 206.
