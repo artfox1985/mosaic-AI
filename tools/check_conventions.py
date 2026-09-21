@@ -522,10 +522,31 @@ def check_prereg_index_consistency(staged_only: bool, staged_files: set[str]) ->
 # PLATE_SHAPING_ENABLED (Mess-Wheel-Arm), nicht an einer fehlenden Fixture;
 # der Test soll in BEIDEN Toggle-Zustaenden gruen bleiben (dortiger
 # Kommentar). Jede NEUE Warnung dagegen verdient einen Blick.
+# `let Some(` gehoert dazu (ergaenzt 2026-09-21): ohne es lief der Anlassfall vom
+# 2026-09-20 an BEIDEN Haelften der Regel vorbei -- ein Test lud ein Modell ueber
+# `let Some(net) = load_...() else { return }`, und weder der Ausloeser noch das
+# Rueckgabemuster trafen. Gefunden hat es nicht dieser Waechter, sondern eine
+# Durchsicht (par.8f).
 SILENT_SKIP_TRIGGER = re.compile(
-    r"exists\(\)|\.is_err\(\)|let\s+Ok\(|uebersprungen|übersprungen", re.IGNORECASE
+    r"exists\(\)|\.is_err\(\)|let\s+Ok\(|let\s+Some\(|uebersprungen|übersprungen",
+    re.IGNORECASE,
 )
-SILENT_SKIP_RETURN = re.compile(r"^\s*return(\s+Ok\(\(\)\))?\s*;\s*$")
+# Zwei Formen, nicht eine (erweitert 2026-09-21, par.8f Beifang 1):
+#   `return;` / `return Ok(());`            -- allein auf der Zeile
+#   `let Some(x) = ... else { return };`    -- die let-else-Form
+# Die zweite fehlte, und genau sie war der Anlassfall: ein Test in `net_mcts.rs`
+# lud ein Modell, das nicht mehr im Baum lag, und kehrte per let-else still
+# zurueck -- monatelang leer gruen, waehrend dieser Waechter danebenstand.
+SILENT_SKIP_RETURN = re.compile(
+    r"^\s*return(\s+Ok\(\(\)\))?\s*;\s*$"
+    r"|else\s*\{\s*return(\s+Ok\(\(\)\))?\s*\}\s*;?\s*$"
+)
+# NUR im Testteil suchen (2026-09-21): die Regel heisst "Test-Skips", scannte aber
+# die ganze Datei und bat den Leser, Nicht-Test-Treffer zu ignorieren. Eine
+# Warnung, die man wegsehen SOLL, verdeckt die naechste echte -- dieselbe Lehre,
+# die Regel 8 dreimal nachbessern musste. Testcode liegt in diesem Baum
+# durchgaengig in `mod tests` hinter `#[cfg(test)]`.
+TEST_MODULE_START = re.compile(r"^\s*(#\[cfg\(test\)\]|mod tests\b|pub mod tests\b)")
 
 
 def check_knob_docs_current(staged_only: bool, staged_files: set[str]) -> list[str]:
@@ -592,8 +613,13 @@ def warn_silent_test_skips(staged_only: bool, staged_files: set[str]) -> None:
         if text is None:
             continue
         lines = text.splitlines()
+        start = next((i for i, l in enumerate(lines) if TEST_MODULE_START.match(l)), None)
+        if start is None:
+            continue
         for i, line in enumerate(lines):
-            if not SILENT_SKIP_RETURN.match(line):
+            if i < start:
+                continue
+            if not SILENT_SKIP_RETURN.search(line):
                 continue
             window = lines[max(0, i - 3): i]
             trigger = next((w for w in window if SILENT_SKIP_TRIGGER.search(w)), None)
@@ -605,8 +631,9 @@ def warn_silent_test_skips(staged_only: bool, staged_files: set[str]) -> None:
                 "  Wenn das ein Test ist: fehlende Voraussetzungen muessen `panic!`en (klare "
                 "Meldung) oder der Test traegt `#[ignore = \"Grund\"]` -- ein stiller Skip "
                 "besteht leer-gruen und prueft nichts (Anlassfall: load_test_net_for_gating, "
-                "17 leer-gruene Tests im Inventar 2026-08-15). Kein Commit-Blocker: die "
-                "Heuristik ist grob; Nicht-Test-Treffer bitte ignorieren.",
+                "17 leer-gruene Tests im Inventar 2026-08-15; zweiter Fall 2026-09-20, ein Test "
+                "auf ein geloeschtes Modell, der per let-else still zurueckkehrte). "
+                "Kein Commit-Blocker.",
                 file=sys.stderr,
             )
 

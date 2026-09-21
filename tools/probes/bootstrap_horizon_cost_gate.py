@@ -59,8 +59,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "engine" / "py"))
+sys.path.insert(0, str(ROOT))                      # corpus_io liegt in der Wurzel
 
 import mosaic_rust as mr  # noqa: E402
+from corpus_io import load_records  # noqa: E402
 
 OUT_JSON = ROOT / "evaluations" / "artifacts" / "bootstrap_horizon_cost_gate.json"
 MODEL = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
@@ -88,7 +90,12 @@ def tiling_zustaende(cap: int) -> list[dict]:
         if len(raus) >= cap:
             break
         try:
-            recs = pickle.load(open(f, "rb"))
+            # ueber corpus_io, NICHT roh: Korpusdateien sind seit
+            # `dump_records(..., compress=True)` gzip, und ein roher `pickle.load`
+            # scheitert an jeder einzelnen. Der Lauf lief dann durch, druckte je
+            # Datei eine Ueberspringen-Zeile und berichtete ueber NICHTS
+            # (Durchsicht 2026-09-21, par.8h Fund 1).
+            recs = load_records(f)
         except Exception as e:  # defekte/halbe Datei ueberspringen, nicht abbrechen
             print(f"  uebersprungen ({Path(f).name}): {e}", file=sys.stderr)
             continue
@@ -104,6 +111,12 @@ def tiling_zustaende(cap: int) -> list[dict]:
                 continue
             gesehen.add(key)
             raus.append(st)
+    if not raus:
+        raise SystemExit(
+            f"ABBRUCH: aus {len(dateien)} Korpusdateien kein einziger Zustand gewonnen. "
+            "Ein Bericht ueber eine leere Grundmenge ist schlechter als kein Bericht "
+            "(par.8h Fund 1). Pruefen: liegen ueberhaupt Records vor, und sind die "
+            "Ueberspringen-Zeilen oben alle vom selben Typ?")
     return raus
 
 

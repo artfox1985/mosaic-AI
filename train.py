@@ -2305,10 +2305,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # der Mini-Lauf war fertig). Der zugehoerige Testtreiber ist am
         # 2026-09-20 entfallen (tote Fixtures); der gruene Lauf Fall A-E steht
         # in docs/working_rules.md.
-        _stop_at = os.environ.get("MOSAIC_PAUSE_TEST_STOP_AT_EPOCH")
+        _stop_at = os.environ.get("MOSAIC_TEST_PAUSE_STOP_AT_EPOCH")
         if _stop_at and int(_stop_at) == epoch + 1 and not _stop_file.exists():
-            _stop_file.write_text("MOSAIC_PAUSE_TEST_STOP_AT_EPOCH\n", encoding="utf-8")
-            print(f"🧪 MOSAIC_PAUSE_TEST_STOP_AT_EPOCH={_stop_at}: Stopp-Datei angelegt.", flush=True)
+            _stop_file.write_text("MOSAIC_TEST_PAUSE_STOP_AT_EPOCH\n", encoding="utf-8")
+            print(f"🧪 MOSAIC_TEST_PAUSE_STOP_AT_EPOCH={_stop_at}: Stopp-Datei angelegt.", flush=True)
         _pause_requested = _stop_file.exists()
         if epoch_checkpoint or _pause_requested:
             _rs = {
@@ -2364,9 +2364,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 sys.exit(PAUSE_EXIT_CODE)
             # Testhaken fuer die Wiederaufnahme (tools/tests): bricht nach dem
             # Speichern der genannten Epoche hart ab, wie ein Absturz.
-            _abort_after = os.environ.get("MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH")
+            _abort_after = os.environ.get("MOSAIC_TEST_RESUME_ABORT_AFTER_EPOCH")
             if _abort_after and int(_abort_after) == epoch + 1:
-                print(f"🧪 MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH={_abort_after}: simulierter Absturz.", flush=True)
+                print(f"🧪 MOSAIC_TEST_RESUME_ABORT_AFTER_EPOCH={_abort_after}: simulierter Absturz.", flush=True)
                 os._exit(99)
 
         # ── Early Stopping: BEIDE Koepfe muessen plateauen (Task #34) ──

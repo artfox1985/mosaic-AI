@@ -350,7 +350,7 @@ mod tests {
         // `OnceLock`-Caches fuer parallel laufende `cargo test`-Threads
         // (gleiches Vorsichts-Muster wie `net_batcher.rs`-Tests).
         static CELL: OnceLock<bool> = OnceLock::new();
-        assert!(!read_bool_env_once(&CELL, "MOSAIC_ORT_CUDA_ENABLED_TEST_UNSET_XYZ", false));
+        assert!(!read_bool_env_once(&CELL, "MOSAIC_TEST_ORT_CUDA_ENABLED_UNSET_XYZ", false));
     }
 
     #[test]

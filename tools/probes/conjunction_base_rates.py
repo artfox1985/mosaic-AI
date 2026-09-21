@@ -32,7 +32,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO))                      # config.py liegt in der Wurzel
+sys.path.insert(0, str(REPO))                      # config.py und corpus_io liegen in der Wurzel
+
+from corpus_io import load_records  # noqa: E402
 sys.path.insert(0, str(REPO / "engine" / "py"))
 from neural_net import _conjunctions_from_dome  # noqa: E402
 
@@ -69,7 +71,10 @@ def main() -> None:
     for q, dateien in sorted(quellen.items()):
         for f in sorted(dateien)[:DATEIEN_JE_PRAEFIX]:
             try:
-                daten = pickle.load(open(f, "rb"))
+                # ueber corpus_io, NICHT roh -- siehe par.8h Fund 1: Korpusdateien
+                # sind gzip, ein roher `pickle.load` uebersprang jede einzelne und
+                # die Sonde berichtete anschliessend ueber eine leere Grundmenge.
+                daten = load_records(f)
             except Exception as e:
                 print(f"  !! {Path(f).name}: {type(e).__name__} -- uebersprungen", flush=True)
                 continue
@@ -94,6 +99,13 @@ def main() -> None:
                             if i < len(atome):
                                 stat[q][g][0] += atome[i]
                                 stat[q][g][1] += 1
+
+    if not sum(games.values()):
+        raise SystemExit(
+            f"ABBRUCH: aus {sum(len(v) for v in quellen.values())} Dateien keine einzige "
+            "Partie gewonnen. Ein Bericht ueber eine leere Grundmenge ist schlechter als "
+            "kein Bericht (par.8h Fund 1)."
+        )
 
     kopf = ["Quelle", "Partien"] + [g.split(" ")[0] for g in GRUPPEN]
     print(f"\n{kopf[0]:14s} {kopf[1]:>8s} " + " ".join(f"{k:>12s}" for k in kopf[2:]))

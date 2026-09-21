@@ -60,6 +60,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from block_stats import block_means  # noqa: E402
+
 BASIS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASIS / "tools"))
 
@@ -208,13 +211,13 @@ def block_mean(diffs: list[float], block: int) -> list[float]:
 
     Ein angebrochener letzter Block zaehlt mit, aber nur wenn er mindestens
     die halbe Blockgroesse traegt -- sonst waere ein 1-Partie-Rest ein
-    vollwertiger Datenpunkt mit der Streuung einer Einzelpartie."""
-    out = []
-    for i in range(0, len(diffs), block):
-        teil = diffs[i:i + block]
-        if len(teil) >= max(1, block // 2):
-            out.append(sum(teil) / len(teil))
-    return out
+    vollwertiger Datenpunkt mit der Streuung einer Einzelpartie.
+
+    Die Rechnung selbst liegt seit 2026-09-21 in `tools/block_stats.py`: dieselbe
+    Zusammenfassung stand dreimal im Baum, mit DREI verschiedenen Rest-Regeln
+    (par.8h Fund 3). Diese hier war die einzige begruendete und ist deshalb die
+    kanonische geworden."""
+    return block_means(diffs, block)
 
 
 # --------------------------------------------------------------------------

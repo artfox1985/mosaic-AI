@@ -18,15 +18,25 @@ import argparse
 import glob
 import json
 import statistics
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tools"))
+from block_stats import block_means  # noqa: E402
 ART = REPO / "evaluations" / "artifacts"
 
 
 def block_sd(values: list[float], block: int = 5) -> dict:
-    blocks = [values[i:i + block] for i in range(0, len(values) - len(values) % block, block)]
-    means = [statistics.mean(b) for b in blocks]
+    """Streuung der Blockmittel; Blockbildung ueber `tools/block_stats.py`.
+
+    Vorher schnitt diese Fassung den angebrochenen letzten Block IMMER ab
+    (`len(values) - len(values) % block`), waehrend zwei andere Fassungen ihn
+    mitzaehlten -- drei Regeln fuer dieselbe Groesse (2026-09-21, par.8h Fund 3).
+    Folgenlos geblieben, weil `paired_gating` je Block auswertet und darum immer
+    auf einer Blockgrenze stoppt: von allen Gating-Artefakten im Baum hat genau
+    eines einen Rest, ein Rauchtest mit n = 2."""
+    means = block_means(values, block)
     return {"n": len(values), "bloecke": len(means), "mittel": round(statistics.mean(values), 3) if values else None,
             "block_sd": round(statistics.stdev(means), 3) if len(means) > 1 else None,
             "se_mittel": round(statistics.stdev(means) / len(means) ** 0.5, 3) if len(means) > 1 else None}

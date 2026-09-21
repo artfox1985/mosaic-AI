@@ -341,7 +341,7 @@ mod tests {
         // allen ANDEREN, evtl. spaeter laufenden Tests im selben Binary
         // kontaminieren (gleiches Vorsichts-Muster wie `net_ort.rs`-Tests).
         static CELL: OnceLock<bool> = OnceLock::new();
-        assert!(!*CELL.get_or_init(|| match std::env::var("MOSAIC_INTERLEAVE_ENABLED_TEST_UNSET_XYZ") {
+        assert!(!*CELL.get_or_init(|| match std::env::var("MOSAIC_TEST_INTERLEAVE_ENABLED_UNSET_XYZ") {
             Ok(v) => v != "0" && !v.trim().is_empty(),
             Err(_) => false,
         }));

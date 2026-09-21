@@ -140,7 +140,7 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   Beleg; wer die Wege neu pruefen will, verankert den Treiber aus der Historie
   auf dem aktuellen Fenster.
   **GRUEN am 2026-09-06 02:00 (alle Faelle A-E):** Pause nach Epoche 1 per
-  Testhaken `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH`, Exit 75, Stopp-Datei
+  Testhaken `MOSAIC_TEST_PAUSE_STOP_AT_EPOCH`, Exit 75, Stopp-Datei
   geloescht, `--resume` danach bitgleich zu A (max |dW| 0,0) -- wie B
   (Absturz) und E (`--fast-loader`). Lief als GPU-Auftrag neben der
   b04-Replikation (Laufzeiten darum gebremst: A 15,9 s, E 9,3 s).

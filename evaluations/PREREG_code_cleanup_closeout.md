@@ -1508,3 +1508,59 @@ Dateinamen ergeben. Berichtigt (`tools/build_release.py::release_name`): ein abs
 du aufgeraeumt hast"*) und braucht einen Versionssprung in `engine/pyproject.toml` UND
 `engine/Cargo.toml` -- beide, das ist die Falle vom 2026-09-20 (maturin liest pyproject, der
 Rust-Code `CARGO_PKG_VERSION`).
+
+### AUFRAEUMEN, ERSTER DURCHGANG (2026-09-21)
+
+**Anlass fuer die Reihenfolge:** Nutzer *"vielleicht wird das projekt weitergehen. nur nicht
+jetzt."* Das dreht die Bewertung aus par.8h um. Ich hatte die Konsolidierungs-Posten (76
+Laufzeit-Bloecke, 15 Binomialtests) als Hygiene fuer eine Codebasis abgetan, die nicht
+weiterentwickelt wird -- bei einer moeglichen Wiederaufnahme ist das falsch. Sortiert wird jetzt
+danach, **was eine wiederaufnehmende Sitzung STILL in die Irre fuehrt**, nicht nach Doppelung.
+
+| Rang | Punkt | Ergebnis |
+| --- | --- | --- |
+| 1 | Blockmittel, drei Rest-Regeln | **vereinheitlicht** in `tools/block_stats.py`, drei Aufrufer umgehaengt, 12 Waechter-Tests |
+| 2 | zwei Sonden melden bei gzip still ein leeres Ergebnis | **behoben**: `corpus_io.load_records` statt rohem `pickle.load`, dazu ein Riegel gegen den Nullfall |
+| 3 | `knob_registry` `_TEST_`-Substring | **behoben**: Praefix statt Substring; vier Knopfnamen nachgezogen |
+| 4 | Regel 5 sieht `let ... else { return }` nicht | **behoben**: beide Haelften erweitert, Scan auf den Testteil begrenzt, 14 Waechter-Tests |
+
+**Zu Rang 1, und es korrigiert meine eigene Rangfolge:** ich hatte den Punkt an die Spitze
+gesetzt, weil ich ihn fuer wirksam hielt. Er ist es nicht. **Gemessen, bevor angefasst wurde:**
+von allen Gating-Artefakten hat genau EINES einen Rest bei Blockgroesse 5, ein Rauchtest mit
+n = 2. Der Grund ist strukturell -- `paired_gating` wertet je Block aus und stoppt darum immer auf
+einer Blockgrenze. Keine registrierte Zahl haengt daran, die Vereinheitlichung aendert keine. Das
+machte sie zugleich KOSTENLOS. Die kanonische Regel ist die von `plate_points_from_arena`, weil sie
+als einzige begruendet war (ein 1-Partie-Rest waere ein Datenpunkt mit der Streuung einer
+Einzelpartie). Praezisierung zum Agentenbefund: `corpus_behaviour_audit.blocks` ist KEINE vierte
+Kopie, sondern ein reiner Zerteiler (`-> list[list]`) -- es waren drei, nicht vier.
+
+**Zu Rang 2:** die beiden Sonden schwiegen nicht ganz, sie druckten je Datei eine
+Ueberspringen-Zeile. Der Schaden war ein anderer: der Lauf lief DURCH und berichtete ueber nichts.
+Beide haben jetzt zusaetzlich einen harten Riegel -- ein Bericht ueber eine leere Grundmenge ist
+schlechter als kein Bericht.
+
+**Zu Rang 3:** der Kommentar der Regel sagte "Praefix `MOSAIC_TEST_`", der Code pruefte
+`contains("_TEST_")`. Zwei echte Laufzeit-Knoepfe in `train.py` rutschten dadurch an BEIDEN
+Waechtern vorbei. Statt sie nachzuregistrieren tragen sie jetzt das Praefix, das ihre Natur
+benennt: `MOSAIC_TEST_PAUSE_STOP_AT_EPOCH`, `MOSAIC_TEST_RESUME_ABORT_AFTER_EPOCH`. **Der
+geschaerfte Waechter hat daraufhin sofort zwei weitere gefunden** -- die synthetischen
+`MOSAIC_*_TEST_UNSET_XYZ` in `net_batcher.rs` und `net_ort.rs` trugen `_TEST_` ebenfalls als
+Infix; auch sie sind umbenannt. Genau dafuer ist ein Waechter da.
+
+**Zu Rang 4, mit einem eigenen Fehler auf dem Weg:** meine erste Reparatur hat nur das
+RUECKGABEMUSTER erweitert. Der Anlassfall waere trotzdem durchgerutscht, weil der AUSLOESER
+`let Some(` gar nicht kannte -- aufgefallen ist das nur, weil ich die Regel gegen den konkreten
+Fall geprueft habe statt gegen ihre Abwesenheit von Warnungen. Dazu ein zweiter Schnitzer: ein
+`\b` in einem nicht-rohen Generierstring wurde als literales BACKSPACE-Zeichen in die Datei
+geschrieben, im Rohtext unsichtbar und im Regex wirkungslos (`cat -A` zeigte `mod tests^H`).
+Beides behoben; der Scan laeuft jetzt nur noch im Testteil, damit die Regel nicht laenger bittet,
+ihre eigenen Treffer zu ignorieren.
+
+**Tore des Durchgangs:** 171 Werkzeug-Tests gruen (147 + 12 + 14, minus zwei zusammengelegte),
+**701 Lib-Tests gruen**, Wheel neu, Vertragshash `6ef829e564c58bd5` unveraendert,
+**Anker-Drift GRUEN** ueber 1.763 Schritte, Konventions-Check gruen ohne Fehlalarm.
+
+**Offen bleiben** die Posten 1 (die uebrigen 21 rohen Korpus-Leser), 2, 4, 5, 6, 8, 9, 10 aus
+par.8h sowie die zehn Punkte aus par.8g. Aufwandsschaetzung dafuer, mit heute gemessenen
+Torkosten (rund 10 min je Rust-Buendel): **rund 15 h**, davon der groesste Einzelposten die 76
+handgeschriebenen Laufzeit-Bloecke.

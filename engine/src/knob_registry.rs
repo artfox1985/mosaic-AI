@@ -266,9 +266,16 @@ mod tests {
     /// kein stilles Durchgehen.
     ///
     /// Tokens mit abschliessendem `_` sind Prosa-Praefixe (Zeilenumbruch in
-    /// Kommentaren) und werden uebersprungen; Tokens mit `_TEST_` sind
-    /// synthetische Test-Env-Vars (OnceLock-Kontaminations-Schutzmuster,
-    /// z.B. MOSAIC_TEST_ENV_VALID_28B) und kein Laufzeit-Knopf.
+    /// Kommentaren) und werden uebersprungen; Tokens mit dem PRAEFIX
+    /// `MOSAIC_TEST_` sind synthetische Test-Env-Vars (OnceLock-Kontaminations-
+    /// Schutzmuster, z.B. MOSAIC_TEST_ENV_VALID_28B) und kein Laufzeit-Knopf.
+    ///
+    /// PRAEFIX, nicht Substring (berichtigt 2026-09-21, par.8h Fund 7): bis dahin
+    /// stand hier `contains("_TEST_")`, und dadurch rutschten ECHTE Laufzeit-Knoepfe
+    /// durch, sobald `_TEST_` irgendwo im Namen vorkam -- die zwei Testhaken in
+    /// `train.py` hiessen `MOSAIC_PAUSE_TEST_...` und `MOSAIC_RESUME_TEST_...` und
+    /// waren an beiden Waechtern vorbei. Sie tragen jetzt das Praefix und fallen
+    /// damit zu Recht unter die Ausnahme, statt zufaellig.
     fn extract_read_site_tokens(text: &str, markers: &[&str], out: &mut BTreeSet<String>) {
         for line in text.lines() {
             for (pos, _) in line.match_indices("MOSAIC_") {
@@ -290,7 +297,7 @@ mod tests {
                 if rest.as_bytes().get(end) != Some(&quote) {
                     continue;
                 }
-                if token == "MOSAIC_" || token.ends_with('_') || token.contains("_TEST_") {
+                if token == "MOSAIC_" || token.ends_with('_') || token.starts_with("MOSAIC_TEST_") {
                     continue;
                 }
                 let before = &line[..pos - 1];

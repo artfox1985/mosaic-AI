@@ -31,6 +31,9 @@ import sys
 import time
 from math import comb
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from block_stats import block_means  # noqa: E402
+
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:  # noqa: BLE001
@@ -58,7 +61,13 @@ def knob_side_points(games: list[dict], knob_board: int) -> tuple[list[float], l
 
 
 def blocks(values: list[float], size: int) -> list[float]:
-    return [sum(values[i:i + size]) / len(values[i:i + size]) for i in range(0, len(values), size)]
+    """Blockmittel ueber `tools/block_stats.py` (2026-09-21, par.8h Fund 3).
+
+    Vorher zaehlte diese Fassung einen angebrochenen letzten Block IMMER mit,
+    auch bei einem einzigen Wert. Gemessen war die Abweichung folgenlos -- kein
+    vorliegendes Artefakt hat einen Rest bei Blockgroesse 5 --, die Regel gilt
+    jetzt trotzdem einheitlich."""
+    return block_means(values, size)
 
 
 def main() -> int:
