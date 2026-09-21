@@ -59,21 +59,15 @@ import subprocess
 import sys
 from math import comb
 from pathlib import Path
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import sign_test_p  # noqa: E402  (par.8h Punkt 4)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 
-def sign_test_p(n_pos: int, n_neg: int) -> float:
-    """Exakter zweiseitiger Vorzeichentest -- gleiche Formel wie
-    `paired_gating.py::mcnemar_exact_p`."""
-    n = n_pos + n_neg
-    if n == 0:
-        return 1.0
-    lo, hi = min(n_pos, n_neg), max(n_pos, n_neg)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 def selfplay_running() -> bool:

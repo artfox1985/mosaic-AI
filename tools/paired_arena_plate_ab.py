@@ -58,6 +58,9 @@ import argparse
 import subprocess
 from pathlib import Path
 from math import comb
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import mcnemar_exact_p  # noqa: E402  (par.8h Punkt 4)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -99,16 +102,7 @@ DEFAULT_THREADS = 10
 ARM_TIMEOUT_SECS = 3 * 3600
 
 
-def mcnemar_exact_p(b: int, c: int) -> float:
-    """Exakter zweiseitiger McNemar-Test -- identische Formel wie in
-    `paired_arena_shrink_ab.py`/`paired_arena_ismcts.py`/`paired_gating.py`."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    lo, hi = min(b, c), max(b, c)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 def run_arm(arm: str, seed: int, n_games: int, block_size: int, threads: int,

@@ -51,6 +51,8 @@ sys.path.insert(0, str(BASE_DIR))
 import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import sign_test_p  # noqa: E402  (par.8h Punkt 4)
 
 # Identisch fuer beide Arme -- siehe PREREG_pcr.md "6 gepaarte Flach-Encoder-
 # Seeds je Korpus". NUR --name/--seed und der MOSAIC_DATA_DIR-Env-Override
@@ -78,16 +80,7 @@ SANDBOX_DIRS = {"pcrkontrolle": BASE_DIR / "data_pcr_kontrolle",
 SPLIT_MANIFEST = BASE_DIR / "evaluations" / "artifacts" / "train_pcr_dose_split.json"
 
 
-def sign_test_p(n_pos: int, n_neg: int) -> float:
-    """Exakter zweiseitiger Vorzeichentest -- identische Formel wie
-    `train_corpus_dose.py::sign_test_p`."""
-    n = n_pos + n_neg
-    if n == 0:
-        return 1.0
-    lo, hi = min(n_pos, n_neg), max(n_pos, n_neg)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 # ── Gepaarter t-Test ohne scipy (identischer Code wie

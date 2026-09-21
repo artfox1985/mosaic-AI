@@ -44,6 +44,10 @@ import os
 import random
 from math import comb, sqrt
 from pathlib import Path
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import binom_p_two_sided, mcnemar_exact_p  # noqa: E402  (par.8h Punkt 4)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -55,18 +59,10 @@ METRICS = [
 ]
 
 
-def binom_p_two_sided(k: int, n: int) -> float:
-    """Exakter zweiseitiger Binomialtest gegen p=0.5."""
-    if n == 0:
-        return 1.0
-    lo, hi = min(k, n - k), max(k, n - k)
-    p_le = sum(comb(n, i) for i in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, i) for i in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
 
 
-def mcnemar_exact_p(b: int, c: int) -> float:
-    return binom_p_two_sided(b, b + c)
+
+
 
 
 def pearson(xs, ys) -> float:

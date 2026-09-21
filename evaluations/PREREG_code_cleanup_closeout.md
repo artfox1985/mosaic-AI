@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 3 davon nach Pruefung abgelehnt. par.8j: Warteschleife sah cargo nicht (gemessen 3 gegen 0), Spec-Abbildung 5 echte Suchknoepfe kurz, tote Modell-Defaults raus. par.8k: 62 rohe Korpus-Leser in 61 Werkzeugen auf corpus_io, 43 davon LIVE defekt (gzip). par.8l: 13 laufzeit-Bloecke ohne Pflichtfeld behoben -- der Fund 'alle 72 umbauen' widersprach einer registrierten Entscheidung. Alle Tore gruen. Offen: par.8h Punkte 4, 9, 10 (9/10 sind Rust) und par.8g Punkt 10. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 3 davon nach Pruefung abgelehnt. par.8j-8m: die Python-Seite von par.8h abgearbeitet -- Warteschleife sah cargo nicht (3 gegen 0), Spec-Abbildung 5 Suchknoepfe kurz, tote Defaults, 62 rohe Korpus-Leser (43 live defekt), 13 unvollstaendige laufzeit-Bloecke, 18 Kopien des Binomialtests (126 registrierte p-Werte exakt reproduziert). 206 Werkzeug-Tests. Offen: nur noch die Rust-Punkte par.8h 9 und 10 sowie par.8g Punkt 10. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1920,3 +1920,55 @@ gruen, alle 13 umgestellten Module importieren sauber, 0 Bloecke mit fehlendem P
 0 gemischte Zeitbasen. Kein Rust beruehrt.
 
 **Offen aus par.8h:** Punkte 4, 9, 10.
+
+## par.8m RESTLISTE par.8h, BUENDEL 4: der exakte Binomialtest (Punkt 4)
+
+**An diesem Test haengen die Gating-Entscheide** -- er ist die Stelle, an der die Kampagne
+entscheidet, ob ein Kandidat Champion wird. Genau deshalb ist er der Posten, bei dem eine
+Vereinheitlichung erst nach einem BELEG zulaessig ist, nicht nach einem Augenschein.
+
+**Bestand, nachgezaehlt:** der Fund nannte "15-mal, unter zwei Namen". Es sind **18 Definitionen
+in 17 Dateien unter vier Namen**: `mcnemar_exact_p` (10x), `sign_test_p` (5x), `binom_p` (2x),
+`binom_p_two_sided` (1x).
+
+### Zwei Belege, bevor und nachdem
+
+**Vorher:** alle 18 Fassungen wurden extrahiert, einzeln ausgefuehrt und auf **961 Eingabepaaren**
+(0..30 x 0..30) gegeneinander gehalten. Ergebnis: bitgleich, alle 18. (Ein erster Durchgang meldete
+eine Abweichung -- das war der Pruefstand, nicht der Code: `offline_vs_arena::mcnemar_exact_p`
+delegiert an `binom_p_two_sided`, und die eingesetzte Stellvertreterfunktion hatte die andere
+Argumentform. Nach der Berichtigung: 18 von 18.)
+
+**Nachher, und das ist der eigentliche Beleg:** jedes Gating-Artefakt traegt seine diskordanten
+Paare (`pair_a_sweeps_b`, `pair_b_sweeps_c`) NEBEN dem berechneten `report_mcnemar_p`. Aus diesen
+Paaren lassen sich **alle 126 registrierten p-Werte im Baum exakt reproduzieren, null
+Abweichungen**. Die Vereinheitlichung bewegt keine einzige registrierte Zahl.
+
+**Auch hier ein Umweg ueber die falsche Grundmenge:** ein erster Versuch rechnete aus
+`a_wins_total`/`b_wins_total`, und 112 von 126 Werten "wichen ab". Das waren GESAMTSIEGE; McNemar
+zaehlt nur die diskordanten PAARE. Dieselbe Falle wie bei der Aktionszahl in CLAUDE.md Zusatz 2:
+die Pruefstelle war richtig, die Grundmenge nicht.
+
+### Was gebaut wurde
+
+`tools/stats_exact.py`. **Die drei Namen bleiben**, sie sind keine Redundanz, sondern sagen, was
+der Aufrufer meint: `binom_p_two_sided(k, n)` fuer k Erfolge aus n, `mcnemar_exact_p(b, c)` fuer
+die diskordanten Paare einer gepaarten Arena, `sign_test_p(n_pos, n_neg)` fuer den Vorzeichentest
+ueber gepaarte Seeds. Die beiden letzten sind je eine Zeile ueber dem ersten.
+
+`tools/tests/test_stats_exact.py` (9 Tests). Der tragende ist
+`RegisteredArtifactsStillReproduce`: er prueft die Formel nicht gegen sich selbst, sondern gegen
+die 126 gemessenen Ergebnisse im Baum. Dazu eine UNABHAENGIG nachgebaute
+Brute-Force-Aufzaehlung (alle Ausgaenge mindestens so extrem wie der beobachtete) als
+Gegenrechnung, Symmetrie, Deckel bei 1,0, und dass keine Datei mehr eine eigene Kopie haelt.
+
+**Kosten beachtet:** der Artefakt-Test parste zunaechst alle 1.191 JSON-Dateien (zusammen 1,3 GB)
+und kostete 11,6 s -- bei einer Suite von 2 s und einem Haken, der bei jedem Commit laeuft, ist das
+zu viel. Ein Vorfilter ueber die Rohbytes bringt ihn auf 3,9 s bei denselben 126 Treffern.
+
+### Tore
+
+**206 Werkzeug-Tests gruen** (197 + 9 neue), Konventions-Check gruen, alle 17 umgehaengten
+Werkzeuge importieren sauber, 0 verbliebene lokale Definitionen. Kein Rust beruehrt.
+
+**Offen aus par.8h:** nur noch die beiden Rust-Punkte 9 und 10.

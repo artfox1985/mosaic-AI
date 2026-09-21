@@ -61,6 +61,8 @@ sys.path.insert(0, str(BASE_DIR))
 import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import sign_test_p  # noqa: E402  (par.8h Punkt 4)
 
 # Windows-Konsole ohne UTF-8 (cp1252, z.B. Hintergrund-Prozesse): die
 # λ-Zeichen in den Auswertungs-Prints wuerfen sonst UnicodeEncodeError --
@@ -124,16 +126,7 @@ def selfplay_running() -> bool:
         return False
 
 
-def sign_test_p(n_pos: int, n_neg: int) -> float:
-    """Exakter zweiseitiger Vorzeichentest -- identische Formel wie
-    `train_corpus_dose.py::sign_test_p`."""
-    n = n_pos + n_neg
-    if n == 0:
-        return 1.0
-    lo, hi = min(n_pos, n_neg), max(n_pos, n_neg)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 # ── Gepaarter t-Test ohne scipy (identischer Code wie

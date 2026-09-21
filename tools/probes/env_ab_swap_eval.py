@@ -33,6 +33,8 @@ from math import comb
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from block_stats import block_means  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # stats_exact liegt in tools/
+from stats_exact import mcnemar_exact_p  # noqa: E402  (par.8h Punkt 4)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -40,13 +42,7 @@ except Exception:  # noqa: BLE001
     pass
 
 
-def mcnemar_exact_p(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    k = min(b, c)
-    tail = sum(comb(n, i) for i in range(0, k + 1)) / 2 ** n
-    return min(1.0, 2 * tail)
+
 
 
 def knob_side_wins(games: list[dict], knob_board: int) -> list[int]:

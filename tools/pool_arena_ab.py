@@ -40,16 +40,12 @@ EVAL_DIR = Path(__file__).resolve().parent.parent / "evaluations"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import mcnemar_exact_p  # noqa: E402  (par.8h Punkt 4)
 
 
-def mcnemar_exact_p(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    lo, hi = min(b, c), max(b, c)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 def _avg(games, key, idx):

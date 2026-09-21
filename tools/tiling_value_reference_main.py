@@ -46,14 +46,11 @@ from neural_net import (MosaicNet, points_dist_bins_from_state,  # noqa: E402
 import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import binom_p_two_sided  # noqa: E402  (par.8h Punkt 4)
 
 
-def binom_p(k: int, n: int) -> float:
-    if n == 0:
-        return 1.0
-    lo, hi = min(k, n - k), max(k, n - k)
-    return min(1.0, 2 * min(sum(comb(n, i) for i in range(0, lo + 1)) / 2 ** n,
-                            sum(comb(n, i) for i in range(hi, n + 1)) / 2 ** n))
+
 
 
 def main() -> None:
@@ -224,12 +221,12 @@ def main() -> None:
     print("  (Referenz: UNABHAENGIGES Netz -- der Selbstbezug des Piloten ist raus)")
     print("=" * 70)
     print(f"  GESAMT: {agree_tot}/{n_tot} richtig ({agree_tot/n_tot:.1%})   "
-          f"Binomialtest gegen 50%: p = {binom_p(agree_tot, n_tot):.2e}")
+          f"Binomialtest gegen 50%: p = {binom_p_two_sided(agree_tot, n_tot):.2e}")
     for r in (2, 3, 4):
         v = per_round[r]
         if v:
             print(f"  Runde {r}: {sum(v)}/{len(v)} ({sum(v)/len(v):.1%})   "
-                  f"p = {binom_p(sum(v), len(v)):.4f}")
+                  f"p = {binom_p_two_sided(sum(v), len(v)):.4f}")
     print(f"  Referenz-Gleichstaende (eigene Kategorie, NICHT in agree/n): {tie_tot} "
           f"{ {r: c for r, c in sorted(per_round_ties.items())} }")
     if refdiff_agree and refdiff_disagree:
@@ -241,7 +238,7 @@ def main() -> None:
     (ROOT / args.out).write_text(json.dumps({
         "rank_model": args.rank_model, "ref_model": args.ref_model,
         "k": args.k, "draws": args.draws, "sims": args.sims,
-        "agree": agree_tot, "n_pairs": n_tot, "binom_p": binom_p(agree_tot, n_tot),
+        "agree": agree_tot, "n_pairs": n_tot, "binom_p": binom_p_two_sided(agree_tot, n_tot),
         "ties": tie_tot, "per_round_ties": {str(r): c for r, c in per_round_ties.items()},
         "per_round": {str(r): [sum(v), len(v)] for r, v in per_round.items() if v},
         "refdiff_agree_median": stats.median(refdiff_agree) if refdiff_agree else None,

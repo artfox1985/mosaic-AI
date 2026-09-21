@@ -51,17 +51,12 @@ ARM_TIMEOUT_SECS = 6 * 3600
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paired_arena_arm_worker import parse_seeds  # noqa: E402
 from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import mcnemar_exact_p  # noqa: E402  (par.8h Punkt 4)
 
 
-def mcnemar_exact_p(b: int, c: int) -> float:
-    """Exakter zweiseitiger McNemar -- identisch zu paired_gating.py."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    lo, hi = min(b, c), max(b, c)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 def champion_model() -> str:

@@ -73,6 +73,9 @@ import corpus_io  # noqa: E402
 import mosaic_rust as mr  # noqa: E402
 import numpy as np  # noqa: E402
 import onnxruntime as ort  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # stats_exact liegt in tools/
+from stats_exact import binom_p_two_sided  # noqa: E402  (par.8h Punkt 4)
 
 
 # ---------------------------------------------------------------- Statistik
@@ -89,14 +92,7 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     return (max(0.0, m - h), min(1.0, m + h))
 
 
-def binom_p(k: int, n: int) -> float:
-    """Exakter zweiseitiger Binomialtest gegen 50 Prozent
-    (gleiche Formel wie tools/tiling_value_reference_main.py:48-53)."""
-    if n == 0:
-        return 1.0
-    lo, hi = min(k, n - k), max(k, n - k)
-    return min(1.0, 2 * min(sum(math.comb(n, i) for i in range(0, lo + 1)) / 2 ** n,
-                            sum(math.comb(n, i) for i in range(hi, n + 1)) / 2 ** n))
+
 
 
 # ------------------------------------------------------------ Netzbewertung
@@ -226,7 +222,7 @@ def summarize(pairs: list[dict], key_filter=None) -> dict:
             "n": len(agree), "treffer": k,
             "quote": round(k / len(agree), 4) if agree else None,
             "wilson95": [round(lo, 4), round(hi, 4)],
-            "binom_p_gegen_50": round(binom_p(k, len(agree)), 6) if agree else None,
+            "binom_p_gegen_50": round(binom_p_two_sided(k, len(agree)), 6) if agree else None,
             "gleichstaende_ausgeschlossen": len(sel) - len(agree),
         }
     stable = [p for p in sel if p["ref_stable"]]
@@ -238,7 +234,7 @@ def summarize(pairs: list[dict], key_filter=None) -> dict:
         "n": len(agree_s), "treffer": k_s,
         "quote": round(k_s / len(agree_s), 4) if agree_s else None,
         "wilson95": [round(lo, 4), round(hi, 4)],
-        "binom_p_gegen_50": round(binom_p(k_s, len(agree_s)), 6) if agree_s else None,
+        "binom_p_gegen_50": round(binom_p_two_sided(k_s, len(agree_s)), 6) if agree_s else None,
     }
     grades = {}
     for p in sel:

@@ -152,6 +152,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 from set_champion import set_champion as _set_champion  # noqa: E402  (Nutzer-Anstoss 2026-07-27)
 from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # stats_exact liegt in tools/
+from stats_exact import mcnemar_exact_p  # noqa: E402  (par.8h Punkt 4)
 
 BLOCK_SIZE = 5                  # Nutzer-Entscheid 2026-08-29: der Seed faellt
                                 # JE BLOCK, Paare eines Blocks teilen die
@@ -175,20 +178,7 @@ SPRT_ALPHA = 0.05
 SPRT_BETA = 0.05
 
 
-def mcnemar_exact_p(b: int, c: int) -> float:
-    """Exakter zweiseitiger Vorzeichentest auf den informativen Zellen (b, c)
-    -- identische Formel wie in `paired_arena_speedbundle.py`/
-    `paired_arena_ismcts.py`: X ~ Binomial(n=b+c, p=0.5),
-    p = 2*min(P(X<=min(b,c)), P(X>=max(b,c))), gedeckelt bei 1.0. Dient hier
-    NUR NOCH als finale Fixed-n-Bericht-Statistik (siehe Modul-Docstring) --
-    nicht mehr als Stopp-Regel, das uebernimmt das SPRT unten."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    lo, hi = min(b, c), max(b, c)
-    p_le = sum(comb(n, k) for k in range(0, lo + 1)) / (2 ** n)
-    p_ge = sum(comb(n, k) for k in range(hi, n + 1)) / (2 ** n)
-    return min(1.0, 2 * min(p_le, p_ge))
+
 
 
 def paired_ci(diffs: list[int], z: float = 1.96) -> tuple[float, float, float]:
