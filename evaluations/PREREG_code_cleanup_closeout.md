@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 3 davon nach Pruefung abgelehnt. par.8j-8m: die Python-Seite von par.8h abgearbeitet -- Warteschleife sah cargo nicht (3 gegen 0), Spec-Abbildung 5 Suchknoepfe kurz, tote Defaults, 62 rohe Korpus-Leser (43 live defekt), 13 unvollstaendige laufzeit-Bloecke, 18 Kopien des Binomialtests (126 registrierte p-Werte exakt reproduziert). 206 Werkzeug-Tests. Offen: nur noch die Rust-Punkte par.8h 9 und 10 sowie par.8g Punkt 10. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e); par.8i die zehn Posten aus par.8g als EIN Buendel (3 nach Pruefung abgelehnt); par.8j-8m die Python-Seite von par.8h (Warteschleife sah cargo nicht, 3 gegen 0 gemessen; Spec-Abbildung 5 Suchknoepfe kurz; 62 rohe Korpus-Leser, 43 live defekt; 13 unvollstaendige laufzeit-Bloecke; 18 Kopien des Binomialtests, 126 registrierte p-Werte exakt reproduziert); par.8n die Rust-Punkte 9 und 10 GEMESSEN und begruendet NICHT gebaut (Plain-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). 206 Werkzeug-Tests, 700 Lib-Tests, Anker-Drift identisch. OFFEN: nur par.8g Punkt 10 (round_transition_resample), Nutzer-Entscheid ueber den Code. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1972,3 +1972,100 @@ zu viel. Ein Vorfilter ueber die Rohbytes bringt ihn auf 3,9 s bei denselben 126
 Werkzeuge importieren sauber, 0 verbliebene lokale Definitionen. Kein Rust beruehrt.
 
 **Offen aus par.8h:** nur noch die beiden Rust-Punkte 9 und 10.
+
+## par.8n RESTLISTE par.8h, BUENDEL 5: die beiden Rust-Punkte (9 und 10) -- GEMESSEN, NICHT GEBAUT
+
+Beide Punkte waren im Fund ausdruecklich als HERLEITUNG markiert ("HERLEITUNG des Agenten, nicht
+gemessen"). Sie sind jetzt gemessen, und die Messung traegt sie nicht.
+
+### Punkt 10 ist am Bestand widerlegt
+
+Der Fund: *"`features.rs:1383` gegen `:1635`: Abschnitt 5 und Abschnitt 17 fahren je Blatt und
+Spieler DIESELBE Tiling-Rekursion zweimal. Vier Rekursionen je Blatt, zwei davon ableitbar."*
+
+Strukturell stimmt der erste Teil: Abschnitt 5 ruft `solve_round_final_score`, Abschnitt 17
+`project_max_tiling`, und `TilingProjection.points` ist laut eigenem Kommentar "identisch zu
+`solve_max_tiling_points`" (`projection_points_match_the_solver` haelt das fest).
+
+**Was der Fund uebersehen hat, ist der Cache.** Beide Wege laufen ueber thread-lokale Caches mit
+demselben Schluesseltyp (`PLAIN_CACHE`, `PROJECTION_CACHE`, `tiling_solver.rs:379-388`). Eine
+Rekursion faellt darum nicht je BLATT an, sondern je unterschiedlichem SPIELERBRETT.
+
+**Gemessen** (`tiling_cache_hit_rate_measurement`, der Test, den par.8i auf `#[ignore]` gesetzt
+statt geloescht hat -- ausdruecklich angestossen mit `-- --ignored`):
+
+```
+plain:    total=47372  distinct=1446  max_repeat=1024  hit_rate=96,9%
+endaware: total=7082   distinct=1567  max_repeat=183   hit_rate=77,9%
+```
+
+**Die Rekursion laeuft bei 3,1 Prozent der Aufrufe.** "Vier Rekursionen je Blatt" ist damit um
+rund den Faktor 30 zu hoch gegriffen. Der erreichbare Gewinn -- eine der beiden Rekursionen fuer
+Braetter, bei denen BEIDE Groessen gebraucht werden -- liegt unterhalb dieser 3,1 Prozent.
+**Nicht gebaut.**
+
+### Punkt 9 ist strukturell wahr und trotzdem nicht lohnend
+
+Der Fund: `tiling_solver::apply_step` klont je Schritt den ganzen `GameState`, obwohl der Solver
+nur `players[pi]` liest.
+
+**Strukturell bestaetigt**, mit einer Praezisierung: der Solver liest nicht nur, er RUFT
+`execute_full_tiling` (`round_end.rs:298`), und die schreibt ueber `log_event` in `state.log` --
+deshalb braucht sie den ganzen Zustand. Der Modulkommentar in `tiling_solver.rs:248-275` sagt
+zurecht "nur `players[pi]` ist ERGEBNISRELEVANT"; er sagt nicht, dass nur darauf zugegriffen wird.
+
+**Gemessen:** `cargo bench --bench clone_cost` -> `gamestate_clone_midgame` **4,61 us**
+(Spanne 4,30-4,95), `gamestate_clone_fresh_start` 2,92 us.
+
+**Warum es trotzdem nicht gemacht wird, mit drei Gruenden in dieser Reihenfolge:**
+
+1. **Derselbe Deckel wie bei Punkt 10.** `solve_rec` laeuft nur bei den 3,1 Prozent
+   Plain-Fehltreffern (22,1 bei endaware). Was immer innerhalb der Rekursion gespart wird, ist
+   darauf gedeckelt -- und die Tiling-Kategorie ist selbst nur ein Teil der Suchzeit.
+2. **Die naheliegende Abkuerzung ist schon da.** Der Suchbaum leert das Log je Knoten
+   (`child_state.log.clear()` in `mcts.rs`/`net_mcts.rs`, im Bench-Kommentar festgehalten). Der
+   teure Teil des Klons ist also nicht das Log, sondern Fabriken, Beutel, Turm, Kuppelvorrat und
+   der GEGNER -- die wegzulassen hiesse, einen kuenstlichen Minimal-`GameState` zu bauen und
+   `solve_rec` darauf zu fahren.
+3. **Und genau das ist die riskanteste Ecke des Baums.** Ein solcher Minimalzustand muesste
+   `round_number` (liest `log_event`) und `scoring_tile_ids` (liest der endaware-Pfad) mitfuehren;
+   uebersieht die Liste ein Feld, aendert sich ein SCORE. Das ist der Pfad neben
+   `scoring.rs:160`, dem Elo-Anker. Am Ende des Projekts, fuer einen auf 3,1 Prozent gedeckelten
+   Gewinn, ist das das falsche Verhaeltnis. **Nicht gebaut.**
+
+### Was dabei doch gebaut wurde: das Instrument wieder lauffaehig
+
+Beim Messen ist aufgefallen, dass `profile_clones.rs` gar nicht mehr laeuft -- und das korrigiert
+meine eigene Begruendung aus par.8i, es als "Instrument zu einer offenen Frage" zu behalten:
+
+* Es lud ueber `Net::load` mit fester `INPUT_SIZE`, also den FLACHEN Lader. Seit dem 2D-Encoder
+  scheitert der an jedem aktuellen Modell (`Failed analyse for node #48 "/conv/conv.0/Conv"`), und
+  flache Modelle liegen keine mehr im Baum. Jetzt `Net::load_auto`, das die Eingabeform am Modell
+  erkennt -- so, wie es der Architektur-Fixpunkt "2D encoder must be additive" verlangt. Der
+  Default zeigt auf den amtierenden Champion statt auf das geloeschte `alphazero_v8.onnx`.
+* `NS_PER_CLONE` stand hart auf **6117** ns. Heute gemessen sind es **4609** ns: die Konstante lag
+  33 Prozent zu hoch und hat jede Prozentangabe des Werkzeugs nach oben verzerrt. Nachgezogen,
+  mit Datum und Messbefehl im Kommentar.
+
+**Was das Werkzeug weiterhin NICHT kann**, und das gehoert dazu statt verschwiegen: sein
+Testzustand ist zu duenn (800 Sims ergaben genau EINEN Netzaufruf, 801 Klone -- also rund ein Klon
+je Sim aus dem Suchbaum und praktisch keiner aus dem Tiling-Loeser). Wer den ANTEIL von
+`apply_step` an den Klonen messen will, braucht einen Zaehler je Aufrufstelle und einen Zustand,
+der das Tiling wirklich ausloest. Solange das fehlt, ist die Zahl oben eine Klon-STUECKKOSTE,
+keine Anteilsmessung -- und als Anteilsmessung wird sie hier auch nicht verwendet.
+
+### Tore
+
+`cargo test --release --no-run` **gruen** (5,9 s warm) -- das ist das Tor, auf das es hier
+ankommt, weil der pre-push die `examples/` mitkompiliert und genau dort die Aenderung liegt.
+
+**Lib-Suite, Wheel und Anker-Drift sind NICHT erneut gefahren, und das ist Absicht:** geaendert
+ist ausschliesslich `engine/examples/profile_clones.rs`. Kein Bibliothekscode, keine Merkmale,
+kein Suchpfad -- eine Drift-Pruefung wuerde denselben Zustand gegen denselben Anker halten wie vor
+zwei Stunden (par.8i, 1.763 Schritte identisch) und nichts Neues belegen. Ein Tor, das
+nachweislich nichts pruefen kann, zu fahren und als gruen zu melden, waere die teurere Variante
+von Schweigen.
+
+**Damit ist par.8h vollstaendig abgearbeitet.** Sechs Punkte gebaut, zwei gemessen und begruendet
+nicht gebaut. Offen aus der ganzen Aufraeum-Prereg bleibt nur par.8g Punkt 10
+(`round_transition_resample`) -- ein Nutzer-Entscheid ueber den Code.

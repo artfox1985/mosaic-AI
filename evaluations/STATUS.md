@@ -40,10 +40,12 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 * **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
   erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
   danach die Konsolenzeile "Champion-Spec ..." lesen.
-* **Die Restliste des Aufraeumens** (`PREREG_code_cleanup_closeout.md` par.8h): nur noch die
-  beiden RUST-Punkte 9 (GameState-Klon je Solver-Schritt) und 10 (doppelte Tiling-Rekursion in
-  features.rs). Beide brauchen den vollen Torlauf inklusive Anker-Drift und Paritaets-Fixture.
-  Die ganze Python-Seite ist am 2026-09-21 erledigt (par.8j bis par.8m).
+* **Das Aufraeumen ist durch** (`PREREG_code_cleanup_closeout.md`): par.8i bis par.8n am
+  2026-09-21. Die beiden Rust-Punkte 9 und 10 sind GEMESSEN und begruendet NICHT gebaut -- der
+  Plain-Tiling-Cache trifft zu 96,9 Prozent, der erreichbare Gewinn ist darauf gedeckelt, und der
+  Weg dorthin fuehrt neben `scoring.rs:160` vorbei. **Offen ist nur noch ein Nutzer-Entscheid:**
+  par.8g Punkt 10, `round_transition_resample` -- der Code-Review nennt den Pfad Altlast, der
+  Modulkopf sagt "BLEIBEN"; die sieben Tests fallen mit ihm oder gar nicht.
   Dazu `tools/build_frozen_golden_probe.py`: laeuft 22 Minuten OHNE jede Fortschrittszeile (kein
   `flush` im ganzen Werkzeug), Verstoss gegen die Regel aus CLAUDE.md.
   Aus par.8g ist nur noch **Punkt 10** offen (`round_transition_resample`) -- ein Entscheid ueber

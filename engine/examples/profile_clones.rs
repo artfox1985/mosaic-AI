@@ -28,10 +28,19 @@ fn midgame_state() -> mosaic_rust::state::GameState {
 }
 
 fn main() {
-    let model_path = std::env::args().nth(1).unwrap_or_else(|| "../models/alphazero_v8.onnx".into());
+    // 2026-09-21 (par.8h Punkt 9): `Net::load` mit fester `INPUT_SIZE` ist der
+    // FLACHE Lader; seit dem 2D-Encoder scheitert er an jedem aktuellen Modell
+    // mit "Failed analyse for node ... Conv", und flache Modelle liegen keine
+    // mehr im Baum. `Net::load_auto` erkennt die Eingabeform am Modell selbst
+    // (Architektur-Fixpunkt "2D encoder must be additive": die Input-Shape
+    // kommt vom Modell, nicht aus einer Konstante). Ohne diese Zeile war das
+    // Werkzeug nicht mehr lauffaehig -- und damit die Frage, zu der es das
+    // Instrument ist, nicht beantwortbar.
+    let default_model = "../models/frozen_champions/v31-b01/model.onnx".to_string();
+    let model_path = std::env::args().nth(1).unwrap_or(default_model);
     let sims: u32 = std::env::args().nth(2).and_then(|s| s.parse().ok()).unwrap_or(2000);
 
-    let net = Net::load(&model_path, mosaic_rust::features::INPUT_SIZE)
+    let net = Net::load_auto(&model_path)
         .unwrap_or_else(|e| panic!("Konnte {model_path} nicht laden: {e}"));
     let state = midgame_state();
     let mut rng = StdRng::seed_from_u64(7);
@@ -46,7 +55,12 @@ fn main() {
     println!("sims={sims} Gesamtzeit={elapsed:?}");
 
     let clones = mosaic_rust::profiling::gamestate_clone_count();
-    const NS_PER_CLONE: f64 = 6117.0; // aus benches/clone_cost.rs (gamestate_clone_midgame)
+    // Neu gemessen 2026-09-21 (par.8h Punkt 9): `cargo bench --bench clone_cost`
+    // gibt fuer `gamestate_clone_midgame` 4,61 us (Spanne 4,30-4,95). Der alte
+    // Wert 6117 lag 33 Prozent darueber -- eine Konstante, die seit einem
+    // frueheren Zustand des `GameState` nicht nachgezogen worden war und jede
+    // Prozentangabe dieses Werkzeugs nach oben verzerrt hat.
+    const NS_PER_CLONE: f64 = 4609.0; // aus benches/clone_cost.rs (gamestate_clone_midgame)
     let clone_ns = clones as f64 * NS_PER_CLONE;
     println!(
         "  GameState-Klone:      n={clones:<6} geschaetzt={:.2}ms ({:.1}%)",
