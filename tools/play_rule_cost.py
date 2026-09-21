@@ -52,6 +52,10 @@ import statistics as stats
 from pathlib import Path
 
 import mosaic_rust
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -64,8 +68,7 @@ def load_states(data_glob: str, n_states: int, seed: int) -> list[dict]:
     rng.shuffle(files)
     out: list[dict] = []
     for fp in files:
-        with open(fp, "rb") as f:
-            recs = pickle.load(f)
+        recs = load_records(fp)
         cand = [r for r in recs if r["state"].get("phase") == "drafting"
                 and not any(pe["action"].get("is_start") for pe in r["policy"])]
         rng.shuffle(cand)

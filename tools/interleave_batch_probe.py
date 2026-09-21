@@ -37,6 +37,9 @@ import pickle
 import subprocess
 import sys
 from pathlib import Path
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
@@ -79,8 +82,7 @@ def machine_ram_gib() -> tuple[float, float]:
 
 
 def pick_state() -> dict:
-    with FROZEN.open("rb") as fh:
-        records = pickle.load(fh)["records"]
+    records = load_records(FROZEN)["records"]
     for rec in records:
         st = rec["state"]
         if st["round"] == 2 and st["phase"] == "drafting":

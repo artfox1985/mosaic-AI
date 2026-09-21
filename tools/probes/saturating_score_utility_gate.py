@@ -32,6 +32,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from neural_net import state_to_tensor, state_to_planes, build_model_from_checkpoint  # noqa: E402
 from neural_net import crop_features_to_model  # noqa: E402
 from config import NUM_ACTIONS  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
@@ -126,8 +129,7 @@ def main():
     print("Selbsttest (calibrate_win_prob_with Identitaet bei a=0,b=1): bestanden.", file=sys.stderr)
 
     import pickle
-    with open(FROZEN_PKL, "rb") as fh:
-        blob = pickle.load(fh)
+    blob = load_records(FROZEN_PKL)
     recs = blob["records"]
     print(f"Messset: {len(recs)} Stellungen ({FROZEN_PKL.name})", file=sys.stderr)
 

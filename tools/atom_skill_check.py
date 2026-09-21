@@ -103,6 +103,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "engine" / "py"))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 DEGENERATE_RATE = 0.01     # naeher als 1 % an 0 oder 1 -> konstant
 DEGENERATE_BRIER = 1e-4    # keine Varianz zu erklaeren
@@ -269,8 +272,7 @@ def load(pattern: str, n_files: int, max_states: int):
     flat, planes, targets, gids, occ = [], [], [], [], []
     tgt_own, stat_own, rounds = [], [], []
     for path in files:
-        with open(path, "rb") as fh:
-            records = pickle.load(fh)
+        records = load_records(path)
         by = collections.defaultdict(list)
         for rec in records:
             by[rec["game_id"]].append(rec)

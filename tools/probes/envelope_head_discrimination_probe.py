@@ -38,6 +38,9 @@ sys.path.insert(0, os.path.join(_ROOT, "engine", "py"))
 sys.path.insert(0, os.path.join(_ROOT, "tools", "probes"))
 from neural_net import state_to_planes, state_to_tensor  # noqa: E402
 from triangle_hull_coverage_probe import HULL_LEFT, HULL_RIGHT, occupancy, deviation  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def grid_index(r, c):
@@ -80,8 +83,7 @@ def main():
     t0 = time.monotonic()
     import onnxruntime as ort
 
-    with open(os.path.join(_ROOT, a.frozen), "rb") as fh:
-        records = pickle.load(fh)["records"]
+    records = load_records(os.path.join(_ROOT, a.frozen))["records"]
     print("frozen:", len(records), "Records", flush=True)
 
     result = {"prereg": "PREREG_geometric_envelope.md Stufe 0 (par.5, Lesart par.5a)",

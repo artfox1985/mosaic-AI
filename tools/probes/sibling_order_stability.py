@@ -44,6 +44,10 @@ import os
 import pickle
 import statistics
 from pathlib import Path
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 BASIS = Path(__file__).resolve().parents[2]
 
@@ -61,7 +65,7 @@ def zustaende(muster, n, phase, krit, je_partie=1, min_runde=1):
     out, gesehen = [], {}
     for f in sorted(glob.glob(muster)):
         try:
-            data = pickle.load(open(f, "rb"))
+            data = load_records(f)
         except Exception:  # noqa: BLE001
             continue
         for s in data:

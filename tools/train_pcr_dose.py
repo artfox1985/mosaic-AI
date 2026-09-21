@@ -48,6 +48,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 # Identisch fuer beide Arme -- siehe PREREG_pcr.md "6 gepaarte Flach-Encoder-
 # Seeds je Korpus". NUR --name/--seed und der MOSAIC_DATA_DIR-Env-Override
@@ -197,8 +200,7 @@ def measure_pcr_stats(groups: dict[str, list[Path]]) -> dict:
         n_rec = n_field = n_true = n_multi = n_multi_true = n_root_q = 0
         game_ids = set()
         for f in files:
-            with open(f, "rb") as fh:
-                game_data = pickle.load(fh)
+            game_data = load_records(f)
             for step in game_data:
                 n_rec += 1
                 game_ids.add((f.name, step.get("game_id")))
@@ -483,14 +485,13 @@ def run_smoke() -> None:
         # (VOR dem Training, unabhaengig vom Cache-Baucode berechnet).
         n_draft = n_masked = 0
         for name in smoke_names[TREATMENT_ARM]:
-            with open(SOURCE_DIR / name, "rb") as fh:
-                for step in pickle.load(fh):
-                    phase = step["state"].get("phase")
-                    is_start = any(pe["action"].get("is_start") for pe in step["policy"])
-                    if phase == "drafting" and not is_start:
-                        n_draft += 1
-                        if step.get("policy_target_valid") is False:
-                            n_masked += 1
+            for step in load_records(SOURCE_DIR / name):
+                phase = step["state"].get("phase")
+                is_start = any(pe["action"].get("is_start") for pe in step["policy"])
+                if phase == "drafting" and not is_start:
+                    n_draft += 1
+                    if step.get("policy_target_valid") is False:
+                        n_masked += 1
         expected_polw_sum = n_draft - n_masked
         print(f"[smoke] pcr-Sandbox: {n_draft} Drafting-Records, davon {n_masked} "
               f"cheap-maskiert -> erwartete polw-Summe {expected_polw_sum}.", flush=True)

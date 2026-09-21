@@ -30,6 +30,9 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8", errors="replace")
 
 from chance_node_pretest import irls, logit  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def main() -> None:
@@ -47,7 +50,7 @@ def main() -> None:
                             state_to_tensor)
 
     rounds = {int(r) for r in args.rounds.split(",")}
-    recs = pickle.load(open(BASE_DIR / args.eval_set, "rb"))
+    recs = load_records(BASE_DIR / args.eval_set)
     recs = recs["records"] if isinstance(recs, dict) and "records" in recs else recs
     sel = [r for r in recs
            if r.get("completed") and r.get("winner") is not None

@@ -90,6 +90,10 @@ import mosaic_rust
 
 from tools.oracle_metrics import _kendall_tau_a
 from tools.scoring_tile_sensitivity import pick_representative_combos, select_states
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 HEAD_FIELDS = ("net_points_forecast", "net_opp_points_forecast", "net_raw_value")
 
@@ -147,8 +151,7 @@ def main():
     ap.add_argument("--out", default="evaluations/artifacts/points_head_plates_stage2.json")
     args = ap.parse_args()
 
-    with open(args.eval_set, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(args.eval_set)
     records = data["records"]
     states = select_states(records, args.n_states)
     print(f"[points_head_stage2] {len(states)} Zustaende gewaehlt "

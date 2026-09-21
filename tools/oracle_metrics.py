@@ -75,6 +75,9 @@ sys.path.insert(0, str(ROOT / "engine" / "py"))
 from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
 from neural_net import (action_to_id, state_to_tensor, state_to_planes,  # noqa: E402
                         build_model_from_checkpoint)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 # AKTIV SEIT 2026-08-02 (v19-Zyklus): das v18_best-Orakel
@@ -183,8 +186,7 @@ def load_oracle(oracle_json: Path = ORACLE_JSON):
 
 
 def load_frozen_states(record_indices: list[int], frozen_pkl: Path = FROZEN_PKL) -> dict[int, dict]:
-    with open(frozen_pkl, "rb") as fh:
-        blob = pickle.load(fh)
+    blob = load_records(frozen_pkl)
     records = blob["records"]
     return {idx: records[idx] for idx in record_indices}
 

@@ -63,6 +63,10 @@ import pickle
 import statistics as stats
 
 import mosaic_rust
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 MUTUALLY_EXCLUSIVE_PAIRS = [(0, 7), (6, 3), (4, 1), (2, 5)]
 
@@ -193,8 +197,7 @@ def main():
     ap.add_argument("--out", default="evaluations/artifacts/scoring_tile_sensitivity_result.json")
     args = ap.parse_args()
 
-    with open(args.eval_set, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(args.eval_set)
     records = data["records"]
     states = select_states(records, args.n_states)
     print(f"[scoring_tile_sensitivity] {len(states)} Zustaende gewaehlt "

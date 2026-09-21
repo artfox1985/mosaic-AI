@@ -37,6 +37,10 @@ import glob
 import pickle
 import statistics
 from pathlib import Path
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 NUM_SLOTS = 9
@@ -145,8 +149,7 @@ def iter_corpus(pattern: str, limit: int | None):
     if not files:
         raise SystemExit(f"Keine Dateien fuer {pattern}")
     for path in files:
-        with open(path, "rb") as fh:
-            yield path, pickle.load(fh)
+        yield path, load_records(path)
 
 
 def cmd_check(args) -> int:

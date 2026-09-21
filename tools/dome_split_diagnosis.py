@@ -243,6 +243,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import mosaic_rust  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 EPS = 1e-9
 
@@ -340,8 +343,7 @@ def has_dome_slot_move(valid_actions: list) -> bool:
 
 
 def load_eligible_records(pkl_path: Path, limit: int):
-    with open(pkl_path, "rb") as fh:
-        frozen = pickle.load(fh)
+    frozen = load_records(pkl_path)
     records = frozen["records"]
     eligible = []
     n_non_drafting = 0

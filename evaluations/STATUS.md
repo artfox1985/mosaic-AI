@@ -40,9 +40,10 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 * **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
   erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
   danach die Konsolenzeile "Champion-Spec ..." lesen.
-* **Die Restliste des Aufraeumens** (`PREREG_code_cleanup_closeout.md` par.8h, Punkte 1, 2, 4,
-  9, 10) -- groesster Einzelposten die 76 handgeschriebenen Laufzeit-Bloecke. Die Punkte 5, 6
-  und 8 sind am 2026-09-21 erledigt (par.8j).
+* **Die Restliste des Aufraeumens** (`PREREG_code_cleanup_closeout.md` par.8h, Punkte 2, 4,
+  9, 10) -- groesster Einzelposten die 76 handgeschriebenen Laufzeit-Bloecke; 9 und 10 sind
+  Rust und brauchen den vollen Torlauf. Erledigt am 2026-09-21: Punkte 5, 6, 8 (par.8j) und
+  Punkt 1 (par.8k, 62 rohe Korpus-Leser in 61 Werkzeugen, davon 43 live defekt).
   Dazu `tools/build_frozen_golden_probe.py`: laeuft 22 Minuten OHNE jede Fortschrittszeile (kein
   `flush` im ganzen Werkzeug), Verstoss gegen die Regel aus CLAUDE.md.
   Aus par.8g ist nur noch **Punkt 10** offen (`round_transition_resample`) -- ein Entscheid ueber

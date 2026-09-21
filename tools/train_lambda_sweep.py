@@ -58,6 +58,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 # Windows-Konsole ohne UTF-8 (cp1252, z.B. Hintergrund-Prozesse): die
 # λ-Zeichen in den Auswertungs-Prints wuerfen sonst UnicodeEncodeError --
@@ -259,12 +262,10 @@ def compute_sample_root_q_fraction(files: list[Path]) -> tuple[int, int]:
     v18_files = [f for f in files if any(f.name.startswith(f"selfplay_{p}_") for p in ROOT_Q_CAPABLE_PREFIXES)]
     other_files = [f for f in files if f not in v18_files]
     for f in other_files:
-        with open(f, "rb") as fh:
-            game_data = pickle.load(fh)
+        game_data = load_records(f)
         n_total += len(game_data)
     for f in v18_files:
-        with open(f, "rb") as fh:
-            game_data = pickle.load(fh)
+        game_data = load_records(f)
         n_total += len(game_data)
         n_with += sum(1 for step in game_data if step.get("root_q") is not None)
     return n_with, n_total

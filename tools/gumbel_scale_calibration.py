@@ -61,6 +61,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 ORACLE_JSON = ROOT / "evaluations" / "artifacts" / "frozen_v1_oracle_labels.json"
@@ -91,7 +94,7 @@ def main() -> None:
     import mosaic_rust as mr
 
     labels = json.loads(ORACLE_JSON.read_text(encoding="utf-8"))["labels"]
-    records = pickle.loads(FROZEN_PKL.read_bytes())["records"]
+    records = load_records(FROZEN_PKL)["records"]
     # Gleichmaessig ueber die gelabelten (= sauberen Drafting-)Zustaende ziehen,
     # damit alle Runden vertreten sind -- deterministisch, kein RNG.
     step = max(1, len(labels) // args.n_states)

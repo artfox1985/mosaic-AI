@@ -48,6 +48,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "engine" / "py"))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 for _s in (sys.stdout, sys.stderr):
     if hasattr(_s, "reconfigure"):
@@ -131,7 +134,7 @@ def main() -> None:
     import torch
     from neural_net import build_model_from_checkpoint, state_to_tensor, state_to_planes
 
-    recs = pickle.load(open(BASE_DIR / args.eval_set, "rb"))
+    recs = load_records(BASE_DIR / args.eval_set)
     recs = recs["records"] if isinstance(recs, dict) and "records" in recs else recs
 
     blob = torch.load(BASE_DIR / args.model, weights_only=False)

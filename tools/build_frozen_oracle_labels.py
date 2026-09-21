@@ -62,6 +62,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import mosaic_rust  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 # Ueber --model/--out ueberschreibbar. Die v16-Labels (frozen_v1_oracle_v1)
@@ -145,8 +148,7 @@ def _parse_cli():
 
 def main() -> None:
     print(f"Lade {FROZEN_PKL} ...")
-    with open(FROZEN_PKL, "rb") as fh:
-        frozen = pickle.load(fh)
+    frozen = load_records(FROZEN_PKL)
     records = frozen["records"]
     print(f"  {len(records)} Records insgesamt (frozen-Version {frozen.get('version')})")
 

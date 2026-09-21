@@ -93,6 +93,9 @@ from neural_net import (
     state_to_tensor, state_to_planes, action_to_id,
     VALUE_SCALE, VALUE_OPP_EPSILON, TD_LAMBDA, build_model_from_checkpoint, encoder_from_state_dict,
 )
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 # Muss 1:1 zu train.py::train() bleiben (val_frac=0.1-Default, Seed 20260707)
 # -- sonst ist der Val-Split hier NICHT derselbe wie beim Training, und die
@@ -232,8 +235,7 @@ def load_frozen_samples(path: Path = FROZEN_EVAL_PATH, include_planes: bool = Fa
             f"Frozen-Eval-Set nicht gefunden unter {path} -- erst "
             "`python tools/build_frozen_eval_set.py` ausfuehren."
         )
-    with open(path, "rb") as fh:
-        blob = pickle.load(fh)
+    blob = load_records(path)
     version = blob.get("version")
     if version != expect_version:
         print(f"⚠️  Warnung: Set-Version {version!r} != erwartet {expect_version!r}")

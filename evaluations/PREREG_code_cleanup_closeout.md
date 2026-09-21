@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A und die Bonuschips gebaut (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 9 Beispiele und 3 tote E2E-Skripte raus, 3 Punkte nach Pruefung abgelehnt. par.8j: die drei stillen Posten aus par.8h -- Warteschleife sah cargo nicht (gemessen 3 gegen 0), Spec-Abbildung 5 echte Suchknoepfe kurz (keine registrierte Zahl betroffen, Rust-Leser ist vollstaendig), tote Modell-Defaults raus. Alle Tore gruen, Anker-Drift identisch. Offen: par.8h Punkte 1, 2, 4, 9, 10 und par.8g Punkt 10. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 9 Beispiele und 3 tote E2E-Skripte raus, 3 Punkte abgelehnt. par.8j: Warteschleife sah cargo nicht (gemessen 3 gegen 0), Spec-Abbildung 5 echte Suchknoepfe kurz (keine registrierte Zahl betroffen), tote Modell-Defaults raus. par.8k: 62 rohe Korpus-Leser in 61 Werkzeugen auf corpus_io, davon 43 LIVE defekt (gzip). Alle Tore gruen. Offen: par.8h Punkte 2, 4, 9, 10 und par.8g Punkt 10. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1789,3 +1789,74 @@ Behandelt wurde aber nicht alles gleich, weil sie nicht dasselbe sind:
 Kein Rust beruehrt, also kein Wheel und keine Anker-Drift noetig.
 
 **Offen aus par.8h:** Punkte 1, 2, 4, 9, 10.
+
+## par.8k RESTLISTE par.8h, BUENDEL 2: die rohen Korpus-Leser (Punkt 1)
+
+**Der als teuerster bezeichnete Fund, und er war groesser als registriert.** Die Vorlage nannte
+"16 Sonden"; nachgezaehlt am Code sind es **62 Lesestellen in 61 Werkzeugen** unter `tools/`.
+Die Zahl 16 kam aus einer engeren Suche -- deshalb steht hier die GRUNDMENGE: alle `*.py` unter
+`tools/` ausser `tools/tests/`, gezaehlt ueber `ast` auf Aufrufe von `pickle.load`/`pickle.loads`,
+nicht ueber Textsuche (die haette die Kommentare mitgezaehlt, in denen die Regel ERKLAERT wird).
+
+### Was davon wirklich defekt war, und was nur zerbrechlich
+
+**Gemessen, nicht angenommen:** die Dateien unter `data/` tragen das gzip-Magic, die eingefrorenen
+Eval-Sets unter `evaluations/` nicht (`frozen_eval_set.pkl`, `_v2`, `_v3` alle roh). Damit zerfaellt
+die Menge:
+
+* **43 der 61 Werkzeuge** lesen ueber `data/`- oder `selfplay_`-Globs. Dort war es LIVE defekt.
+  Beleg auf derselben Datei: `pickle.load` -> `UnpicklingError: invalid load key, '\x1f'`,
+  `load_records` -> 10 abgeschlossene Spiele (`data/selfplay_v28-b02-policy_20260913_1208_g10.pkl`,
+  ueber `scoring_tile_impact.load_final_game_records`).
+* **18** lesen nur eingefrorene Eval-Sets. Dort lief es -- und haette beim ersten komprimierten
+  Eval-Set aufgehoert. `load_records` entscheidet am Magic-Byte und ist in BEIDEN Faellen richtig.
+
+**Der eigentliche Schaden war die Fehlerpolitik, nicht die Doppelung.** Vier Politiken standen
+nebeneinander: laut sterben (die Mehrheit), die Ausnahme schlucken und STILL ueber eine leere
+Grundmenge berichten (zwei Sonden, in par.8h Rang 2 behoben), ein eigener Lader in
+`count_new_nodes_in_corpus`, der am AUSNAHMETYP statt am Magic-Byte entschied, und ein
+`sys.path.insert(0, ".")`, das nur traegt, solange man aus der Projektwurzel startet.
+
+### Wie umgestellt wurde
+
+56 Stellen fielen in vier mechanische Bauformen (`with open(..., "rb")`, `pickle.load(open(...))`,
+`pickle.loads(p.read_bytes())`, `with p.open("rb")`), sechs mussten von Hand
+(`dome_split_diagnosis`, `interleave_batch_probe`, `plate_head_labels`,
+`envelope_head_discrimination_probe`, `train_pcr_dose`, plus der eigene Lader in
+`count_new_nodes_in_corpus`).
+
+**Warum der mechanische Teil belegbar sicher ist:** das Muster verlangte, dass die
+`pickle.load`-Zeile die EINZIGE Anweisung im `with`-Block ist. Waere ein Block mehrzeilig gewesen,
+haette die Entfernung der `with`-Zeile die Einrueckung gebrochen -- `ast.parse` ueber alle
+Werkzeuge meldet null Fehler, also war kein Block mehrzeilig. Zehn Einfuegungen des Imports
+landeten zunaechst INNERHALB eines mehrzeiligen `import (...)`; sie sind ueber `ast.end_lineno`
+neu gesetzt worden statt ueber eine Zeilenheuristik.
+
+Jede Datei hat jetzt einen `__file__`-relativen Anker statt eines arbeitsverzeichnis-abhaengigen;
+geprueft ist fuer jede, dass das errechnete `parents[N]` tatsaechlich `corpus_io.py` enthaelt.
+
+### Der Waechter
+
+`tools/tests/test_no_raw_corpus_readers.py` (5 Tests): keine rohe `pickle`-Lesestelle unter
+`tools/` ausserhalb einer namentlich BEGRUENDETEN Ausnahmeliste (heute zwei: `repack_corpus`,
+das beide Formen anfassen MUSS, und `corpus_io` selbst), kein `sys.path.insert(0, ".")`, und
+jeder `corpus_io`-Import mit absolutem Anker. Gezaehlt wird ueber `ast`, nicht ueber Text --
+sonst wuerden die Kommentare, die diese Regel erklaeren, ihre eigene Verletzung melden.
+
+### Eigener Fehler auf dem Weg
+
+Ein Kompilierlauf zur Zwischenpruefung schrieb seine `.pyc` in die PROJEKTWURZEL statt in den
+Scratchpad (die Umgebungsvariable war in der Ersetzung leer, `Path("") / name` ist ein relativer
+Pfad). 232 Dateien, alle ungetrackt -- aber eine davon hiess wie ein Testmodul und hat die
+Testsuche uebernommen: `unittest discover` brach mit *"module incorrectly imported"* ab. Entfernt,
+nachdem geprueft war, dass alle 232 denselben Zeitstempel meines Laufs tragen und keine getrackt
+ist. **Lehre: ein Zwischenschritt, der Dateien schreibt, gehoert in den Scratchpad mit einem
+Pfad, der nicht still relativ werden kann.**
+
+### Tore
+
+**192 Werkzeug-Tests gruen** (187 + 5 neue), Konventions-Check gruen, `ast.parse` ueber alle
+Werkzeuge fehlerfrei, eine umgestellte Funktion auf einer echten gzip-Korpusdatei nachgefahren.
+Kein Rust beruehrt.
+
+**Offen aus par.8h:** Punkte 2, 4, 9, 10.

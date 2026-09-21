@@ -53,6 +53,10 @@ import statistics as stats
 import mosaic_rust
 
 from tools.scoring_tile_sensitivity import pick_representative_combos, select_states
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def run_trace(state, tile_ids, model_path, sims, c_puct, seed):
@@ -195,8 +199,7 @@ def main():
 
     import pickle
 
-    with open(args.eval_set, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(args.eval_set)
     records = data["records"]
     states = select_states(records, args.n_states)
     print(f"[plate_rank_invariance] {len(states)} Zustaende gewaehlt "

@@ -85,6 +85,8 @@ sys.path.insert(0, os.path.join(ROOT, "engine", "py"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import scoring_tile_sensitivity as sts  # noqa: E402  (all_valid_combos/pick_representative_combos, Memory feedback_check_existing_tools_first)
 from neural_net import build_model_from_checkpoint, state_to_tensor, state_to_planes  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 # ── Logistische Regression (reines NumPy, IRLS/Newton-Raphson) ─────────────
@@ -374,8 +376,7 @@ def main():
             raise SystemExit(f"Kein ONNX zum Champion '{name}' gefunden -- --model-path-for-api setzen.")
         print(f"[r5_value_calibration] API-ONNX (Inhalt egal): {args.model_path_for_api}")
 
-    with open(args.eval_set, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(args.eval_set)
     records = data["records"]
     n_r5 = sum(1 for r in records if r["state"]["round"] == 5 and r["state"]["phase"] == "drafting")
     print(f"[r5_value_calibration] {n_r5} Runde-5-Drafting-Records im eval-set verfuegbar.")

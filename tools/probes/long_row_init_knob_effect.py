@@ -40,6 +40,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "engine" / "py"))
 
 import mosaic_rust as m  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "artifacts" / "long_row_init_knob_effect.json"
@@ -91,8 +94,7 @@ def collect(files, cap, cap_per_file):
     for f in files:
         if len(found) >= cap:
             break
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         n = 0
         for r in recs:
             if n >= cap_per_file or len(found) >= cap:

@@ -22,6 +22,10 @@ import json
 import pickle
 import re
 from pathlib import Path
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 BASIS = Path(__file__).resolve().parents[2]
 ZEILE = re.compile(r"\[asym_vorzug\] game_id=(\S+) seed=\d+ zwangsseite=(\d)")
@@ -44,7 +48,7 @@ def main() -> None:
     treffer = {"zwang": 0, "frei": 0}
     ohne_zuordnung = 0
     for f in sorted(glob.glob(str(BASIS / a.korpus))):
-        data = pickle.load(open(f, "rb"))
+        data = load_records(f)
         letzte = {}
         for s in data:
             letzte[s.get("game_id")] = s.get("state")

@@ -13,6 +13,9 @@ B = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(B))                 # config.py (Wurzel)
 sys.path.insert(0, str(B / "engine" / "py"))
 from neural_net import _conjunctions_from_dome, _ownership_from_dome  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ARME = [
     ("heur_own", "D Heuristik"),
@@ -40,8 +43,7 @@ for prefix, name in ARME:
     agg = {g: {0: [0, 0], 1: [0, 0]} for g, _ in GRUPPEN}
     offene_specials = {0: 0, 1: 0}
     for pf in dateien:
-        with open(pf, "rb") as f:
-            data = pickle.load(f)
+        data = load_records(pf)
         last_by_gid = {}
         for step in data:
             last_by_gid[step["game_id"]] = step

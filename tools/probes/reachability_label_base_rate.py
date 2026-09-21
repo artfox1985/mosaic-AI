@@ -27,6 +27,9 @@ import pickle
 import sys
 from collections import defaultdict
 from pathlib import Path
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 BASIS = Path(__file__).resolve().parents[2]
 
@@ -48,7 +51,7 @@ def main() -> None:
     genug: dict = defaultdict(int)
     for f in sorted(glob.glob(str(BASIS / a.states))):
         try:
-            data = pickle.load(open(f, "rb"))
+            data = load_records(f)
         except Exception:  # noqa: BLE001
             continue
         for s in data:

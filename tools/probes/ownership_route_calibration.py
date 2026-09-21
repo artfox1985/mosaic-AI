@@ -69,6 +69,9 @@ from ownership_gate_a import (  # noqa: E402
     reconstruct_split,
     spearman,
 )
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 OUT_JSON = REPO / "evaluations" / "artifacts" / "ownership_route_calibration_results.json"
@@ -92,7 +95,7 @@ THRESH_CHECK = [0.3, 0.5, 0.7, 0.9]
 
 def iter_tiling_records(pkl_path):
     """Je Spiel: (gid, last_record, [tiling-phase Zwischenzustaende])."""
-    data = pickle.load(open(pkl_path, "rb"))
+    data = load_records(pkl_path)
     by_gid = {}
     for step in data:
         by_gid.setdefault(step["game_id"], []).append(step)

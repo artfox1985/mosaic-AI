@@ -18,14 +18,17 @@ from diagnosis import (
     _dome_row_fully_built,
     _dome_row_has_open_matching_slot,
 )
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def collect_cases(data_dir: str, prefix: str, margin_threshold: float = 0.2):
     files = sorted(glob.glob(os.path.join(data_dir, f"{prefix}*.pkl")))
     cases = []
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
         for step in data:
             policy = step.get('policy', [])
             if not policy:

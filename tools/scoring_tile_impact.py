@@ -53,6 +53,10 @@ import statistics as stats
 from collections import Counter, defaultdict
 
 import mosaic_rust
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 BROKEN_PENALTIES = [-1, -2, -3, -4]
 MAX_BROKEN = 4
@@ -90,8 +94,7 @@ def is_board_final(state):
 def load_final_game_records(filepath):
     """Gruppiert Records je Spiel (kontig, siehe `selfplay_diversity_report.
     py`), gibt je ABGESCHLOSSENEM Spiel den LETZTEN Record zurueck."""
-    with open(filepath, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(filepath)
     games = {}
     order = []
     for r in data:

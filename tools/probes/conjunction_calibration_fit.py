@@ -37,6 +37,9 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "engine" / "py"))
 sys.path.insert(0, str(REPO / "tools" / "probes"))
 import ownership_gate_a as GA  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 GRUPPEN = {
     "Reihen k0":      (0, 6),
@@ -124,8 +127,7 @@ def sammle_zustaende(dateien, partien_je_arm=0):
     states, cps, labels, runden = [], [], [], []
     n_partien = 0
     for f in sorted(dateien):
-        with open(f, "rb") as fh:
-            daten = pickle.load(fh)
+        daten = load_records(f)
         je_spiel = collections.defaultdict(list)
         for s in daten:
             je_spiel[s["game_id"]].append(s)

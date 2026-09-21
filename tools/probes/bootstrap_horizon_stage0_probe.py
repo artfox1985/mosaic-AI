@@ -62,6 +62,9 @@ sys.path.insert(0, str(BASIS / "tools"))
 from paired_arena_env_ab import champion_model  # noqa: E402 -- bestehende Champion-Aufloesung wiederverwenden
 
 import mosaic_rust as mr  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 KORPUS_GLOB = str(BASIS / "data" / "selfplay_v20wdl_*.pkl")
 OUT = BASIS / "evaluations" / "artifacts" / "bootstrap_horizon_stage0_probe.json"
@@ -104,7 +107,7 @@ def gather_candidates(files: list[str]) -> dict[tuple, list[dict]]:
     pools: dict[tuple, list[dict]] = defaultdict(list)
     n_games = 0
     for f in files:
-        data = pickle.load(open(f, "rb"))
+        data = load_records(f)
         per_game: dict[str, list[dict]] = defaultdict(list)
         for r in data:
             per_game[r["game_id"]].append(r)

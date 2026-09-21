@@ -18,6 +18,9 @@ import math
 import pickle
 import sys
 from pathlib import Path
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
@@ -111,8 +114,7 @@ def main():
 
     for f in files:
         n_files += 1
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         for r in recs:
             n_records += 1
             pv, rnd = points_val_for_step(r)

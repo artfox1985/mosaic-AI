@@ -26,6 +26,10 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "engine" / "py"))
 sys.path.insert(0, str(REPO))
 from neural_net import action_to_id, UnknownActionTypeError  # noqa: E402
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 RANGES = [("mond 406-410", 406, 410), ("rueckgabe 411-413", 411, 413),
             ("slot/rotation kuppel 328-354", 328, 354),
@@ -34,13 +38,6 @@ RANGES = [("mond 406-410", 406, 410), ("rueckgabe 411-413", 411, 413),
             ("stapel-blick 405", 405, 405)]
 
 
-def load_records(fp):
-    try:
-        with gzip.open(fp, "rb") as f:
-            return pickle.load(f)
-    except OSError:
-        with open(fp, "rb") as f:
-            return pickle.load(f)
 
 
 def ids_of(entries, unknown_types):

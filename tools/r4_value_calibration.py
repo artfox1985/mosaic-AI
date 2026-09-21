@@ -80,6 +80,9 @@ import mosaic_rust  # noqa: E402
 from r5_value_calibration import (  # noqa: E402
     load_torch_model, raw_value_points_torch, value_to_win_prob, points_to_pts, ols_slope_r2,
 )
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 # ── Positions-Substrat: (letzter R4-Record, erster R5-Record) je Partie ────
@@ -90,8 +93,7 @@ def find_r4_r5_pairs_in_file(path: str):
     Entscheidungspunkten mehrerer Partien -- Reihenfolge innerhalb einer
     Partie ist chronologisch (verifiziert), Partien selbst koennen
     verschraenkt sein."""
-    with open(path, "rb") as f:
-        recs = pickle.load(f)
+    recs = load_records(path)
     by_game = OrderedDict()
     for r in recs:
         by_game.setdefault(r["game_id"], []).append(r)

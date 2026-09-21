@@ -59,6 +59,9 @@ from neural_net import (  # noqa: E402
 )
 from neural_net import crop_features_to_model  # noqa: E402
 from config import NUM_ACTIONS  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
@@ -272,8 +275,7 @@ def collect_qualifying(files, cap_total, cap_per_file=3, rounds=None, seed=None)
     for f in files:
         if len(found) >= cap_total:
             break
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         cands = []
         for r in recs:
             # Ohne Seed identisch zum Bestand: Abbruch, sobald der Deckel je

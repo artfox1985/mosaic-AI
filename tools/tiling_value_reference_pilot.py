@@ -58,6 +58,9 @@ import torch  # noqa: E402
 from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
 from neural_net import (MosaicNet, points_dist_bins_from_state,  # noqa: E402
                         state_to_tensor)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 
@@ -92,7 +95,7 @@ def main() -> None:
     net.load_state_dict(ck["model_state"], strict=False)
     net.eval()
 
-    records = pickle.loads(FROZEN_PKL.read_bytes())["records"]
+    records = load_records(FROZEN_PKL)["records"]
     til = [r for r in records
            if r["state"].get("phase") == "tiling" and 2 <= int(r["state"].get("round", 0)) <= 4]
     step = max(1, len(til) // args.n_states)

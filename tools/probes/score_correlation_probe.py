@@ -25,6 +25,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import numpy as np
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
@@ -50,8 +53,7 @@ def collect_games(files):
     """game_id -> dict(X, Y, completed, M={round: clamped_margin}, file)."""
     games = {}
     for f in files:
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         for r in recs:
             gid = r["game_id"]
             g = games.get(gid)

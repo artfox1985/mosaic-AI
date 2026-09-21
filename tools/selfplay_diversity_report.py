@@ -33,13 +33,16 @@ import os
 import pickle
 import statistics
 from collections import Counter, defaultdict
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def load_games(filepath):
     """Laedt eine Pickle-Datei und gruppiert die Records nach game_id (Records
     liegen je Spiel garantiert kontig hintereinander -- siehe Exploration)."""
-    with open(filepath, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(filepath)
     games = []
     cur_id = None
     cur = []

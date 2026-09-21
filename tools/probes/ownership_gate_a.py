@@ -71,6 +71,9 @@ from neural_net import (  # noqa: E402
     state_to_planes,
     state_to_tensor,
 )
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ARMS = ["w0", "w01", "w02", "w05"]
 # Wiederverwendbarkeit fuer spaetere Arme auf DEMSELBEN Held-out (z.B.
@@ -140,7 +143,7 @@ def is_corpus_file(path):
 
 def iter_games(pkl_path):
     """Yields (game_id, last_record, last_round3_record) per game in file."""
-    data = pickle.load(open(pkl_path, "rb"))
+    data = load_records(pkl_path)
     last, mid3 = {}, {}
     for step in data:
         gid = step["game_id"]

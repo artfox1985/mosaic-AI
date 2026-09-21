@@ -38,6 +38,9 @@ CORPUS_GLOB = str(REPO / "data" / "ownership_corpus" / "selfplay_v21_own_k1_*.pk
 # (79 Kanaele) NICHT mehr -- fuer Nachmessungen aktueller Netze --model
 # setzen und gegen die protokollierten Alt-Werte vergleichen.
 import sys as _sys  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 MODELS = {
     "b18_best": REPO / "models" / "alphazero_v21-b18_best.onnx",
@@ -148,8 +151,7 @@ def main():
     decisions = []  # eine Zeile je qualifizierender Entscheidung
 
     for fi, fp in enumerate(files):
-        with open(fp, "rb") as f:
-            data = pickle.load(f)
+        data = load_records(fp)
         n_total_records += len(data)
 
         batch_flat = []

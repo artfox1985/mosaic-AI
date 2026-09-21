@@ -22,6 +22,10 @@ import math
 import pickle
 import statistics
 from pathlib import Path
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 VALUE_SCALE = 50.0  # engine/py/neural_net.py::VALUE_SCALE
 TD_LAMBDA = 0.5      # engine/py/neural_net.py::TD_LAMBDA
@@ -106,8 +110,7 @@ def main():
     n_records_with_both = 0
 
     for fpath in files:
-        with open(fpath, "rb") as fh:
-            game_data = pickle.load(fh)
+        game_data = load_records(fpath)
         game_ids_in_file = set()
         for step in game_data:
             n_records_total += 1

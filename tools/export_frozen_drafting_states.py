@@ -26,6 +26,10 @@ import argparse
 import json
 import pickle
 from pathlib import Path
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -47,8 +51,7 @@ def main() -> int:
     args = ap.parse_args()
 
     pkl_path = REPO / args.set
-    with pkl_path.open("rb") as fh:
-        frozen = pickle.load(fh)
+    frozen = load_records(pkl_path)
     records = frozen["records"]
     print(f"{pkl_path}: {len(records)} Records (Version {frozen.get('version')})")
 

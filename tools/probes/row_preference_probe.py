@@ -69,6 +69,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plate_points_from_arena import game_list  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "artifacts" / "row_preference_probe.json"
@@ -165,8 +168,7 @@ def add_heur_pkl_source(stats: dict, key: str, pkl_glob: str):
     st = stats.setdefault(key, RowStats())
     games_seen = set()
     for f in files:
-        with open(f, "rb") as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
         by_game = defaultdict(list)
         for rec in data:
             by_game[rec["game_id"]].append(rec)

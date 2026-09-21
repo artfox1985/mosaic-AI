@@ -116,6 +116,9 @@ import torch  # noqa: E402
 import scoring_tile_sensitivity as sts  # noqa: E402
 import r5_value_calibration as r5  # noqa: E402
 from neural_net import state_to_tensor, state_to_planes  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def model_flat_features(model):
@@ -593,8 +596,7 @@ def main():
     wall_start = time.time()
     cpu_start = time.process_time()
 
-    with open(args.eval_set, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(args.eval_set)
     records = data["records"]
 
     states = r5.select_round5_states(records, args.n_states)

@@ -35,6 +35,9 @@ from pathlib import Path
 BASIS = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BASIS))
 sys.path.insert(0, str(BASIS / "engine" / "py"))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 # Profil aus PREREG_shaping_scale_per_round.md par.4
 SCALE_FLAT = 50.0
@@ -76,7 +79,7 @@ def main() -> None:
     gesehen: dict = {}
     for f in sorted(glob.glob(str(BASIS / a.states))):
         try:
-            data = pickle.load(open(f, "rb"))
+            data = load_records(f)
         except Exception:  # noqa: BLE001
             continue
         for s in data:

@@ -43,6 +43,9 @@ from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
 from neural_net import (MosaicNet, points_dist_bins_from_state,  # noqa: E402
                         state_to_tensor, state_to_planes,
                         build_model_from_checkpoint)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def binom_p(k: int, n: int) -> float:
@@ -119,7 +122,7 @@ def main() -> None:
         if done:
             break
         try:
-            game_data = pickle.load(open(f, "rb"))
+            game_data = load_records(f)
         except Exception:
             continue
         n_file = 0

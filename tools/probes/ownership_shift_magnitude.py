@@ -45,6 +45,9 @@ from pathlib import Path
 
 BASIS = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BASIS / "engine" / "py"))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def sammle_zustaende(muster: str, n: int, phase: str):
@@ -52,7 +55,7 @@ def sammle_zustaende(muster: str, n: int, phase: str):
     out = []
     for f in sorted(glob.glob(muster)):
         try:
-            data = pickle.load(open(f, "rb"))
+            data = load_records(f)
         except Exception as e:  # noqa: BLE001 -- eine kaputte Datei darf nicht alles stoppen
             print(f"  uebersprungen {Path(f).name}: {e}")
             continue

@@ -51,6 +51,9 @@ import torch  # noqa: E402
 from config import MODELS_DIR  # noqa: E402
 from neural_net import (build_model_from_checkpoint, state_to_planes,  # noqa: E402
                         state_to_tensor)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 # 2026-09-01 (PREREG_geometric_envelope.md par.3e): das Werkzeug konnte nur den
 # Flach-Encoder (`MosaicNet`) laden; die registrierte Messung auf dem
@@ -166,7 +169,7 @@ def main() -> None:
 
     import mosaic_rust as mr
 
-    records = pickle.loads(FROZEN_PKL.read_bytes())["records"]
+    records = load_records(FROZEN_PKL)["records"]
     tiling = [r for r in records if r["state"].get("phase") == "tiling"]
     print(f"Frozen set: {len(records)} Records, davon {len(tiling)} in der Tiling-Phase")
     if not tiling:

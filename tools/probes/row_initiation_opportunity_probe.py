@@ -49,6 +49,9 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
@@ -113,8 +116,7 @@ def analyse_record(rec):
 def collect(files, cap_records=None):
     rows, n_drafting, n_gelegenheit = [], 0, 0
     for f in files:
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         for r in recs:
             a = analyse_record(r)
             if a is None:

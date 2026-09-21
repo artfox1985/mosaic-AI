@@ -22,10 +22,11 @@ import glob
 import json
 import math
 import statistics as st
+import pathlib
 import sys
 import time
 
-sys.path.insert(0, ".")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
 
 PROFILE = [1.0, 0.92, 0.67, 0.33, 0.0]   # ENVELOPE_PROFILE_DEFAULT (envelope.rs:37)

@@ -108,6 +108,9 @@ from r5_value_calibration import (  # noqa: E402
     fit_logistic, curve_win_prob, ols_slope_r2,
 )
 from oracle_metrics import _kendall_tau_a as kendall_tau_a  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 K1_TILE_ID = 1  # ABGELESEN aus tools/probes/column_build_structural_probe.py:249 ("Vertikale Reihen")
 
@@ -207,8 +210,7 @@ def list_corpus_files(pattern: str, n_files: int, rng: random.Random) -> list:
 
 
 def round5_start_candidates_from_file(pkl_path: str, source_tag: str) -> list:
-    with open(pkl_path, "rb") as f:
-        recs = pickle.load(f)
+    recs = load_records(pkl_path)
     if isinstance(recs, dict) and "records" in recs:
         recs = recs["records"]
     by_game: dict = {}

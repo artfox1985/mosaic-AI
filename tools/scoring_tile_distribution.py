@@ -31,6 +31,10 @@ import os
 import pickle
 from collections import Counter
 from itertools import combinations
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 # Muss mit engine/src/scoring.rs::MUTUALLY_EXCLUSIVE_PAIRS übereinstimmen.
 MUTUALLY_EXCLUSIVE_PAIRS = [(0, 7), (6, 3), (4, 1), (2, 5)]
@@ -49,8 +53,7 @@ TILE_NAMES = {
 def iter_game_scoring_ids(filepath):
     """Ein `scoring_tile_ids`-Tripel je Spiel (erster angetroffener Record je
     game_id reicht -- das Feld ist über das ganze Spiel konstant)."""
-    with open(filepath, "rb") as f:
-        data = pickle.load(f)
+    data = load_records(filepath)
     seen = set()
     out = []
     for r in data:

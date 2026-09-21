@@ -58,6 +58,10 @@ import glob
 import math
 import pickle
 from collections import defaultdict
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 ROWS = 6
 ROUNDS = 5
@@ -119,8 +123,7 @@ def main() -> int:
     pat: dict[tuple, dict[int, list[int]]] = defaultdict(dict)
 
     for f in files:
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         for rec in recs:
             st = rec.get("state") or {}
             rnd = st.get("round")

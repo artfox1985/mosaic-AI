@@ -48,6 +48,9 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "engine" / "py"))
 sys.path.insert(0, str(REPO / "tools"))
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 NUM_SLOTS = 9
 CRITERIA = {"c6": 6, "c3": 3}   # Kopf-Block -> Wertungsplatten-ID
@@ -68,8 +71,7 @@ def load_dataset(pattern: str, n_files: int, max_states: int):
     per_criterion_total = collections.Counter()
 
     for path in files:
-        with open(path, "rb") as fh:
-            records = pickle.load(fh)
+        records = load_records(path)
         for gid, recs in group_games(records).items():
             last = recs[-1]["state"]
             active = set(last.get("scoring_tile_ids") or [])

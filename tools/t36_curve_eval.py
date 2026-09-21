@@ -33,6 +33,9 @@ import torch  # noqa: E402
 
 from neural_net import (build_model_from_checkpoint, state_to_planes,  # noqa: E402
                         state_to_tensor)
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 
 def val_files(exclude_file_regex: str | None = None) -> list[str]:
@@ -85,7 +88,7 @@ def main() -> None:
     # Einmalige Vorverarbeitung (identisch fuer alle Modelle).
     planes_l, flat_l, y_l, gid_l = [], [], [], []
     for f in files:
-        for st in pickle.load(open(f, "rb")):
+        for st in load_records(f):
             if st.get("completed") is False or st.get("winner") is None:
                 continue
             s = st["state"]

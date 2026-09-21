@@ -8,9 +8,10 @@ Zeitstempel und faellt darum heraus (gleiche Ausnahme wie in `generator_repro_pr
 import glob
 import hashlib
 import json
+import pathlib
 import sys
 
-sys.path.insert(0, ".")  # corpus_io liegt in der Projektwurzel, nicht in tools/
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
 
 

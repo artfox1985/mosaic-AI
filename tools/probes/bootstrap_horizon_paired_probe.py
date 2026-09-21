@@ -16,6 +16,10 @@ Einstieg wuerde die Messung rund zwanzigfach verbilligen.
 """
 import json, pickle, sys, time, random, pathlib
 import mosaic_rust as mr
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 MODEL = "models/alphazero_v21_2d_brierbest.onnx"
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 60
@@ -24,8 +28,7 @@ SEED = 20260825
 
 t_wand0, t_cpu0 = time.time(), time.process_time()
 
-with open(KORPUS, "rb") as fh:
-    recs = pickle.load(fh)
+recs = load_records(KORPUS)
 # Echten Partieausgang je game_id aus dem letzten Record der Partie.
 ausgang = {}
 for r in recs:

@@ -48,6 +48,9 @@ import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
+from corpus_io import load_records  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CORPUS = BASE_DIR / "data" / "ownership_corpus"
@@ -186,7 +189,7 @@ def validate(files):
     quellen = Counter()
     beispiele = []
     for f in files:
-        recs = pickle.load(open(f, "rb"))
+        recs = load_records(f)
         for r in recs:
             st = r.get("state") or {}
             if st.get("phase") != "drafting":
@@ -252,7 +255,7 @@ def analyse(files, verbose=True):
     mit_wahl = 0
 
     for i, f in enumerate(files):
-        for r in pickle.load(open(f, "rb")):
+        for r in load_records(f):
             rcq = r.get("root_child_q")
             if not rcq or len(rcq) != len(r["policy"]):
                 continue
