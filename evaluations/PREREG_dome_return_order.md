@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: R1-R3 gebaut und abgenommen (12.4-12.11), der Knoten 411-413 ist im v30-Korpus. Die Streuung sitzt seit 2026-09-19 im KNOTEN-Weg (12.12) und ist in der v31-Erzeugung wirksam. DOSIS p = 0,81 (12.12a): die alten 0,0146 standen auf einer fremden Grundmenge (Mondstapel statt Kuppelplatten, Faktor 50); 82,2 Prozent der Partien haben gar keine Gelegenheit, Obergrenze 17,75 Prozent, am Korpus gegengeprueft 15,0 Prozent. Wirkungsfrage offen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: GEBAUT ja (Knoten 411-413 in Aktionsraum, Encoder, Suche, Korpus). TRAEGT nein: A/B 74:76 und 74:76, Vorzeichentest p=1,0 (par.9); erklaert durch den VORAB registrierten Deckel aus par.8a -- der Value-Kopf sieht nur die TYP-Folge, 93 bzw. 85 Prozent der Paare spielen dasselbe. Der Knopf bleibt (Massstab Vollstaendigkeit, nicht Elo), Default 0. Dosis-Nachrechnung an der v31-Erzeugung eingeloest (par.13): 28,0 Prozent der Sockel-Partien haben eine Gelegenheit gegen 17,75 an v30, Knoten durchgehend mit Lernziel. Nutzer-Entscheid 2026-09-21: geschlossen. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -1299,3 +1299,70 @@ tiefe Zuege (>= 3 Platten) machen **8,0 Prozent** aus und sitzen fast vollstaend
 mittlere Tiefe 1,99)**, waehrend Runde 4 **keinen einzigen** tiefen Zug zeigt (mittlere Tiefe exakt 1,00) --
 passend zum Rundenfenster `return_order_round_allowed`. Gemessen wurde das an einem Sockel, der an diesen
 Knoten argmax spielt; es zeigt also den IST-Zustand des Netzes, nicht das Optimum.
+
+## par.13 WIRKUNGSFRAGE GESCHLOSSEN (Nutzer-Entscheid 2026-09-21)
+
+**Nutzer: *"kannst schliessen"*.** Damit steht das Verdikt zur Leitfrage dieser Prereg.
+
+### GEBAUT: ja, vollstaendig
+
+Die Rueckgabe-Reihenfolge ist ein eigener Entscheidungsknoten (IDs 411-413, `choose_return_first`,
+`neural_net.py:1067-1069`) und steht im Aktionsraum, im Encoder, in der Suche und im Korpus.
+
+### TRAEGT: kein messbarer Effekt, und der Grund war vorab registriert
+
+Das vorab festgelegte A/B (par.5 Punkt 1) ergab ueber zwei Seed-Basen **74:76 und 74:76**,
+Vorzeichentest **p = 1,0** in beiden Faellen, gepaarte Differenz -0,027 mit der Null im Intervall,
+Punkte praktisch gleich (54,14/54,23 und 52,88/53,07). Nach der Regel aus par.5 heisst das "kein
+messbarer Effekt".
+
+**Der erklaerende Befund steht daneben:** in **93 bzw. 85 Prozent** der Paare spielen beide Modi
+dasselbe. Der Deckel dafuer war in par.8a Befund 1 VORAB registriert -- der Value-Kopf sieht die
+Reihenfolge nur als TYP-Folge (`features.rs:212`, oberste vier Positionen als +1 Spezial /
+-1 Joker / 0). Permutationen gleichtypiger Platten sind fuer das Netz identisch, und Modus 1
+faellt dann per Gleichstand auf die Ziehreihenfolge zurueck.
+
+**Der Knopf bleibt** (par.0/par.1, Nutzer-Praezedenz): der Massstab ist Vollstaendigkeit, nicht
+Elo. Ein legaler Zug, den die Suche nicht waehlen kann, ist eine Luecke im Modell, auch wenn sie
+nichts kostet. Default unveraendert `MOSAIC_RETURN_ORDER_MODE = 0` (Ziehreihenfolge); die
+Champion-Spec `v31-b01` traegt das Feld nicht, der Champion spielt also auf dem Default.
+
+### Die Dosis-Nachrechnung an der v31-Erzeugung: GEMACHT (2026-09-21)
+
+12.12a hielt fest, dass `p = 0,81` an der **v30**-Erzeugung geeicht wurde und die Gelegenheitsrate
+VERHALTENSABHAENGIG ist -- lernt das Netz, oefter tief zu ziehen, steigen die Gelegenheiten. Die
+Wiedervorlage ist jetzt eingeloest.
+
+**n = 300 Partien je Klasse** (30 ordnungsfrei gezogene Dateien je Klasse, Seed 7),
+**GRUNDMENGE** die Partien dieser Dateien, **EINHEIT** Partien mit mindestens einem Record, dessen
+`valid_actions` eine der IDs 411-413 traegt:
+
+| Klasse | Partien mit Gelegenheit | Records mit Knoten (valid / policy) |
+| --- | --- | --- |
+| Sockel (`policy`) | 84 von 300 = **28,0 %** | 105 / 105 |
+| temperiert (`value-tempc`) | 67 von 300 = **22,3 %** | 74 / 74 |
+| Ausflug (`value-excursion`) | 62 von 295 = **21,0 %** | 78 / 78 |
+
+**Die Vorhersage aus 12.12a haelt.** An der v30-Erzeugung hatten **17,75 Prozent** der Partien
+ueberhaupt eine Gelegenheit; im Sockel der v31-Erzeugung sind es **28,0 Prozent** -- Faktor 1,58 in
+genau der Richtung, die der Vorbehalt genannt hat. Der zweite Vorbehalt ("temperierte Klasse
+UNGEPRUEFT") ist damit ebenfalls erledigt: sie liegt mit 22,3 Prozent unter dem Sockel, nicht
+darueber.
+
+**Und der Knoten traegt durchgehend ein Lernziel:** in allen drei Klassen ist jeder Record, der
+die IDs in `valid_actions` hat, auch in `policy` vertreten (105/105, 74/74, 78/78). Der v31-Korpus
+erfuellt damit die Bedingung aus `feedback_knob_ab_needs_corpus_that_used_it` -- ein A/B ueber
+diesen Knopf waere auf ihm erstmals nicht mehr Henne-Ei.
+
+**Vorbehalt zur Vergleichbarkeit, ausdruecklich:** die 17,75 Prozent stammen aus der Zaehlweise von
+12.12a, meine 28,0 Prozent aus der oben benannten. Beide meinen "Partie hat mindestens eine
+Gelegenheit", aber sie sind nicht Zeile fuer Zeile gegeneinander geprueft; die Richtung ist
+belastbar, der Faktor 1,58 auf die zweite Stelle nicht.
+
+### Warum hier nicht weiter gemessen wird
+
+Ein A/B, das den Deckel umgeht, muesste zuerst den ENCODER aendern -- die Reihenfolge als mehr als
+eine Typ-Folge zeigen. Das ist eine andere Frage als die dieser Prereg, und par.10 hat "keine
+weitere Stufe" bereits als Nutzer-Entscheid registriert. Das A/B mit mehr Partien zu wiederholen
+wuerde am 93-Prozent-Split nichts aendern: Paare, die nichts unterscheiden, werden durch mehr
+Partien nicht informativ.

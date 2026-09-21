@@ -31,9 +31,14 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 1. **Brier-Regel gestreift** (par.3 Punkt 7d): 0,22919 gegen 0,22804 des Vorgaengers, +0,5 Prozent
    relativ. Zweite Generation in Folge, aber deutlich weniger als die +2,7 Prozent bei `v30-b02`.
    Ein Intervall dazu liegt NICHT vor.
-2. **R5 und R4b nicht gefahren** -- seit v24-b06 nicht mehr, Werkzeuge auf die v18-Aera
-   voreingestellt. Fuer den Schluss-Champion waere R5 die einzige Pruefung des Value-Kopfs gegen
-   eine EXAKTE Grundwahrheit. Nutzer-Entscheid: ziehen oder die Checklisten-Zeile kuerzen.
+2. **R4b ist am 2026-09-21 am Schluss-Champion GEFAHREN** (`PREREG_r4_value_calibration.md`
+   par.20, Nutzer-Auftrag). Kein Nachziehen, sondern eine neue Messung: das alte Artefakt zieht
+   sein Substrat aus dem geloeschten v18-Korpus. Ergebnis: der v20-Befund "beide Koepfe blind"
+   gilt fuer `v31-b01` NICHT mehr (Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt
+   50,0 Prozent). NEUER Befund: der Punkte-Kopf ueberschiesst um Faktor 2,1 in der Streuung.
+   Kein gepaarter Vergleich (anderes Substrat, andere Decke), n=72 indikativ.
+   **R5 bleibt offen** -- die Sonde ist seit par.8j wieder lauffaehig (toter Default entfernt,
+   API-ONNX loest auf den Champion auf), gefahren ist sie nicht. Nutzer-Entscheid.
 
 ### WAS ALS NAECHSTES ANSTEHT
 

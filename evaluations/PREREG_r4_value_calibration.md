@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: "Kein Befund" (R² negativ), zusaetzlich Methoden-Alarm (Vorzeichen-Anker nur 9/24) -> Folge-Messung "R4b" initiiert; Git-Commit `cb4773d`, kein Prosa-Absatz in history.md -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: v20-Aera "kein Befund" (R2 negativ, Vorzeichen-Anker 9/24) -> R4b initiiert. AM SCHLUSS-CHAMPION NACHGEFAHREN 2026-09-21 (par.20, Nutzer-Auftrag): der alte Befund gilt fuer v31-b01 NICHT mehr -- Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt 50,0 Prozent. Neuer Befund: der Punkte-Kopf UEBERSCHIESST (Steigung 1,19, sd 40,2 gegen wahre 18,8), darum margin_scale_vs_expected -2,18 ohne Nachskalierung bei r=0,56. KEIN gepaarter Vergleich: anderes Substrat, andere Decke; n=72 nur indikativ. -->
 
 # Vorregistrierung: Runde-4-Ende-Value-Kalibrierung gegen gesampelte exakte Ground Truth (Chance-Knoten-Erwartung)
 
@@ -307,3 +307,98 @@ Vorbereitung (Zeile ~6941-6958); die Commit-Message ist die einzige
 textuelle Verdikt-Quelle. Nicht zu verwechseln mit dem spaeteren, separaten
 "R4b"-Task (`evaluations/artifacts/r4b_value_calibration_wdl.json`, N=72, andere
 Methodik, eigene Vorregistrierung/eigenes Werkzeug).
+
+## par.20 R4b AM SCHLUSS-CHAMPION GEFAHREN (2026-09-21, Nutzer-Auftrag)
+
+**Nutzer: *"dann zieh das auch am aktuellen champion"*** -- im Anschluss an die Feststellung, dass
+die R5-Sonde wieder lauffaehig ist, R4b aber nicht.
+
+### Warum das kein Nachziehen war, sondern eine neue Messung
+
+Meine erste Auskunft war die halbe Wahrheit. Ich hatte gesagt, `r4b_zone_probe` sei an
+`alphazero_v20_2d_opp_brierbest.pth` gebunden, weil derselbe Name Schluessel der Referenzwerte im
+eingefrorenen JSON ist. Das stimmt, ist aber nicht der harte Blocker. **Der harte Blocker ist das
+SUBSTRAT:** `r4b_value_calibration_v20_n72.json` traegt als `data_glob` den Wert
+`data/selfplay_v18_*.pkl` -- **0 Dateien im Baum**, der Korpus ist geloescht. Und die 72 Zustaende
+selbst stehen NICHT im Artefakt (`per_state` traegt nur Kennzahlen, keinen Zustand). Die
+Zustands-Reproduktion, die das Werkzeug als erstes prueft, kann also gar nicht gelingen.
+
+**Der gangbare Weg ist deshalb eine frische Messung**, und sie ist vollwertig: die Grundwahrheit
+(`true_margin`/`true_winprob`, exakte Alpha-Beta-Marge ueber 16 Neubefuellungen) ist
+MODELLUNABHAENGIG. Neue Zustaende aus einem aktuellen Korpus, frische Grundwahrheit, Champion
+darauf gemessen.
+
+### Lauf
+
+`tools/r4_value_calibration.py`, Modell `models/frozen_champions/v31-b01/model.pth`, Substrat
+`data/selfplay_v30-b02-policy_*.pkl` (die v31-Erzeugung), n = 72 Zustaende, k = 16 Refills,
+400 Sims, c_puct 1,5, `state_seed` 20260803 -- dieselben Stellgroessen wie die v20-Referenz.
+Auswahl: 58 Dateien gescannt, 580 Partien, **0 Ausschluesse**.
+Artefakt: `evaluations/artifacts/r4_value_calibration_v31-b01_n72.json`.
+**Laufzeit 2.693,7 s (44 min 55 s), 37,4 s je Zustand.**
+
+### Ergebnis
+
+| Kennzahl | v20 (2026-08) | **v31-b01 (2026-09-21)** |
+| --- | --- | --- |
+| Value-Kopf Steigung | 0,0562 | **0,4540** |
+| Value-Kopf R2 | 0,0078 | **0,4142** |
+| Punkte-Kopf Steigung | 0,3235 | **1,1930** |
+| Punkte-Kopf R2 | 0,1786 | **0,3116** |
+| Decke `r2_max` win / margin | 0,9672 / 0,9742 | 0,9139 / 0,9827 |
+| realisiert `win_scale_vs_expected` | -0,3375 | **+0,4104** |
+| realisiert `margin_scale_vs_expected` | +0,0309 | **-2,1830** |
+| Vorzeichen-Anker | 36 von 72 = 50,0 % | **50 von 70 = 71,4 %** |
+
+**Die Steigung ist d(Modell)/d(Wahrheit)** (`ols_slope_r2(x=Wahrheit, y=Modell)`, am Code
+geprueft) -- Werte unter 1 heissen GEDAEMPFT, ueber 1 UEBERSCHIESSEND.
+
+**Lesart, vorsichtig:**
+
+1. **Der R4b-Befund der v20-Aera gilt fuer den Schluss-Champion nicht mehr.** Er lautete "beide
+   Koepfe blind fuer exakte R4-End-Info, R2 ~ 0". Der Value-Kopf liegt jetzt bei R2 = 0,414 gegen
+   eine EXAKTE Grundwahrheit, und der Vorzeichen-Anker trifft 71,4 statt 50,0 Prozent -- 50 Prozent
+   war der Muenzwurf, der damals den Methoden-Alarm ausgeloest hat.
+2. **Der Betrag hat die Seite gewechselt.** Die v20-Koepfe waren gedaempft (0,056 / 0,323); der
+   Champion ueberschiesst beim Punkte-Kopf (1,193). Gemessen an den Streuungen: die wahre Marge
+   hat sd 18,80, die Modell-Marge sd 40,17 -- **Faktor 2,1 zu weit**. Genau das erklaert das stark
+   negative `margin_scale_vs_expected` von -2,18: ohne Nachskalierung ist die absolute Marge
+   schlechter als der Mittelwert-Vorhersager, obwohl sie mit r = 0,56 klar korreliert. Die
+   Information IST da, die Skala stimmt nicht.
+3. **Kein Widerspruch zu den beiden Zahlen:** R2 = 0,3116 ist der Wert NACH Anpassung von Steigung
+   und Achsenabschnitt, -2,18 der Wert OHNE. Rechnerisch konsistent
+   (r = 0,556; 0,556 x 40,17/18,80 = 1,19 = die Steigung).
+
+### Was diese Zahlen NICHT sind
+
+**Kein gepaarter Vergleich.** Die v20-Messung lief auf Zustaenden aus dem v18-Korpus, diese auf
+Zustaenden aus der v31-Erzeugung. Andere Stellungen, andere Decke (`r2_max` win 0,967 gegen
+0,914 -- die Decke ist substrat-, nicht modellabhaengig). **Die Spalten stehen nebeneinander, sie
+sind nicht voneinander abgezogen.** Ein sauberer Delta-Wert braeuchte beide Modelle auf DEMSELBEN
+Substrat; das v18-Modell dafuer liegt nicht mehr im Baum. Die Richtung ist bei diesen Abstaenden
+belastbar, die zweite Stelle nicht.
+
+**Zweiter Vorbehalt, n = 72.** Das war schon in der v20-Messung als "nur indikativ" vermerkt und
+gilt unveraendert.
+
+### Zwei Maengel am Werkzeug, mitbehoben
+
+* **Dieselben toten Defaults wie bei R5** (`--models` auf drei geloeschte Checkpoints,
+  `--data-glob` auf den geloeschten v18-Korpus, `--model-path-for-api` auf ein geloeschtes ONNX).
+  Die beiden ersten sind jetzt `required`, der dritte loest auf den amtierenden Champion auf --
+  laut Moduldoku wird sein Inhalt fuer Runde-5-Zustaende nie benutzt, nur seine Ladbarkeit.
+* **Der Lauf war STUMM**: zwischen Auswahl-Statistik und Ergebnis kam 45 Minuten lang keine Zeile,
+  derselbe Regelverstoss wie bei `build_frozen_golden_probe.py`. Jetzt eine Zeile je Zustand mit
+  Laufzeit und `flush`. Und er schrieb **keinen `laufzeit`-Block** -- jetzt ueber
+  `runtime_block.laufzeit_block` mit Einheit `s_je_zustand`, weil dieses Werkzeug keine Partien
+  spielt. Die Laufzeit DIESES Laufs ist aus den Harness-Zeitstempeln nachgetragen und im Artefakt
+  als solche gekennzeichnet, statt sie verfallen zu lassen.
+
+### Offen
+
+`r4b_zone_probe.py` (die URSACHEN-Analyse: Ridge von Trunk-Embedding bzw. Roh-Eingabe auf die
+Grundwahrheit) ist damit wieder fahrbar -- sie braucht nur `R4B_JSON` und `MODEL_KEY` auf das neue
+Artefakt gezogen. Ihre Frage "wo geht die Information verloren" ist durch dieses Ergebnis aber
+verschoben: sie war fuer R2 ~ 0 gestellt, und der Value-Kopf liegt jetzt bei 0,414 gegen eine
+Decke von 0,914. Die schaerfere Frage waere die SKALA des Punkte-Kopfs (Faktor 2,1 zu weit), nicht
+mehr die Blindheit. Nicht gefahren, Nutzer-Entscheid.

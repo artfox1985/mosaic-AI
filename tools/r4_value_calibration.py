@@ -81,8 +81,11 @@ from r5_value_calibration import (  # noqa: E402
     load_torch_model, raw_value_points_torch, value_to_win_prob, points_to_pts, ols_slope_r2,
 )
 import pathlib
+import time
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 
 # ── Positions-Substrat: (letzter R4-Record, erster R5-Record) je Partie ────
@@ -344,6 +347,10 @@ def bootstrap_r2_max(per_state, n_bootstrap: int, seed: int):
     }
 
 
+_T_START = 0.0
+_C_START = 0.0
+
+
 # ── Modell-Messung ueber N Zustaende ────────────────────────────────────
 
 def measure_model(pth_path: str, chosen_states: list, k_refills: int, model_path_for_api: str,
@@ -354,6 +361,13 @@ def measure_model(pth_path: str, chosen_states: list, k_refills: int, model_path
         row = measure_one_state(gid, r4_rec, r5_rec, k_refills, model, encoder,
                                  model_path_for_api, sims, c_puct, seed, si)
         per_state.append(row)
+        # Fortschritt SICHTBAR (CLAUDE.md "Lange Laeufe NIE in eine Pipe"): der
+        # volle Lauf schwieg am 2026-09-21 knapp 45 Minuten zwischen Start und
+        # Ergebnis. Eine Dauer, die man erst am Ende erfaehrt, hilft beim
+        # naechsten Lauf, aber nicht beim laufenden.
+        if not smoke:
+            print(f"[r4_value_calibration] Zustand {si + 1}/{len(chosen_states)} "
+                  f"({time.monotonic() - _T_START:.0f}s) game={gid}", flush=True)
         if smoke:
             print(f"  Zustand {si} (game={gid}, Datei={os.path.basename(path)}):")
             print(f"    R4 current_player={row['r4_current_player']}  raw_value_p0={row['raw_value_p0']:.4f} "
@@ -438,24 +452,50 @@ def measure_model(pth_path: str, chosen_states: list, k_refills: int, model_path
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--models", nargs="+", default=[
-        "models/alphazero_v19_2d_best.pth",  # primaer (Champion)
-        "models/alphazero_v18_best.pth", "models/alphazero_v19_best.pth",  # sekundaer
-    ], help="Torch-Checkpoints (.pth) -- einheitlicher Messpfad fuer alle Modelle")
-    ap.add_argument("--model-path-for-api", default="models/alphazero_v18_best.onnx",
-                     help="beliebiger gueltiger ONNX-Pfad, den net_search_state_json laden MUSS (API-Zwang) -- "
-                          "fuer Runde-5-Zustaende inhaltlich nie benutzt (round5.rs-Kurzschluss)")
+    # Keine toten Defaults mehr (par.8h Fund 8, hier nachgezogen 2026-09-21):
+    # die drei Checkpoints und der v18-Korpus liegen nicht mehr im Baum. Das
+    # gewaehlte Netz IST die Substanz der Messung, also wird die Wahl verlangt.
+    ap.add_argument("--models", nargs="+", required=True,
+                    help="Torch-Checkpoints (.pth) -- einheitlicher Messpfad fuer alle Modelle")
+    # Umgekehrter Fall: laut Moduldoku wird der Inhalt fuer Runde-5-Zustaende
+    # nie benutzt (round5.rs-Kurzschluss), gebraucht wird nur ein LADBARER
+    # ONNX-Pfad. Darum ein Default, der mitwandert.
+    ap.add_argument("--model-path-for-api", default=None,
+                    help="beliebiger gueltiger ONNX-Pfad, den net_search_state_json laden MUSS "
+                         "(API-Zwang) -- fuer Runde-5-Zustaende inhaltlich nie benutzt. "
+                         "Ohne Angabe: der amtierende Champion.")
     ap.add_argument("--sims", type=int, default=400)
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--n-states", type=int, default=24)
     ap.add_argument("--k-refills", type=int, default=16)
-    ap.add_argument("--data-glob", default="data/selfplay_v18_*.pkl")
+    # Der v18-Korpus ist geloescht; ein Glob, der nichts trifft, ist eine
+    # Falschauskunft statt einer Bequemlichkeit.
+    ap.add_argument("--data-glob", required=True,
+                    help="Glob auf die Korpusdateien, aus denen die R4-Ende-Zustaende kommen")
     ap.add_argument("--state-seed", type=int, default=20260803)
     ap.add_argument("--n-bootstrap", type=int, default=1000)
     ap.add_argument("--out", default="evaluations/artifacts/r4_value_calibration_result.json")
     ap.add_argument("--smoke", action="store_true",
                      help="Rauchtest: 2 Zustaende x 3 Refills x NUR das erste Modell, keine Regression.")
     args = ap.parse_args()
+    global _T_START, _C_START
+    _T_START, _C_START = time.monotonic(), time.process_time()
+
+    if args.model_path_for_api is None:
+        modelle = pathlib.Path(__file__).resolve().parents[1] / "models"
+        name = (modelle / "champion.txt").read_text(encoding="utf-8").strip()
+        basis = name
+        for suffix in ("_brierbest", "_best"):
+            if basis.endswith(suffix):
+                basis = basis[: -len(suffix)]
+        for kandidat in (modelle / f"alphazero_{name}.onnx",
+                         modelle / "frozen_champions" / basis / "model.onnx"):
+            if kandidat.exists():
+                args.model_path_for_api = str(kandidat)
+                break
+        else:
+            raise SystemExit(f"Kein ONNX zum Champion '{name}' gefunden -- --model-path-for-api setzen.")
+        print(f"[r4_value_calibration] API-ONNX (Inhalt egal): {args.model_path_for_api}", flush=True)
 
     n_states = 2 if args.smoke else args.n_states
     k_refills = 3 if args.smoke else args.k_refills
@@ -493,6 +533,10 @@ def main():
     print("\n=== ZUSAMMENFASSUNG ===")
     print(json.dumps(summary, indent=2, ensure_ascii=True, default=str))
 
+    # CLAUDE.md-Pflichtblock. Einheit ist der ZUSTAND, nicht die Partie --
+    # dieses Werkzeug spielt keine Partien, es misst je R4-Ende-Zustand.
+    summary["laufzeit"] = laufzeit_block(_T_START, cpu_start=_C_START, threads=1,
+                                         n_units=len(chosen_states), unit="zustand")
     result = {"summary": summary, "per_model": model_results}
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
