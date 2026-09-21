@@ -27,6 +27,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "engine" / "py"))
 import corpus_io  # noqa: E402
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 
 def stacks_after_move(state):
@@ -48,7 +52,7 @@ def main():
     ap.add_argument("--out", default="evaluations/artifacts/moon_target_corpus_probe.json")
     a = ap.parse_args()
 
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
     files = sorted(glob.glob(a.pattern))[: a.max_files]
     print(f"[moon-korpus] {len(files)} Dateien", flush=True)
 
@@ -83,7 +87,7 @@ def main():
                 c["abweichend"] += 1
         if (i + 1) % 5 == 0:
             print(f"[moon-korpus] {i+1}/{len(files)} Dateien, {c['entscheide']} Entscheide "
-                  f"({time.time()-t0:.0f} s)", flush=True)
+                  f"({time.monotonic() - t0:.0f} s)", flush=True)
 
     scored = c["kanonisch"] + c["abweichend"]
     result = {
@@ -96,7 +100,7 @@ def main():
         "bewertet": scored,
         "anteil_abweichend": round(c["abweichend"] / scored, 4) if scored else None,
         "tor": "unter 0,10 = Henne-Ei, dann faellt B1 (nur B2 mit v30-Korpus)",
-        "laufzeit": {"wanduhr_s": round(time.time() - t0, 1)},
+        "laufzeit": laufzeit_block(t0, cpu_start=c0, threads=1),
     }
     io.open(a.out, "w", encoding="utf-8").write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(result, indent=2, ensure_ascii=False), flush=True)

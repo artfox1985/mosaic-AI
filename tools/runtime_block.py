@@ -42,7 +42,8 @@ import time
 
 def laufzeit_block(wall_start: float, *, cpu_start: float | None = None,  # konvention-ok: spiegelt den in CLAUDE.md festgelegten Artefakt-Feldnamen "laufzeit"
                    threads: int | None = None,
-                   n_games: int | None = None) -> dict:
+                   n_games: int | None = None,
+                   n_units: int | None = None, unit: str = "partie") -> dict:
     """Baut den `laufzeit`-Block aus einem `time.monotonic()`-Startwert.
 
     `wall_start`   -- Rueckgabe von `time.monotonic()` VOR dem Messteil.
@@ -51,13 +52,23 @@ def laufzeit_block(wall_start: float, *, cpu_start: float | None = None,  # konv
     `threads`      -- die Thread-Zahl, mit der gemessen wurde; None nur, wenn
                       der Begriff fuer das Werkzeug keinen Sinn hat.
     `n_games`      -- Partien des Laufs; None, wenn keine gespielt wurden.
+    `n_units`/`unit` -- fuer Werkzeuge, deren Laufeinheit KEINE Partie ist:
+                      `n_units=1234, unit="record"` schreibt `s_je_record`
+                      statt `s_je_partie`. Nachgetragen 2026-09-21 (par.8h
+                      Punkt 2): drei Sonden hatten den Block genau deshalb von
+                      Hand gebaut, weil `s_je_partie` fuer sie gelogen haette.
+                      Eine Einheit, die nicht passt, ist ein Grund, den Helfer
+                      zu erweitern -- nicht, ihn zu umgehen.
     """
     wall = time.monotonic() - wall_start
     cpu = None if cpu_start is None else round(time.process_time() - cpu_start, 1)
-    per_game = round(wall / n_games, 3) if n_games else None
+    if n_units is not None:
+        name, n = f"s_je_{unit}", n_units
+    else:
+        name, n = "s_je_partie", n_games
     return {
         "wanduhr_s": round(wall, 1),
         "cpu_s": cpu,
         "threads": threads,
-        "s_je_partie": per_game,
+        name: round(wall / n, 4) if n else None,
     }

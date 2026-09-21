@@ -26,6 +26,10 @@ from __future__ import annotations
 
 import argparse, glob, io, json, re, statistics, time
 from collections import Counter
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 RUNDE = re.compile(r"^\[R(\d+)\]")
 SONNE = re.compile(r"\u2600\ufe0f?\s+(\S+):\s+\d+\u00d7\s+(\S+)\s+von\s+(\S+)")
@@ -40,7 +44,7 @@ def main():
     ap.add_argument("--artifacts", nargs="+", required=True)
     ap.add_argument("--out", default="evaluations/artifacts/moon_access_balance.json")
     a = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
 
     c = Counter()
     distances = []
@@ -132,7 +136,7 @@ def main():
                    "GENAU dieser Stein sofort abgeholt wird. Er traegt NICHT die Aussage 'der "
                    "Hebel ist klein': ein Mondzug nimmt alle Oberseiten einer Farbe, die Wahl "
                    "steuert also Buendelgroessen. Siehe 'buendel'."),
-        "laufzeit": {"wanduhr_s": round(time.time() - t0, 1)},
+        "laufzeit": laufzeit_block(t0, cpu_start=c0, threads=1),
     }
     io.open(a.out, "w", encoding="utf-8").write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(result, indent=2, ensure_ascii=False), flush=True)

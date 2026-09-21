@@ -35,6 +35,9 @@ sys.path.insert(0, str(REPO / "engine" / "py"))
 import torch  # noqa: E402
 import corpus_io  # noqa: E402
 from neural_net import build_model_from_checkpoint, state_to_planes, state_to_tensor  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 FROZEN = REPO / "evaluations" / "frozen_eval_set_v3.pkl"
 ORACLE = REPO / "evaluations" / "artifacts" / "frozen_v3_oracle_labels.json"
@@ -83,7 +86,7 @@ def main() -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=20260906)
     a = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
     recs = corpus_io.load_records(FROZEN)["records"]
     oracle = {}
     if ORACLE.exists():
@@ -97,7 +100,7 @@ def main() -> int:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     planes = torch.stack([state_to_planes(r["state"]).float() for r in recs])
     flat_full = torch.stack([state_to_tensor(r["state"]) for r in recs])
-    print(f"{len(recs)} Zustaende kodiert ({time.time() - t0:.0f}s), Orakel-Labels {len(oracle)}", flush=True)
+    print(f"{len(recs)} Zustaende kodiert ({time.monotonic() - t0:.0f}s), Orakel-Labels {len(oracle)}", flush=True)
     rng = np.random.default_rng(a.seed)
     out = {"prereg": "PREREG_geometric_envelope.md par.8.5 / par.12a B1,B2 / par.12b Punkte 1-2", "frozen": FROZEN.name,
            "n": len(recs), "block": BLOCK, "draws": DRAWS, "nur_spieler_am_zug": True, "modelle": {}}
@@ -140,10 +143,10 @@ def main() -> int:
         spann[rd] = {"marge_min_max": [min(xs), max(xs)], "marge_spannweite": round(max(xs) - min(xs), 3),
                      "orakel_min_max": [min(xo), max(xo)] if xo else None, "orakel_spannweite": round(max(xo) - min(xo), 3) if xo else None}
     out["netz_spannweite"] = spann
-    out["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 1), "cpu_s": round(time.process_time(), 1), "threads": 1, "device": device}
+    out["laufzeit"] = laufzeit_block(t0, cpu_start=c0, threads=1) | {"device": device}
     Path(a.out).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print("Netz-Spannweite je Runde (Marge):", {k: v["marge_spannweite"] for k, v in spann.items()})
-    print(f"Artefakt: {a.out} ({time.time() - t0:.0f}s)")
+    print(f"Artefakt: {a.out} ({time.monotonic() - t0:.0f}s)")
     return 0
 
 

@@ -23,6 +23,10 @@ import os
 import re
 import time
 from collections import defaultdict
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 PATTERNS = {
     "tiling": (re.compile(r"^\[R(\d)\] 🎯 (Spieler 1|Spielerin|KI): \+(\d+) Pkt \(Reihe"), +1),
@@ -44,7 +48,7 @@ def main() -> int:
     ap.add_argument("--pattern", default="static/log/game_*.log")
     ap.add_argument("--out", default="evaluations/artifacts/server_log_points_probe.json")
     a = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
     files = []
     agg = defaultdict(lambda: defaultdict(float))
     finals = defaultdict(list)
@@ -104,7 +108,7 @@ def main() -> int:
               f"{out['seiten'][who]['endwertung_nach_kategorie']}")
         for r, row in rows.items():
             print(f"   {r}: {row}")
-    out["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 2), "cpu_s": round(time.process_time(), 2), "threads": 1}
+    out["laufzeit"] = laufzeit_block(t0, cpu_start=c0, threads=1)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(out, fh, ensure_ascii=False, indent=1)

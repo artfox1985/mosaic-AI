@@ -30,6 +30,8 @@ import pathlib
 import subprocess
 import sys
 import time
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT))
@@ -97,7 +99,7 @@ def main():
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--seed-base", type=int, default=926000)
     args = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
 
     import mosaic_rust as mr
     proc = worker_start()
@@ -120,7 +122,7 @@ def main():
                 rnd = rg.round_number()
                 if guard % 25 == 0:
                     print(f"  Partie {g + 1}: Schritt {guard}, Runde {rnd}, "
-                          f"{queries} Vergleiche ({time.time() - t0:.0f}s)", flush=True)
+                          f"{queries} Vergleiche ({time.monotonic() - t0:.0f}s)", flush=True)
                 state_json = rg.state_json()
                 seed = rg.pending_search_seed()
                 st = json.loads(state_json)
@@ -157,7 +159,7 @@ def main():
                     d["lehrer_bedient"] += int(t_a.get("row") in site_rows)
                     d["netz_bedient"] += int(net_a.get("row") in site_rows)
             print(f"  Partie {g + 1}/{args.games} fertig, {queries} Vergleiche "
-                  f"({time.time() - t0:.0f}s, {errors} Worker-Fehler)", flush=True)
+                  f"({time.monotonic() - t0:.0f}s, {errors} Worker-Fehler)", flush=True)
     finally:
         try:
             proc.stdin.close(); proc.terminate()
@@ -177,7 +179,7 @@ def main():
             "lehrer_bedient_fehlzeile": (d["lehrer_bedient"] / d["site_n"]) if d["site_n"] else None,
             "netz_bedient_fehlzeile": (d["netz_bedient"] / d["site_n"]) if d["site_n"] else None,
         }
-    result["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 1), "threads": 1}
+    result["laufzeit"] = laufzeit_block(t0, cpu_start=c0, threads=1)
     ARTIFACT.write_text(json.dumps(result, indent=1, ensure_ascii=False),
                         encoding="utf-8", newline="\n")
     for k, v in result["je_runde_und_stelle"].items():

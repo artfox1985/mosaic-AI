@@ -44,6 +44,8 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "engine" / "py"))
 
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 ARTIFACT_BASE = _ROOT / "evaluations" / "artifacts"
 PREREG = "PREREG_heuristic_v2_long_rows.md par.3b.8 Stufe A"
@@ -86,7 +88,7 @@ def main():
     ap.add_argument("--suffix", default="",
                     help="Artefaktnamens-Suffix, z.B. _onpolicy_b04")
     args = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
 
     import onnxruntime as ort
     from neural_net import state_to_planes, state_to_tensor
@@ -161,7 +163,7 @@ def main():
         per_file.append(stats)
         if time.time() - t_report > 15:
             print(f"  {fi + 1}/{len(files)} Dateien, {sites_total} Stellen "
-                  f"({time.time() - t0:.0f}s)", flush=True)
+                  f"({time.monotonic() - t0:.0f}s)", flush=True)
             t_report = time.time()
 
     def agg(getter):
@@ -191,7 +193,7 @@ def main():
                     if gaps and sum(g[1] for g in gaps) else None,
             },
         }
-    result["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 1), "threads": 1}
+    result["laufzeit"] = laufzeit_block(t0, cpu_start=c0, threads=1)
     result["pattern"] = args.pattern
     ARTIFACT = ARTIFACT_BASE / f"ownership_map_completion_sites{args.suffix}.json"
     ARTIFACT.parent.mkdir(parents=True, exist_ok=True)

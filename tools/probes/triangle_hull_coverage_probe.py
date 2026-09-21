@@ -33,6 +33,8 @@ import time
 _ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT))
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 ARTIFACT_DIR = _ROOT / "evaluations" / "artifacts"
 
@@ -196,7 +198,7 @@ def main():
     ap.add_argument("--pattern", required=True)
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
 
     files = sorted(glob.glob(str(_ROOT / "data" / args.pattern)))
     if args.limit:
@@ -276,7 +278,7 @@ def main():
                 end_dev.append(deviation(final_cells, hull))
                 fz_stats.append(forbidden_zone_stats(final_cells, hull))
         if fi % 50 == 49:
-            print(f"  {fi + 1}/{len(files)} Dateien ({time.time() - t0:.0f}s)", flush=True)
+            print(f"  {fi + 1}/{len(files)} Dateien ({time.monotonic() - t0:.0f}s)", flush=True)
 
     n = len(end_hull_fill)
     result = {
@@ -291,7 +293,7 @@ def main():
             "aussen_fuellstand_mittel_von_15": sum(end_out_fill) / n,
             "dreiecks_abweichung_mittel": sum(end_dev) / n,
         },
-        "laufzeit": {"wanduhr_s": round(time.time() - t0, 1), "threads": 1},
+        "laufzeit": laufzeit_block(t0, cpu_start=c0, threads=1),
     }
     # Stufe D2 (par.3b.8): vier Huellen-Kennzahlen
     taus = [d["frontier_tau"] for d in d2_stats if d["frontier_tau"] is not None]

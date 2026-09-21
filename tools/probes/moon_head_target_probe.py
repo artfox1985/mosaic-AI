@@ -56,6 +56,9 @@ from corpus_dataset import moon_target_from_policy  # noqa: E402
 import mosaic_rust as mr  # noqa: E402
 import numpy as np  # noqa: E402
 import onnxruntime as ort  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 # Spiegel von corpus_dataset.py:1143 (dort lokal in der Bau-Schleife definiert):
 # Reihenfolge der fuenf Kopf-Ausgaenge.
@@ -165,7 +168,7 @@ def main():
     ap.add_argument("--max-records", type=int, default=0, help="0 = alle passenden Records")
     ap.add_argument("--out", default="evaluations/artifacts/moon_head_target_probe.json")
     a = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
 
     files = [ln.strip() for ln in open(a.val_list, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
     files = [f if os.path.isabs(f) or f.startswith("data") else os.path.join("data", f) for f in files]
@@ -228,7 +231,7 @@ def main():
                 d["top_is_canonical"] += int(list(fav) == canon)
                 d["top_is_played"] += int(list(fav) == list(played))
             if n_records % 250 == 0:
-                print(f"[moon_probe] {n_records} Records ({time.time()-t0:.0f} s)", flush=True)
+                print(f"[moon_probe] {n_records} Records ({time.monotonic() - t0:.0f} s)", flush=True)
             if a.max_records and n_records >= a.max_records:
                 done = True
                 break
@@ -249,8 +252,8 @@ def main():
         "selbsttest_determinismus_max_abs": selftest,
         "gleichverteilung_nll": summ(uniform_nll),
         "modelle": {},
-        "laufzeit": {"wanduhr_s": round(time.time() - t0, 1), "n_records": n_records,
-                     "s_je_record": round((time.time() - t0) / n_records, 4) if n_records else None},
+        "laufzeit": laufzeit_block(t0, cpu_start=c0, threads=1,
+                                   n_units=n_records, unit="record") | {"n_records": n_records},
     }
     for name, d in per_model.items():
         result["modelle"][name] = {

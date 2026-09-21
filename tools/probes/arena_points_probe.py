@@ -28,6 +28,10 @@ import os
 import re
 import time
 from collections import defaultdict
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 NAME = r"(?P<name>[^:]+?)"
 PATTERNS = {
@@ -122,7 +126,7 @@ def main() -> int:
     ap.add_argument("--artifact", nargs="+", required=True, help="paired_arena_env_*.json (eins oder mehrere)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
     out = {"prereg": "PREREG_geometric_envelope.md par.8.10/8.11 (Kuppel-Bonus je Partie als Abnahme-Kennzahl)",
            "dateien": [], "gepoolt": None}
     pooled: list[dict] = []
@@ -144,7 +148,7 @@ def main() -> int:
         out["gepoolt"] = summarize(tally(pooled))
         out["gepoolt"]["hinweis"] = ("Pooling nach NAME: nur sinnvoll, wenn NetzA in allen Dateien dasselbe "
                                      "Modell ist (bei beiden Richtungen eines Paars NICHT der Fall -- dann je Datei lesen)")
-    out["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 2), "cpu_s": round(time.process_time(), 2), "threads": 1}
+    out["laufzeit"] = laufzeit_block(t0, cpu_start=c0, threads=1)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(out, fh, ensure_ascii=False, indent=1)

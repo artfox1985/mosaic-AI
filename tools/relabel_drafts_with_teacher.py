@@ -32,6 +32,8 @@ import time
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 from corpus_io import load_records, dump_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 WORKER_ARTIFACT = _ROOT / "models" / "frozen_heuristics" / "hv2_generator"
 # Artefaktname folgt dem Eingabeverzeichnis (Lehre 2026-08-29: der harte
@@ -146,7 +148,7 @@ def main():
     ap.add_argument("--limit-files", type=int, default=None)
     ap.add_argument("--seed-base", type=int, default=936000)
     args = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
 
     import mosaic_rust as mr
     files = sorted(glob.glob(str(_ROOT / args.in_dir / "*.pkl")))
@@ -179,7 +181,7 @@ def main():
                 with lock:
                     done_files[0] += 1
                     print(f"  {done_files[0]}/{len(files)} Dateien "
-                          f"({time.time() - t0:.0f}s)", flush=True)
+                          f"({time.monotonic() - t0:.0f}s)", flush=True)
         finally:
             try:
                 proc.stdin.close(); proc.terminate()
@@ -199,8 +201,8 @@ def main():
     agg["fehler_beispiele"] = [b for s in stats_all for b in s.get("fehler_beispiele", [])][:5]
     result = {"prereg": "PREREG_heuristic_v2_long_rows.md par.3b.9",
               "in_dir": args.in_dir, "dateien": len(files), "workers": n, **agg,
-              "laufzeit": {"wanduhr_s": round(time.time() - t0, 1), "threads": n,
-                           "s_je_label": round((time.time() - t0) / max(1, agg["relabelt"]), 3)}}
+              "laufzeit": laufzeit_block(t0, cpu_start=c0, threads=n,
+                                         n_units=agg["relabelt"], unit="label")}
     artifact = artifact_path(args.in_dir)
     artifact.write_text(json.dumps(result, indent=1, ensure_ascii=False),
                         encoding="utf-8", newline="\n")

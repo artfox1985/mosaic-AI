@@ -38,6 +38,10 @@ import corpus_io  # noqa: E402
 import mosaic_rust as mr  # noqa: E402
 import numpy as np  # noqa: E402
 import onnxruntime as ort  # noqa: E402
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 TOP_K = 3  # RETURN_ORDER_MAX_PERMUTED: hoechstens 3! = 6 Kandidaten
 
@@ -72,7 +76,7 @@ def main():
     ap.add_argument("--out", default="evaluations/artifacts/return_order_sensitivity_r1.json")
     a = ap.parse_args()
 
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
     files = sorted(glob.glob(a.pattern))[: a.max_files]
     opts = ort.SessionOptions()
     opts.intra_op_num_threads = 1
@@ -121,7 +125,7 @@ def main():
             (same_seq if len(set(type_seqs)) == 1 else diff_seq).append(span)
             cases += 1
             if cases % 25 == 0:
-                print(f"[R1] {cases} Faelle ({time.time()-t0:.0f} s)", flush=True)
+                print(f"[R1] {cases} Faelle ({time.monotonic() - t0:.0f} s)", flush=True)
         if cases >= a.max_cases:
             break
 
@@ -152,8 +156,8 @@ def main():
         "selbsttest_determinismus": selftest,
         "gleiche_typfolge": stats(same_seq),
         "verschiedene_typfolge": stats(diff_seq),
-        "laufzeit": {"wanduhr_s": round(time.time() - t0, 1), "faelle": cases,
-                     "s_je_fall": round((time.time() - t0) / max(cases, 1), 3)},
+        "laufzeit": laufzeit_block(t0, cpu_start=c0, threads=1,
+                                   n_units=cases, unit="fall") | {"faelle": cases},
     }
     io.open(a.out, "w", encoding="utf-8").write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(result, indent=2, ensure_ascii=False), flush=True)

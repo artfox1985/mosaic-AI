@@ -31,6 +31,9 @@ sys.path.insert(0, str(REPO / "engine" / "py"))
 import torch  # noqa: E402
 import corpus_io  # noqa: E402
 from neural_net import build_model_from_checkpoint, state_to_planes, state_to_tensor  # noqa: E402
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 
 def sample_states(file_list: Path, n: int, seed: int) -> list[dict]:
@@ -67,9 +70,9 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=20260906)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
-    t0 = time.time()
+    t0, c0 = time.monotonic(), time.process_time()
     states = sample_states(REPO / a.file_list, a.n_states, a.seed)
-    print(f"{len(states)} Zustaende aus {a.file_list} (Seed {a.seed}, {time.time() - t0:.1f}s)", flush=True)
+    print(f"{len(states)} Zustaende aus {a.file_list} (Seed {a.seed}, {time.monotonic() - t0:.1f}s)", flush=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     out = {"n_states": len(states), "file_list": a.file_list, "seed": a.seed, "device": device, "modelle": {}}
     for name in a.models:
@@ -97,7 +100,7 @@ def main() -> int:
         out["modelle"][name] = {"encoder": encoder, "input_size": in_size, "hidden_size": ckpt.get("hidden_size"),
                                 "epochs": ckpt.get("epochs"), "schichten": cap, "dead_mittel": avg_dead,
                                 "rank_mittel": avg_rank, "verdikt": verdict}
-    out["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 1), "cpu_s": round(time.process_time(), 1), "threads": 1}
+    out["laufzeit"] = laufzeit_block(t0, cpu_start=c0, threads=1)
     if a.out:
         Path(a.out).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
         print(f"Artefakt: {a.out}")

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 9 Beispiele und 3 tote E2E-Skripte raus, 3 Punkte abgelehnt. par.8j: Warteschleife sah cargo nicht (gemessen 3 gegen 0), Spec-Abbildung 5 echte Suchknoepfe kurz (keine registrierte Zahl betroffen), tote Modell-Defaults raus. par.8k: 62 rohe Korpus-Leser in 61 Werkzeugen auf corpus_io, davon 43 LIVE defekt (gzip). Alle Tore gruen. Offen: par.8h Punkte 2, 4, 9, 10 und par.8g Punkt 10. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 3 davon nach Pruefung abgelehnt. par.8j: Warteschleife sah cargo nicht (gemessen 3 gegen 0), Spec-Abbildung 5 echte Suchknoepfe kurz, tote Modell-Defaults raus. par.8k: 62 rohe Korpus-Leser in 61 Werkzeugen auf corpus_io, 43 davon LIVE defekt (gzip). par.8l: 13 laufzeit-Bloecke ohne Pflichtfeld behoben -- der Fund 'alle 72 umbauen' widersprach einer registrierten Entscheidung. Alle Tore gruen. Offen: par.8h Punkte 4, 9, 10 (9/10 sind Rust) und par.8g Punkt 10. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1860,3 +1860,63 @@ Werkzeuge fehlerfrei, eine umgestellte Funktion auf einer echten gzip-Korpusdate
 Kein Rust beruehrt.
 
 **Offen aus par.8h:** Punkte 2, 4, 9, 10.
+
+## par.8l RESTLISTE par.8h, BUENDEL 3: der laufzeit-Pflichtblock (Punkt 2)
+
+**Die Ueberschrift des Fundes war die falsche Frage.** Registriert war: "72 Werkzeuge schreiben
+den `laufzeit`-Pflichtblock von Hand, 6 nehmen den Helfer". Das allein ist kein Defekt, sondern
+eine ENTSCHEIDUNG, die im Helfer selbst steht (`tools/runtime_block.py`, 2026-08-27): *"die
+bestehenden regelkonformen Werkzeuge bleiben unangetastet (kein Umbau ohne Anlass), NEUE und
+bisher saeumige Werkzeuge nehmen ihn."* Alle 72 umzubauen waere ein Verstoss gegen eine
+registrierte Entscheidung gewesen, kein Aufraeumen.
+
+**Die richtige Frage ist, welche Bloecke die REGEL verletzen** -- CLAUDE.md verlangt vier Felder,
+nicht eine Bauform. Das sind die "saeumigen", und genau sie nennt der Helfer als seinen Anlass.
+
+### Die Grundmenge, und warum die erste Zaehlung falsch war
+
+Eine erste Messung ueber den DATEITEXT ergab 24 Werkzeuge mit fehlenden Feldern. Davon waren elf
+Fehlalarm: `tile_ledger_crosscheck` schreibt `s_je_zustand`, `moon_head_target_probe`
+`s_je_record`, `relabel_drafts_with_teacher` `s_je_label` -- fuer Werkzeuge ohne Partien ist das
+RICHTIGER als ein `s_je_partie`, das luegen wuerde.
+
+Gezaehlt wird darum INNERHALB des Block-Literals, und `s_je_*` zaehlt in jeder Auspraegung:
+**13 Bloecke verletzten die Regel**, davon drei ohne `cpu_s` UND `threads`
+(`moon_access_balance`, `moon_bundle_leverage`, `moon_target_corpus_probe` trugen nur `wanduhr_s`).
+
+### Was gebaut wurde
+
+Die 13 haengen jetzt am Helfer. Dieser hat dafuer eine Erweiterung bekommen: `n_units=...` mit
+`unit="record"` schreibt `s_je_record` statt `s_je_partie`. **Das ist der Punkt, an dem der Helfer
+vorher versagt hat** -- drei Sonden hatten den Block von Hand gebaut, WEIL seine feste Einheit
+fuer sie falsch war. Eine Einheit, die nicht passt, ist ein Grund, den Helfer zu erweitern, nicht
+ihn zu umgehen.
+
+Stand danach: **20 Werkzeuge am Helfer** (vorher 7), 57 handgeschriebene Bloecke, **0 mit
+fehlendem Pflichtfeld**. Die 57 bleiben nach der Entscheidung von 2026-08-27 unangetastet.
+
+### Die Zeitbasis: gemessen, aber NICHT flaechendeckend umgebaut
+
+49 Werkzeuge rechnen auf `time.time()`, 21 auf `time.monotonic()`. Fuer eine DAUER ist
+`monotonic` das richtige (`time.time()` kann durch eine Uhrkorrektur springen), aber der Schaden
+ist bei einem mehrstuendigen Lauf selten und klein, und ein Umbau von 49 Werkzeugen faellt wieder
+unter "kein Umbau ohne Anlass". Umgestellt sind die 13, die ohnehin angefasst wurden.
+
+### Eigener Fehler, und er waere still geblieben
+
+Beim Umstellen der 13 hat die Ersetzung `time.time() - t0` gesucht -- mit Leerzeichen um den
+Minus. **Vier Fortschrittszeilen schreiben `time.time()-t0` ohne.** Nach dem Wechsel von `t0` auf
+`monotonic` haetten sie die Epochenzeit minus der Rechner-Laufzeit gedruckt: eine Zahl in
+Milliardenhoehe, in einer Fortschrittszeile beilaeufig genug, um nicht aufzufallen. Gefunden hat
+es eine Nachmessung, nicht der Durchlauf.
+
+Deshalb hat der Waechter einen eigenen Test dafuer: `NobodyMixesTheTwoClocks` sucht jede Variable,
+die aus `time.monotonic()` kommt und irgendwo von `time.time()` abgezogen wird.
+
+### Tore
+
+**197 Werkzeug-Tests gruen** (192 + 5 neue in `test_runtime_block_fields.py`), Konventions-Check
+gruen, alle 13 umgestellten Module importieren sauber, 0 Bloecke mit fehlendem Pflichtfeld,
+0 gemischte Zeitbasen. Kein Rust beruehrt.
+
+**Offen aus par.8h:** Punkte 4, 9, 10.
