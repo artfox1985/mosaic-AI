@@ -37,25 +37,21 @@ FILES = [
     "data/selfplay_test-b_0001.pkl",
 ]
 
-# Wert auf dem Stand VOR dem Fix (Commit-Basis 49d85df), gleiche Dateiliste,
-# Schalter nicht gesetzt. Aendert sich dieser Literal, hat jemand den
-# DEFAULT-Schluessel bewegt und damit jeden Bestandscache entwertet -- das
-# darf nur absichtlich passieren, mit Eintrag in der Prereg.
+# STOLPERDRAHT fuer den DEFAULT-Fenster-Schluessel. Aendert sich dieser Literal,
+# hat jemand den Default bewegt und damit jeden Bestandscache entwertet -- das darf
+# nur ABSICHTLICH passieren, mit Eintrag in der zustaendigen Prereg.
 #
-# ABSICHTLICH BEWEGT am 2026-09-17: "bea417f31e0e" -> "41b98a5d3890"
-# (Nutzer-Entscheid, PREREG_rust_data_layer.md par.9b, Weg (1) aus par.9a).
-# Der Fenster-Schluessel traegt seither UNBEDINGT die Merkmals-Formelversion
-# (`config.FEATURE_FORMULA_VERSION`, Marker "+featfmt_a2phantom-20260912") und
-# die Merkmals-Quelle ("+featsrc_record" bzw. "+featsrc_rust"). Nachgeprueft:
-# das Schluesselmaterial ohne diese beiden Marker ergibt exakt den alten Wert
-# "bea417f31e0e" -- es hat sich nichts sonst bewegt. Die Entwertung aller
-# vorhandenen Monolithen ist die gewollte Folge; der Neubau faellt mit dem
-# INPUT_SIZE-Wechsel fuer den Arm v29-b07 ohnehin an.
-# Bewegt 2026-09-17 (zweiter Zug desselben Tags): INPUT_SIZE 794 -> 884 durch Abschnitt 17
-# (Tiling-Projektion, Variante C, Arm v29-b07, PREREG_round_transition_search_sampling.md
-# par.18/18.9); INPUT_SIZE steht im Block- und damit im Fenster-Schluessel. Vorher ba128e934a4a.
-# Bewegt 2026-09-18: INPUT_SIZE 884 -> 888 durch Abschnitt 18 (geordnete eigene Designs, R2/P.16,
-# PREREG_dome_return_order.md par.12.6/12.8/12.10); vorher 5fd616444e86 (884), davor ba128e934a4a (794).
+# Der Waechter hat gehalten: dreimal bewegt (2026-09-17 zweimal, 2026-09-18), jedes
+# Mal mit Grund und Prereg-Verweis. Die Kette ist bea417f31e0e -> ba128e934a4a ->
+# 5fd616444e86 -> 41b98a5d3890 und steht ausgeschrieben in `PREREG_rust_data_layer.md`
+# par.9a/9b (Formelversion und Merkmalsquelle im Schluessel),
+# `PREREG_round_transition_search_sampling.md` par.18 (INPUT_SIZE 794 -> 884) und
+# `PREREG_dome_return_order.md` par.12.6-12.10 (884 -> 888).
+#
+# Hier steht bewusst nur der STAND, nicht die Chronik (gekuerzt 2026-09-21, par.8g
+# Punkt 5): der Block war auf 18 Zeilen Verlauf angewachsen -- dieselbe Bauform, die
+# CLAUDE.md beim Prereg-Statuskopf abgeschafft hat ("Der Kopf ist ein STATUS, keine
+# Chronik"), und die den eigentlichen Satz darueber zu ueberdecken drohte.
 KEY_WITH_SWITCH_OFF = "41b98a5d3890"
 
 

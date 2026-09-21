@@ -3265,7 +3265,18 @@ mod tests {
     /// wiederkehrt. Kein `assert` auf eine Mindest-Trefferquote -- das
     /// Ergebnis ENTSCHEIDET (siehe Bericht), es wird hier nur reproduzierbar
     /// gemessen und geloggt (`cargo test -- --nocapture`).
+    /// `#[ignore]` seit 2026-09-21 (par.8g Punkt 4): der Test traegt KEIN Assert
+    /// auf das Verhalten, lief aber in jedem `cargo test` mit -- 100 Rundenuebergaenge
+    /// und 13 Suchen. Die Frage, fuer die er gebaut wurde (Task #99), ist entschieden.
+    /// Geloescht wird er NICHT: er ist das Instrument fuer eine offene Frage -- die
+    /// Kosten je Zug haengen ueber `TilingKey` an der Vielfalt der Brettzustaende, was
+    /// den ungeklaerten Kostenbefund der v31-Erzeugung erklaeren koennte
+    /// (`docs/measured_runtimes.md`, Abschnitt "Generation v31"; par.8h). Und er ist
+    /// der einzige Aufrufer von `mcts::search_action`; ein `#[ignore]`-Test kompiliert
+    /// weiter, der Aufruf bleibt also bestehen.
+    /// Fahren mit: `cargo test --release tiling_cache_hit_rate_measurement -- --ignored --nocapture`
     #[test]
+    #[ignore = "Messung ohne Verhaltens-Assert; ausdruecklich anstossen (par.8g Punkt 4)"]
     fn tiling_cache_hit_rate_measurement() {
         use rand::rngs::StdRng;
         use rand::SeedableRng;

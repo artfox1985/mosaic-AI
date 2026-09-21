@@ -40,10 +40,22 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 * **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
   erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
   danach die Konsolenzeile "Champion-Spec ..." lesen.
-* **Die zehn Punkte der Aufraeumliste** (`PREREG_code_cleanup_closeout.md` par.8g), dazu neu:
-  `tools/build_frozen_golden_probe.py` laeuft 22 Minuten OHNE jede Fortschrittszeile (kein `flush`
-  im ganzen Werkzeug) -- Verstoss gegen die Regel aus CLAUDE.md.
+* **Die Restliste des Aufraeumens** (`PREREG_code_cleanup_closeout.md` par.8h, Punkte 1, 2, 4,
+  5, 6, 8, 9, 10), rund 15 h -- groesster Einzelposten die 76 handgeschriebenen Laufzeit-Bloecke.
+  Dazu `tools/build_frozen_golden_probe.py`: laeuft 22 Minuten OHNE jede Fortschrittszeile (kein
+  `flush` im ganzen Werkzeug), Verstoss gegen die Regel aus CLAUDE.md.
+  Aus par.8g ist nur noch **Punkt 10** offen (`round_transition_resample`) -- ein Entscheid ueber
+  den CODE, nicht ueber seine sieben Tests.
 * **Letzter restic-Snapshot mit Beleg** und der Abschlussbericht.
+
+**Erledigt am 2026-09-21:** die zehn Punkte aus par.8g als EIN Rust-Buendel (par.8i) -- neun
+Beispiele unter `engine/examples/` und die drei toten E2E-Skripte unter `engine/` entfernt, der
+Cache-Messtest auf `#[ignore]`, die Groessen-Basislinie nachgezogen; **drei Punkte nach Pruefung
+abgelehnt** (der Stolperdraht am Fenster-Schluessel hat gehalten, die Tiling-Geometrie-Sonde lebt,
+und der Nutzen der zwei Konventions-Teile IST die bessere Fehlermeldung). Alle Tore gruen,
+Anker-Drift 1.763 Schritte identisch. **Neu ungedeckt:** die HTTP-Routen von `server.py` haben
+keine automatische E2E-Abdeckung mehr; die drei Skripte waren rot, weil ihre eigene Zugwahl die
+seit v30 neuen Knotentypen nicht kennt.
 
 **Erledigt am 2026-09-20 nach der Promotion:** die Umbenennung auf Tessa in allen drei
 Schritten (Manifestfeld, Frontend ueber die Konstante `AI_DISPLAY_NAME`, README), das

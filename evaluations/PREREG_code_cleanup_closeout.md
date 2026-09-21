@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1 (par.8) und Gruppe A (par.8d) gebaut, par.8e Bonuschips komplett, par.8f/8g vier tote Posten entfernt. QUALITAETS-DURCHSICHT par.8h (2026-09-21): ein selbst eingebauter Korrektheitsfehler im Tiling-Cache-Schluessel behoben (Greedy-Rueckfall ab 14 Chips ist handreihenfolge-abhaengig), vier weitere Stellen berichtigt, 10 repo-weite Funde als Vorlage. Anker-Drift gruen, 701 Tests gruen. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A und die Bonuschips gebaut (par.8, 8d, 8e). Durchsicht par.8h fand einen selbst eingebauten Korrektheitsfehler im Tiling-Cache-Schluessel (behoben) plus 10 repo-weite Funde; davon 4 abgearbeitet. par.8i: die zehn Posten aus par.8g als EIN Buendel, 9 Beispiele und 3 tote E2E-Skripte raus, 3 Punkte nach Pruefung abgelehnt, nur Punkt 10 bleibt Nutzer-Entscheid. Alle Tore gruen, Anker-Drift 1.763 Schritte identisch. Rest aus par.8h: rund 15 h. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1564,3 +1564,132 @@ ihre eigenen Treffer zu ignorieren.
 par.8h sowie die zehn Punkte aus par.8g. Aufwandsschaetzung dafuer, mit heute gemessenen
 Torkosten (rund 10 min je Rust-Buendel): **rund 15 h**, davon der groesste Einzelposten die 76
 handgeschriebenen Laufzeit-Bloecke.
+
+## par.8i DIE ZEHN PUNKTE AUS par.8g, ALS EIN BUENDEL (2026-09-21)
+
+**Nutzer-Auftrag:** *"mach weiter mit par.8g als buendel"* -- als EIN Rust-Buendel, damit der
+Torlauf (rund 10 min, heute gemessen) einmal statt zehnmal anfaellt.
+
+**Drei der zehn Punkte haben die Pruefung nicht ueberstanden**, und das ist das wichtigere
+Ergebnis des Durchgangs: eine Vorlage aus einer Durchsicht ist eine Behauptung, kein Auftrag.
+
+| Punkt | Ergebnis |
+| --- | --- |
+| 1-3 `engine/examples/` | **9 von 11 entfernt** (15 Dateien -> 6), aber nicht die vorgeschlagene Auswahl |
+| 4 `tiling_cache_hit_rate_measurement` | **`#[ignore]` mit Grund**, nicht geloescht |
+| 5 Stolperdraht Fenster-Schluessel | **BLEIBT**, nur die Chronik im Kommentar gekuerzt |
+| 6 `test_tiling_geometry_probe.py` | **ABGELEHNT** -- die Sonde lebt |
+| 7 `engine/*.py` E2E-Skripte | drei gefahren, **alle rot** -> entfernt |
+| 8 Konventions-Regel 4, zwei Teile | **ABGELEHNT** -- der Nutzen IST die bessere Fehlermeldung |
+| 9 Konventions-Regel 1 | Basislinie nachgezogen, die Ratsche meldet wieder nur NEUES Wachstum |
+| 10 `round_transition_resample` | Nutzer-Entscheid ueber den CODE -- offen, unberuehrt |
+
+### Was ein Blockschnitt mitgenommen haette
+
+**`planes_parity.rs` stand in KEINER der beiden Listen** und waere als Teil des Blocks gefallen --
+par.8g Punkt 1 verlangte ausdruecklich, es mitzubeurteilen. Es hat zwei lebende Stellen, die es
+als Referenzroute nennen (`engine/py/neural_net.py:167`, `tools/probes/feature_parity_rust_python.py:23`).
+Bleibt.
+
+**`profile_clones.rs` war IN dem Block und bleibt trotzdem.**
+`evaluations/review/code_review_2026-09-11_search.md` fuehrt es als Instrument zu einer OFFENEN
+Optimierungsfrage (`note_gamestate_clone()`), und genau die ist am 2026-09-21 als Fund 9 in par.8h
+wieder aufgetaucht (`GameState`-Klone je Solver-Schritt). Ein Werkzeug loeschen, dessen Frage
+offen ist, waere verkehrt herum.
+
+**Entfernt sind damit neun:** `net_determinism`, `latency_2d_vs_flat`, `probe_input_shape`,
+`net_load_time_probe`, `interleave_concurrency_probe`, `eval_batch_size_numeric_probe`,
+`net_2d_probe`, `net_2d_probe_two_input`, `net_load_auto_backcompat`. Jeder Name ist vor dem
+Schnitt ueber `*.py`, `*.sh`, `*.md`, `*.toml` gesucht worden: ausserhalb von `engine/examples/`
+und dieser Prereg wird keiner genannt. Einen Cargo-Eintrag hat nur `ort_cuda_batch_probe`
+(feature-gated), die uebrigen sind implizit -- die Datei zu loeschen genuegt.
+
+**Zu `net_load_auto_backcompat` im Besonderen**, weil par.8g Punkt 3 es an einen
+Architektur-Fixpunkt band: die additive Encoder-Regel wird NICHT von diesem Beispiel getragen,
+sondern von den Tests in `features.rs:2191-2208` mit den Alt-Breiten `LEN_BEFORE_*`
+(714/744/755/794/884). Das Beispiel konnte seine Aufgabe ohnehin nicht mehr erfuellen -- beide
+Modelle, die es laedt (v17, v18), sind geloescht, es endete mit `exit(2)`. Die dritte Option
+neben "umhaengen" und "aufgeben" war also, dass die Aufgabe laengst woanders erfuellt ist.
+
+### Punkt 4: fast falsch herum gelaufen
+
+`tiling_cache_hit_rate_measurement` traegt kein Assert auf Verhalten und lief in JEDEM
+`cargo test` mit. Loeschen waere trotzdem doppelt verkehrt gewesen: er ist der einzige Aufrufer
+von `mcts::search_action` (dessen Tod damit sichtbar wuerde -- ein eigener Entscheid, wie par.8g
+Punkt 4 selbst festhaelt), UND er ist das Instrument fuer die Cache-Vielfalt-Hypothese aus par.8h.
+`#[ignore]` mit Begruendung im Attribut nimmt die Kosten je Push, ohne beides zu verlieren; ein
+ignorierter Test kompiliert weiter und verfaellt darum nicht still.
+
+### Punkt 5: der Waechter hat gehalten, gewuchert ist die Chronik
+
+Der Befund lautete, der eingefrorene Schluessel sei "in zwei Tagen dreimal nachgezogen" worden und
+damit ein umgangenes Tor. **Am Bestand stimmt das nicht.** Der Kommentar verlangt ausdruecklich,
+das duerfe nur absichtlich und mit Eintrag in der Prereg geschehen, und alle drei Bewegungen sind
+genau so dokumentiert, mit Grund und Verweis (`PREREG_rust_data_layer` par.9a/9b,
+`PREREG_round_transition_search_sampling` par.18, `PREREG_dome_return_order` par.12.6-12.10). Ein
+Tor, das dreimal ausgeloest und dreimal bewusst passiert wurde, hat getan, wozu es da ist. Der
+Test bleibt unveraendert. Gekuerzt ist allein der Kommentarblock, der auf 18 Zeilen Verlauf
+angewachsen war -- dieselbe Bauform, die CLAUDE.md beim Prereg-Statuskopf abgeschafft hat.
+
+### Punkt 6 und 8: abgelehnt, mit Grund
+
+**Punkt 6:** `tools/probes/tiling_geometry_probe.py` lebt -- `docs/tools_index.md:103` fuehrt sie
+mit zwei Aufrufern. Neun Tests, die lebenden Code decken und zusammen unter einer Sekunde laufen,
+zu loeschen waere genau der Fehler aus par.8d Punkt 2, wo ein Komplettschnitt die Abdeckung einer
+lebenden Funktion mitgenommen haette. Die Vorlage nannte diese Praezedenz selbst und zog dann den
+halben Schluss daraus.
+
+**Punkt 8:** die Teile `missing_from_index` und der Abschnitts-Zaehler sind von der
+Byte-Gleichheit logisch gedeckt; ihr verbleibender Nutzen ist die PRAEZISERE Fehlermeldung. Sie
+kosten nur Zeilen, nie Laufzeit an einem gruenen Lauf. Fuer eine moeglicherweise wiederaufnehmende
+Sitzung (Nutzer: *"vielleicht wird das projekt weitergehen"*) ist eine Meldung, die sagt WAS
+fehlt, mehr wert als ein Dutzend gesparte Zeilen.
+
+### Punkt 7: rot -- und der Grund ist der eigentliche Befund
+
+`engine/smoketest.py`, `server_rust_test.py`, `server_ai_test.py` einmal gefahren, wie die Vorlage
+es verlangte (Flask-Testclient, kein laufender Server noetig). **Alle drei scheitern**, und zwar
+aussagekraeftig: zwei brechen mit *"Passen nicht erlaubt - es gibt noch gueltige Aktionen"* ab,
+der dritte mit *"Spiel noch nicht beendet"*. Ursache ist ihre eigene Zugwahl, die den seit v30
+gewachsenen Aktionsraum nicht kennt (Mondstapel 406-410, Rueckgabe 411-413, Slot und Rotation als
+eigene Knoten). **Kein Server-Defekt** -- dieselben Routen tragen die Mensch-Partien und sind am
+2026-09-20 am laufenden Bild geprueft.
+
+Entfernt nach der in par.8g registrierten Regel ("sind sie rot, ist die Entscheidung leicht").
+
+**Was dadurch ungedeckt bleibt, und das gehoert benannt statt hingenommen:** die HTTP-Routen von
+`server.py` haben jetzt KEINE automatische E2E-Abdeckung mehr. Der Ersatz ist unvollstaendig --
+`tools/claude_play.py` treibt dieselbe Engine ueber die Kommandozeile, nicht ueber die Routen; die
+Routen selbst belegen nur noch echte Mensch-Partien. Wer die Skripte wieder aufbaut, muss ihre
+Zugwahl um die vier neuen Knotentypen erweitern; der Rest ihres Aufbaus (Flask-Testclient,
+vollstaendige Partie ohne Server) war tragfaehig und ist in der Historie nachlesbar.
+
+### Punkt 9
+
+Die Groessen-Basislinie war 119 Dateien hinterher, darum loeste die Ratsche bei jedem Lauf aus,
+ohne je eine Zerlegung ausgeloest zu haben. Nachgezogen statt abgeschafft: sie meldet damit wieder
+nur NEUES Wachstum, und das ist die Eigenschaft, um derentwillen sie gebaut wurde.
+
+### Tore des Buendels (alle gruen)
+
+| Tor | Ergebnis |
+| --- | --- |
+| `cargo test --release --no-run` | gruen, **1:00 min** (vorher 1:26 -- der Gewinn aus den neun entfernten Beispielen) |
+| Lib-Suite | **700 gruen, 0 rot, 20 ignoriert** (19 + der neue `#[ignore]`), 99,3 s |
+| Netz-Paritaets-Fixture | gruen (in der Suite) |
+| Wheel | neu gebaut, 32,4 s; Vertragshash `6ef829e564c58bd5`, `input_size` 888, `num_actions` 414, `engine_version` 1.0.0 -- unveraendert |
+| **Anker-Drift gegen `hv4_anchor`** | **GRUEN**, 1.763 Schritte Feld fuer Feld gleich |
+| Werkzeug-Tests | **171 gruen**, 1,2 s |
+| Konventions-Check | gruen, ohne Fehlalarm |
+
+Die Lib-Suite steht bei 700 statt 701, weil der Messtest aus Punkt 4 jetzt ignoriert wird; es ist
+kein Test verloren gegangen.
+
+### Was aus par.8g offen bleibt
+
+Nur **Punkt 10** (`round_transition_resample`), und der ist unveraendert ein Entscheid ueber den
+CODE: der Code-Review nennt den Pfad Altlast, der Modulkopf sagt "BLEIBEN". Die sieben Tests
+fallen mit ihm oder gar nicht -- sie einzeln anzufassen waere die falsche Reihenfolge.
+
+Die uebrigen offenen Posten stehen unveraendert in par.8h (Punkte 1, 2, 4, 5, 6, 8, 9, 10),
+Aufwand dafuer weiterhin rund 15 h.
