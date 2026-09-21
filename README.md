@@ -38,10 +38,12 @@ same replay window with the same seed and the same recipe and differed in a
 single factor, the start: 404:396 cold against 443:297 warm, a gap of 9.4
 percentage points.
 
-**Ratings live in segments.** Two engine corrections (the round-5 solver, then a
-hull-evaluation fix) moved the anchor's own moves, and ratings are not
-comparable across such a boundary; earlier segments are kept in
-`archive/elo_history_pre_*.csv`. Since the second segment the anchor ships its
+**Ratings live in segments.** Two engine corrections moved the anchor's own
+moves, and each opened a new segment: the min-node move ordering in the round-5
+solver (`evaluations/PREREG_round5_minfix_elo_reset.md`) and the phantom-tile
+fix, which re-anchored the ladder on `hv4_anchor` on 2026-09-12. Ratings are not
+comparable across such a boundary; the old registers are kept as
+`archive/elo_history_pre_r5fix.csv` and `archive/elo_history_pre_phantomfix.csv`. Since the second segment the anchor ships its
 own wheel, so an engine change can no longer move the fixed point of the ladder,
 and every change is checked against it move by move.
 

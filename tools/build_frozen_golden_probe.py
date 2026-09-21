@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import sys
 from pathlib import Path
 
@@ -58,6 +59,13 @@ def main() -> int:
 
     game_seed = args.seed_base
     games_played = 0
+    # Fortschritt SICHTBAR (CLAUDE.md "Lange Laeufe NIE in eine Pipe", Nutzer
+    # 2026-08-25): die Sammelphase lief bis 2026-09-21 bis zu 22 Minuten ohne
+    # eine einzige Zeile. Eine Dauer, die man erst am Ende erfaehrt, hilft beim
+    # naechsten Lauf, aber nicht beim laufenden.
+    t_start = time.monotonic()
+    print(f"[golden_probe] Sammelphase: bis zu {args.max_games} Partien, "
+          f"{args.per_round} Sonden je Runde, {args.sims} Sims", flush=True)
     while games_played < args.max_games and any(v > 0 for v in per_round_needed.values()):
         games_played += 1
         first_player = games_played % 2
@@ -87,6 +95,10 @@ def main() -> int:
             # net_arena_choice_state_json fuer die Sonden-Antwort neu
             # berechnet wird (deterministisch, gleicher Seed).
             rg.drafting_decide_and_apply_inprocess(model_path, spec_path, args.sims, args.c_puct)
+        found_per_round = {r: len(candidates[r]) for r in range(1, 6)}
+        print(f"[golden_probe] Partie {games_played}/{args.max_games} "
+              f"({time.monotonic() - t_start:.0f}s) Kandidaten je Runde: "
+              + " ".join(f"R{r}={n}" for r, n in found_per_round.items()), flush=True)
 
     probes = []
     probe_id = 0
@@ -99,7 +111,7 @@ def main() -> int:
         take = pool_sorted[: args.per_round]
         if len(take) < args.per_round:
             raise SystemExit(
-                f"Nur {len(take)}/{args.per_round} Kandidaten fuer Runde {round_no} gefunden "
+                f"Nur {len(take)}/{args.per_round} Kandidaten fuer Runde {round_no} found_per_round "
                 f"(--max-games erhoehen oder --per-round senken)."
             )
         for has_pending, state_json, _orig_seed in take:
@@ -122,8 +134,10 @@ def main() -> int:
                 }
             )
             print(
-                f"Sonde {probe_id}: Runde {round_no} pending={has_pending} "
-                f"seed={probe_seed} action={resp['action']}"
+                f"[golden_probe] Sonde {probe_id}: Runde {round_no} "
+                f"pending={has_pending} seed={probe_seed} action={resp['action']} "
+                f"({time.monotonic() - t_start:.0f}s)",
+                flush=True,
             )
 
     # Repo-relativ statt absolut (Codepflege-Audit Befund 25) -- reine
@@ -147,7 +161,9 @@ def main() -> int:
     out_path = artifact_dir / "golden_probe.json"
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     n_pending = sum(1 for p in probes if p["has_pending_dome_choice"])
-    print(f"geschrieben: {out_path} ({len(probes)} Sonden, davon {n_pending} mit pending_dome_choice gesetzt)")
+    print(f"geschrieben: {out_path} ({len(probes)} Sonden, davon {n_pending} "
+          f"mit pending_dome_choice gesetzt) -- {time.monotonic() - t_start:.0f}s, "
+          f"{games_played} Partien", flush=True)
     return 0
 
 

@@ -46,10 +46,9 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
   Weg dorthin fuehrt neben `scoring.rs:160` vorbei. **Offen ist nur noch ein Nutzer-Entscheid:**
   par.8g Punkt 10, `round_transition_resample` -- der Code-Review nennt den Pfad Altlast, der
   Modulkopf sagt "BLEIBEN"; die sieben Tests fallen mit ihm oder gar nicht.
-  Dazu `tools/build_frozen_golden_probe.py`: laeuft 22 Minuten OHNE jede Fortschrittszeile (kein
-  `flush` im ganzen Werkzeug), Verstoss gegen die Regel aus CLAUDE.md.
-  Aus par.8g ist nur noch **Punkt 10** offen (`round_transition_resample`) -- ein Entscheid ueber
-  den CODE, nicht ueber seine sieben Tests.
+  `tools/build_frozen_golden_probe.py` meldet seit dem 2026-09-21 Fortschritt (Sammelphase je
+  Partie mit Fuellstand je Runde, Sonden mit Laufzeit, alles mit `flush`) -- vorher lief es bis
+  zu 22 Minuten stumm.
 * **Letzter restic-Snapshot mit Beleg** und der Abschlussbericht.
 
 **Erledigt am 2026-09-21:** die zehn Punkte aus par.8g als EIN Rust-Buendel (par.8i) -- neun
