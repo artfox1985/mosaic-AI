@@ -37,8 +37,13 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
    gilt fuer `v31-b01` NICHT mehr (Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt
    50,0 Prozent). NEUER Befund: der Punkte-Kopf ueberschiesst um Faktor 2,1 in der Streuung.
    Kein gepaarter Vergleich (anderes Substrat, andere Decke), n=72 indikativ.
-   **R5 bleibt offen** -- die Sonde ist seit par.8j wieder lauffaehig (toter Default entfernt,
-   API-ONNX loest auf den Champion auf), gefahren ist sie nicht. Nutzer-Entscheid.
+   **R5 ebenfalls gefahren** (`PREREG_r5_value_calibration.md` par.14) -- und anders als R4b
+   GEPAART: gleiches eingefrorenes Eval-Set, gleiche Stellgroessen wie die Altlaeufe, Kennlinie
+   bitgleich, ein Faktor unterscheidet die Zeilen. Die Daempfung des Value-Kopfs ist von 0,0859
+   auf 0,1459 gestiegen und damit kleiner geworden, aber NICHT weg (1,0 waere unverzerrt); R2
+   0,309 statt 0,147. Der Punkte-Kopf ueberschiesst neuerdings (1,088 statt 0,973) -- dieselbe
+   Richtung wie in R4b, also zwei unabhaengige Sonden mit demselben Vorzeichenwechsel.
+   **Damit ist der offene Punkt 2 der Promotionsliste erledigt.**
 
 ### WAS ALS NAECHSTES ANSTEHT
 

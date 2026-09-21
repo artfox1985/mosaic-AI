@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Unterbietet der Value-Kopf den Plattenlohn, und laesst sich das heilen? | Beleg: JA und NEIN -- die Daempfung ist real und stabil (b01 0,0859, Punkte-Kopf trifft dieselbe Groesse mit 0,97), aber **par.12 (2026-09-01) widerlegt ihre Rolle**: keine Einstellung des Kopfes holt den Spaltenbau in der Tiefe zurueck (B=2,0 schadet -0,125, B=0,5 und Punkte-Blend bewegen nichts; Delle @100 gegen @400 = 0,205). Phase 3 GESCHLOSSEN ohne Bau, Trainingslauf gespart; die Ursache erbt `search_depth_column_optimum` Stufe 4. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Unterbietet der Value-Kopf den Plattenlohn, und laesst sich das heilen? | Beleg: JA und NEIN -- die Daempfung ist real (v23-b01 0,0859), aber par.12 widerlegt ihre ROLLE: keine Einstellung des Kopfes holt den Spaltenbau zurueck, Phase 3 ohne Bau geschlossen. AM SCHLUSS-CHAMPION NACHGEFAHREN 2026-09-21 (par.14), GEPAART (gleiches Eval-Set, gleiche Stellgroessen, Kennlinie bitgleich): Daempfung 0,1459 statt 0,0859, R2 0,309 statt 0,147 -- kleiner geworden, nicht weg. Der Punkte-Kopf ueberschiesst jetzt (1,088 statt 0,973), dieselbe Richtung wie R4b. -->
 
 # Vorregistrierung: Runde-5-Value-/Punkte-Kopf-Kalibrierung gegen exakte Ground Truth
 
@@ -845,3 +845,65 @@ ohne benannten Nutzniesser wird in diesem Projekt nicht gebaut.
 grenzt sie ein: die Ursache liegt nicht in der Skalierung des Blattwerts und
 nicht in fehlender Punkte-Information, sondern in dem, was die tiefere Suche
 mit den Kandidaten TUT.
+
+## par.14 R5 AM SCHLUSS-CHAMPION GEFAHREN (2026-09-21)
+
+Nach R4b (`PREREG_r4_value_calibration.md` par.20) die zweite der beiden Sonden, die seit
+`v24-b06` nicht mehr liefen. Damit ist der offene Punkt 2 der Promotionsliste erledigt.
+
+### Warum dieser Vergleich traegt -- und der von R4b nicht
+
+Bei R4b war das Substrat weg (der v18-Korpus, aus dem die 72 Zustaende kamen), die Spalten
+standen darum nur NEBENEINANDER. **Hier ist es umgekehrt:** alle R5-Laeufe der Geschichte
+nutzten dasselbe eingefrorene `evaluations/frozen_eval_set.pkl` mit denselben Stellgroessen
+(n_states 24, n_combos 6, curve_n_states 233, 400 Sims, Seed 1000). Der Lauf am Champion hat sie
+unveraendert uebernommen. **Ein Faktor unterscheidet die Zeilen: das Modell.**
+
+**Gegenprobe, die das belegt:** die Kennlinie kam BITGLEICH heraus wie in beiden Altlaeufen
+(b = 0,39438, McFadden-R2 = 0,634, n = 233). Sie haengt allein am Eval-Set und am exakten Loeser,
+nicht am gemessenen Netz -- genau wie die Moduldoku es behauptet.
+
+| Modell | Value Steigung | Value R2 | Punkte Steigung | Punkte R2 | n |
+| --- | --- | --- | --- | --- | --- |
+| `v22-b05` | 0,0886 | 0,1149 | 0,9888 | 0,3085 | 139 |
+| `v23-b01` | 0,0859 | 0,1468 | 0,9728 | 0,3073 | 139 |
+| **`v31-b01`** | **0,1459** | **0,3087** | **1,0875** | **0,3716** | 139 |
+
+### Befund
+
+1. **Die Daempfung des Value-Kopfs ist kleiner geworden, aber sie ist NICHT weg.** Der
+   Prereg-Kopf hielt sie als "real und stabil" fest (0,0859 bei `v23-b01`). Am Champion sind es
+   **0,1459** -- rund das 1,7-fache, und trotzdem weit unter 1,0. Der Kopf unterbietet den
+   Plattenlohn weiterhin deutlich; er tut es nur weniger stark.
+2. **Die Erklaerungskraft hat sich verdoppelt**: R2 0,115 / 0,147 -> **0,309**. Der Kopf liegt
+   also nicht nur naeher an der richtigen Skala, er ordnet die Zustaende auch besser.
+3. **Der Punkte-Kopf hat die Seite gewechselt.** Er traf dieselbe Groesse frueher fast exakt
+   (0,989 / 0,973); jetzt **1,088**, also leicht UEBERSCHIESSEND. Dieselbe Richtung wie in R4b
+   (dort 1,19 mit Streuungs-Faktor 2,1). Zwei unabhaengige Messungen an verschiedenen
+   Rundenphasen zeigen denselben Vorzeichenwechsel -- das ist kein Rauschen einer einzelnen
+   Sonde.
+
+### Was par.12 dazu sagt, und was NICHT widerlegt ist
+
+par.12 (2026-09-01) hat die ROLLE der Daempfung widerlegt: keine Einstellung des Kopfes holte den
+Spaltenbau in der Tiefe zurueck. **Dieser Lauf aendert daran nichts** -- er misst die Daempfung,
+nicht ihre Wirkung. Dass sie sich von 0,086 auf 0,146 bewegt hat, ohne dass daran ein
+Trainingsziel gehaengt wurde, ist ein Nebenbefund der Generationenfolge, kein Beleg fuer einen
+Hebel. Phase 3 bleibt geschlossen.
+
+### Laufzeit und zwei Luecken im Werkzeug
+
+**854,9 s (14 min 15 s), 6,15 s je Zustand-Kombination-Paar.** Vorab aus einem Kleinlauf
+hochgerechnet (6 Kennlinienpunkte in 16 s -> rund 1,3 s je Suche, rund 10 min) -- die Rechnung lag
+30 Prozent zu tief, weil die Messphase je Paar teurer ist als ein Kennlinienpunkt.
+
+* **Kein `laufzeit`-Block**, wie schon bei R4. Jetzt ueber `runtime_block.laufzeit_block` mit
+  Einheit `s_je_paar`.
+* **`model_path_for_api` stand in KEINEM Artefakt**, auch nicht in den beiden Altlaeufen. Damit
+  ist nicht belegbar, womit die Altlaeufe gerechnet haben -- nur erschliessbar aus dem damaligen
+  Default (`models/alphazero_v18_best.onnx`). Genau die Luecke, vor der
+  `feedback_run_manifest_gegen_referenz` warnt: ein fehlendes Flag ist ein stiller Default. Das
+  Feld wird jetzt geschrieben, zusammen mit `seed`.
+
+Beides ist im Artefakt dieses Laufs von Hand nachgetragen und als nachgetragen GEKENNZEICHNET,
+statt die Zahlen verfallen zu lassen.

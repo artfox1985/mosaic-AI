@@ -73,6 +73,7 @@ import os
 import pathlib
 import pickle
 import sys
+import time
 
 import numpy as np
 import torch
@@ -87,6 +88,8 @@ import scoring_tile_sensitivity as sts  # noqa: E402  (all_valid_combos/pick_rep
 from neural_net import build_model_from_checkpoint, state_to_tensor, state_to_planes  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # corpus_io liegt in der Wurzel
 from corpus_io import load_records  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))  # runtime_block liegt in tools/
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 
 # ── Logistische Regression (reines NumPy, IRLS/Newton-Raphson) ─────────────
@@ -138,6 +141,10 @@ def local_expected_delta_winprob(a: float, b: float, ab_ref: float, true_delta_p
     (siehe Moduldoku Punkt 4)."""
     p_ref = curve_win_prob(a, b, ab_ref)
     return b * p_ref * (1.0 - p_ref) * true_delta_pts
+
+
+_T_START = 0.0
+_C_START = 0.0
 
 
 def ols_slope_r2(x: list, y: list):
@@ -357,6 +364,8 @@ def main():
     ap.add_argument("--out", default="evaluations/artifacts/r5_value_calibration_result.json")
     ap.add_argument("--seed", type=int, default=1000)
     args = ap.parse_args()
+    global _T_START, _C_START
+    _T_START, _C_START = time.monotonic(), time.process_time()
 
     if args.model_path_for_api is None:
         # Nur LADBAR muss er sein, nicht bestimmt (s. Hilfetext). Der
@@ -409,9 +418,21 @@ def main():
     summary = {
         "eval_set": args.eval_set, "n_states": len(states), "n_combos": args.n_combos,
         "sims": args.sims, "c_puct": args.c_puct, "curve_n_states": args.curve_n_states,
+        "seed": args.seed,
+        # NACHGETRAGEN 2026-09-21: bis dahin stand nirgends im Artefakt, mit
+        # WELCHEM API-ONNX gerechnet wurde. Der Inhalt ist fuer Runde-5-Zustaende
+        # zwar belanglos (round5.rs-Kurzschluss), aber ein Lauf-Manifest, das
+        # eine Stellgroesse verschweigt, macht jeden spaeteren Abgleich zu einer
+        # Vermutung (Memory feedback_run_manifest_gegen_referenz).
+        "model_path_for_api": args.model_path_for_api,
         "curve": curve,
         "models": {k: {kk: vv for kk, vv in v.items() if kk != "per_pair"} for k, v in model_results.items()},
     }
+    # CLAUDE.md-Pflichtblock. Einheit ist das ZUSTAND-KOMBINATION-Paar, nicht die
+    # Partie -- dieses Werkzeug spielt keine Partien.
+    n_paare = sum(v.get("n_state_combo_pairs", 0) for v in model_results.values())
+    summary["laufzeit"] = laufzeit_block(_T_START, cpu_start=_C_START, threads=1,
+                                         n_units=n_paare, unit="paar")
     print("\n=== ZUSAMMENFASSUNG ===")
     print(json.dumps(summary, indent=2, ensure_ascii=True, default=str))
 
