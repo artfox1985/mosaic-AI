@@ -32,17 +32,8 @@ ART=evaluations/artifacts
 MODELS="v27-b01_brierbest v28-b01_brierbest v28-b02_brierbest v29-b02_brierbest v29-b03_brierbest v29-b05_brierbest"
 
 BUSY='[p]aired_gating\.py|[f]rozen_referee_match\.py|[o]ffline_diagnosis|[t]rain\.py|[b]uild_cache_incremental\.py|[w]indow_train_split\.py'
-maschine_frei() {
-  local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$BUSY' -and \$_.Name -notmatch 'pwsh|powershell' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
-  [ "$n" = "0" ]
-}
-
-echo "########## NETZ-GESUNDHEIT PUNKT 5 WARTET $(date +%F' '%H:%M:%S)"
-while :; do
-  maschine_frei && { echo "   Maschine frei ($(date +%H:%M:%S))"; break; }
-  echo "   belegt ($(date +%H:%M:%S))"; sleep 5
-done
+. "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
+wait_for_free_cpu "Netz-Gesundheit Punkt 5" "" "$BUSY"
 
 echo ""
 echo "== 1) frozen_v3, ZURUECKGEHALTEN fuer alle sechs Staende $(date +%F' '%H:%M:%S)"

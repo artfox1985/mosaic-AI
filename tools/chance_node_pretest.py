@@ -116,7 +116,10 @@ def r2(preds, ys):
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--model", default="models/alphazero_v19_2d_best.pth")
+    # Kein Default mehr (par.8h Fund 8, 2026-09-21): der bisherige zeigte auf ein
+    # geloeschtes Modell. Ein Default, der nicht existiert, ist keine Bequemlichkeit,
+    # sondern eine Falschauskunft -- die Wahl ist jetzt ein bewusster Akt.
+    ap.add_argument("--model", required=True, help="Torch-Checkpoint (.pth)")
     ap.add_argument("--eval-set", default="evaluations/frozen_eval_set.pkl")
     ap.add_argument("--hi", type=int, default=15,
                     help="Fuellstand >= hi -> Gruppe 'nach' (Default 15 von 21)")

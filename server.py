@@ -200,46 +200,12 @@ _CHAMPION_MODEL = _load_champion_model()
 # werden die Spec-Felder hier EINMAL beim Start in die Env-Knoepfe
 # uebersetzt -- nur, wo der Nutzer den Knopf nicht schon selbst gesetzt hat
 # (explizite Umgebung gewinnt, und sie wird laut gemeldet). Ohne Spec-Datei
-# bleibt alles beim Bestand. Knopf-Namen: engine/src/knob_registry.rs.
-_SPEC_TO_ENV = {
-    "implicit_minimax_alpha": "MOSAIC_IMPLICIT_MINIMAX_A",
-    "long_row_init_shaping_w": "MOSAIC_LONG_ROW_INIT_W",
-    "score_utility_c": "MOSAIC_SCORE_UTILITY_C",
-    "score_utility_b": "MOSAIC_SCORE_UTILITY_B",
-    "envelope_search_c": "MOSAIC_ENVELOPE_SEARCH_C",
-    "envelope_tiling_w": "MOSAIC_ENVELOPE_TILING_W",
-    "envelope_tiling_value_w": "MOSAIC_ENVELOPE_TILING_VALUE_W",
-    "envelope_projection_mode": "MOSAIC_ENVELOPE_PROJECTED",
-    "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
-    "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
-    "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
-    "special_row6_w": "MOSAIC_SPECIAL_ROW6_W",
-    # par.12c (2026-09-11): beide Spec-Felder sind OPTIONAL (Default 0). Die
-    # Schleife unten ueberspringt fehlende Felder, aeltere Specs bleiben also
-    # unveraendert -- und eine Spec, die sie traegt, wirkt auch in der GUI.
-    "dead_cell_w": "MOSAIC_DEAD_CELL_W",
-    "out_wild_w": "MOSAIC_OUT_WILD_W",
-    # K4 (2026-09-12, PREREG_round_estimate_leaf_term.md par.3/par.4): ebenfalls
-    # OPTIONALE Spec-Felder; das Profil ist eine Liste und wird wie
-    # envelope_profile kommasepariert uebergeben.
-    "round_est_c": "MOSAIC_ROUND_EST_C",
-    "round_est_b_profile": "MOSAIC_ROUND_EST_B_PROFILE",
-    # PREREG_dome_return_order.md par.4 (2026-09-12): ebenfalls OPTIONALES
-    # Spec-Feld, Default 0 (Ziehreihenfolge).
-    "return_order_mode": "MOSAIC_RETURN_ORDER_MODE",
-    # PREREG_start_dome_choice.md par.9c (2026-09-12): OPTIONALES Spec-Feld,
-    # Default 0 (Handregel). Bei 1 sucht die Netz-KI ihre Startkuppel
-    # (py.rs::ai_start_tile_json liest den Knopf).
-    "start_by_search": "MOSAIC_START_BY_SEARCH",
-    # PREREG_moon_stack_order.md par.4 (2026-09-14): OPTIONALES Spec-Feld,
-    # Default 1 (Fan-out an = Bestand). Umgekehrte Polung zu den Nachbarn --
-    # 0 schaltet den Fan-out AUS und laesst nur die kanonische Reihenfolge.
-    "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
-    # PREREG_moon_stack_order.md par.9 (2026-09-14): OPTIONALES Spec-Feld,
-    # Default 256. Budget der Mondstapel-Nachsuche JE VARIANTE; wirkt nur bei
-    # moon_order_variants == 2.
-    "moon_order_search_sims": "MOSAIC_MOON_ORDER_SEARCH_SIMS",
-}
+# bleibt alles beim Bestand.
+#
+# Die Abbildung selbst steht seit 2026-09-21 in `spec_env.py` (par.8h Fund 6):
+# sie stand hier und in `tools/claude_play.py` wortgleich und lag in beiden
+# Fassungen zwoelf Felder hinter `net_mcts.rs::KNOWN_FIELDS`.
+from spec_env import SPEC_TO_ENV as _SPEC_TO_ENV, apply_spec_env as _apply_spec_env
 
 
 def _resolve_champion_spec(name: str):
@@ -278,20 +244,16 @@ def _apply_champion_spec_env(name: str) -> None:
     except (OSError, ValueError) as e:
         print(f"⚠️  Champion-Spec {spec_path} nicht lesbar ({e}) -- Env-Defaults gelten.")
         return
-    gesetzt, ueberstimmt = [], []
-    for field, env_name in _SPEC_TO_ENV.items():
-        if field not in spec:
-            continue
-        value = spec[field]
-        text = ",".join(str(v) for v in value) if isinstance(value, list) else str(value)
-        if env_name in os.environ and os.environ[env_name] != text:
-            ueberstimmt.append(f"{env_name}={os.environ[env_name]} (Spec: {text})")
-            continue
-        os.environ[env_name] = text
-        gesetzt.append(f"{env_name}={text}")
-    print(f"Champion-Spec {spec_path.name}: " + (", ".join(gesetzt) if gesetzt else "nichts gesetzt"))
-    if ueberstimmt:
-        print("⚠️  Umgebung ueberstimmt die Champion-Spec: " + ", ".join(ueberstimmt))
+    bericht = _apply_spec_env(spec, respect_existing=True)
+    print(f"Champion-Spec {spec_path.name}: "
+          + (", ".join(bericht["gesetzt"]) if bericht["gesetzt"] else "nichts gesetzt"))
+    if bericht["ueberstimmt"]:
+        print("⚠️  Umgebung ueberstimmt die Champion-Spec: " + ", ".join(bericht["ueberstimmt"]))
+    if bericht["unbekannt"]:
+        # LAUT, nicht still: ein Feld ohne Env-Knopf wirkt in der GUI nicht,
+        # und die Partie saehe trotzdem plausibel aus (par.8h Fund 6).
+        print("⚠️  Spec-Felder OHNE Env-Knopf -- sie wirken in der GUI NICHT: "
+              + ", ".join(bericht["unbekannt"]))
 
 
 _apply_champion_spec_env(_CHAMPION_MODEL)

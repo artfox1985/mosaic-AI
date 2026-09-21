@@ -38,16 +38,8 @@ for d in "$ANCHOR_DIR" "$CHAMP2_DIR"; do
   [ -d "$d" ] || { echo "ABBRUCH: $d fehlt"; exit 1; }
 done
 
-cpu_frei() {
-  local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { (\$_.CommandLine -match '[s]elf_play\.py|[t]rain\.py|[p]aired_gating\.py|[f]rozen_referee_match\.py|[b]uild_cache|[m]aturin' -and \$_.Name -match 'python') -or \$_.Name -match '^(cargo|rustc)' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
-  [ "$n" = "0" ]
-}
-echo "########## PROMOTIONS-KANTEN $CAND $(date +%F' '%H:%M:%S)"
-while :; do
-  cpu_frei && { echo "   Maschine frei ($(date +%H:%M:%S))"; break; }
-  echo "   belegt ($(date +%H:%M:%S))"; sleep 120
-done
+. "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
+wait_for_free_cpu "v31-b01-Kanten"
 
 echo ""
 echo "===== b) ANKER-KANTE $CAND gegen hv4_anchor, n=50, Seed-Basis 20262000 $(date +%F' '%H:%M:%S)"

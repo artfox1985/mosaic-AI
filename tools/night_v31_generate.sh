@@ -50,14 +50,8 @@ if str(d.get("input_size")) != "888" or str(d.get("num_actions")) != "414":
 # Die Dosis steht als CLI-Flag an jedem der drei Aufrufe unten.
 PYEOF
 
-busy() {
-  local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '[s]elf_play\.py|[t]rain\.py|[p]aired_gating|[f]rozen_referee|[b]uild_cache|[c]argo|[m]aturin' -and \$_.Name -match 'python' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
-  [ "$n" != "0" ]
-}
-echo "== WARTEN auf eine freie Maschine $(date +%F' '%H:%M:%S)"
-while busy; do echo "   belegt ($(date +%H:%M:%S))"; sleep 120; done
-echo "   frei ($(date +%H:%M:%S))"
+. "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
+wait_for_free_cpu "v31-Erzeugung"
 
 echo ""
 echo "== 1) Sockel (Traeger), 4.000 Partien -- policy-aktiv $(date +%F' '%H:%M:%S)"

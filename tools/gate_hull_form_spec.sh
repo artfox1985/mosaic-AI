@@ -18,24 +18,11 @@ NET="models/alphazero_v24-b06_brierbest.onnx"
 CTL=${4:-models/v24-b06_brierbest.spec.json}
 ART="evaluations/artifacts"
 
-procs() {
-  local out
-  for _try in 1 2 3; do
-    out=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' -and \$_.Name -match 'python|bash|cargo' }).Count" 2>/dev/null | tr -d '\r[:space:]')
-    case "$out" in ''|*[!0-9]*) sleep 5 ;; *) echo "$out"; return 0 ;; esac
-  done
-  echo 999
-}
-echo "== Warten auf freie CPU $(date +%H:%M:%S); Deckel 3 h"
-tick=0
-while true; do
-  m=$(procs 'paired_gating|paired_arena|self_play\.py|argmax_profile|maturin|cargo '); m=${m:-999}
-  [ "$m" = "0" ] && break
-  tick=$((tick+1)); [ "$tick" -gt 180 ] && { echo "STOPP: 3 h ohne freie CPU"; exit 65; }
-  [ $((tick % 5)) -eq 0 ] && echo "   warte: CPU-Last=$m ($(date +%H:%M:%S))"
-  sleep 60
-done
-echo "   CPU frei $(date +%H:%M:%S); Arm $ARM gegen Kontrolle $CTL, Seed $SEED"
+. "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
+# Deckel 3 h (180 Ticks à 60 s), wie bisher: ein Tor, das ewig wartet,
+# verdeckt, dass die Maschine nie frei wird.
+wait_for_free_cpu "Huellenform-Tor" 180 \n  || { echo "STOPP: 3 h ohne freie CPU"; exit 65; }
+echo "   Arm $ARM gegen Kontrolle $CTL, Seed $SEED"
 
 # Einfaktorialitaet BELEGEN statt behaupten: die beiden Specs duerfen sich in genau einem
 # Feld unterscheiden. Ein zweites Feld waere ein zweiter Faktor und die Messung wertlos.

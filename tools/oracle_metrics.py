@@ -623,19 +623,29 @@ def _apply_spec_env(spec_path: Path) -> dict:
     in einem Prozess.
 
     Die Abbildung Spec-Feld -> Env-Name wird hier NICHT neu geschrieben,
-    sondern aus `tools/claude_play.py` bezogen (dort `SPEC_TO_ENV`, selbst ein
-    Spiegel von `server.py::_SPEC_TO_ENV`) -- eine dritte Kopie waere eine
-    Driftquelle. `heuristik_variante` steht bewusst nicht in der Abbildung
-    (netzlose Seite) und wird als ignoriertes Feld protokolliert."""
-    sys.path.insert(0, str(ROOT / "tools"))
-    from claude_play import SPEC_TO_ENV, apply_spec_env  # noqa: E402 -- erst hier, kein Modul-Import
+    sondern aus `spec_env.py` bezogen -- eine eigene Kopie waere eine
+    Driftquelle. Bis zum 2026-09-21 lief der Bezug ueber `claude_play`, das
+    selbst eine Kopie von `server.py` war; alle drei lagen zwoelf Felder hinter
+    `net_mcts.rs::KNOWN_FIELDS` (par.8h Fund 6). Fuer DIESES Werkzeug war das
+    der gefaehrlichste Ort: es faehrt A/B als zwei Laeufe mit verschiedenen
+    `--spec`-Dateien, und ein nicht abgebildetes Feld haette zwei IDENTISCHE
+    Arme ergeben. `ignorierte_spec_felder` trennt seither, was bewusst
+    uebergangen wird (z.B. `heuristik_variante`, netzlose Seite) von dem, was
+    keinen Knopf hat."""
+    from spec_env import SPEC_TO_ENV, apply_spec_env  # noqa: E402 -- erst hier, kein Modul-Import
 
-    apply_spec_env(spec_path)
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    bericht = apply_spec_env(spec)
+    if bericht["unbekannt"]:
+        raise SystemExit(
+            f"ABBRUCH: {spec_path} traegt Felder OHNE Env-Knopf: {bericht['unbekannt']}. "
+            "Sie wirken in diesem Lauf NICHT -- ein A/B darueber waere zwei gleiche Arme."
+        )
     return {
         "spec_file": _rel_to_root(spec_path),
         "gesetzte_env": {env: os.environ[env] for field, env in SPEC_TO_ENV.items() if field in spec},
         "ignorierte_spec_felder": sorted(k for k in spec if k not in SPEC_TO_ENV),
+        "bewusst_uebergangen": bericht["uebergangen"],
     }
 
 

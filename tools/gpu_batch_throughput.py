@@ -96,7 +96,10 @@ def measure(model, nn_mod, device: str, batch: int, reps: int, warmup: int) -> f
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--model", default="models/alphazero_v21_2d_brierbest.pth")
+    # Kein Default mehr (par.8h Fund 8, 2026-09-21): der bisherige zeigte auf ein
+    # geloeschtes Modell. Ein Default, der nicht existiert, ist keine Bequemlichkeit,
+    # sondern eine Falschauskunft -- die Wahl ist jetzt ein bewusster Akt.
+    ap.add_argument("--model", required=True, help="Torch-Checkpoint (.pth)")
     ap.add_argument("--reps", type=int, default=30)
     ap.add_argument("--warmup", type=int, default=10)
     ap.add_argument("--out", default="evaluations/artifacts/gpu_batch_throughput.json")

@@ -119,8 +119,12 @@ RULES = {
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--model", default="models/alphazero_v17_best.onnx")
-    p.add_argument("--data-glob", default="data/selfplay_v16_*.pkl")
+    # Kein Default mehr (par.8h Fund 8, 2026-09-21): der bisherige zeigte auf ein
+    # geloeschtes Modell. Ein Default, der nicht existiert, ist keine Bequemlichkeit,
+    # sondern eine Falschauskunft -- die Wahl ist jetzt ein bewusster Akt.
+    p.add_argument("--model", required=True, help="ONNX des zu messenden Netzes")
+    # Ebenso: der v16-Korpus liegt nicht mehr im Baum.
+    p.add_argument("--data-glob", required=True, help="Glob auf die Korpusdateien")
     p.add_argument("--n-states", type=int, default=30)
     p.add_argument("--sims", type=int, default=400)
     p.add_argument("--c-puct", type=float, default=1.5)

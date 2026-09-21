@@ -63,20 +63,8 @@ SPEC=models/frozen_champions/v30-b02/spec.json
 [ -f "$SPEC" ] || { echo "ABBRUCH: Champion-Spec $SPEC fehlt"; exit 4; }
 echo "== v31-KETTE, Champion-Spec: $SPEC"
 
-cpu_frei() {
-  local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { (\$_.CommandLine -match '[s]elf_play\.py|[t]rain\.py|[p]aired_gating\.py|[f]rozen_referee_match\.py|[b]uild_cache|[w]indow_train_split|[o]ffline_diagnosis|[d]ead_unit_probe|[m]aturin' -and \$_.Name -match 'python') -or \$_.Name -match '^(cargo|rustc)' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
-  # Leere oder unklare Antwort gilt als BELEGT (gehaertet, drei Vorfaelle).
-  [ "$n" = "0" ]
-}
-warte_frei() {
-  echo "########## v31-KETTE WARTET ($1) $(date +%F' '%H:%M:%S)"
-  while :; do
-    cpu_frei && { echo "   Maschine frei ($(date +%H:%M:%S))"; break; }
-    echo "   belegt ($(date +%H:%M:%S))"; sleep 120
-  done
-  sleep 20
-}
+. "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
+warte_frei() { wait_for_free_cpu "$1"; }
 
 echo ""
 echo "== 0) Cache-Waechter beenden, falls einer laeuft $(date +%H:%M:%S)"

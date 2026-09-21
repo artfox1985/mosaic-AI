@@ -70,6 +70,7 @@ import copy
 import json
 import math
 import os
+import pathlib
 import pickle
 import sys
 
@@ -332,12 +333,20 @@ def measure_model(pth_path: str, states: list, combos: list, curve: dict,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--eval-set", default="evaluations/frozen_eval_set.pkl")
-    ap.add_argument("--models", nargs="+", default=[
-        "models/alphazero_v18_best.pth", "models/alphazero_v19_best.pth", "models/alphazero_v19_2d_best.pth",
-    ], help="Torch-Checkpoints (.pth) -- einheitlicher Messpfad fuer alle Modelle, siehe Moduldoku Punkt 2")
-    ap.add_argument("--model-path-for-api", default="models/alphazero_v18_best.onnx",
-                     help="beliebiger gueltiger ONNX-Pfad, den net_search_state_json laden MUSS (API-Zwang) -- "
-                          "fuer Runde-5-Zustaende inhaltlich nie benutzt (round5.rs-Kurzschluss)")
+    # Kein Default mehr (par.8h Fund 8, 2026-09-21): die drei Checkpoints sind
+    # geloescht. Sie SIND die Substanz der Messung und lassen sich nicht durch
+    # ein beliebiges anderes Netz ersetzen -- also wird die Wahl verlangt.
+    ap.add_argument("--models", nargs="+", required=True,
+                    help="Torch-Checkpoints (.pth) -- einheitlicher Messpfad fuer alle Modelle, "
+                         "siehe Moduldoku Punkt 2")
+    # Hier ist es umgekehrt: die Moduldoku sagt selbst, der Inhalt sei fuer
+    # Runde-5-Zustaende nie benutzt (round5.rs-Kurzschluss), gebraucht wird nur
+    # ein LADBARER ONNX-Pfad. Darum ein Default, der mitwandert, statt eines
+    # eingefrorenen Namens.
+    ap.add_argument("--model-path-for-api", default=None,
+                    help="beliebiger gueltiger ONNX-Pfad, den net_search_state_json laden MUSS "
+                         "(API-Zwang) -- fuer Runde-5-Zustaende inhaltlich nie benutzt "
+                         "(round5.rs-Kurzschluss). Ohne Angabe: der amtierende Champion.")
     ap.add_argument("--sims", type=int, default=400)
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--n-states", type=int, default=24)
@@ -346,6 +355,24 @@ def main():
     ap.add_argument("--out", default="evaluations/artifacts/r5_value_calibration_result.json")
     ap.add_argument("--seed", type=int, default=1000)
     args = ap.parse_args()
+
+    if args.model_path_for_api is None:
+        # Nur LADBAR muss er sein, nicht bestimmt (s. Hilfetext). Der
+        # amtierende Champion wandert mit, ein fester Name verfaellt.
+        modelle = pathlib.Path(ROOT) / "models"
+        name = (modelle / "champion.txt").read_text(encoding="utf-8").strip()
+        basis = name
+        for suffix in ("_brierbest", "_best"):
+            if basis.endswith(suffix):
+                basis = basis[: -len(suffix)]
+        for kandidat in (modelle / f"alphazero_{name}.onnx",
+                         modelle / "frozen_champions" / basis / "model.onnx"):
+            if kandidat.exists():
+                args.model_path_for_api = str(kandidat)
+                break
+        else:
+            raise SystemExit(f"Kein ONNX zum Champion '{name}' gefunden -- --model-path-for-api setzen.")
+        print(f"[r5_value_calibration] API-ONNX (Inhalt egal): {args.model_path_for_api}")
 
     with open(args.eval_set, "rb") as f:
         data = pickle.load(f)

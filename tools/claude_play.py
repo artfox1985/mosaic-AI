@@ -75,42 +75,13 @@ GAMES_DIR = REPO / "evaluations" / "artifacts" / "claude_play"
 COLORS = {"blau": "B", "gelb": "G", "rot": "R", "schwarz": "S", "türkis": "T", "bunt": "*"}
 COLOR_IN = {"b": "blau", "blau": "blau", "g": "gelb", "gelb": "gelb", "r": "rot", "rot": "rot",
             "s": "schwarz", "schwarz": "schwarz", "t": "türkis", "tuerkis": "türkis", "türkis": "türkis"}
-# Wie server.py `_SPEC_TO_ENV` (server.py:205): Spec-Felder des Gegners als Env-Knoepfe,
-# VOR dem Import der Engine gesetzt (OnceLock-Getter lesen nur einmal je Prozess).
-SPEC_TO_ENV = {
-    "implicit_minimax_alpha": "MOSAIC_IMPLICIT_MINIMAX_A",
-    "long_row_init_shaping_w": "MOSAIC_LONG_ROW_INIT_W",
-    "score_utility_c": "MOSAIC_SCORE_UTILITY_C",
-    "score_utility_b": "MOSAIC_SCORE_UTILITY_B",
-    "envelope_search_c": "MOSAIC_ENVELOPE_SEARCH_C",
-    "envelope_tiling_w": "MOSAIC_ENVELOPE_TILING_W",
-    "envelope_tiling_value_w": "MOSAIC_ENVELOPE_TILING_VALUE_W",
-    "envelope_projection_mode": "MOSAIC_ENVELOPE_PROJECTED",
-    "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
-    "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
-    "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
-    "special_row6_w": "MOSAIC_SPECIAL_ROW6_W",
-    # par.12c (2026-09-11), OPTIONALE Spec-Felder mit Default 0.
-    "dead_cell_w": "MOSAIC_DEAD_CELL_W",
-    "out_wild_w": "MOSAIC_OUT_WILD_W",
-    # K4 (2026-09-12), ebenfalls OPTIONALE Spec-Felder; das Profil ist eine
-    # Liste und wird wie envelope_profile kommasepariert uebergeben.
-    "round_est_c": "MOSAIC_ROUND_EST_C",
-    "round_est_b_profile": "MOSAIC_ROUND_EST_B_PROFILE",
-    # PREREG_dome_return_order.md par.4 (2026-09-12), OPTIONALES Spec-Feld
-    # mit Default 0 (Ziehreihenfolge).
-    "return_order_mode": "MOSAIC_RETURN_ORDER_MODE",
-    # PREREG_start_dome_choice.md par.9c (2026-09-12), OPTIONALES Spec-Feld
-    # mit Default 0 (Handregel); bei 1 sucht die Netz-KI ihre Startkuppel.
-    "start_by_search": "MOSAIC_START_BY_SEARCH",
-    # PREREG_moon_stack_order.md par.4 (2026-09-14), OPTIONALES Spec-Feld mit
-    # Default 1 (Fan-out an = Bestand); 0 laesst nur die kanonische
-    # Reihenfolge der Mondsteine zu.
-    "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
-    # PREREG_moon_stack_order.md par.9 (2026-09-14), OPTIONALES Spec-Feld mit
-    # Default 256; Budget der Nachsuche JE VARIANTE, wirkt nur bei Wert 2.
-    "moon_order_search_sims": "MOSAIC_MOON_ORDER_SEARCH_SIMS",
-}
+# Spec-Felder des Gegners als Env-Knoepfe, VOR dem Import der Engine gesetzt
+# (OnceLock-Getter lesen nur einmal je Prozess). Die Abbildung steht seit
+# 2026-09-21 in `spec_env.py` -- sie stand hier und in `server.py` wortgleich
+# und lag in beiden zwoelf Felder hinter `net_mcts.rs::KNOWN_FIELDS`
+# (par.8h Fund 6). Der Name bleibt re-exportiert, `tools/oracle_metrics.py`
+# hat ihn frueher von hier bezogen.
+from spec_env import SPEC_TO_ENV  # noqa: F401 -- Re-Export fuer Altaufrufer
 
 
 # ---------------------------------------------------------------- Partie-Verzeichnis
@@ -151,11 +122,13 @@ def save_manifest(name: str, m: dict) -> None:
 
 
 def apply_spec_env(spec_path: Path) -> None:
-    spec = json.loads(spec_path.read_text(encoding="utf-8"))
-    for field, env in SPEC_TO_ENV.items():
-        if field in spec:
-            v = spec[field]
-            os.environ[env] = ",".join(str(x) for x in v) if isinstance(v, list) else str(v)
+    """Spec-Felder setzen. Ein Feld OHNE Env-Knopf wird laut gemeldet: still
+    uebergangen hiesse, dass ein A/B-Lauf zwei identische Arme faehrt."""
+    from spec_env import apply_spec_env as _apply
+    bericht = _apply(spec_path)
+    if bericht["unbekannt"]:
+        print(f"WARNUNG: {spec_path.name} traegt Felder OHNE Env-Knopf, sie wirken NICHT: "
+              + ", ".join(bericht["unbekannt"]))
 
 
 def resolve_model(name: str) -> Path:

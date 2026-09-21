@@ -75,6 +75,24 @@ def main() -> None:
     from neural_net import (build_model_from_checkpoint, state_to_planes,
                             state_to_tensor)
 
+    # par.8h Fund 8 (2026-09-21): `MODEL_KEY` ist KEIN Default, den man
+    # umhaengen koennte -- er ist zugleich Schluessel in `R4B_JSON` (dort
+    # liegen die Referenzwerte je Zustand fuer GENAU dieses Netz) und Pfad des
+    # zu ladenden Checkpoints. Ein anderes Modell hier einzutragen wuerde die
+    # Sonde gegen fremde Referenzwerte rechnen lassen. Das Modell ist
+    # geloescht; die Sonde ist damit ohne Wiederherstellung aus dem
+    # restic-Repo nicht lauffaehig, und das gehoert frueh und laut gesagt
+    # statt als Traceback aus `torch.load`.
+    fehlt = BASE_DIR / MODEL_KEY
+    if not fehlt.exists():
+        raise SystemExit(
+            f"{MODEL_KEY} liegt nicht im Baum. Die Sonde ist an dieses Netz GEBUNDEN: "
+            f"derselbe Name ist Schluessel der Referenzwerte in {R4B_JSON.name}. "
+            "Ein anderes Modell einzusetzen waere kein Ersatz, sondern ein Messfehler. "
+            "Entweder den Checkpoint aus dem restic-Repo holen oder die Sonde ziehen "
+            "(offener Nutzer-Entscheid, evaluations/STATUS.md)."
+        )
+
     ref = json.loads(R4B_JSON.read_text(encoding="utf-8"))
     per_state = ref["per_model"][MODEL_KEY]["per_state"]
     ref_ids = [r["game_id"] for r in per_state]

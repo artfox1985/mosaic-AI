@@ -173,7 +173,10 @@ def value_debug_heads(analysis):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--eval-set", default="evaluations/frozen_eval_set.pkl")
-    ap.add_argument("--model", default="models/alphazero_v16_best.onnx")
+    # Kein Default mehr (par.8h Fund 8, 2026-09-21): der bisherige zeigte auf ein
+    # geloeschtes Modell. Ein Default, der nicht existiert, ist keine Bequemlichkeit,
+    # sondern eine Falschauskunft -- die Wahl ist jetzt ein bewusster Akt.
+    ap.add_argument("--model", required=True, help="ONNX des zu messenden Netzes")
     ap.add_argument("--sims", type=int, default=400)
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--n-states", type=int, default=16)

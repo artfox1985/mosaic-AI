@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A und die Bonuschips gebaut (par.8, 8d, 8e). Durchsicht par.8h fand einen selbst eingebauten Korrektheitsfehler im Tiling-Cache-Schluessel (behoben) plus 10 repo-weite Funde; davon 4 abgearbeitet. par.8i: die zehn Posten aus par.8g als EIN Buendel, 9 Beispiele und 3 tote E2E-Skripte raus, 3 Punkte nach Pruefung abgelehnt, nur Punkt 10 bleibt Nutzer-Entscheid. Alle Tore gruen, Anker-Drift 1.763 Schritte identisch. Rest aus par.8h: rund 15 h. -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: Stufe 1, Gruppe A und die Bonuschips gebaut (par.8, 8d, 8e). par.8i: die zehn Posten aus par.8g als EIN Buendel, 9 Beispiele und 3 tote E2E-Skripte raus, 3 Punkte nach Pruefung abgelehnt. par.8j: die drei stillen Posten aus par.8h -- Warteschleife sah cargo nicht (gemessen 3 gegen 0), Spec-Abbildung 5 echte Suchknoepfe kurz (keine registrierte Zahl betroffen, Rust-Leser ist vollstaendig), tote Modell-Defaults raus. Alle Tore gruen, Anker-Drift identisch. Offen: par.8h Punkte 1, 2, 4, 9, 10 und par.8g Punkt 10. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -1693,3 +1693,99 @@ fallen mit ihm oder gar nicht -- sie einzeln anzufassen waere die falsche Reihen
 
 Die uebrigen offenen Posten stehen unveraendert in par.8h (Punkte 1, 2, 4, 5, 6, 8, 9, 10),
 Aufwand dafuer weiterhin rund 15 h.
+
+## par.8j RESTLISTE par.8h, BUENDEL 1: die drei stillen Posten (2026-09-21)
+
+**Nutzer-Auftrag:** *"mach weiter mit den restlichen punkten aus par.8h"*. Zuerst die drei, die
+nicht doppelt sind, sondern FALSCH: Punkte 5, 6 und 8. Rein auf der Python- und Shell-Seite, also
+ohne Rust-Torlauf.
+
+**Zwei der drei Befunde des Agenten waren im Detail unzutreffend**, und beide Male lag der
+tatsaechliche Sachverhalt daneben, nicht nur die Zeilenangabe. Das ist der Grund, warum REGEL 0
+auch fuer eine sorgfaeltige Durchsicht gilt.
+
+### Punkt 5: die defekte Warteschleife, mit Gegenprobe statt Behauptung
+
+Fuenf Kopien, vier Bauformen, eine davon defekt -- das stimmte. `tools/night_v31_generate.sh:55`
+verundete `[c]argo|[m]aturin` in der Kommandozeile mit `Name -match 'python'`; ein `cargo.exe`
+heisst nicht `python.exe`, die Kopie konnte einen laufenden Build also nie sehen. Genau an der
+Stelle, an der CLAUDE.md sagt, dass ein Build Messlast ist.
+
+**Gemessen, nicht behauptet:** bei laufendem `cargo test --release --no-run` zaehlt der
+gehaertete Filter **3** Prozesse (cargo plus rustc), der alte **0**. Die Erzeugungskette haette in
+diesem Moment eine Messung gestartet.
+
+Alle fuenf haengen jetzt an `tools/lib/cpu_free.sh`. Die drei Haertungen dort stammen je aus
+einem Vorfall: der Klammer-Trick gegen das Warten auf sich selbst, Cargo/rustc/maturin am
+PROZESSNAMEN statt in der Kommandozeile, und eine unlesbare Antwort gilt als BELEGT. Die
+Bezeichner sind bei der Gelegenheit englisch geworden (`cpu_busy_count`, `cpu_is_free`,
+`wait_for_free_cpu`), wie es die Konvention seit 2026-08-24 verlangt.
+
+### Punkt 6: schaerfer als registriert -- und trotzdem keine falsche Zahl
+
+Registriert war: zwei byte-gleiche Kopien von `_SPEC_TO_ENV`, beide zwoelf Felder hinter
+`net_mcts.rs::KNOWN_FIELDS`, und *"die aktuelle Champion-Spec traegt davon `heuristik_variante`
+-- das Feld wird beim GUI-Laden still uebergangen"*.
+
+**Der Beispielfall war der falsche.** `heuristik_variante` fehlt ABSICHTLICH: es waehlt die
+Variante der netzlosen Gegenseite, ist kein Suchknopf des Netzes, und `oracle_metrics`
+protokolliert es seit je als ignoriertes Feld. Die zwoelf Fehlenden zerfallen in acht solche
+(sechs Erzeugungs-Stilmittel plus `heuristik_variante`) und **fuenf echte Suchknoepfe mit
+eigenem Env-Namen**: `special_unlock_w`, `special_unlock_beta`, `moon_order_search_scale`,
+`round_transition_leaf`, `net_tiling_tiebreak`.
+
+**Die Rueckwaerts-Pruefung war hier Pflicht, und sie faellt gut aus.** Im Baum liegen neun
+A/B-Specs, die genau diese Felder tragen (`tiebreak_off/on`, `rt_leaf_off/on`,
+`moon_order_scale0/1`, `k6_off/w025/w050`). Alle neun sind ueber `paired_gating` gemessen worden,
+also ueber den RUST-Leser, der alle 32 Felder kennt; und die vier registrierten
+`oracle_metrics`-Laeufe nennen als ignoriertes Feld ausschliesslich `heuristik_variante`. **Keine
+registrierte Zahl haengt daran.** Es war eine geladene, keine abgefeuerte Waffe.
+
+**Wo sie geladen war, ist der Punkt:** `oracle_metrics` faehrt A/B als ZWEI Laeufe mit
+verschiedenen `--spec`-Dateien. Waere eine der neun durch dieses Werkzeug gegangen, haette es
+zwei IDENTISCHE Arme gemessen -- und an den Zahlen waere das nicht zu sehen gewesen.
+
+Die Abbildung steht jetzt einmal in `spec_env.py` (Wurzelverzeichnis wie `corpus_io.py`, weil
+`server.py` sie importiert und PyInstaller ueber `pathex=[PROJECT_ROOT]` laeuft: ein Modul unter
+`tools/` waere im portablen Bundle nicht gelandet). Die fuenf Knoepfe sind nachgetragen, die acht
+Ausnahmen tragen je einen GRUND im Code, und alle drei Aufrufer melden ein Feld ohne Knopf jetzt
+laut -- `oracle_metrics` bricht sogar ab, weil dort ein stilles Ueberspringen die Messung
+entwertet.
+
+**Der eigentliche Schutz ist `tools/tests/test_spec_env.py`** (16 Tests): er liest `KNOWN_FIELDS`
+aus dem Rust-Quelltext und verlangt fuer JEDES Feld eine Entscheidung -- abgebildet oder mit
+Grund ausgenommen. Dazu die Gegenrichtung (kein erfundener Env-Name), ein Abgleich gegen
+`knob_registry.rs` (ein Tippfehler setzt sonst eine Variable, die niemand liest) und die Probe
+aufs Exempel ueber alle `models/*.spec.json`. Ein neues Spec-Feld in Rust zwingt damit zu einer
+Entscheidung auf der Python-Seite, statt still zwoelf anwachsen zu lassen.
+
+### Punkt 8: die Pfade stimmten nicht, und ein Posten war gar kein Default
+
+Die sechs Werkzeuge liegen in `tools/`, nicht in `tools/probes/` wie registriert. Bestaetigt ist
+der Kern: fuenf Modelle und ein Korpus-Glob zeigen ins Leere
+(`alphazero_v16/v17/v18_best`, `v19_2d_best`, `v21_2d_brierbest`, `data/selfplay_v16_*.pkl`),
+dazu die drei Checkpoints in `--models` von `r5_value_calibration`.
+
+Behandelt wurde aber nicht alles gleich, weil sie nicht dasselbe sind:
+
+* **Vier Werkzeuge** (`plate_rank_invariance`, `play_rule_cost`, `chance_node_pretest`,
+  `gpu_batch_throughput`) und `--models` von `r5_value_calibration`: Default weg, Flag
+  `required`. Das gewaehlte Netz IST die Substanz der Messung; ein Default, der nicht existiert,
+  ist keine Bequemlichkeit, sondern eine Falschauskunft.
+* **`r5_value_calibration --model-path-for-api`** ist der Gegenfall: die Moduldoku sagt selbst,
+  der Inhalt werde fuer Runde-5-Zustaende nie benutzt (`round5.rs`-Kurzschluss), gebraucht werde
+  nur ein LADBARER ONNX-Pfad. Dort ist ein mitwandernder Default richtig -- jetzt der amtierende
+  Champion aus `models/champion.txt`.
+* **`r4b_zone_probe` ist gar kein Default.** `MODEL_KEY` ist zugleich Schluessel in
+  `r4b_value_calibration_v20_n72.json`, wo die Referenzwerte je Zustand fuer GENAU dieses Netz
+  liegen. Ein anderes Modell einzutragen waere kein Ersatz, sondern ein Messfehler. Die Sonde
+  bekommt darum einen frueh ausloesenden Riegel, der das benennt, statt einen Traceback aus
+  `torch.load` zu liefern -- und verweist auf den offenen Nutzer-Entscheid, ob sie gezogen wird.
+
+### Tore
+
+187 Werkzeug-Tests gruen (171 + 16 neue), Konventions-Check gruen, `server.py` und
+`tools/claude_play.py` laden sauber, die Champion-Spec setzt unveraendert ihre zwoelf Knoepfe.
+Kein Rust beruehrt, also kein Wheel und keine Anker-Drift noetig.
+
+**Offen aus par.8h:** Punkte 1, 2, 4, 9, 10.
