@@ -40,12 +40,12 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 * **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
   erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
   danach die Konsolenzeile "Champion-Spec ..." lesen.
-* **Das Aufraeumen ist durch** (`PREREG_code_cleanup_closeout.md`): par.8i bis par.8n am
-  2026-09-21. Die beiden Rust-Punkte 9 und 10 sind GEMESSEN und begruendet NICHT gebaut -- der
-  Plain-Tiling-Cache trifft zu 96,9 Prozent, der erreichbare Gewinn ist darauf gedeckelt, und der
-  Weg dorthin fuehrt neben `scoring.rs:160` vorbei. **Offen ist nur noch ein Nutzer-Entscheid:**
-  par.8g Punkt 10, `round_transition_resample` -- der Code-Review nennt den Pfad Altlast, der
-  Modulkopf sagt "BLEIBEN"; die sieben Tests fallen mit ihm oder gar nicht.
+* **Das Aufraeumen ist ABGESCHLOSSEN** (`PREREG_code_cleanup_closeout.md`, par.8i bis par.8o,
+  alles am 2026-09-21). Die Rust-Punkte 9 und 10 sind GEMESSEN und begruendet nicht gebaut (der
+  Plain-Tiling-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). Der letzte
+  Nutzer-Entscheid ist gefallen: der Inversions-Pfad in `round_transition_resample` ist raus
+  (432 Zeilen, sieben Tests, kein Verbraucher), der Vorwaerts-Pfad bleibt -- `r4_value_calibration`
+  haengt daran. Vertragshash unveraendert, Anker-Drift identisch.
   `tools/build_frozen_golden_probe.py` meldet seit dem 2026-09-21 Fortschritt (Sammelphase je
   Partie mit Fuellstand je Runde, Sonden mit Laufzeit, alles mit `flush`) -- vorher lief es bis
   zu 22 Minuten stumm.

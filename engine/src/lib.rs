@@ -2109,71 +2109,19 @@ fn round_transition_leaf_fill_diag_json(
     .to_string())
 }
 
-/// PREREG_r4_value_calibration.md, Abschnitt "Vorbedingung": invertiert die
-/// Fabrik-Neubefüllung eines Runde-5-Startzustands (Übergang 4→5,
-/// `state.rs::setup_new_round`/`fill_factories`) und sampelt `n_samples`
-/// frische Neubefüllungen DESSELBEN Vor-Befüllungs-Bretts -- Grundlage für
-/// die Runde-4-Ende-Ground-Truth (`ab_value` je Sample über `round5.rs`,
-/// siehe PREREG-Dokument, Abschnitt "Ground Truth"). Additiv: es gab bisher
-/// keinen Python-Einstieg für diese RÜCKWÄRTS-Richtung (nur
-/// `advance_after_tiling_json` direkt oberhalb, die VORWÄRTS-Richtung
-/// Tiling-Leaf → nächste Runde).
+/// PREREG_r4_value_calibration.md, Vorbedingung -- der VORWÄRTS-Weg zur
+/// Runde-4-Ende-Ground-Truth, und seit 2026-09-21 der einzige.
 ///
-/// **BEFUND 2026-08-03 (Koordinator, 9000-Partien-Korpus): 87,6 % der echten
-/// Runde-5-Starts haben einen leeren Turm** -- die Ausschlussregel dieser
-/// Funktion (Turm-Reshuffle-Grenzfall, siehe
-/// `round_transition_resample`-Moduldoku) würde also fast das ganze
-/// PREREG-Substrat verwerfen. Diese Funktion bleibt additiv erhalten (für den
-/// verbleibenden ~12,4%-Fall weiterhin exakt), der PREREG-r4-Pfad selbst
-/// nutzt aber ab jetzt [`autoplay_to_round5_and_resample_json`] weiter unten
-/// (Vorwärts-Pfad ab dem echten Runde-4-Zustand, umgeht die Turm-Ambiguität
-/// komplett, siehe dortige Doku).
+/// Daneben stand bis dahin eine RÜCKWÄRTS-Variante
+/// (`resample_round_transition_json`), die die Fabrik-Neubefüllung eines
+/// Runde-5-Starts invertierte. Sie ist entfernt: **87,6 % der echten
+/// Runde-5-Starts haben einen leeren Turm** (Befund 2026-08-03, 9.000-Partien-
+/// Korpus), und ihre Ausschlussregel für mehrdeutig invertierbare Zustände
+/// hätte damit fast das ganze PREREG-Substrat verworfen. Schon seit dem
+/// PREREG-Redesign vom 2026-08-03 hatte sie keinen Aufrufer mehr
+/// (`PREREG_code_cleanup_closeout.md` par.8g Punkt 10).
 ///
-/// `r5_start_state_json` muss ein UNBERÜHRTER Runde-5-Start sein (Phase
-/// Drafting, `round==5`, alle Fabriken frisch befüllt: 4 kleine × 4
-/// Sonnenplättchen + große × 5, kein Mond-Vorrat, Bonuschips unaufgedeckt) --
-/// siehe `round_transition_resample::invert_round5_fill` für die exakte
-/// Validierung inkl. Turm-Reshuffle-Grenzfall (PREREG "Bekannte
-/// Einschränkungen": mehrdeutig invertierbare Zustände geben `Err` statt
-/// einer stillen Näherung, s. dortiger Moduldoku-Kommentar). `seed` treibt
-/// sowohl die `json_to_state`-Rekonstruktion der (für die Fabrik-Inversion
-/// irrelevanten) verdeckten Sammlungen als auch, je Sample-Index
-/// deterministisch abgeleitet (`seed + i`), die eigentliche Neubefüllung.
-/// Rückgabe: JSON-Array von `n_samples` `state_to_json`-Zustandsdicts
-/// (dasselbe Format, das `json_to_state`/`net_search_state_json` wieder
-/// einliest).
-#[pyfunction]
-#[pyo3(signature = (r5_start_state_json, n_samples, seed))]
-fn resample_round_transition_json(
-    r5_start_state_json: &str,
-    n_samples: u32,
-    seed: u64,
-) -> PyResult<String> {
-    use pyo3::exceptions::PyValueError;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-
-    let mut recon_rng = StdRng::seed_from_u64(seed);
-    let parsed: serde_json::Value = serde_json::from_str(r5_start_state_json).map_err(|e| {
-        PyValueError::new_err(format!("r5_start_state_json: JSON-Parse-Fehler: {e}"))
-    })?;
-    let state = crate::serialize::json_to_state(&parsed, &mut recon_rng).map_err(PyValueError::new_err)?;
-
-    let samples =
-        crate::round_transition_resample::resample_round5_start(&state, n_samples, seed)
-            .map_err(PyValueError::new_err)?;
-
-    let out: Vec<serde_json::Value> = samples
-        .iter()
-        .map(|s| crate::serialize::state_to_json(s, true))
-        .collect();
-    Ok(serde_json::Value::Array(out).to_string())
-}
-
-/// PREREG_r4_value_calibration.md, Vorbedingung -- VORWÄRTS-Ersatz für
-/// [`resample_round_transition_json`] (siehe dessen Doku für den
-/// 87,6%-Turm-leer-Befund, der die Inversion für das PREREG-Substrat
-/// praktisch unbrauchbar macht). Setzt beim echten "letzten R4-Record"
+/// Setzt beim echten "letzten R4-Record"
 /// (`round==4`, `phase=="tiling"`, PREREG "Positions-Substrat") an, wo
 /// Beutel/Turm noch als EXAKTE Multisets bekannt sind (kein
 /// Zähler-Rekonstruktions-Verlust) -- keine Inversion, keine
@@ -2380,7 +2328,6 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_drafting_policy_states_json_batch, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
-    m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
     m.add_function(wrap_pyfunction!(round_transition_leaf_fill_diag_json, m)?)?;
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(bootstrap_horizon_stage0_probe_json, m)?)?;

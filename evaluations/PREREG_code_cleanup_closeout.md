@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben? | Beleg: Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e); par.8i die zehn Posten aus par.8g als EIN Buendel (3 nach Pruefung abgelehnt); par.8j-8m die Python-Seite von par.8h (Warteschleife sah cargo nicht, 3 gegen 0 gemessen; Spec-Abbildung 5 Suchknoepfe kurz; 62 rohe Korpus-Leser, 43 live defekt; 13 unvollstaendige laufzeit-Bloecke; 18 Kopien des Binomialtests, 126 registrierte p-Werte exakt reproduziert); par.8n die Rust-Punkte 9 und 10 GEMESSEN und begruendet NICHT gebaut (Plain-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). 206 Werkzeug-Tests, 700 Lib-Tests, Anker-Drift identisch. OFFEN: nur par.8g Punkt 10 (round_transition_resample), Nutzer-Entscheid ueber den Code. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche Defekte, Fussangeln und Altlasten werden behoben? | Beleg: ABGEARBEITET 2026-09-21. Stufe 1, Gruppe A, Bonuschips (par.8, 8d, 8e); par.8i die zehn Posten aus par.8g als EIN Buendel (3 nach Pruefung abgelehnt); par.8j-8m die Python-Seite von par.8h (Warteschleife sah cargo nicht, 3 gegen 0 gemessen; Spec-Abbildung 5 Suchknoepfe kurz; 62 rohe Korpus-Leser, 43 live defekt; 13 unvollstaendige laufzeit-Bloecke; 18 Kopien des Binomialtests, 126 p-Werte exakt reproduziert); par.8n die Rust-Punkte 9/10 GEMESSEN und begruendet nicht gebaut (Plain-Cache trifft 96,9 Prozent); par.8o der Inversions-Pfad raus auf Nutzer-Entscheid (432 Zeilen, 7 Tests, kein Verbraucher). Vertragshash unveraendert, Anker-Drift 1.763 Schritte identisch, 693 Lib-Tests, 206 Werkzeug-Tests. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -2069,3 +2069,79 @@ von Schweigen.
 **Damit ist par.8h vollstaendig abgearbeitet.** Sechs Punkte gebaut, zwei gemessen und begruendet
 nicht gebaut. Offen aus der ganzen Aufraeum-Prereg bleibt nur par.8g Punkt 10
 (`round_transition_resample`) -- ein Nutzer-Entscheid ueber den Code.
+
+## par.8o par.8g PUNKT 10 AUSGEFUEHRT: der Inversions-Pfad ist raus (2026-09-21)
+
+**Nutzer-Entscheid** auf Vorlage: *"Raus, Vorwaerts bleibt"*. Damit ist der letzte offene Posten
+der ganzen Aufraeum-Prereg geschlossen.
+
+### Die Praemisse des Punktes war ein Scheingegensatz
+
+par.8g Punkt 10 lautete: *"der Code-Review nennt den Pfad Altlast, der Modulkopf sagt BLEIBEN"*.
+Am Bestand widersprechen sich die beiden nicht. Der Modulkopf schrieb selbst, der PREREG-r4-Pfad
+*"nutzt ab jetzt NICHT mehr diese Inversion"* -- dieselbe Tatsache wie Review-Befund T4. Sein
+"BLEIBEN" war ein WERTURTEIL ueber korrekten, committeten Code, keine Behauptung, er werde
+benutzt. Die Entscheidung stand also nie zwischen zwei Befunden, sondern zwischen zwei Haltungen
+zu unbenutztem Code.
+
+### Der Bestand, an dem entschieden wurde
+
+| | Verbraucher | Zeilen | Tests |
+| --- | --- | --- | --- |
+| **Vorwaerts** `autoplay_to_round5_and_resample` | LEBT: `tools/r4_value_calibration.py:224` | ~151 | 6 |
+| **Inversion** `invert_round5_fill`, `resample_round5_start`, PyO3-Huelle `resample_round_transition_json`, `state::fill_factories_for_resample` | KEINER | ~186 | 7 |
+
+Die beiden Haelften sind unabhaengig -- die Vorwaerts-Route ruft weder die Inversion noch deren
+Helfer. Der einzige Treffer auf der Python-Seite war ein Kommentar in
+`r4_value_calibration.py:20`, der ausdruecklich sagt, dass die Inversions-Variante NICHT benutzt
+wird.
+
+**Praezisierung zur Vorlage:** dort stand "sieben Tests". Das stimmt fuer die Inversion; die
+Vorwaerts-Seite hat SECHS, nicht zwei (eine erste, zu enge Zaehlung hatte nur die beiden Tests
+mit `autoplay` im Namen gesehen). Der Schnitt musste die Test-Helfer also auseinandersortieren,
+nicht nur die `#[test]`-Bloecke.
+
+**Warum der Pfad tot war**, mit der Zahl aus seinem eigenen Kopf: `Bag::refill_from_tower` leert
+den Turm IMMER vollstaendig, ein beobachteter leerer Turm ist darum nicht unterscheidbar zwischen
+"war schon leer" und "ein Refill hat ihn geleert". Die konservative Regel lehnte jeden solchen
+Zustand ab -- und **87,6 Prozent der echten Runde-5-Starts haben einen leeren Turm** (Befund
+2026-08-03, 9.000-Partien-Korpus). Der PREREG-Pfad wurde noch am selben Tag auf das
+Vorwaerts-Sampling umgestellt; der Rueckwaerts-Weg lag seither als korrekter, aber unbenutzter
+Baustein da.
+
+### Was entfernt wurde
+
+`invert_round5_fill`, `resample_round5_start`, die PyO3-Huelle
+`resample_round_transition_json` samt Registrierung in `lib.rs`,
+`state::fill_factories_for_resample` (einziger Aufrufer war `resample_round5_start`) und die
+sieben Tests samt ihrer vier nur dort gebrauchten Helfer. **432 Zeilen weg, 41 dazu**
+(ueberwiegend der neu gefasste Modulkopf).
+
+**Der Modulkopf beschrieb nach dem Schnitt das falsche Modul** -- er fuehrte die Inversion noch
+als Zweck. Neu gefasst: vorne steht jetzt, was das Modul TUT, danach als Chronik, was es einmal
+konnte und warum das weg ist. Ein Kopf, der eine entfernte Funktion erklaert, ist genau die
+stille Falschauskunft, gegen die dieser ganze Durchgang laeuft.
+
+### Zwei eigene Fehler auf dem Weg
+
+1. **Zu weit gekuerzt.** Nach dem Entfernen meldete der Compiler vier verwaiste Importe; ich habe
+   alle vier gestrichen. Drei davon (`NUM_SMALL_FACTORIES`, `TILES_PER_SMALL_FACTORY`,
+   `TILES_PER_LARGE_FACTORY`) braucht aber der verbliebene TESTBLOCK ueber `use super::*` -- der
+   Lib-Build war gruen, der Test-Build rot. Sie stehen jetzt im Testblock selbst, wo sie
+   hingehoeren; dadurch ist auch der Lib-Build warnungsfrei, statt drei "unused import" zu
+   melden, die eine spaetere Sitzung erst wieder diagnostizieren muesste.
+2. **Ein Satzrest** beim Umschreiben des Nachbar-Doc-Kommentars in `lib.rs` (die alte Klammer
+   stand noch hinter dem neuen Text). Beim Nachlesen gefunden, nicht vom Compiler -- Doku
+   kompiliert eben mit, ohne gelesen zu werden.
+
+### Tore (alle gruen)
+
+`cargo test --release --no-run` **ohne Warnung**, Lib-Suite **693 Tests** (700 minus die sieben
+entfernten, 82,7 s), Wheel neu (28,0 s), Vertragshash **`6ef829e564c58bd5` unveraendert** -- er
+haengt allein an `INPUT_SIZE`, den Planes-Massen, `NUM_ACTIONS` und der Kopfliste (`lib.rs:694-702`),
+nicht an der PyO3-Oberflaeche. API-Probe am installierten Wheel:
+`resample_round_transition_json` weg, `autoplay_to_round5_and_resample_json` da.
+**Anker-Drift GRUEN**, 1.763 Schritte Feld fuer Feld gleich. 206 Werkzeug-Tests, Konventions-Check
+gruen.
+
+**Damit ist `PREREG_code_cleanup_closeout.md` abgearbeitet.**
