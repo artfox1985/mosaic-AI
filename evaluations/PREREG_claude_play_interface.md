@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 7 Partien (par.7), 5:2 fuer Claude; das Netz punktet aus Platzierungen statt aus den Wertungsplatten. Sichtgleichheit gilt in KEINE Richtung, Angleich ENTSCHIEDEN mit v29. **Zugklassen-Differential GEMESSEN (par.12): KEIN Knopf** -- die roh auffaellige Kuppelplatzierung (53 von 53) ist nach Normierung auf die Optionszahl nicht von blinder Wahl unterscheidbar; bei 7 Partien ohne Ausgangs-Varianz nicht aufloesend. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 8 Partien (par.7), 5:3, je Gegner getrennt (par.8.8). NEU g08 gegen v31-b01: 71:101 -- und die Plattenblindheit aus g02-g07 ist WEG: das Netz gewinnt die Endwertung 34:18 (zwei volle Zeilen, zwei volle Spalten, drei Eckplatten) UND die Platzierungen. Sichtgleichheit: par.11, fuer g08 nicht nachgeprueft. Zugklassen-Differential GEMESSEN (par.12): KEIN Knopf. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -566,6 +566,55 @@ b. **R2 -12**: dieselbe Senken-Falle wie in g02/g04/g05. Alle sechs Reihen farbl
 c. `chips 2` verbrauchte ausgerechnet den blau-tragenden Chip fuer eine Zelle, die drei
    beliebige gebraucht haette; damit fehlte R3 die zweite passende Farbe (-1). Die Auswahl
    trifft die Engine, nicht der Spieler (par.9 P.13).
+
+---
+
+**g08 (2026-09-20; Seed 20260917, Claude Spieler 1, NETZ Erstspieler, Gegner
+`v31-b01_brierbest` @400, Spec `models/frozen_champions/v31-b01/spec.json`):
+Claude 71 : 101 Netz, NETZ GEWINNT um 30.** 45 Claude-Zuege. Wertungsplatten:
+Horizontale Reihen (3), Eckplatten (3/8), Vertikale Reihen (7).
+
+**Der Befund der Partie: die Plattenblindheit ist WEG.** Endwertung je Kriterium
+(Manifest `result.end_scoring`): Netz Horizontale 6 (zwei volle Zeilen), Eckplatten 14
+(drei Eckplatten fertig), Vertikale 14 (zwei volle Spalten) = **34**; Claude Horizontale 0,
+Eckplatten 11 ((0,0) und (2,0)), Vertikale 7 (eine volle Spalte) = **18**. Damit dreht sich
+das Muster aus g02-g07 um: dort gewann Claude die Endwertung regelmaessig (g06 10:0, g07
+8:2) und verlor trotzdem an den Platzierungen. Hier gewinnt das Netz BEIDE Haelften.
+
+**Standard-Kennzahlen** (Endraster, Spezialfliesen mitgezaehlt):
+
+- *Reihenauslastung Kuppel*: Claude 18 Steine (z0 5, z1 4, z2 2, z3 2, z4 3, z5 2);
+  Netz 21 (z0 6, z1 6, z2 3, z3 2, z4 2, z5 2). Das Netz fuellt die beiden OBEREN Zeilen
+  vollstaendig -- genau die 3-Punkte-Platte, die in dieser Auslage lag.
+- *Spaltenauslastung*: Netz zwei volle Spalten (c0, c1); Claude eine volle (c0), dazu eine
+  mit 5 (c1) und eine mit 4 (c2).
+- *Strafleistenauslastung*: Claude -8 (R1 -2, R2 -5, R4 -1), Netz -10 (R3 -3, R4 -2,
+  R5 -5). Erstmals in der Serie ist die Strafleisten-Bilanz fuer Claude die bessere; die
+  Niederlage kommt NICHT von dort (g07 war -25 zu -11).
+- *Punkte und Marge*: 71 : 101, Marge -30.
+
+**Stapelziehungen**: Netz 4 (je eine in R1-R4, Stand danach 4/6/12/30), Claude 0. Keine
+Mehrfachziehung, kein einziger Zug bei Stand 0 -- die Null-Klammer-Ausbeutung aus g05/g07
+taucht bei v31-b01 nicht auf, weil es nie auf 0 faellt.
+
+**Beobachtungen**:
+
+1. **Das Netz spielt die Wertungsplatten.** Zwei volle Kuppelzeilen (3 Pkt je Zeile), zwei
+   volle Spalten (7 je Spalte) und drei fertige Eckplatten sind keine Nebenprodukte einer
+   Linienstrategie: alle drei aktiven Kriterien sind bedient. Gegenprobe noetig (g09/g10),
+   ob das die Auslage oder das Netz ist.
+2. **Platzierungspunkte bleiben seine Staerke**: 67 Punkte aus dem Spiel gegen meine 53.
+3. Die Null-Klammer wird nicht gebraucht: das Netz haelt den Stand durchgehend positiv.
+
+**Eigene Fehler:**
+
+a. **R1 -2 und R2 -5**: zweimal Ueberlauf, weil ein Mondzug (Aktion C) MEHR Steine bringt
+   als die Zielreihe fasst -- die Zahl steht nicht in der Zugliste, sie ergibt sich erst aus
+   den Stapelspitzen. In R1 waren es 2 Tuerkis in eine Reihe mit einem freien Platz.
+b. **Strategisch zu schmal**: der ganze Plan lief auf Spalte 0 plus die linken Eckplatten
+   (24 Kriteriumspunkte). Das hat funktioniert (18 von 24 geholt), war aber gegen 34 zu
+   wenig -- die zweite Spalte war mit denselben Steinen erreichbar gewesen, wenn R2/R3
+   frueher auf c1 statt auf c2 gezielt haetten.
 
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")

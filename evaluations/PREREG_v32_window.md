@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v32-Fenster zugeschnitten, und welches Rezept faehrt der erste Arm? | Beleg: par.1 ZUSCHNITT steht (Rotationsregel, Bestand am 2026-09-22 gezaehlt: neu v31-b01, G-1 v30-b02, G-2 v29-b11; v28-b02 geloescht). par.6 REZEPT ist OFFEN -- Startgewicht, Knoepfe und die Dosis der Rueckgabe-Streuung sind Nutzer-Entscheide und muessen VOR dem Start stehen. Nichts erzeugt, nichts trainiert. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: par.1 Zuschnitt steht (neu v31-b01, G-1 v30-b02, G-2 v29-b11, Seed 20260953, Val-Pool ^selfplay_v31-). par.6 REZEPT ENTSCHIEDEN (Nutzer 2026-09-22 "Einstellungen wie v31"): Erzeugung unveraendert bis auf Generator, Seeds 20260938/39/40 und den Spec-Namen; Dosis 0,81 bleibt, obwohl die Gelegenheitsrate von 17,75 auf 28,0 Prozent gestiegen ist -- bewusst. Training ein Arm v32-b01, Warmstart. Erzeugung laeuft seit 2026-09-22. -->
 
 # Vorregistrierung: das v32-Fenster
 
@@ -65,24 +65,54 @@ Engines entstanden. Das ist kein Aera-Bruch im Sinne der Elo-Leiter (der Anker h
 gehoert in den Bericht, statt still hingenommen zu werden. Wer aus diesem Fenster eine Aussage
 ueber Merkmals-Wirkungen zieht, hat diesen Unterschied als Nebenfaktor.
 
-## par.6 REZEPT -- OFFEN, Nutzer-Entscheide
+## par.6 REZEPT: UNVERAENDERT WIE v31 (Nutzer-Entscheid 2026-09-22)
 
-**Nichts davon ist entschieden. Der Ablauf verlangt sie VOR dem Start.**
+**Nutzer: *"Das brauchst nicht von mir. Du faehrst die Einstellungen wie v31."*** Damit sind die
+fuenf offenen Punkte in einem Zug entschieden: es wird nichts variiert.
 
-1. **Startgewicht.** Warmstart von `v31-b01_brierbest` oder Kaltstart? Die Kaltstart-Frage ist in
-   v30 einfaktoriell beantwortet (404:396 kalt gegen 443:297 warm, 9,36 Punkte, `PREREG_v30_window.md`
-   par.9) -- der Warmstart ist der belegte Weg, ein Kaltstart braeuchte einen eigenen Grund.
-2. **Knoepfe und Spec der Erzeugung.** Uebernahme der v31-Spec oder Aenderungen. Hierher gehoert
-   auch, ob `return_order_mode` aus dem Default 0 geholt wird.
-3. **Dosis der Rueckgabe-Streuung `MOSAIC_RETURN_ORDER_RANDOM_P`.** **Der Wert 0,81 ist an der
-   v30-Erzeugung geeicht** (17,75 Prozent der Partien mit Gelegenheit). An der v31-Erzeugung
-   gemessen sind es **28,0 Prozent** (Sockel; `PREREG_dome_return_order.md` par.13, Nachtrag
-   2026-09-22). Bei unveraenderter Dosis streut v32 in deutlich mehr Partien als die 15 Prozent,
-   fuer die 0,81 gerechnet wurde. Nach derselben Rechnung laegen rund **0,54** an --
-   **Herleitung aus der Messung, keine Entscheidung.**
-4. **Zahl der Arme.** v31 hatte einen. Ein zweiter Arm braucht einen benannten Faktor und eine
-   eigene Registrierung (`docs/generation_naming.md`).
-5. **Val-Pool-Regex und Traeger-Anteile** der Alt-Klassen.
+### Erzeugung
+
+`tools/night_v32_generate.sh`, Fortschreibung der am selben Tag geloeschten
+`night_v31_generate.sh` (Git-Historie). **Genau drei Dinge sind geaendert:**
+
+| | v31-Erzeugung | **v32-Erzeugung** |
+| --- | --- | --- |
+| Generator | `alphazero_v30-b02_brierbest.onnx` | **`alphazero_v31-b01_brierbest.onnx`** |
+| Seeds (Sockel / tempc / Ausflug) | 20260934 / 35 / 36 | **20260938 / 39 / 40** |
+| Spec-Datei | `models/v30_generation.spec.json` | **`models/v31_generation.spec.json`** |
+
+Die Spec ist **byte-identisch** (sha256 `4a3f9db3...`), nur nach dem GENERATOR benannt, damit das
+Lauf-Manifest selbsterklaerend ist. Inhalt unveraendert: `envelope_hull_form 2`,
+`envelope_projection_mode 1`, `envelope_profile [1,0; 0,92; 0,67; 0,33; 0,0]`,
+`score_utility_b 20`, `special_row6_w 1`, `start_by_search 1`, `return_order_mode 1`,
+`heuristik_variante hv1`, alles uebrige 0.
+
+Alles andere steht wie in v31: 3 x 4.000 Partien, 100 Sims, 11 Threads, `--chunk 10`,
+`--per-file 10`, `--start-slot-random-p 0.15`; Sockel `--tau-argmax-from-move 1 --deviate-prob 1.0`,
+Schwarm a `--action-temp 2 --deviate-prob 1.0`, Schwarm b
+`--excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise`. Der Seed-Schritt von 4 je
+Generation ist derselbe wie beim Fenster-Seed (v30 fuhr 20260930/31/32).
+
+### Die Dosis bleibt 0,81 -- als Entscheidung, nicht als Versehen
+
+`--return-order-random-p 0.81` steht unveraendert in allen drei Klassen. **Der Vorbehalt dazu ist
+registriert und wird hier nicht weggelassen:** die 0,81 sind an der v30-Erzeugung geeicht (17,75
+Prozent der Partien mit Gelegenheit, Ziel "15 Prozent mindestens einmal"). An der v31-Erzeugung
+gemessen sind es **28,0 Prozent** (`PREREG_dome_return_order.md` par.13, Nachtrag 2026-09-22).
+Bei gleicher Dosis streut v32 also in deutlich mehr Partien als die 15 Prozent, fuer die 0,81
+gerechnet wurde; hergeleitet laegen rund **0,54** an.
+
+**Der Nutzer hat "Einstellungen wie v31" entschieden, nachdem dieser Punkt vorgelegt war.** Die
+hoehere Streurate ist damit gewollt. Fuer die Auswertung heisst das: der Anteil gestreuter
+Rueckgaben in v32 ist NICHT mit dem in v31 vergleichbar, obwohl die Dosis gleich ist -- die
+Gelegenheitsrate hat sich bewegt, nicht der Knopf.
+
+### Training
+
+Ein Arm, **`v32-b01`**, **WARMSTART von `v31-b01_brierbest`**, sonst rezeptgleich zu v31-b01. Der
+Kaltstart ist in v30 einfaktoriell widerlegt (404:396 kalt gegen 443:297 warm bei sonst gleichem
+Fenster, Monolith, Seed und Rezept, `PREREG_v30_window.md` par.9). Ein zweiter Arm braeuchte einen
+benannten Faktor und eine eigene Registrierung (`docs/generation_naming.md`).
 
 ## par.7 PFLICHTPRUEFUNGEN VOR DEM START
 
