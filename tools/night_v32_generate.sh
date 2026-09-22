@@ -13,12 +13,12 @@
 #                 (byte-identischer Inhalt, sha256 4a3f9db3..., nur nach dem GENERATOR benannt,
 #                 damit das Lauf-Manifest selbsterklaerend ist)
 #
-# UNVERAENDERT, ausdruecklich: `--return-order-random-p 0.81`. Die Dosis ist an der
-# v30-Erzeugung geeicht (17,75 Prozent der Partien mit Gelegenheit); an der v31-Erzeugung
-# gemessen sind es 28,0 Prozent (`PREREG_dome_return_order.md` par.13). Bei gleicher Dosis
-# streut v32 also in mehr Partien als die 15 Prozent, fuer die 0,81 gerechnet wurde --
-# hergeleitet laegen rund 0,54 an. **Der Nutzer hat "Einstellungen wie v31" entschieden;
-# 0,81 bleibt, und das ist eine Entscheidung, kein Uebersehen.**
+# UNVERAENDERT, ausdruecklich: `--return-order-random-p 0.81`. Beim Schreiben stand hier ein
+# Vorbehalt, die Gelegenheitsrate sei von 17,75 auf 28,0 Prozent gestiegen. Das war ein
+# Zaehlfehler: die beiden Zahlen meinen verschiedene Kriterien (>= 3 gegen >= 2 Restplatten).
+# Mit EINER Zaehlweise an beiden Korpora nachgemessen liegt die Rate bei 22,5 gegen 23,5
+# Prozent, die Streurate bei 12,0 gegen 14,0 -- Ziel war 15. Die Dosis ist richtig
+# eingestellt (`PREREG_dome_return_order.md` par.13, Berichtigung 2026-09-23).
 #
 # KEINE PIPE, keine eigene Umleitung; als DATEI starten.
 set -uo pipefail

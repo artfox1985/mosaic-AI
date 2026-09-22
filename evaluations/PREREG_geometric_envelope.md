@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen, par.13 (Nutzer 2026-09-12: Schliesskriterium auf Arena umgestellt). K3-P c 1,0, Huellenform 2, K5 sind Rezeptbestandteil seit v24-b07 (Huellenform 2 gepoolt 391:329, p 0,023, par.8.15e/f); vier Champions in Folge mit Knopf bestehen Tor 1 und Tor 2b; C2 an beiden v28-Armen erfuellt (+0,14 / +0,23 volle Spalten, par.12c). Kanal A (A1/A2) gilt nicht mehr (huellenblindes Orakel); K3-D und Jokerfeld gebaut, Default 0, ohne Arm. **par.8.6 GESCHLOSSEN (8.6c, 2026-09-15): der Value-Anteil im Tiling (`envelope_tiling_value_w`) traegt nicht** -- zweimal gemessen, an zwei Netzen und zwei Basislinien, vier Arme, 80:80 und 81:79 (p 1,000). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13). Huellenform 2 gepoolt 391:329, p 0,023, Rezeptbestandteil seit v24-b07; vier Champions in Folge bestehen Tor 1 und 2b. `envelope_tiling_value_w` traegt NICHT (par.8.6, 80:80 und 81:79). NACHGELAGERT und noch NICHT gefahren: par.14/14a, vorregistriert 2026-09-22 -- wie viel vom Dreieck ist heute der Knopf, wie viel der eingelernte Prior (Nutzer: die Huelle war "nur ein proxy"). Der Knopf selbst bleibt entschieden; offen ist, ob das Geruest weg kann. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2641,3 +2641,122 @@ ueber die Lauf-KI; beide bleiben Knoepfe ohne Rezeptwirkung, keine Arena, par.13
 Artefakte `c2_v28b02_jokerfeld.json`, `c2_v28b02_k3d.json`. Damit ist der Nachtrag erledigt
 und die Prereg bleibt ENTSCHIEDEN.
 
+
+## par.14 VORREGISTRIERT 2026-09-22: wie viel vom Dreieck ist der KNOPF, wie viel der PRIOR?
+
+**Anlass, Nutzer nach den Claude-Partien g08-g10:** *"eine Anmerkung war dass das Netz tendenziell
+immer entlang einer dreiecksmatrix spielt"* -- und auf die Rueckfrage, ob die Huelle noch als Knopf
+wirkt oder die Spielweise eingelernt ist: *"War eigentlich nur ein proxy um das Netz in eine
+moegliche Form zu leiten."*
+
+**Das ist die entscheidende Umdeutung.** Die Huelle war GERUEST. Ein Geruest baut man ab, sobald es
+traegt -- und ob es traegt, ist genau die hier registrierte Frage.
+
+### Bestand, am Code geprueft (2026-09-22)
+
+* **Der Knopf ist aktiv.** Die Champion-Spec `v31-b01` traegt `envelope_search_c: 1.0` und
+  `envelope_hull_form: 2` ("Dreieck plus die zweite Zelle der Rasterzeile 6", 22 Zellen,
+  `knob_registry.rs`).
+* **Er wirkt allein am NETZ-Blattwert** (`net_mcts.rs:3659`, nur wenn `env_c != 0.0`):
+  `shift = C_HULL * tanh(w_e(Runde) * (H(Brett 0) - H(Brett 1)))`, Nullsumme, geklammert, mit dem
+  Rundenprofil `[1,0; 0,92; 0,67; 0,33; 0,0]` -- in Runde 5 also AUS. Der Heuristik-Pfad liest ihn
+  strukturell nicht.
+* **Das Netz SIEHT die Huelle nicht.** In `features.rs` kommt sie nicht vor, in
+  `engine/py/neural_net.py` gibt es keinen Huellen-Kopf (beides gegreppt, 0 Treffer). Es gab nie
+  ein Huellen-Trainingsziel.
+
+**Daraus folgt der Aufbau der Frage:** die Form kann nur ueber zwei Wege im Spiel sein -- als
+Such-Term (Knopf) und als NACHAHMUNG, weil jeder Korpus seit v24 von einem Generator mit aktivem
+Knopf stammt. Die Aufteilung zwischen beiden ist NIE gemessen worden; alle bisherigen A/B
+verglichen Formen und Dosen, nie "Knopf aus gegen Knopf an" am heutigen Netz.
+
+### Aufbau (VORAB)
+
+**Ein Faktor, belegt:** `models/hull_off.spec.json` ist eine Kopie der Champion-Spec mit
+`envelope_search_c: 0.0`; der Vergleich der beiden JSON ergibt **genau ein** abweichendes Feld
+(geprueft beim Anlegen).
+
+1. **Staerke:** `tools/paired_gating.py`, **dasselbe Netz** `v31-b01_brierbest` auf beiden Seiten,
+   Spec-Dateien `frozen_champions/v31-b01/spec.json` gegen `hull_off.spec.json`, Blockgroesse 5,
+   `--log-games`, **zwei Seeds** (Praezedenz `tiebreak_on_vs_off`, `rt_leaf_on_vs_off`).
+2. **Form:** `tools/probes/triangle_hull_coverage_probe.py` auf den geloggten Partien BEIDER Arme.
+   GRUNDMENGE: Partien des Laufs, EINHEIT: Anteil der je Runde NEU belegten Zellen innerhalb der
+   Huelle, plus Fuellstaende Huelle/Aussen und Dreiecks-Abweichung je Runde.
+3. Die sechs Standard-Kennzahlen (CLAUDE.md) aus denselben Logs.
+
+### Lesart, VORAB festgelegt
+
+| Form ohne Knopf | Staerke ohne Knopf | Schluss |
+| --- | --- | --- |
+| haelt | haelt | **Das Geruest hat getragen und kann weg.** Ein Knopf weniger im Rezept. |
+| haelt | faellt | Der Knopf tut etwas anderes als die FORM -- er bleibt, und was er tut, ist offen. |
+| faellt | haelt | Die Form war Kosmetik der Suche, nicht Ursache der Staerke. Knopf kann weg, die Beobachtung aus den Claude-Partien erklaert sich als Such-Artefakt. |
+| faellt | faellt | Das Geruest traegt noch. Bleibt. |
+
+**"Faellt" bei der Staerke** heisst nach der Hausregel: signifikanter Verlust bei n >= 150 Paaren
+oder in der Replikation (McNemar, Block-z auf DIFFERENZIERTEN Blockwerten). **"Faellt" bei der
+Form** ist KEIN Signifikanztest, sondern ein Richtwert -- die Sonde liefert Profile, keine Tore
+(so schon in `PREREG_heuristic_v2_long_rows.md` par.3b.8 Stufe D festgelegt).
+
+### Kosten
+
+Gemessen am Praezedenzlauf `tiebreak_on_vs_off` (400 Partien, 10 Threads): **6.183 s Wanduhr,
+15,46 s je Partie**. Zwei Seeds also rund **3,5 h**, die Sonde danach Minuten.
+
+**Eingeplant NACH der v32-Erzeugung** (die belegt die Maschine bis etwa 23:15 des 2026-09-22).
+Nicht gestartet.
+
+### Nebenbefund beim Vorbereiten
+
+`tools/gate_hull_form_spec.sh` ist auf `models/alphazero_v24-b06_brierbest.onnx` genagelt, und das
+Netz liegt nicht mehr im Baum -- dieselbe Klasse toter Default wie in par.8h Fund 8 der
+Aufraeum-Prereg. Fuer diesen Lauf wird es nicht gebraucht (`paired_gating` bekommt die Specs
+direkt), aber das Skript ist in seinem jetzigen Zustand nicht lauffaehig.
+
+### par.14a ZWEI BENANNTE NUTZNIESSER (Nutzer 2026-09-22, nach dem Vorregistrieren)
+
+Der Nutzer hat zwei Folgen genannt, falls die Form ohne Knopf haelt. Beide sind HYPOTHESEN mit
+einem Messweg, keine Befunde -- und sie sind NICHT dieselbe Sache.
+
+**(a) *"Wenn es haelt koennte es auch fuer die self plays helfen. Diverses Spiel geht dann nach
+oben."*** Der Knopf zieht die Suche auf EINE Zielform; ohne ihn deckt der Korpus mehr
+Brettzustaende ab. Der Value-Kopf lernt aus Zustaenden, also ist Abdeckung sein Rohstoff.
+**Instrument steht schon:** `tools/probes/corpus_state_diversity_probe.py` (kanonische Form je
+Record und Seite ist die 36-Bit-Maske der gefuellten Kuppelfelder plus die Runde -- bewusst das
+BRETT, nicht der ganze Zustand, weil Fabriken und Beutel ohnehin je Partie wuerfeln).
+**Reichweite, ausdruecklich: das kann v32 NICHT mehr betreffen.** Die v32-Erzeugung laeuft seit
+2026-09-22 09:44 mit aktivem Knopf. Es ist eine v33-Frage.
+
+**(b) *"Das Netz spielt eventuell noch immer so, aber es kann besser auf den Gegner reagieren."***
+**Hier gehoert der Term genau gelesen, und er ist NICHT gegnerblind:**
+`shift = C_HULL * tanh(w_e(Runde) * (H(Brett 0) - H(Brett 1)))` vergleicht BEIDE Bretter und ist
+nullsummig. Der Knopf ignoriert den Gegner also nicht.
+
+**Was er stattdessen tut, und das traegt die Hypothese trotzdem:** er zwingt den Vergleich auf
+EINE Achse -- Huellendeckung --, unabhaengig davon, ob diese Achse die Stellung entscheidet. Das
+ist ein Zug konstanter Richtung auf den Blattwert, der mit dem konkurriert, was der Value-Kopf
+ueber die konkrete Stellung gelernt hat. Fuehrt der Gegner die Partie auf eine andere Achse
+(Spalten, Spezialfelder, Strafleiste), zieht der Term weiter Richtung Huelle. **Sein Gewicht
+faellt ueber die Runden** (Profil 1,0 / 0,92 / 0,67 / 0,33 / 0,0), der Effekt sitzt also in R1-R4
+und ist in R5 per Konstruktion null.
+
+**Instrument steht ebenfalls schon:** `tools/probes/opponent_disruption_analysis.py` wertet die
+GEGNER-Plattenpunkte aus gepaarten Logs aus, Nebenmessung eigene Punkte, Boden, Siege.
+
+### Was das fuer den registrierten Lauf aendert: nichts am Aufbau, drei Ablesungen statt einer
+
+Der Lauf aus par.14 faehrt `--log-games`. Aus DENSELBEN Logs kommen damit ohne Zusatzkosten:
+
+1. **Form** -- `triangle_hull_coverage_probe.py` (Huellendeckung je Runde).
+2. **Staerke** -- McNemar und Block-z aus `paired_gating`.
+3. **Gegner-Reaktion** -- `opponent_disruption_analysis.py` (Gegner-Plattenpunkte).
+
+**Vorbehalt, vorab:** Hypothese (b) sagt "besser reagieren", und die Zielgroesse dafuer ist
+umstritten -- weniger Gegnerpunkte KANN auch heissen, dass die eigene Punktequelle leidet. Darum
+wird die Gegner-Plattenpunkt-Zahl NIE allein gelesen, sondern immer neben den eigenen Punkten und
+der Marge (sechs Standard-Kennzahlen, CLAUDE.md).
+
+**Und die Gegenprobe zu (a), damit die Vielfalt nicht schoengeredet wird:** mehr Abdeckung ist
+kein Selbstzweck. `project_search_depth_column_tradeoff` haelt fest, dass genau hier ein TAUSCH
+sitzt -- 25 bis 100 Sims bauen rund 0,6 Spalten gegen 0,34 ab 250, aber @25 verliert 11:29. Eine
+Vielfalts-Verbesserung, die Staerke kostet, ist in dieser Kampagne schon einmal gemessen worden.

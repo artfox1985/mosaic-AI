@@ -1379,6 +1379,42 @@ keine Entscheidung** -- sie liegt beim Nutzer.
 Das Verdikt zur Leitfrage bleibt unberuehrt: es haengt am A/B und am Typ-Folge-Deckel, nicht an der
 Zahl der Generationen.
 
+### BERICHTIGUNG 2026-09-23: mein Vergleich von gestern war apples-to-oranges
+
+**Am v32-Korpus mit DERSELBEN Zaehlweise nachgemessen, beide Generationen, je 20 Dateien und
+200 Partien:**
+
+| Erzeugung | Partien mit Gelegenheit | Partien mit Streuung |
+| --- | --- | --- |
+| v31 (Generator `v30-b02`) | 45 von 200 = **22,5 %** | 24 = **12,0 %** |
+| v32 (Generator `v31-b01`) | 47 von 200 = **23,5 %** | 28 = **14,0 %** |
+
+**+1,0 Prozentpunkte bei n = 200 -- das ist Rauschen** (eine Standardabweichung liegt bei rund
+3 Punkten). Die Gelegenheitsrate hat sich zwischen den Generationen NICHT bewegt.
+
+**Wo mein Fehler lag:** die 17,75 Prozent aus 12.12a zaehlen Partien mit mindestens einer
+Gelegenheit **mit MINDESTENS DREI Restplatten**. Meine 28,0 Prozent zaehlten Partien mit
+mindestens einem Record, dessen `valid_actions` die IDs 411-413 traegt -- und der Knoten steht
+dort, sobald ueberhaupt eine Wahl besteht, also **ab ZWEI Platten**. Die zweite Menge enthaelt die
+erste; sie musste groesser sein. **Verglichen habe ich damit nicht zwei Generationen, sondern zwei
+Kriterien.**
+
+Ich hatte den Vorbehalt selbst hingeschrieben ("nicht Zeile fuer Zeile gegeneinander geprueft")
+und die Zahl trotzdem eine Empfehlung tragen lassen. Genau davor warnt CLAUDE.md Zusatz 2: n,
+GRUNDMENGE und EINHEIT gegen die des VERBRAUCHERS pruefen.
+
+**Was damit faellt:**
+
+* Der "Faktor 1,58 nach oben" -- nicht belegt.
+* Die hergeleitete Dosis **`p = 0,54`** -- nicht belegt. Sie stand auf dem Sprung von 17,75 auf
+  28,0, den es nicht gibt.
+* Der Satz, die Nachrechnung sei "der erste Handgriff vor der v32-Erzeugung" -- sie war es nicht.
+
+**Was steht:** die Streurate liegt bei **14,0 Prozent** gegen das Ziel von 15 Prozent, bei n = 200
+also innerhalb einer halben Standardabweichung. **Die Dosis 0,81 ist richtig eingestellt**, und der
+Nutzer-Entscheid "Einstellungen wie v31" brauchte keine Revision -- er war die richtige Wahl, aus
+einem Grund, den ich erst hinterher sauber messen konnte.
+
 ### Warum hier nicht weiter gemessen wird
 
 Ein A/B, das den Deckel umgeht, muesste zuerst den ENCODER aendern -- die Reihenfolge als mehr als

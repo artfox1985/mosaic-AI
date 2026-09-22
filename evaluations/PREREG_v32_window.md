@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: par.1 Zuschnitt steht (neu v31-b01, G-1 v30-b02, G-2 v29-b11, Seed 20260953, Val-Pool ^selfplay_v31-). par.6 REZEPT ENTSCHIEDEN (Nutzer 2026-09-22 "Einstellungen wie v31"): Erzeugung unveraendert bis auf Generator, Seeds 20260938/39/40 und den Spec-Namen; Dosis 0,81 bleibt, obwohl die Gelegenheitsrate von 17,75 auf 28,0 Prozent gestiegen ist -- bewusst. Training ein Arm v32-b01, Warmstart. Erzeugung laeuft seit 2026-09-22. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: par.1 Zuschnitt steht, par.6 Rezept entschieden (Nutzer "Einstellungen wie v31"). par.9 ERZEUGUNG GEFAHREN 2026-09-22/23: 13 h 57 min, 1.201 Dateien, alle Klassen Exit 0. Manifest-Diff genau 4 Abweichungen (Modell, Seed, Spec, Version), Wiedervorlage am ersten Record gruen (Knoten mit Lernziel), Streurate 14,0 Prozent gegen Ziel 15, TOR 2a HAELT (sp_voll 0,977 gegen 0,955). Profil stabil. Offen: Fensterbau, Monolith, Training v32-b01, Tore 1 und 2b. -->
 
 # Vorregistrierung: das v32-Fenster
 
@@ -93,19 +93,27 @@ Schwarm a `--action-temp 2 --deviate-prob 1.0`, Schwarm b
 `--excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise`. Der Seed-Schritt von 4 je
 Generation ist derselbe wie beim Fenster-Seed (v30 fuhr 20260930/31/32).
 
-### Die Dosis bleibt 0,81 -- als Entscheidung, nicht als Versehen
+### Die Dosis bleibt 0,81 -- und die Nachmessung gibt dem Entscheid recht
 
-`--return-order-random-p 0.81` steht unveraendert in allen drei Klassen. **Der Vorbehalt dazu ist
-registriert und wird hier nicht weggelassen:** die 0,81 sind an der v30-Erzeugung geeicht (17,75
-Prozent der Partien mit Gelegenheit, Ziel "15 Prozent mindestens einmal"). An der v31-Erzeugung
-gemessen sind es **28,0 Prozent** (`PREREG_dome_return_order.md` par.13, Nachtrag 2026-09-22).
-Bei gleicher Dosis streut v32 also in deutlich mehr Partien als die 15 Prozent, fuer die 0,81
-gerechnet wurde; hergeleitet laegen rund **0,54** an.
+`--return-order-random-p 0.81` steht unveraendert in allen drei Klassen.
 
-**Der Nutzer hat "Einstellungen wie v31" entschieden, nachdem dieser Punkt vorgelegt war.** Die
-hoehere Streurate ist damit gewollt. Fuer die Auswertung heisst das: der Anteil gestreuter
-Rueckgaben in v32 ist NICHT mit dem in v31 vergleichbar, obwohl die Dosis gleich ist -- die
-Gelegenheitsrate hat sich bewegt, nicht der Knopf.
+**Beim Vorlegen hatte ich einen Vorbehalt registriert, der sich als mein eigener Zaehlfehler
+erwiesen hat** (`PREREG_dome_return_order.md` par.13, Berichtigung 2026-09-23): ich hatte die
+Gelegenheitsrate mit 28,0 Prozent gegen registrierte 17,75 Prozent gehalten und daraus rund
+`p = 0,54` hergeleitet. Die beiden Zahlen zaehlen verschiedene Dinge -- 17,75 Prozent meint
+Gelegenheiten mit mindestens DREI Restplatten, meine 28,0 Prozent den Knoten in `valid_actions`,
+also ab ZWEI. **Verglichen waren zwei Kriterien, nicht zwei Generationen.**
+
+**Mit einer Zaehlweise an beiden Korpora nachgemessen** (je 20 Dateien, 200 Partien):
+
+| Erzeugung | Gelegenheit | gestreut |
+| --- | --- | --- |
+| v31 (Generator `v30-b02`) | 22,5 % | 12,0 % |
+| **v32 (Generator `v31-b01`)** | **23,5 %** | **14,0 %** |
+
+Der Unterschied ist Rauschen (n = 200, sd rund 3 Punkte). **Die Streurate liegt mit 14,0 Prozent
+am Ziel von 15 Prozent** -- die Dosis ist richtig eingestellt, und "Einstellungen wie v31" war die
+richtige Wahl.
 
 ### Training
 
@@ -131,6 +139,61 @@ Aus dem Ablauf, unveraendert:
   Hash `6ef829e564c58bd5`, Anker-Drift gruen ueber 1.763 Schritte.
 * **Plattenplatz.** Nach der Loeschung am 2026-09-22 liegt `data/` bei 4,6 GB; die neuen Klassen
   brauchen rund 1,3 GB plus Bloecke.
+
+## par.9 ERZEUGUNG GEFAHREN (2026-09-22/23)
+
+`tools/night_v32_generate.sh`, gestartet 09:44:39, fertig **23:41:37 = 13 h 57 min**. Alle drei
+Klassen Exit 0, **1.201 Dateien / 12.010 Partien**.
+
+| Klasse | Zeitraum | Dauer | Dateien |
+| --- | --- | --- | --- |
+| Sockel (`policy`) | 09:44:39 - 14:16:19 | 4 h 32 | 400 |
+| Schwarm a (`value-tempc`) | 14:16:19 - 18:49:56 | 4 h 34 | 400 |
+| Schwarm b (`value-excursion`) | 18:49:56 - 23:41:37 | 4 h 52 | 401 |
+
+**Die Wanduhr ist NICHT sauber gegen v31 (14,66 h) zu halten.** Waehrend des Laufs lag Nebenlast
+auf der Maschine: die Claude-Partien g09 (10:10) und g10 (18:55) trieben je eine Netzsuche, dazu
+ein Commit um 18:59 mit 206 Tests im Haken. Der Effekt ist erkennbar klein -- die beiden ersten
+Klassen liefen mit 4:32 und 4:34 praktisch gleich, obwohl g09 in die erste fiel --, aber die Zahl
+ist keine saubere Vergleichsgroesse mehr und wird hier nicht als solche gefuehrt.
+
+### Pflichtpruefungen
+
+| Pruefung | Ergebnis |
+| --- | --- |
+| Manifest-Diff gegen `manifest_v30-b02-policy_20260919_202347.json` | **genau 4 Abweichungen**: `model`, `seed`, `spec`, `version` -- exakt die drei registrierten Aenderungen plus den daraus folgenden Versionsnamen. Kein stiller Default. |
+| Wiedervorlage am ersten Record | **GRUEN**: 1.989 Records aus 10 Partien, `dome_pool_view` in allen; Mondknoten 406-410 **248 valid / 248 policy**, Rueckgabeknoten 411-413 **2/2** -- mit Lernziel, nichts faellt eine Generation zurueck |
+| Stack-Draw-Kontrolle | `MOSAIC_STACK_DRAW_RESEARCH=1` gesetzt, vom Skript geprueft |
+| Streuung am Korpus (20 Dateien, 200 Partien) | Gelegenheit **23,5 %**, gestreut **14,0 %** gegen das Ziel 15 % |
+| **Tor 2a** | `sp_voll` **0,977 (+-0,017)** fuer `v31-b01` gegen **0,955 (+-0,017)** fuer `v30-b02` -- **HAELT** (Kriterium ist Nicht-Unterlegenheit, nicht Signifikanz) |
+
+Artefakt: `evaluations/artifacts/corpus_sanity_v31-b01-policy.json`, Laufzeit 358,2 s.
+
+### Die sechs Standard-Kennzahlen des Sockels (CLAUDE.md), gegen die Vorgeneration
+
+| | `v30-b02` | **`v31-b01`** |
+| --- | --- | --- |
+| volle Spalten je Seite (`sp_voll`) | 0,955 | **0,977** |
+| Spalten >= 4 / >= 3 | 2,224 / 3,168 | 2,246 / 3,177 |
+| volle Reihen | 0,098 | 0,094 |
+| Strafleiste je Seite | 5,105 | 5,046 |
+| eigene Punkte | 52,34 | **52,87** |
+| Margin | 0,00 (per Konstruktion) | 0,00 |
+
+**Das Profil ist stabil** -- keine Kennzahl bewegt sich ueber ihr Intervall hinaus.
+
+### Ein Posten, der seit zwei Generationen unveraendert liegt
+
+Die Punkte je Wertungsplatte sind bis auf die zweite Stelle dieselben. Auffaellig bleibt **k6
+Spezialfelder: -9,39 Punkte, Ertrag > 0 in 0,0 Prozent von 1.499 Partien** (v30-b02: -9,41 und
+ebenfalls 0,0 Prozent). In ZWEI vollen Generationen hat keine Seite aus dieser Platte je einen
+positiven Ertrag gezogen.
+
+Das deckt sich mit dem Befund aus den Claude-Partien (`PREREG_claude_play_interface.md`,
+2026-09-22: "das Netz bedient die aktiven Wertungsplatten unzuverlaessig, g09/g10 je drei leere
+Spezialfelder") und mit `project_special_tile_yield_remeasure`. **Es ist hier nur festgehalten,
+nicht gedeutet** -- ob -9,39 eine Strafe fuer unbelegte Felder ist oder ein Rechenartefakt der
+Zuordnung, ist in dieser Prereg nicht geprueft.
 
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`, damit der Start planbar ist)
 
