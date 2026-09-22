@@ -1359,6 +1359,26 @@ diesen Knopf waere auf ihm erstmals nicht mehr Henne-Ei.
 Gelegenheit", aber sie sind nicht Zeile fuer Zeile gegeneinander geprueft; die Richtung ist
 belastbar, der Faktor 1,58 auf die zweite Stelle nicht.
 
+### NACHTRAG 2026-09-22: die Nachrechnung hat jetzt einen Verbraucher
+
+Als par.13 geschrieben wurde, galt v31 als letzte Generation; die Nachrechnung war damit ein
+Abschlussbefund ohne Abnehmer. **Nutzer-Entscheid 2026-09-22: v32 wird gefahren.** Damit hat sie
+einen, und zwar sofort:
+
+**Die Dosis `MOSAIC_RETURN_ORDER_RANDOM_P = 0,81` ist an der v30-Erzeugung geeicht** -- dort hatten
+17,75 Prozent der Partien ueberhaupt eine Gelegenheit. Gemessen an der v31-Erzeugung sind es
+**28,0 Prozent** (Sockel). Bei unveraenderter Dosis streut die v32-Erzeugung also in deutlich mehr
+Partien als die 15 Prozent, fuer die `p = 0,81` einmal ausgerechnet wurde.
+
+**Vor dem Start der v32-Erzeugung ist die Dosis neu zu setzen oder ausdruecklich zu bestaetigen.**
+Der Ort dafuer ist par.6 der v32-Fenster-Prereg, nicht diese Datei. Nach der Rechnung aus 12.12a
+(gesucht ist das `p`, das die Zielrate bei der GEMESSENEN Gelegenheitsrate trifft) laegen bei
+28,0 Prozent Gelegenheit rund **`p = 0,54`** an. **Das ist eine Herleitung aus der Messung oben,
+keine Entscheidung** -- sie liegt beim Nutzer.
+
+Das Verdikt zur Leitfrage bleibt unberuehrt: es haengt am A/B und am Typ-Folge-Deckel, nicht an der
+Zahl der Generationen.
+
 ### Warum hier nicht weiter gemessen wird
 
 Ein A/B, das den Deckel umgeht, muesste zuerst den ENCODER aendern -- die Reihenfolge als mehr als

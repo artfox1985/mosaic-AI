@@ -29,9 +29,10 @@ heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
 `tools/elo_tracker.py report`). None of its four edges was stopped early. It beat
 the previous champion 461:339 over two seeds, the anchor 45:5, and `v29-b09` two
 generations back 79:71 -- the last of those well below what the other two would
-predict, and recorded as such rather than smoothed over. `v31` is the final
-generation; the technical name stays in the ladder and the files, `Tessa` is the
-name the game shows.
+predict, and recorded as such rather than smoothed over. `Tessa` is the name
+the game shows for the reigning champion; the technical name stays in the ladder
+and the files. `v32` is in preparation (user decision 2026-09-22) -- an earlier
+version of this file called `v31` the final generation, which it is not.
 
 **The cold-start question is settled.** `v30-b01` and `v30-b02` trained on the
 same replay window with the same seed and the same recipe and differed in a

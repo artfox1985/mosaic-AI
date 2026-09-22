@@ -1405,10 +1405,13 @@ sind `hv4_anchor/golden_probe/` (vorkanonisch, eingefroren solange Leitersegment
 * **`greedy_chip_indices` ordnungsfrei machen** (`round_end.rs:509`) waere die tiefere Loesung --
   dann waere die Austauschbarkeits-Behauptung wahr statt ueberwiegend wahr. Es ist aber eine
   VERHALTENSAENDERUNG im Spielpfad und zieht Fixture, Golden Probes und Anker-Drift nach, fuer ein
-  Regime, dessen Haeufigkeit ungemessen ist. Nach dem Schluss-Champion nicht mehr angemessen.
+  Regime, dessen Haeufigkeit ungemessen ist. Damals als "nach dem Schluss-Champion nicht mehr
+  angemessen" verworfen; seit dem 2026-09-22 laeuft v32, die Abwaegung steht damit wieder offen.
 * **Farb-Bitmaske als Datentyp von `BonusChip`** statt `Vec<TileColor>`: waere die tiefste Form,
   aendert aber den Record- und GUI-Vertrag (`serialize.rs:219` zeigt `colors` als Namensliste) und
-  damit wieder Fixture und Probes. Kein messbarer Gewinn, kein v32.
+  damit wieder Fixture und Probes. Kein messbarer Gewinn.
+  (Der Zusatz "kein v32" stand hier bis zum 2026-09-22 -- v32 wird gefahren, der
+  Nullbefund zum Gewinn bleibt davon unberuehrt.)
 * **Die toten Testhaken in `train.py`** (`:2308`, `:2367`, Env `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH`
   und `MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH`): ihr Treiber ist am 2026-09-20 geloescht. Sie zu
   entfernen wuerde die in par.8g registrierte Alternative "neu verankern" zunichtemachen -- das

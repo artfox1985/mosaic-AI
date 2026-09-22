@@ -216,7 +216,6 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/count_new_nodes_in_corpus.py` | Wieviel LERNSTOFF tragen die neuen Suchknoten in einer Korpus-Klasse? | evaluations 1 | 2026-09-18 |
 | `tools/gate_hull_form_spec.sh` | Gating des Spec-Kandidaten (Huellenform 2, wahlweise plus K5) gegen die Champion-Spec, | evaluations 4 | 2026-09-07 |
 | `tools/k3_arm_summary.py` | Kennzahlen eines Knopf-Arms der Kette night_k3_knobs_b06.sh fuer die Registrierung | evaluations 2 | 2026-09-06 |
-| `tools/night_v31_generate.sh` | v31-ERZEUGUNG, alle drei Klassen. Generator: der neue Champion v30-b02. | evaluations 2 | 2026-09-19 |
 | `tools/probes/arena_block_sd_probe.py` | Arena-Streuung fuer PREREG_geometric_envelope.md par.12b Punkt 3 (C1-Aufloesung). | evaluations 2 | 2026-09-06 |
 | `tools/probes/arena_points_probe.py` | Punktbilanz je Seite aus den Partie-Logs eines Arena-Artefakts (`--log-games`), | evaluations 4 | 2026-09-05 |
 | `tools/probes/blocker_split_abcd.py` | Aufspaltung des "Farbe nicht im Angebot"-Blockers (74-77%, PREREG_provokation | evaluations 1 | 2026-08-25 |

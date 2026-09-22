@@ -124,9 +124,11 @@ Was jetzt läuft: Generation 29 und 30. In 29 wird gemessen, ob die
 Suche am Rundenende schon das Legen der Fliesen sehen soll, ob die
 Startsetzung der Kuppel ein Suchentscheid wird, und woran genau die
 Züge eines stärkeren Gegners (Partien gegen ein großes Sprachmodell)
-vom Netz abweichen. Was davon trägt, kommt in Generation 30. Mit
-ihr endet das Projekt: Das Schlussmodell heißt Tessa, und die
-Web-Oberfläche bekommt eine gemessene Leiter von Schwierigkeitsstufen.
+vom Netz abweichen. Was davon trägt, kam in Generation 30.
+
+Das Projektende ist seither zweimal verschoben worden: erst galt v30 als
+Abschluss, dann v31, seit dem 2026-09-22 läuft v32. Der Champion heißt im
+Spiel Tessa, die technischen Generationsnamen bleiben daneben stehen.
 
 ## 4. Warum so umständlich? (Unsere Arbeitsregeln, und woher sie kommen)
 

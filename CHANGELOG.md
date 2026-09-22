@@ -83,7 +83,8 @@ two seeds against the previous champion, 45:5 against the anchor, and 79:71
 against `v29-b09` two generations back. That last edge sits well below what the
 other two predict; it is recorded as an open anomaly rather than smoothed over.
 
-`v31` is the final generation.
+`v31` was called the final generation when this tag was cut. It is not:
+`v32` was released to proceed on 2026-09-22.
 
 ### Engine and rules
 
