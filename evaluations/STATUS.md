@@ -19,7 +19,16 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**NICHTS** (Stand 2026-09-20, Prozessliste geprueft).
+**NICHTS** (Stand 2026-09-22 10:30, Prozessliste geprueft, nicht die Task-Meldungen).
+
+**RAHMEN GEAENDERT 2026-09-22 (Nutzer: *"du faehrst v32"*):** v31 ist NICHT die letzte
+Generation. Der Generationswechsel v31 -> v32 ist gefahren (`/mosaic-generation-turnover`,
+Schritte 0 bis 6); die Erzeugung ist NICHT gestartet und braucht die Entscheide aus
+`PREREG_v32_window.md` par.6. **Keine Generation mehr als die letzte behandeln, solange es dafuer
+keine frische Aussage gibt** -- das Projektende ist dreimal verschoben worden (v30, v31, jetzt
+v32), und am 2026-09-21 hing an der Annahme bereits eine Fehlregistrierung: die
+Dosis-Nachrechnung der Rueckgabe-Reihenfolge wurde als "nicht mehr gebraucht" abgelegt und war
+einen Tag spaeter der erste Handgriff vor der v32-Erzeugung.
 
 **Die Promotion von `v31-b01` ist VOLLSTAENDIG** nach `docs/promotion_checklist.md`, alle sieben
 Punkte: Champion gesetzt, vier Elo-Kanten registriert, Diagnostiken gefahren, Artefakt eingefroren
@@ -47,9 +56,14 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
 
 ### WAS ALS NAECHSTES ANSTEHT
 
-* **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- die letzten der Reihe,
-  erstmals gegen den Schluss-Champion. Server VOR dem Start neu starten, sonst spielt er `v30-b02`;
-  danach die Konsolenzeile "Champion-Spec ..." lesen.
+* **Die v32-Erzeugung** (`PREREG_v32_window.md`). par.1 Zuschnitt steht (neu `v31-b01`, G-1
+  `v30-b02`, G-2 `v29-b11`, Seed 20260953, Val-Pool `^selfplay_v31-`); **par.6 Rezept ist offen**
+  und braucht Nutzer-Entscheide: Startgewicht (Warmstart ist der belegte Weg), Knoepfe und Spec,
+  Zahl der Arme -- und die **Dosis der Rueckgabe-Streuung**: `p = 0,81` ist an v30 geeicht
+  (17,75 Prozent Gelegenheit), an v31 gemessen sind es 28,0 Prozent, hergeleitet laegen rund 0,54 an.
+* **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- erstmals gegen
+  `v31-b01`. Server VOR dem Start neu starten, sonst spielt er `v30-b02`; danach die Konsolenzeile
+  "Champion-Spec ..." lesen.
 * **Das Aufraeumen ist ABGESCHLOSSEN** (`PREREG_code_cleanup_closeout.md`, par.8i bis par.8o,
   alles am 2026-09-21). Die Rust-Punkte 9 und 10 sind GEMESSEN und begruendet nicht gebaut (der
   Plain-Tiling-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). Der letzte
@@ -119,7 +133,7 @@ GRUEN. Herleitung im Kapitel "Promotion v31-b01" in `../archive/history.md`.
 | v29-b09@400 | 1364 | [1328; 1404] | 3.140 | 2 von 10 |
 | v28-b02@400 | 1345 | [1314; 1382] | 4.100 | 6 von 18 |
 
-**Engine-Stand:** Wheel **1.0.0** (mit dem Schluss-Champion von 0.1.0 gehoben), Vertragshash
+**Engine-Stand:** Wheel **1.1.0** (0.1.0 -> 1.0.0 mit dem v31-Champion, 1.1.0 am 2026-09-21 mit dem berichtigten Tiling-Cache-Schluessel), Vertragshash
 unveraendert `6ef829e564c58bd5`, 888/414. Die Version geht weder in den Hash noch in einen
 Cache-Schluessel noch in den Handshake ein -- belegt am lebenden Objekt (Golden Probe 10/10 ueber
 den Versionswechsel, Anker-Drift gruen).
@@ -187,8 +201,8 @@ nicht am Korpus nachgezaehlt).
 | `v31_window` | der laufende Zyklus selbst |
 | `dome_return_order` | die Streuung ist gebaut und wirksam; offen ist ihre WIRKUNG, messbar erst am v31-Training |
 | `code_cleanup_closeout` | Gruppe B (Wrapper, drei Spec-Felder) und Gruppe C |
-| `difficulty_levels` | ganze Leiter auf den Schluss-Champion vertagt |
-| `claude_play_interface` | Partien g08-g10, Abschluss mit dem Schlussmodell |
+| `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
+| `claude_play_interface` | Partien g08-g10 gegen `v31-b01` |
 
 Beim Generationswechsel am 2026-09-19 nachgezogen: die Koepfe von `v30_window` (auf
 ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 0,81), danach

@@ -187,6 +187,16 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
 Weitere Arme ab `v29-b12` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
 
+**Reserviert 2026-09-22 (Generationswechsel v31 -> v32):**
+**`v32-b01`** (erster Arm der Generation v32 auf dem v32-Fenster; Generator der Erzeugung ist
+`v31-b01_brierbest`, der amtierende Champion -- v31 hatte EINEN Arm, damit greift
+"Generator = bester Stand von N-1" ohne die Konkurrenzregel aus `generation_loop.md`).
+Fensterzuschnitt nach der Rotationsregel: neu `v31-b01`, G-1 `v30-b02`, G-2 `v29-b11`;
+`v28-b02` ist am 2026-09-22 mit Freigabe geloescht. Seed **20260953** (Vierer-Schritt: v30
+20260945, v31 20260949), Val-Pool `^selfplay_v31-`. **Rezept, Startgewicht und die Dosis der
+Rueckgabe-Streuung sind NICHT entschieden** -- sie gehoeren in par.6 der v32-Fenster-Prereg,
+vor den Start. Weitere Arme ab `v32-b02` nur mit eigener Registrierung.
+
 **Reserviert 2026-09-19 (Generationswechsel v30 -> v31):**
 **`v31-b01`** (erster Arm der Generation v31 auf dem v31-Fenster, 2.947 Dateien, Seed 20260949,
 Val-Pool `^selfplay_v30-`; **WARMSTART von `v30-b02_brierbest`**, sonst v30-Rezept. Der Kaltstart

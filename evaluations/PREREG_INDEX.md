@@ -77,17 +77,18 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 122 Dateien = 2 OFFEN + 108 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 123 Dateien = 3 OFFEN + 108 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (2)
+## OFFEN (3)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_claude_play_interface.md` | Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | 7 Partien (par.7), 5:2 fuer Claude; das Netz punktet aus Platzierungen statt aus den Wertungsplatten. Sichtgleichheit gilt in KEINE Richtung, Angleich ENTSCHIEDEN mit v29. **Zugklassen-Differential GEMESSEN (par.12): KEIN Knopf** -- die roh auffaellige Kuppelplatzierung (53 von 53) ist nach Normierung auf die Optionszahl nicht von blinder Wahl unterscheidbar; bei 7 Partien ohne Ausgangs-Varianz nicht aufloesend. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
+| `PREREG_v32_window.md` | Wie wird das v32-Fenster zugeschnitten, und welches Rezept faehrt der erste Arm? | par.1 ZUSCHNITT steht (Rotationsregel, Bestand am 2026-09-22 gezaehlt: neu v31-b01, G-1 v30-b02, G-2 v29-b11; v28-b02 geloescht). par.6 REZEPT ist OFFEN -- Startgewicht, Knoepfe und die Dosis der Rueckgabe-Streuung sind Nutzer-Entscheide und muessen VOR dem Start stehen. Nichts erzeugt, nichts trainiert. |
 
 ## ENTSCHIEDEN (108)
 
@@ -198,7 +199,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_v28_window.md` | Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | ABGESCHLOSSEN 2026-09-13 (par.11). Erzeugung gefahren (par.10, 9,9 h), Tor 2a haelt; b01 Tor 1 bestanden gegen v27-b01; b02 (Variante B) Nullbefund gegen b01, als korrektere Fassung der beste Stand (Nutzer); b03/b04 gefahren; PROMOTION v28-b02 vollstaendig 2026-09-12, Elo 1394 [1350, 1445] (Segment 2, Stand 2026-09-13 nach den Sims-Kanten; bei der Promotion 1353). Reste in ihren eigenen Preregs. |
 | `PREREG_v29_window.md` | Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | par.9 komplett: Erzeugung, b01-b09, Tore; v29-b03 schlug den Champion (275:215), promoviert wurde am 2026-09-18 v29-b09 (Gating 423:377, Anker 128:22, Champion-2 90:60; PREREG_minimal_strength_core.md 10.13/10.18). Generator der v30-Erzeugung v29-b11. Generationsbericht in archive/history.md. |
 | `PREREG_v30_window.md` | Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm mindestens auf Champion-Niveau `v29-b09`? | NEIN. par.9: `v30-b01` kalt 404:396 = 50,50 %, Block-z +0,278, H0; der einfaktorielle Warmstart-Arm `v30-b02` 443:297 = 59,86 %, Block-z +5,360, TRAEGT (9,36 Punkte Unterschied bei gleichem Fenster, Monolith, Seed und Rezept). Tor 0 und Tor 2a gruen (sp_voll 0,90087 gegen 0,84275), Tor 2b blind (par.9). Generator fuer v31 ist `v30-b02` auf Stufe 1, seit 2026-09-19 auch Champion. |
-| `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten, und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.6 -- Erzeugung 14,66 h, Tor 2a HAELT (sp_voll 0,955 gegen 0,901), Fenster 2.947 Dateien, Training `v31-b01` warm in 58 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT: 461:339 aus 800 = 57,62 %, Block-z +4,24 auf differenzierten Werten, beide Seeds einzeln signifikant.** Tor 2b erstmals wieder verwendbar, 800/800 ohne Replay. Promotion ist ein eigener Ablauf und offen. |
+| `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten, und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.6 -- Erzeugung 14,66 h, Tor 2a HAELT (sp_voll 0,955 gegen 0,901), Fenster 2.947 Dateien, Training `v31-b01` warm in 58 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT: 461:339 aus 800 = 57,62 %, Block-z +4,24 auf differenzierten Werten, beide Seeds einzeln signifikant.** Tor 2b erstmals wieder verwendbar, 800/800 ohne Replay. Promotion am 2026-09-20 VOLLZOGEN: `v31-b01` ist Champion (Elo 1458 [1414; 1510], vier Kanten, keine frueh gestoppt). Generator der v32-Erzeugung. |
 | `PREREG_value_rank_metric.md` | Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 |
 | `PREREG_value_scale_correction.md` | Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 |
 

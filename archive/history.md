@@ -21513,3 +21513,54 @@ Bundle haette sein eigenes Modell nicht gefunden. Die Spec liest den Namen jetzt
 Fehlerklasse wie beim README am selben Tag: was bei jeder Promotion von Hand nachgezogen werden
 muss, wird irgendwann nicht nachgezogen -- und an eine PyInstaller-Spec denkt beim Champion-Wechsel
 niemand.
+
+# Generationswechsel v31 -> v32 (2026-09-22)
+
+**Nutzer-Entscheid:** *"du faehrst v32"* -- nach `/mosaic-generation-turnover`, Schritte 0 bis 6.
+v31 war einen Tag lang als letzte Generation gefuehrt; das war die dritte Verschiebung des
+Projektendes (erst v30, dann v31, jetzt v32).
+
+**Was das an Registriertem falsch gemacht hat.** Nur die vorwaerts gerichteten Aussagen: README,
+CHANGELOG und `docs/project_overview.md` nannten v31 die letzte Generation. Die datierten
+Chronikstellen in den Preregs blieben stehen -- sie waren richtig, als sie geschrieben wurden.
+
+**Eine Stelle war mehr als Kosmetik.** In `PREREG_dome_return_order.md` par.13 war die
+Dosis-Nachrechnung mit der Begruendung abgelegt worden, es folge keine Erzeugung mehr, deren Dosis
+davon abhinge. Einen Tag spaeter ist sie der erste Handgriff vor der v32-Erzeugung: `p = 0,81` ist
+an der v30-Erzeugung geeicht (17,75 Prozent der Partien mit Gelegenheit), an der v31-Erzeugung
+gemessen sind es 28,0 Prozent. **Lehre, im Projektgedaechtnis festgehalten: eine Begruendung nie
+auf der Finalitaet einer Generation aufbauen.**
+
+## Geloescht (Freigabe A bis D plus F, Beleg im restic-Snapshot `bb2d8bad` vom 2026-09-22)
+
+| Gruppe | Umfang | Beleg |
+| --- | --- | --- |
+| drei v31-Ketten-Skripte in `tools/` | 3 Dateien | 3 Treffer im Snapshot |
+| `data/selfplay_v28-b02-*` (G-3, aus der Rotation) | 1.201 Dateien, 1,34 GB | 1.201 Treffer |
+| verwaiste Bloecke `v27-b01` + `v28-b02` | 2.402 Bloecke, 1,14 GB | Quellkorpus im Snapshot bzw. nicht mehr existent |
+| `alphazero_v29-b10.{pth,onnx}` (ohne Rolle) | 23,3 MB | -- |
+
+Zusammen rund **2,5 GB**; `cache_inventory.py --orphans` meldet danach **0 Waisen**, `data/` liegt
+bei 4,6 GB. **Fuer Caches ist der Beleg nicht der Snapshot, sondern der Korpus:** `*.h5` steht in
+`tools/backup_excludes.txt` ausdruecklich drin, Aufnahmekriterium dort ist "nur was REGENERIERBAR
+ist". Bei den v27-b01-Bloecken existierte dieser Korpus nicht mehr -- sie waren weder
+regenerierbar noch brauchbar.
+
+**Nicht geloescht:** die beiden Monolithen des v31-Fensters (1,55 GB). Sie sind erst tot, wenn das
+v32-Fenster gebaut ist; bis dahin sind sie die einzige Fassung ihres Fensters. Ebenso bleiben alle
+losen Modelle mit Rolle (Champion, Fenster-Generator, Elo-Knoten) und beide eingefrorenen
+Champion-Artefakte -- die Regel "nur die letzten zwei" ist mit `v30-b02` und `v31-b01` bereits
+erfuellt.
+
+## Stand danach
+
+`v31-b01` ist Champion und Generator der v32-Erzeugung; die Generatorwahl war ohne Konkurrenz, weil
+v31 genau einen Arm hatte. Das Artefakt ist vollstaendig (Modell, Spec, eigenes Wheel 1.0.0,
+Manifest, Golden-Probe). Engine-Stand Wheel 1.1.0, Vertragshash `6ef829e564c58bd5`, Anker-Drift
+gruen ueber 1.763 Schritte.
+
+`PREREG_v32_window.md` ist angelegt: par.1 Zuschnitt mechanisch aus der Rotationsregel (neu
+`v31-b01`, G-1 `v30-b02`, G-2 `v29-b11`, Seed 20260953, Val-Pool `^selfplay_v31-`), par.6 Rezept
+ausdruecklich OFFEN. Darin auch der Unterschied, den dieses Fenster als erstes traegt: die
+Alt-Klassen sind unter Wheel 1.0.0 oder frueher erzeugt, die neuen unter 1.1.0, und dazwischen
+liegt die Berichtigung des Tiling-Cache-Schluessels.
