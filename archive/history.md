@@ -21564,3 +21564,26 @@ gruen ueber 1.763 Schritte.
 ausdruecklich OFFEN. Darin auch der Unterschied, den dieses Fenster als erstes traegt: die
 Alt-Klassen sind unter Wheel 1.0.0 oder frueher erzeugt, die neuen unter 1.1.0, und dazwischen
 liegt die Berichtigung des Tiling-Cache-Schluessels.
+
+## 2026-09-20 -- Claude-Partien g08-g10 gegen den Champion v31-b01 (1:2)
+
+Die Reihe aus `PREREG_claude_play_interface.md` ist damit vollstaendig: zehn Partien, je gegen
+den amtierenden Champion ihrer Zeit (par.8.8). Gegen `v31-b01_brierbest` @400, Claude jeweils
+Zweitspieler: **g08 71:101 verloren, g09 49:28 gewonnen, g10 46:72 verloren**.
+
+Die drei Partien im Detail stehen in par.7; hier nur, was ueber die Serie hinaus zaehlt:
+
+- **Die Plattenblindheit ist nicht geklaert, sondern zweigeteilt.** In g08 bediente das Netz
+  alle drei aktiven Kriterien (Endwertung 34:18), in g09 und g10 liess es je drei Spezialfelder
+  leer, obwohl genau die in diesen Auslagen -3 je Feld kosteten. Verdacht (ungeprueft): es
+  spielt eine feste Struktur -- volle Spalte c0, lange Zeilen --, die in g08 zufaellig mit der
+  Auslage zusammenfiel.
+- **Die Null-Klammer ist bei v31-b01 Eroeffnung, nicht Notnagel.** g10: dreizehn Ziehungen in
+  Runde 1 (fuenf bezahlt, von 5 auf 0), danach Stand 0 bis Runde 4, 28 Ziehungen gesamt -- und
+  trotzdem 26 Punkte Vorsprung am Ende. In g09 dieselbe Eroeffnung, dort verlor das Netz.
+  Damit ist Arm A1 der `PREREG_corpus_behaviour_audit.md` in vier Partien an lebenden Spielen
+  bestaetigt.
+- **Ein eigener Bedienfehler dreimal in Folge** (par.13): die Zugliste nennt die Stueckzahl
+  eines Mondzugs nicht, die steht nur in den Stapelspitzen. Kosten ueber die drei Partien:
+  -15 Strafpunkte, in g09 und g10 jeweils der groesste Einzelposten. Ein reiner Anzeige-Fix
+  ist vorgeschlagen und nicht gebaut.

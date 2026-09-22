@@ -61,9 +61,13 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
   und braucht Nutzer-Entscheide: Startgewicht (Warmstart ist der belegte Weg), Knoepfe und Spec,
   Zahl der Arme -- und die **Dosis der Rueckgabe-Streuung**: `p = 0,81` ist an v30 geeicht
   (17,75 Prozent Gelegenheit), an v31 gemessen sind es 28,0 Prozent, hergeleitet laegen rund 0,54 an.
-* **Drei Claude-Partien g08-g10** (`PREREG_claude_play_interface.md` P1) -- erstmals gegen
-  `v31-b01`. Server VOR dem Start neu starten, sonst spielt er `v30-b02`; danach die Konsolenzeile
-  "Champion-Spec ..." lesen.
+* **Drei Claude-Partien g08-g10 GESPIELT** (2026-09-20, `PREREG_claude_play_interface.md`
+  par.7): gegen `v31-b01_brierbest` @400 steht es **1:2** (71:101, 49:28, 46:72), Claude als
+  Zweitspieler. Zwei Befunde: das Netz bedient die aktiven Wertungsplatten NICHT zuverlaessig
+  (g09/g10 je drei leere Spezialfelder, in g09 kostete ihn das die Partie), gewinnt aber ueber
+  Platzierungspunkte; und es nutzt die Null-Klammer als EROEFFNUNG -- in g10 dreizehn Ziehungen
+  in Runde 1, Stand 0 bis Runde 4, 28 Ziehungen gesamt. Offen als Vorschlag: par.13, die
+  Stueckzahl eines Mondzugs fehlt in der Zugliste (-15 Punkte in drei Partien).
 * **Das Aufraeumen ist ABGESCHLOSSEN** (`PREREG_code_cleanup_closeout.md`, par.8i bis par.8o,
   alles am 2026-09-21). Die Rust-Punkte 9 und 10 sind GEMESSEN und begruendet nicht gebaut (der
   Plain-Tiling-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). Der letzte
@@ -202,7 +206,7 @@ nicht am Korpus nachgezaehlt).
 | `dome_return_order` | die Streuung ist gebaut und wirksam; offen ist ihre WIRKUNG, messbar erst am v31-Training |
 | `code_cleanup_closeout` | Gruppe B (Wrapper, drei Spec-Felder) und Gruppe C |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
-| `claude_play_interface` | Partien g08-g10 gegen `v31-b01` |
+| `claude_play_interface` | g08-g10 gespielt (1:2); offen ist nur noch der Anzeige-Fix aus par.13 |
 
 Beim Generationswechsel am 2026-09-19 nachgezogen: die Koepfe von `v30_window` (auf
 ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 0,81), danach

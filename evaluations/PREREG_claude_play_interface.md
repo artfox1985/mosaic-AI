@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 8 Partien (par.7), 5:3, je Gegner getrennt (par.8.8). NEU g08 gegen v31-b01: 71:101 -- und die Plattenblindheit aus g02-g07 ist WEG: das Netz gewinnt die Endwertung 34:18 (zwei volle Zeilen, zwei volle Spalten, drei Eckplatten) UND die Platzierungen. Sichtgleichheit: par.11, fuer g08 nicht nachgeprueft. Zugklassen-Differential GEMESSEN (par.12): KEIN Knopf. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 10 Partien (par.7), 6:4, je Gegner getrennt (par.8.8). Gegen v31-b01 1:2 (g08 71:101, g09 49:28, g10 46:72). Das Netz bedient die aktiven Kriterien NICHT zuverlaessig (g09/g10 je drei leere Spezialfelder), gewinnt aber ueber Platzierungen -- und nutzt die Null-Klammer als EROEFFNUNG (g10: 13 Ziehungen in R1, Stand 0 bis R4). NEU par.13: Mondzug-Stueckzahl fehlt in der Zugliste, -15 Punkte in drei Partien, Anzeige-Fix vorgeschlagen, nicht gebaut. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -615,6 +615,108 @@ b. **Strategisch zu schmal**: der ganze Plan lief auf Spalte 0 plus die linken E
    (24 Kriteriumspunkte). Das hat funktioniert (18 von 24 geholt), war aber gegen 34 zu
    wenig -- die zweite Spalte war mit denselben Steinen erreichbar gewesen, wenn R2/R3
    frueher auf c1 statt auf c2 gezielt haetten.
+
+---
+
+**g09 (2026-09-20; Seed 20260918, Claude Spieler 1, NETZ Erstspieler, Gegner
+`v31-b01_brierbest` @400, Spec wie g08): Claude 49 : 28 Netz, CLAUDE GEWINNT um 21.**
+40 Claude-Zuege. Wertungsplatten: Diagonale Reihen (10 je Diagonale), Horizontale Reihen
+(3), **Spezialfelder (-3 je LEEREM Spezialfeld)**.
+
+**Endwertung je Kriterium** (Manifest): Claude Diagonale 10 (Hauptdiagonale komplett),
+Horizontale 0, Spezialfelder -6 (zwei von vier leer) = **+4**; Netz Diagonale 0 (Haupt 2/6,
+Gegen 4/6), Horizontale 0, Spezialfelder -9 (drei leer) = **-9**. 13 Punkte Unterschied
+allein aus der Endwertung, bei 21 Punkten Endabstand.
+
+**Standard-Kennzahlen** (Endraster, Spezialfliesen mitgezaehlt):
+
+- *Reihenauslastung Kuppel*: Claude 18 Steine (z0 5, z1 4, z2 3, z3 4, z4 1, z5 1);
+  Netz 19 (z0 5, z1 3, z2 4, z3 3, z4 2, z5 2).
+- *Spaltenauslastung*: Claude keine volle Spalte, drei mit 4 (c0, c1, c2); Netz eine volle
+  (c0), sonst hoechstens 3. In dieser Auslage zaehlten Spalten nicht -- beide bauten sie
+  trotzdem, das Netz staerker.
+- *Strafleistenauslastung*: Claude -11 (R2 -6, R4 -3, R5 -2), Netz -18 (R1 -3, R2 -2,
+  **R3 -12**, R4 -1).
+- *Punkte und Marge*: 49 : 28, Marge +21.
+
+**Stapelziehungen: Netz 25, Claude 2.** Das Muster aus g05/g07 ist zurueck, und diesmal
+kostet es das Netz die Partie: in R2 faellt es mit vier bezahlten Ziehungen von 5 auf 0 und
+zieht danach **13 weitere gratis**, in R3 noch einmal 9. Der Unterschied zu g08 ist nicht
+das Verhalten, sondern die Gelegenheit -- in g08 stand es nie auf 0.
+
+**Beobachtungen**:
+
+1. **Die Plattenblindheit ist NICHT zurueck, aber sie ist auch nicht weg.** Das Netz baute
+   wieder die volle Spalte c0 (in g08 das Siegmittel), obwohl Spalten hier NICHT gewertet
+   wurden -- und liess drei Spezialfelder leer, obwohl genau das hier -3 je Feld kostete.
+   Das passt zu g04/g06/g07 und widerspricht g08: dort waren alle drei aktiven Kriterien
+   bedient. Verdacht (ungeprueft): das Netz spielt eine feste Struktur (Spalte c0, lange
+   Zeilen), die in g08 zufaellig mit der Auslage zusammenfiel.
+2. **Die Diagonale ist ein Claude-Kriterium**: sie kostet je Zelle eine eigene
+   Musterreihen-Vollendung (1+2+3+4+5+6 = 21 Fliesen) und bringt keine Linienpunkte, weil
+   Diagonalzellen nicht orthogonal benachbart sind. Sie war nur bezahlbar, weil WILD-Zellen
+   auf drei der sechs Positionen lagen ((1,1), (3,3) ueber Rotation gewaehlt) und zwei
+   Zellen ueber Chips vollendet wurden.
+3. **Bonuschips als Fliesenersatz**: drei Reihen (R2, R3, R5) wurden mit Chips vollendet,
+   zusammen 8 Chips fuer 3 Kuppelzellen -- darunter (5,5), die letzte Diagonalzelle.
+
+**Eigene Fehler:**
+
+a. **R2 -6 (Runde 2)**: `s m türkis 0` in eine Reihe mit EINEM freien Platz, waehrend vier
+   Mondstapel Tuerkis oben liegen hatten. Drei Fliesen fielen auf die Strafleiste. Exakt
+   der Fehler aus g08 (dort -2/-5), zweimal in drei Partien: **die Zugliste nennt die
+   Stueckzahl eines Mondzugs nicht**, sie steht nur implizit in den Stapelspitzen.
+b. Die Gegendiagonale (1/6) blieb liegen; mit derselben Fliesenzahl waeren beide nicht zu
+   haben gewesen, die Wahl war richtig.
+
+---
+
+**g10 (2026-09-20; Seed 20260919, Claude Spieler 1, NETZ Erstspieler, Gegner
+`v31-b01_brierbest` @400, Spec wie g08): Claude 46 : 72 Netz, NETZ GEWINNT um 26.**
+43 Claude-Zuege. Wertungsplatten: Eckplatten (3/8), **Spezialfelder (-3 je LEEREM Feld)**,
+Farbenreiche Reihen (4 je Reihe mit >= 5 Farben).
+
+**Endwertung je Kriterium** (Manifest): Claude Eckplatten 3 (nur (0,0)), Spezialfelder -12
+(VIER leer), Farbenreiche 8 (z0 und z1) = **-1**; Netz Eckplatten 11 ((0,0) und eine untere),
+Spezialfelder -9 (drei leer), Farbenreiche 4 (eine Reihe) = **+6**.
+
+**Standard-Kennzahlen** (Endraster, Spezialfliesen mitgezaehlt):
+
+- *Reihenauslastung Kuppel*: Claude 17 Steine (z0 5, z1 5, z2 3, z3 2, z4 1, z5 1);
+  Netz 19 (z0 5, z1 5, z2 4, z3 2, z4 2, z5 1). Fast dasselbe Profil -- beide bauen oben.
+- *Spaltenauslastung*: keiner eine volle Spalte; Claude drei mit 4 (c0, c1, c2), Netz zwei
+  mit 5 und eine mit 4. Spalten zaehlten in dieser Auslage nicht.
+- *Strafleistenauslastung*: Claude -13 (R2 -6, R3 -1, R4 -5, R5 -1), Netz -19 (R1 -2,
+  R2 -8, R3 -5, R4 -1, R5 -3).
+- *Punkte und Marge*: 46 : 72, Marge -26.
+
+**Stapelziehungen: Netz 28, Claude 0.** Das Netz zieht in R1 dreizehnmal (fuenf bezahlt, von
+5 auf 0), in R2 neunmal und in R3 fuenfmal -- alles bei Stand 0, also gratis. Es steht bis
+Runde 4 auf 0 und gewinnt trotzdem mit 26 Punkten Abstand.
+
+**Beobachtungen**:
+
+1. **Die Null-Klammer ist bei v31-b01 kein Notnagel, sondern Eroeffnung.** In g09 und g10
+   faellt das Netz in Runde 1/2 absichtlich auf 0 und durchsucht dann den halben Kuppelstapel
+   gratis; in g10 kostet ihn das nichts und bringt ihm die Plattenwahl fuer die ganze Partie.
+   Zusammen mit g05/g07 ist das jetzt in vier Partien belegt (`PREREG_corpus_behaviour_audit.md`
+   Arm A1).
+2. **Das Spezialfelder-Kriterium schlaegt beide**, aber Claude haerter (-12 zu -9): vier von
+   neun Platten auf meinem Brett trugen ein Spezialfeld, und drei davon lagen in den unteren
+   Slots, wo die Musterreihen 5 und 6 sie nie freischalten. Der Fehler passierte in Runde 3-4,
+   als die AUSLAGE nur noch Spezialplatten hatte -- die Wahl ist dann keine mehr.
+3. Farbenreiche Reihen sind dagegen ein Claude-Kriterium (8:4): z0 braucht fuenf
+   R0-Vollendungen mit fuenf verschiedenen Farben, das laesst sich ueber die Rotationen der
+   drei oberen Platten vorbereiten.
+
+**Eigene Fehler:**
+
+a. **R2 -6 (Runde 2)**: derselbe Mondzug-Ueberlauf wie in g08/g09, diesmal mit drei Gelb, die
+   in KEINE Reihe passten (alle sechs waren farblich belegt). **Dritte Partie in Folge mit
+   demselben Fehlermuster** -- siehe par.13.
+b. **Vier Spezialfelder angenommen** (par.7 g10 Beobachtung 2), ohne vorher zu pruefen, ob die
+   unteren Slots ueberhaupt noch freischaltbar sind. Zwei davon haette ich in Runde 3 in die
+   oberen Slots legen koennen.
 
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
@@ -1295,3 +1397,31 @@ braucht, ist Varianz im AUSGANG, also Partien, die Claude verliert.
 4. **Kuppel-Rotation nur beschreibend** in der feinen Klasse, vom Orakel nicht bewertet.
 5. **Gelesen wird `.engine.log`**, nicht `game.log`: ab g02 traegt nur die erstere den Kopf und
    die Aktions-IDs. Je Partie steht im Artefakt, welche Datei benutzt wurde.
+
+## par.13 WIEDERKEHRENDER BEDIENFEHLER: die Stueckzahl eines Mondzugs steht nirgends (g08-g10, 2026-09-20)
+
+**Befund, gemessen ueber drei Partien:** Aktion C ("alle obersten Steine EINER Farbe ueber
+ALLE Mondbereiche") nimmt so viele Steine, wie Mondstapel diese Farbe oben tragen, plus alles
+dieser Farbe aus dem Mondpool der grossen Fabrik. **Die Zugliste nennt diese Zahl nicht** --
+sie steht nur implizit in den Fabrikzeilen, und der Spieler muss sie vor jedem Zug aus bis zu
+fuenf Stapelspitzen selbst zusammenzaehlen.
+
+Kosten in dieser Serie (Grundmenge: alle Ueberlaeufe durch Aktion C, Einheit Strafpunkte):
+
+| Partie | Runde | Zug | Ueberlauf | Strafpunkte |
+| --- | --- | --- | --- | --- |
+| g08 | R1 | 2 Tuerkis in eine Reihe mit 1 freien Platz | 1 | -2 |
+| g08 | R4 | 2 Blau in R0 (Kapazitaet 1) | 1 | -1 |
+| g09 | R2 | 4 Tuerkis in R0 (Kapazitaet 1) | 3 | -6 |
+| g10 | R2 | 3 Gelb, keine Reihe nahm sie an | 3 | -6 |
+
+**Summe -15 Punkte in drei Partien**, alle vermeidbar durch eine einzige Zahl in der Zugliste.
+In g09 und g10 war der Fehler jeweils der groesste Einzelposten der Strafleiste.
+
+**Vorschlag (NICHT gebaut, Nutzer-Entscheid offen):** `s m <farbe>` in der Zugliste um die
+Stueckzahl ergaenzen, also `s m tuerkis x4 0-3|floor`, und bei `x > Restkapazitaet der Reihe`
+die Zeile als Warnung markieren. Die Zahl liegt im Zustand bereits vor (`factories[].moon`
+plus `large_factory.moon`), es ist reine Anzeige -- keine Engine-Aenderung, kein Eingriff in
+die Zuggenerierung. Damit faellt der haeufigste Bedienfehler der Serie weg, ohne dass das
+Fenster Information bekommt, die ein menschlicher Spieler nicht auch haette (die Stapelspitzen
+liegen offen).
