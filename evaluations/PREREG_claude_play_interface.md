@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 10 Partien (par.7), 6:4, je Gegner getrennt (par.8.8). Gegen v31-b01 1:2 (g08 71:101, g09 49:28, g10 46:72). Das Netz bedient die aktiven Kriterien NICHT zuverlaessig (g09/g10 je drei leere Spezialfelder), gewinnt aber ueber Platzierungen -- und nutzt die Null-Klammer als EROEFFNUNG (g10: 13 Ziehungen in R1, Stand 0 bis R4). NEU par.13: Mondzug-Stueckzahl fehlt in der Zugliste, -15 Punkte in drei Partien, Anzeige-Fix vorgeschlagen, nicht gebaut. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: GESCHLOSSEN 2026-09-22 nach 10 Partien (par.7), je gegen den Champion ihrer Zeit (par.8.8), gegen v31-b01 1:2. Zwei Befunde, die keine Arena zeigt: die Null-Klammer ist EROEFFNUNG, nicht Notnagel (g10: 13 Ziehungen in R1, Stand 0 bis R4), und das Netz bedient die aktiven Wertungsplatten unzuverlaessig (g09/g10 je drei leere Spezialfelder). Werkzeug bleibt in tools/ (par.8.6), Anzeige-Fix par.13 gebaut. KEINE Siegquote ueber die Reihe: wechselnde Gegner, Sicht ungleich (par.11). -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1418,10 +1418,36 @@ Kosten in dieser Serie (Grundmenge: alle Ueberlaeufe durch Aktion C, Einheit Str
 **Summe -15 Punkte in drei Partien**, alle vermeidbar durch eine einzige Zahl in der Zugliste.
 In g09 und g10 war der Fehler jeweils der groesste Einzelposten der Strafleiste.
 
-**Vorschlag (NICHT gebaut, Nutzer-Entscheid offen):** `s m <farbe>` in der Zugliste um die
-Stueckzahl ergaenzen, also `s m tuerkis x4 0-3|floor`, und bei `x > Restkapazitaet der Reihe`
-die Zeile als Warnung markieren. Die Zahl liegt im Zustand bereits vor (`factories[].moon`
-plus `large_factory.moon`), es ist reine Anzeige -- keine Engine-Aenderung, kein Eingriff in
-die Zuggenerierung. Damit faellt der haeufigste Bedienfehler der Serie weg, ohne dass das
-Fenster Information bekommt, die ein menschlicher Spieler nicht auch haette (die Stapelspitzen
-liegen offen).
+**GEBAUT am 2026-09-22** (Nutzer-Auftrag: "bau den anzeige-fix aus par.13 ein und schliesse
+das prereg"). Drei Stellen in `tools/claude_play.py`, alle reine Anzeige bzw. Eingabe:
+
+1. `moon_take_count(st, color)` -- die Stueckzahl aus dem Zustand. Zaehlweise am Code
+   geprueft, nicht am Handbuch: `execution.rs:262-300` (`execute_moon_take`) laeuft ueber alle
+   kleinen Fabriken und danach ueber den Pool der grossen; je kleinem Mondstapel faellt GENAU
+   EIN Stein und nur, wenn er OBEN liegt (`factory.rs:86-108`, `stack.last() == color`,
+   Index 0 = unten laut `factory.rs:60-61`), aus dem Pool dagegen ALLE der Farbe
+   (`factory.rs:196-208`). Die Zahl steht in keinem Zugeintrag -- `serialize.rs:546-552`
+   traegt Quelle, Farbe, Reihe und Rueckgabe-Reihenfolge, sonst nichts.
+2. `legal_moves_text` haengt sie an die Zeile der Aktion C (`s m tuerkis x4 0-3|floor`) und
+   ergaenzt, wo die Zahl den freien Platz einer Zielreihe uebersteigt, die Warnung
+   `!! UEBERLAUF auf die Strafleiste: R0 +3, R1 +2`. Sonnenseiten-Zuege bleiben unveraendert:
+   dort steht die Stueckzahl ablesbar in der Fabrikzeile.
+3. Der Zugparser filtert ein Feld der Form `x<Zahl>` weg, damit eine kopierte Anzeigezeile
+   nicht abgewiesen wird; `x<Zahl>` ist an keiner Stelle der Notation ein gueltiges Feld.
+
+**Was der Fix NICHT tut:** er gibt dem Fenster keine Information, die ein Mensch am Tisch
+nicht auch haette -- die Mondstapel liegen mit ihrer Spitze offen, und der Pool der grossen
+Fabrik ist vollstaendig sichtbar. Er ersetzt nur das Kopfrechnen ueber bis zu fuenf Stapel.
+Die Sicht-Bilanz aus par.11 aendert sich dadurch nicht.
+
+**Abgesichert:** neun Tests in `tools/tests/test_claude_play_board_hints.py` (Klassen
+`MoonTakeCount`, `OverflowWarning`, `MoveParserTolerance`) -- vergrabene Steine zaehlen nicht,
+der Pool zaehlt vollstaendig, die Warnung rechnet mit dem FREIEN Platz einer teilgefuellten
+Reihe, sie bleibt weg, wenn alles passt, Sonnenzuege behalten ihre Zeilenform, und ein
+kopiertes `x4` wird ignoriert. Gesamtstand der Datei: 28 Tests, gruen.
+
+**Noch offen, klein:** ein Rauchtest gegen eine LEBENDE Partie steht aus -- beim Bau lief ein
+Self-Play auf der CPU (`self_play.py --mode network`), und die Exklusivitaetsregel laesst
+daneben keinen zweiten CPU-Auftrag zu. Die Tests decken die Zustandsform ab (Mondstapel als
+Liste von Stapeln, Pool als flache Liste, beide gegen `serialize.rs:224-241` geprueft); der
+erste Zug der naechsten Partie zeigt die Zeile im Echtbetrieb.

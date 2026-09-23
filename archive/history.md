@@ -21587,3 +21587,18 @@ Die drei Partien im Detail stehen in par.7; hier nur, was ueber die Serie hinaus
   eines Mondzugs nicht, die steht nur in den Stapelspitzen. Kosten ueber die drei Partien:
   -15 Strafpunkte, in g09 und g10 jeweils der groesste Einzelposten. Ein reiner Anzeige-Fix
   ist vorgeschlagen und nicht gebaut.
+
+## 2026-09-22 -- Anzeige-Fix am Spiel-Interface, Prereg geschlossen
+
+Nutzer-Auftrag: "bau den anzeige-fix aus par.13 ein und schliesse das prereg". Gebaut sind
+drei Stellen in `tools/claude_play.py`, alle reine Anzeige bzw. Eingabe: `moon_take_count`
+rechnet die Stueckzahl eines Mondzugs aus dem Zustand (je kleinem Stapel hoechstens der
+oberste Stein, aus dem Pool der grossen Fabrik alle der Farbe -- geprueft an
+`execution.rs:262-300` und `factory.rs:86-108`/`196-208`), die Zugliste zeigt sie als `x4` und
+warnt, wo sie den freien Platz der Zielreihe uebersteigt, und der Parser ignoriert ein
+mitkopiertes `x<Zahl>`. Neun neue Tests, Datei jetzt 28, gruen.
+
+Damit ist `PREREG_claude_play_interface.md` ENTSCHIEDEN. Bilanz der Reihe: zehn Partien gegen
+den jeweils amtierenden Champion, keine Siegquote (wechselnde Gegner, ungleiche Sicht), aber
+zwei Befunde, die keine Arena liefert -- die Null-Klammer als Eroeffnung und die
+unzuverlaessige Bedienung der aktiven Wertungsplatten. Offene Preregs damit bei 2.

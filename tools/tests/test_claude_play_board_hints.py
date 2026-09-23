@@ -221,5 +221,110 @@ class MoonOrder(unittest.TestCase):
         self.assertEqual(cp.move_source_key({"source": "LARGE_FACTORY_SUN"}), "gf")
 
 
+def moon_state(rows=None):
+    """Zustand mit Mondbestand: drei kleine Stapel (oben tuerkis, blau, tuerkis) und ein
+    Pool der grossen Fabrik mit zwei Tuerkis. Aktion C auf Tuerkis nimmt also 2 + 2 = 4."""
+    return {
+        "phase": "drafting",
+        "current_player": 1,
+        "factories": [
+            {"id": 1, "sun": [], "moon": [["blau", "türkis"]]},          # oben tuerkis
+            {"id": 2, "sun": [], "moon": [["türkis", "blau"]]},          # oben blau
+            {"id": 3, "sun": [], "moon": [["rot", "rot", "türkis"]]},    # oben tuerkis
+            {"id": 4, "sun": [], "moon": []},                            # leer
+        ],
+        "large_factory": {"sun": [], "moon": ["türkis", "gelb", "türkis"], "marker": False},
+        "players": [
+            {"pattern_lines": []},
+            {"pattern_lines": rows if rows is not None else [
+                {"index": 0, "capacity": 1, "color": None, "tiles": []},
+                {"index": 1, "capacity": 2, "color": None, "tiles": []},
+                {"index": 3, "capacity": 4, "color": None, "tiles": []},
+            ]},
+        ],
+        "valid_moves": [
+            {"type": "stone", "source": "SMALL_FACTORY_MOON", "factory_id": None,
+             "color": "türkis", "row": r, "moon_order": []} for r in (0, 1, 3, -1)
+        ] + [
+            {"type": "stone", "source": "SMALL_FACTORY_SUN", "factory_id": 2,
+             "color": "blau", "row": 1, "moon_order": []},
+        ],
+    }
+
+
+class MoonTakeCount(unittest.TestCase):
+    """Die Stueckzahl eines Mondzugs (par.13). Zaehlweise geprueft an `execution.rs:262-300`:
+    je kleinem Stapel HOECHSTENS EINER, und nur wenn er oben liegt (`factory.rs:86-108`,
+    Index 0 = unten), aus dem Pool der grossen Fabrik dagegen ALLE der Farbe
+    (`factory.rs:196-208`)."""
+
+    def test_counts_tops_and_the_whole_pool(self):
+        self.assertEqual(cp.moon_take_count(moon_state(), "türkis"), 4)   # 2 Spitzen + 2 Pool
+
+    def test_buried_tiles_do_not_count(self):
+        # Blau liegt in F1 und F3 unten und in F2 oben -> nur der eine zaehlt.
+        self.assertEqual(cp.moon_take_count(moon_state(), "blau"), 1)
+
+    def test_pool_only(self):
+        self.assertEqual(cp.moon_take_count(moon_state(), "gelb"), 1)
+
+    def test_absent_colour_is_zero(self):
+        self.assertEqual(cp.moon_take_count(moon_state(), "schwarz"), 0)
+
+
+class OverflowWarning(unittest.TestCase):
+    """Die Warnzeile ist der eigentliche Zweck: viermal in g08-g10 sind Steine auf die
+    Strafleiste gefallen, weil die Stueckzahl nirgends stand (par.13, -15 Punkte)."""
+
+    def test_line_carries_count_and_overflow(self):
+        out = cp.legal_moves_text(moon_state(), {"me": 1})
+        line = [l for l in out.splitlines() if l.startswith("  s m ")][0]
+        self.assertIn("s m türkis x4", line)
+        self.assertIn("UEBERLAUF", line)
+        self.assertIn("R0 +3", line)   # Kapazitaet 1, vier Steine
+        self.assertIn("R1 +2", line)
+        self.assertNotIn("R3", line.split("UEBERLAUF")[1])  # Kapazitaet 4 fasst alle
+
+    def test_partly_filled_row_counts_only_the_free_places(self):
+        rows = [{"index": 3, "capacity": 4, "color": "türkis", "tiles": ["türkis", "türkis"]}]
+        st = moon_state(rows)
+        st["valid_moves"] = [v for v in st["valid_moves"] if v.get("row") in (3, -1)]
+        line = [l for l in cp.legal_moves_text(st, {"me": 1}).splitlines() if l.startswith("  s m ")][0]
+        self.assertIn("R3 +2", line)   # 4 Steine, nur zwei Plaetze frei
+
+    def test_no_warning_when_everything_fits(self):
+        rows = [{"index": 5, "capacity": 6, "color": None, "tiles": []}]
+        st = moon_state(rows)
+        st["valid_moves"] = [{"type": "stone", "source": "SMALL_FACTORY_MOON", "factory_id": None,
+                              "color": "türkis", "row": 5, "moon_order": []}]
+        line = [l for l in cp.legal_moves_text(st, {"me": 1}).splitlines() if l.startswith("  s m ")][0]
+        self.assertIn("x4", line)
+        self.assertNotIn("UEBERLAUF", line)
+
+    def test_sun_moves_keep_their_old_shape(self):
+        """Nur Aktion C bekommt die Zahl -- bei einer Sonnenseite steht die Stueckzahl
+        ablesbar in der Fabrikzeile, und die Zeile soll nicht laenger werden."""
+        line = [l for l in cp.legal_moves_text(moon_state(), {"me": 1}).splitlines()
+                if l.startswith("  s 2 ")][0]
+        self.assertEqual(line, "  s 2 blau 1")
+
+
+class MoveParserTolerance(unittest.TestCase):
+    def test_count_token_is_ignored(self):
+        """Wer die Zeile samt Anzeige kopiert, soll nicht abgewiesen werden."""
+        calls = []
+
+        class G:
+            def state_json(self):
+                import json as _j
+                return _j.dumps({"valid_moves": []})
+
+            def apply_stone(self, *a):
+                calls.append(a)
+
+        cp.apply_move(G(), {"me": 1}, "s m türkis x4 3")
+        self.assertEqual(calls, [("SMALL_FACTORY_MOON", "türkis", 3, None, None)])
+
+
 if __name__ == "__main__":
     unittest.main()

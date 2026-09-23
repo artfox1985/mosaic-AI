@@ -31,6 +31,11 @@ Zugnotation (par.3.3), Farben blau gelb rot schwarz tuerkis (auch B G R S T):
                                                           m (Mondzug, Aktion C), gf / gm (grosse
                                                           Fabrik Sonne / Mond); <reihe> 0-5 oder "floor";
                                                           die Anzeige nennt zu jedem legalen Zug die Kurzform.
+                                                          Bei Aktion C steht dort zusaetzlich die STUECKZAHL
+                                                          ("s m tuerkis x4 0-3|floor") und, wo sie die freie
+                                                          Kapazitaet einer Zielreihe uebersteigt, wie viele
+                                                          Steine auf die Strafleiste fielen. Die Zahl darf
+                                                          beim Zug mitkopiert werden, sie wird ignoriert.
                                                           Aktion C ist IMMER global: sie nimmt den obersten
                                                           Stein der Farbe von JEDEM Mondstapel plus alle
                                                           dieser Farbe aus dem Pool der grossen Fabrik
@@ -63,6 +68,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -748,6 +754,37 @@ def compact_rows(rows: list[int]) -> str:
     return "|".join(parts) if parts else "-"
 
 
+def moon_take_count(st: dict, color: str) -> int:
+    """Wie viele Steine Aktion C in DIESEM Zustand fuer `color` einsammelt.
+
+    Am Code geprueft, nicht am Handbuch allein: `execution.rs:262-300`
+    (`execute_moon_take`) laeuft ueber alle kleinen Fabriken und danach ueber den Mondpool
+    der grossen. Je kleinem Mondstapel faellt GENAU EIN Stein, und nur wenn er OBEN liegt
+    (`factory.rs:86-108`: `stack.last() == color`; Index 0 = unten, `factory.rs:60-61`);
+    aus dem Pool der grossen Fabrik dagegen ALLE Steine der Farbe (`factory.rs:196-208`).
+
+    Warum das hier gerechnet wird: der Zugeintrag traegt die Stueckzahl NICHT
+    (`serialize.rs:546-552` -- Quelle, Farbe, Reihe, Rueckgabe-Reihenfolge, sonst nichts).
+    Genau diese fehlende Zahl hat in g08-g10 viermal zum Ueberlauf gefuehrt
+    (PREREG_claude_play_interface.md par.13, zusammen -15 Strafpunkte).
+    """
+    n = 0
+    for f in st.get("factories") or []:
+        for stack in f.get("moon") or []:
+            if stack and stack[-1] == color:
+                n += 1
+    return n + sum(1 for c in ((st.get("large_factory") or {}).get("moon") or []) if c == color)
+
+
+def row_free_capacity(st: dict, m: dict) -> dict:
+    """Freier Platz je Musterreihe von Claude: Kapazitaet minus liegende Steine."""
+    players = st.get("players") or []
+    if m["me"] >= len(players):
+        return {}
+    return {r["index"]: r["capacity"] - len(r.get("tiles") or [])
+            for r in (players[m["me"]].get("pattern_lines") or [])}
+
+
 def legal_moves_text(st: dict, m: dict) -> str:
     vm = st.get("valid_moves") or []
     if not vm:
@@ -764,8 +801,24 @@ def legal_moves_text(st: dict, m: dict) -> str:
         src = move_source_key(v)
         key = (src, v["color"], tuple(v.get("moon_order") or []))
         groups.setdefault(key, []).append(v["row"])
+    free = row_free_capacity(st, m)
     for (src, color, moon), rows in groups.items():
-        L.append(f"  s {src} {color} {compact_rows(rows)}" + (f" mond:{','.join(moon)}" if moon else ""))
+        # Aktion C ist der einzige Zug, dessen Stueckzahl nicht in der Auslage abzulesen ist:
+        # sie ergibt sich erst aus bis zu fuenf Stapelspitzen (par.13). Darum steht sie hier,
+        # zusammen mit der Warnung, in welcher Reihe sie ueberlaeuft.
+        line = f"  s {src} {color}"
+        if src == "m":
+            n = moon_take_count(st, color)
+            line += f" x{n}"
+        line += f" {compact_rows(rows)}"
+        if moon:
+            line += f" mond:{','.join(moon)}"
+        if src == "m":
+            over = [f"R{r} +{n - free[r]}" for r in sorted(rows)
+                    if r >= 0 and r in free and free[r] < n]
+            if over:
+                line += "   !! UEBERLAUF auf die Strafleiste: " + ", ".join(over)
+        L.append(line)
     domes = {}
     for v in vm:
         if v["type"] == "dome_display":
@@ -857,6 +910,10 @@ def apply_move(g, m: dict, text: str) -> str:
         raise SystemExit("leerer Zug")
     cmd = parts[0].lower()
     if cmd == "s":
+        # Die Zugliste nennt bei Aktion C die Stueckzahl als "x4" (par.13). Wer die Zeile
+        # samt dieser Anzeige kopiert, soll nicht daran scheitern: "x<Zahl>" ist an keiner
+        # Stelle der Notation ein gueltiges Feld (Quelle, Farbe, Reihe, mond:...).
+        parts = [tok for tok in parts if not re.fullmatch(r"x\d+", tok)]
         src, color, row = parts[1], parse_color(parts[2]), parts[3]
         moon = []
         for extra in parts[4:]:

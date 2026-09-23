@@ -61,13 +61,14 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
   und braucht Nutzer-Entscheide: Startgewicht (Warmstart ist der belegte Weg), Knoepfe und Spec,
   Zahl der Arme -- und die **Dosis der Rueckgabe-Streuung**: `p = 0,81` ist an v30 geeicht
   (17,75 Prozent Gelegenheit), an v31 gemessen sind es 28,0 Prozent, hergeleitet laegen rund 0,54 an.
-* **Drei Claude-Partien g08-g10 GESPIELT** (2026-09-20, `PREREG_claude_play_interface.md`
-  par.7): gegen `v31-b01_brierbest` @400 steht es **1:2** (71:101, 49:28, 46:72), Claude als
+* **Claude-Partien-Prereg GESCHLOSSEN** (2026-09-22). Die drei letzten Partien g08-g10
+  (`PREREG_claude_play_interface.md` par.7): gegen `v31-b01_brierbest` @400 steht es **1:2** (71:101, 49:28, 46:72), Claude als
   Zweitspieler. Zwei Befunde: das Netz bedient die aktiven Wertungsplatten NICHT zuverlaessig
   (g09/g10 je drei leere Spezialfelder, in g09 kostete ihn das die Partie), gewinnt aber ueber
   Platzierungspunkte; und es nutzt die Null-Klammer als EROEFFNUNG -- in g10 dreizehn Ziehungen
-  in Runde 1, Stand 0 bis Runde 4, 28 Ziehungen gesamt. Offen als Vorschlag: par.13, die
-  Stueckzahl eines Mondzugs fehlt in der Zugliste (-15 Punkte in drei Partien).
+  in Runde 1, Stand 0 bis Runde 4, 28 Ziehungen gesamt. Der Anzeige-Fix aus par.13 ist gebaut
+  (Stueckzahl und Ueberlauf-Warnung am Mondzug, neun Tests); ein Rauchtest gegen eine lebende
+  Partie steht noch aus, weil beim Bau das v32-Self-Play die CPU hatte.
 * **Das Aufraeumen ist ABGESCHLOSSEN** (`PREREG_code_cleanup_closeout.md`, par.8i bis par.8o,
   alles am 2026-09-21). Die Rust-Punkte 9 und 10 sind GEMESSEN und begruendet nicht gebaut (der
   Plain-Tiling-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). Der letzte
@@ -198,15 +199,16 @@ Monolith, gleicher Seed, gleiches Rezept, einziger Unterschied der Start -- 404:
 beiden juengsten Generationen belegt, also rund 81,6 Prozent des Fensters (HERLEITUNG aus par.1,
 nicht am Korpus nachgezaehlt).
 
-## 5. PREREG-BESTAND (5 OFFEN laut Index 2026-09-19; Ziel rund 7)
+## 5. PREREG-BESTAND (2 OFFEN laut Index 2026-09-22; Ziel rund 7)
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v31_window` | der laufende Zyklus selbst |
-| `dome_return_order` | die Streuung ist gebaut und wirksam; offen ist ihre WIRKUNG, messbar erst am v31-Training |
-| `code_cleanup_closeout` | Gruppe B (Wrapper, drei Spec-Felder) und Gruppe C |
+| `v32_window` | der laufende Zyklus selbst; Erzeugung laeuft seit 2026-09-22 |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
-| `claude_play_interface` | g08-g10 gespielt (1:2); offen ist nur noch der Anzeige-Fix aus par.13 |
+
+Am 2026-09-22 geschlossen: `claude_play_interface` (zehn Partien gespielt, Anzeige-Fix par.13
+gebaut). Davor bereits auf ENTSCHIEDEN gezogen und darum aus der Tabelle raus: `v31_window`,
+`dome_return_order`, `code_cleanup_closeout`.
 
 Beim Generationswechsel am 2026-09-19 nachgezogen: die Koepfe von `v30_window` (auf
 ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 0,81), danach
