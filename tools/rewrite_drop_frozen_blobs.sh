@@ -41,6 +41,21 @@
 #    Klon kann eine Anker-Kante nicht mehr nachfahren, ohne dass der Nutzer das
 #    Artefakt bereitstellt. Das gehoert vor dem Lauf gewusst.
 #
+# 4. **`filter-repo` setzt den Arbeitsbaum HART zurueck** (`git_filter_repo.py`
+#    Z.4940, "if we need a reset, do a reset --hard"). Alles, was HEAD bisher
+#    trackte und nachher nicht mehr im Baum steht, ist damit auch VON DER PLATTE
+#    weg. Beim Lauf am 2026-09-23 betraf das 20 Dateien, darunter der Elo-Anker
+#    `hv4_anchor` samt Wheel und Golden Probe und das Artefakt des amtierenden
+#    Champions. Sie wurden vorher in den Scratchpad kopiert und danach
+#    zurueckgelegt, byte-gleich geprueft (20 von 20) -- als ignorierte Dateien,
+#    also genau der gewollte Endzustand.
+#    **Getroffen hat es dabei auch `player_profiles.json`:** die Datei stand als
+#    geaendert im Baum, und der Reset hat den HEAD-Stand darueber geschrieben.
+#    Sie ist nie committet (stehende Regel), der Verlust ist also der Stand seit
+#    dem letzten Commit. Rueckweg: restic-Snapshot unmittelbar vor dem Lauf.
+#    WER DAS HIER NOCHMAL FAEHRT: vorher `git status` lesen und JEDE nicht
+#    committete Aenderung sichern, nicht nur die Pfade im Filter.
+#
 # ------------------------------------------------------- VORBEDINGUNGEN -----
 #
 # a) **Keine zweite Sitzung auf dem Baum.** Ein Umschrieb waehrend einer

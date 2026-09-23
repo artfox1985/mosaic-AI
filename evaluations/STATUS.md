@@ -416,6 +416,14 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
 - **Regel 0**, Prereg-Kopf im selben Zug wie das Ergebnis, Laufzeiten ins Artefakt, sechs
   Standard-Kennzahlen in jedem Messbericht, kein Geviertstrich in Dateien, Bezeichner englisch,
   Inhalte deutsch.
+- **Eingefrorene Netze sind NICHT mehr im Repo** (Nutzer-Entscheid 2026-09-23, Umschrieb am
+  selben Tag gefahren: 227,5 -> 33,7 MiB). Champions behalten Spec, Manifest und Golden Probe
+  und bleiben identifizierbar; ihre `.onnx`/`.pth`/`.whl` und die Heuristiken GANZ liegen nur
+  noch im Arbeitsbaum und in restic. Ein frischer Klon hat damit kein lauffaehiges Netz -- der
+  Nutzer stellt eines bereit, wenn es gebraucht wird. **Kein `git add -f`** fuer kuenftige
+  Champions. Die Elo-Zahlen der Heuristik-Knoten stehen im Register `elo_history.csv`.
+  Der Umschrieb hat JEDEN Commit-Hash ersetzt: bestehende Klons sind ungueltig, und der noch
+  ausstehende Push ist ein Force-Push (nur auf Anweisung).
 - Keine neuen Netzkoepfe; nicht jeden Arm in die Elo-Leiter.
 
 ## 8. BEFUNDE, die eine Nachschau brauchen
