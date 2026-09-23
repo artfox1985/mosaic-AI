@@ -61,16 +61,46 @@ Offen bleiben:
    der **Alt-Set-Brier auf `frozen_v3`**, also die Zahl, an der die gestreifte Brier-Regel
    haengt. Der Trainings-Brier (0,1835) beantwortet sie NICHT: er steht auf dem Val-Anteil des
    jeweiligen Fensters und wechselt mit der Generation die Grundmenge.
-2. **Die beiden v31-Monolithen sind JETZT Loeschkandidaten**
-   (`data/.cache_8da26a898040.h5` 1,48 GB, `.cache_c57d3023e58b.h5` 0,07 GB) -- das v32-Fenster
-   steht, sie sind nicht mehr die einzige Fassung. **Loeschung nur mit restic-Beleg UND neuer
-   pfadgenauer Freigabe**; die Freigabe vom 2026-09-22 ist verbraucht.
-3. **Huellen-Sonde**, fahrbereit als `tools/hull_probe_par14.sh` (Nutzer-Freigabe 2026-09-22
-   *"Ja plan es ein."*), rund 3,5 h. Sie prueft selbst, ob die Maschine frei und der Vergleich
-   einfaktoriell ist. Stand der Werkzeugpruefung vom 2026-09-23 in
-   `PREREG_geometric_envelope.md` par.14, Nebenbefunde 2 und 3: Ablesung 1 (Form, Endbrett) und
-   2 (Staerke) laufen mit dem Bestand, **Ablesung 3 (Gegner-Reaktion) ist ein offener
-   Nutzer-Entscheid** -- ihr Instrument ist auf eine andere Bauform gebaut.
+2. **ERLEDIGT 2026-09-23: die beiden v31-Monolithen sind geloescht**
+   (`data/.cache_8da26a898040.h5` 1,48 GB und `.cache_c57d3023e58b.h5` 0,07 GB), auf
+   pfadgenaue Nutzer-Anweisung, zweimal gegeben (*"Loesch die Monolithen"*, nach Einwand
+   bekraeftigt mit *"Wie gross die Platte ist steht nicht zur Debatte. Loesch den cache"*).
+   `data/` liegt danach bei 6,2 GB, uebrig sind die beiden v32-Caches
+   (`.cache_1587a92e5739.h5` 1,42 GB Monolith, `.cache_813d90612a2b.h5` 0,07 GB Val).
+
+   **OHNE restic-Beleg, und das ist kein Versaeumnis, sondern strukturell:**
+   `tools/backup_excludes.txt` schliesst `*.h5` pauschal aus, weil Trainingscaches als
+   "jederzeit nachbaubar" gelten. Fuer diesen Monolithen stimmte das nicht mehr -- von den
+   2.800 Quelldateien seines Trainingsanteils fehlten **545 im Baum** (nachgezaehlt: 400
+   `v28-b02-policy` plus 145 `v28-b02-value-excursion`, am 2026-09-22 herausrotiert und
+   geloescht). Er war damit der Trainingssatz des amtierenden Champions `v31-b01` in seiner
+   letzten vorhandenen Form.
+
+   **Rueckweg, falls er je gebraucht wird:** `v28-b02` aus dem restic-Snapshot `bb2d8bad`
+   zurueckholen (1.201 `.pkl`, in par.1 der v32-Prereg belegt; `*.pkl` WIRD gesichert), dann
+   Bloecke bauen (rund 11 min fuer 1.201 Dateien) und `build_cache_incremental.py --merge-out`
+   gegen `data/window_v31_train.txt` fahren (rund 10 min). Die drei v31-Fensterlisten liegen
+   im Baum, sind aber **nicht git-getrackt** -- wer sie verliert, verliert das Rezept.
+
+   **Die Lehre fuer die Ausschlussliste:** "regenerierbar" ist keine Eigenschaft des
+   DATEITYPS, sondern des Zustands seiner Quellen. Ein Monolith wird unwiederbringlich in dem
+   Moment, in dem seine Quellgeneration herausrotiert -- und `*.h5` faellt trotzdem weiter
+   pauschal aus der Sicherung. Wer kuenftig eine Generation loescht, sollte im selben Zug
+   entscheiden, was mit den Monolithen geschieht, die auf ihr stehen.
+3. **ERLEDIGT 2026-09-23: die Huellen-Sonde ist gefahren** (`tools/hull_probe_par14.sh`,
+   13:15:57 bis 17:09:22 = 3 h 53 min, Exit 0). Ergebnis und Entscheid in
+   `PREREG_geometric_envelope.md` **par.14c**.
+   **Der Knopf traegt:** dasselbe Netz beidseits, nur die Spec getauscht -- mit Knopf
+   **462:338 = 57,75 Prozent, Block-z +3,94**, BEIDE Seeds einzeln signifikant (+2,59 / +2,95).
+   **Die Form haelt ohne Knopf weitgehend** (Huellenfuellung 0,79 -> 0,72 bei unveraendertem
+   Aussenanteil) -- der eingelernte Prior traegt den groesseren Teil.
+   **Was der Knopf stattdessen tut: er baut Spalten.** 1,14 gegen 0,77 volle Spalten je Partie
+   (**-0,4**), 4 Punkte Margin, und er kauft das mit rund 2 Punkten mehr Strafleiste.
+   **NUTZER-ENTSCHEID: *"dann bleibt der knopf an."*** `envelope_search_c 1,0` bleibt in
+   Champion- und Erzeugungs-Spec. Damit ist par.14 geschlossen.
+   **Ablesung 3 (Gegner-Reaktion) ist NICHT gefahren** -- ihr Instrument ist auf eine andere
+   Bauform gebaut (par.14, Nebenbefund 2), und in einem Kopf-an-Kopf-Lauf waere "der Gegner"
+   der jeweils andere Arm. Weiterhin offener Nutzer-Entscheid, falls die Frage noch zaehlt.
 
 **Der Abnehmer der Huellen-Sonde ist seit 2026-09-23 benannt und registriert**
 (`PREREG_geometric_envelope.md` par.14b): ein GETEILTER Sockel in v33, 1.350 Partien huellen-an

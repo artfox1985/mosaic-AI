@@ -202,3 +202,5 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-09-20T17:03:59,paired_gating,v31-b01,v30-b02,400,400,0.56,59.035,57.57,7.36,7.01,0.0
 2026-09-23T11:01:07,paired_gating,v32-b01,v31-b01,400,400,0.5025,58.178,58.047,6.99,7.348,0.0
 2026-09-23T13:02:00,paired_gating,v32-b01,v31-b01,400,400,0.5825,59.453,56.79,7.05,7.527,0.0
+2026-09-23T15:15:29,paired_gating,hull_on,hull_off,400,400,0.5725,60.06,56.263,8.123,6.513,0.0
+2026-09-23T17:09:21,paired_gating,hull_on,hull_off,400,400,0.5825,58.88,54.835,8.21,6.143,0.0

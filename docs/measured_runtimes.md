@@ -449,3 +449,22 @@ Maschine: dieselbe wie v31 (10 Threads in den Arenen, 6 Worker im Cache-Bau, CUD
 Cache-Waechter mitlaufen, faellt der Blockbau von 11 min auf Sekunden (v31-Beleg, Z.345).
 Der Waechter kostet dafuer waehrend der Erzeugung Kerne -- bei v32 lief keiner, und die
 Erzeugung war ohnehin durch Nebenlast verunreinigt.
+
+## Huellen-Sonde (`PREREG_geometric_envelope.md` par.14), gemessen am 2026-09-23, exklusiv
+
+`tools/hull_probe_par14.sh`: dasselbe Netz beidseits, nur die Spec getauscht
+(`envelope_search_c` 1,0 gegen 0,0), 400 Sims, 10 Threads, zwei Seeds a 200 Paaren,
+`--log-games`. **13:15:57 bis 17:09:22 = 3 h 53 min**, Exit 0.
+
+| Abschnitt | Dauer | je Block (5 Paare) |
+| --- | --- | --- |
+| Seed 20261280 | 7.172 s = 1 h 59,5 | rund 179 s |
+| Seed 20261281 | 6.830 s = 1 h 53,8 | rund 171 s |
+
+**Die Vorab-Schaetzung war gut:** par.14 rechnete mit rund 3,5 h aus dem Praezedenzlauf
+`tiebreak_on_vs_off` (15,46 s je Partie), gemessen wurden 3 h 53 = **17,5 s je Partie**, also
+13 Prozent teurer. Beide Arme laufen mit Netzsuche; der huellenfreie Arm ist nicht billiger,
+der Term kostet praktisch nichts (er ist ein `tanh` auf dem fertigen Blattwert).
+
+**Planungsgroesse fuer eine Spec-A/B-Sonde am Champion** (dasselbe Netz, ein Feld Unterschied,
+zwei Seeds a 200 Paaren @400, 10 Threads): **rund 4 h**. Ein Seed allein: 2 h.

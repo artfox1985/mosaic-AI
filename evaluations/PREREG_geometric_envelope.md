@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13). Huellenform 2 gepoolt 391:329, p 0,023, Rezeptbestandteil seit v24-b07; vier Champions in Folge bestehen Tor 1 und 2b. `envelope_tiling_value_w` traegt NICHT (par.8.6, 80:80 und 81:79). NACHGELAGERT und noch NICHT gefahren: par.14/14a, vorregistriert 2026-09-22 -- wie viel vom Dreieck ist heute der Knopf, wie viel der eingelernte Prior (Nutzer: die Huelle war "nur ein proxy"). Der Knopf selbst bleibt entschieden; offen ist, ob das Geruest weg kann. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13), Rezeptbestandteil seit v24-b07. **par.14 GEFAHREN 2026-09-23**, dasselbe Netz beidseits, nur die Spec getauscht: mit Knopf **462:338 = 57,75 Prozent, Block-z +3,94**, beide Seeds einzeln signifikant. Die Form haelt ohne Knopf weitgehend (0,79 -> 0,72), der Knopf ist aber **0,4 volle Spalten und 4 Punkte** je Partie wert. **Nutzer-Entscheid: der Knopf bleibt an** (par.14c). Offen: der geteilte Sockel (par.14b). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2786,6 +2786,15 @@ Gating-JSON).
   braeuchte es `.pkl`-Korpora, also eigene `self_play`-Laeufe je Spec, eine andere Bauform mit
   eigener Laufzeit.
 
+**NACHTRAG 2026-09-23, nach par.14c: der Preis des Zuschnitts ist jetzt gemessen.** Die
+huellenfreie Haelfte kaeme von einem Spieler, der gegen sich selbst mit Knopf 338:462 verliert
+(Block-z +3,94 fuer den Knopf) und **0,4 volle Spalten je Partie weniger** baut. Das widerlegt
+den Zuschnitt NICHT -- sein Ziel ist diverses Material, nicht besseres --, aber es benennt, was
+er kostet: 2.650 der 4.000 Sockel-Partien kaemen aus schwaecherem Spiel, und zwar schwaecher in
+genau der Groesse, auf die die Kampagne zielt. **Der Nutzer-Entscheid "der Knopf bleibt an"
+(par.14c) betrifft das REZEPT und schliesst diesen Zuschnitt nicht automatisch mit; ob er
+kommt, ist offen.**
+
 **Einschaetzung (als solche markiert, kein Befund):** fuer die Torfrage aus par.14b reicht das
 Endbrett. Ob die Huelle frueh oder spaet gefuellt wird, ist eine Verfeinerung, die den Entscheid
 "teilen oder nicht" nicht traegt.
@@ -2944,3 +2953,71 @@ hinzuschreiben.
 * Die Vielfalts-Messung selbst: `tools/probes/corpus_state_diversity_probe.py` auf beiden
   Haelften, gleiche Zaehlweise, gleicher n. Erst dann ist "diverses Material" eine Zahl und
   nicht eine Absicht.
+
+### par.14c ERGEBNIS: der Knopf bleibt (gefahren 2026-09-23, 13:15:57 bis 17:09:22 = 3 h 53 min)
+
+`tools/hull_probe_par14.sh`, exklusiv, Exit 0. **Dasselbe Netz** `alphazero_v31-b01_brierbest.onnx`
+auf beiden Seiten, 400 Sims, c_puct 1,5, Blockgroesse 5, Deckel 200 Paare, `--log-games`, zwei
+Seeds. **Einfaktorialitaet vom Skript selbst geprueft und protokolliert**: `envelope_search_c`
+an 1,0 gegen aus 0,0, **abweichende Felder: 1**. Beide Seeds liefen in den Deckel, kein
+SPRT-Entscheid (LLR +3,553 und +4,791).
+
+#### Ablesung 2 -- STAERKE: sie faellt ohne Knopf, auf beiden Seeds
+
+| Seed | Stand (hull_on : hull_off) | Anteil | Mittel | sd | **Block-z** | McNemar |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261280 | 229:171 | 57,25 % | 0,5725 | 0,1768 | **+2,59** | p = 0,0087 |
+| 20261281 | 233:167 | 58,25 % | 0,5825 | 0,1767 | **+2,95** | p = 0,0027 |
+| **gepoolt** | **462:338** aus 800 | **57,75 %** | 0,5775 | 0,1757 | **+3,94** | |
+
+Block-z auf DIFFERENZIERTEN Blockwerten mit Summenprobe, dieselbe an v31 geeichte Rechnung wie
+in `PREREG_v32_window.md` par.10. **Beide Seeds liegen EINZELN ueber 1,96** -- ein festerer
+Befund als Tor 1 desselben Tages, der auf einem Seed ruhte.
+
+#### Ablesung 1 -- FORM: sie wird duenner, sie bricht nicht weg
+
+| | hull_on (1280 / 1281) | hull_off (1280 / 1281) | Differenz |
+| --- | --- | --- | --- |
+| Fuellstand Huelle, kosten-gewichtet | 0,7933 / 0,7919 | 0,7216 / 0,7189 | **-0,072 / -0,073** |
+| Steine ausserhalb | 0,1787 / 0,1781 | 0,1815 / 0,1857 | +0,003 / +0,008 |
+| `huelle_H` (innen minus aussen) | 0,6147 / 0,6138 | 0,5401 / 0,5332 | -0,075 / -0,081 |
+
+**Ohne Knopf spielt das Netz weiterhin in der Huelle** -- 0,72 statt 0,79 bei praktisch
+unveraendertem Aussenanteil. Es faellt nicht in formloses Spiel zurueck. Der eingelernte Prior
+traegt also den groesseren Teil der Form; der Knopf legt rund 7 Punkte Fuellung drauf.
+
+**Vorbehalt, vorher angemeldet und hier wiederholt:** die Formzahlen sind gegen das DREIECK
+(Gesamtkosten 56) normiert (`arena_column_probe.py:150`), waehrend die Spec
+`envelope_hull_form 2` faehrt (22 Zellen, Gesamtkosten 62). Beide Arme sind identisch gemessen,
+der VERGLEICH ist also sauber; das absolute Niveau bezieht sich aufs Dreieck.
+
+#### Was der Knopf statt der Form tut: er baut SPALTEN
+
+| Kennzahl je Seite | hull_on (1280 / 1281) | hull_off (1280 / 1281) | Differenz |
+| --- | --- | --- | --- |
+| **volle Spalten** | **1,1425 / 1,1450** | **0,7650 / 0,7250** | **-0,378 / -0,420** |
+| Spalten >= 4 | 2,4225 / 2,4100 | 2,2200 / 2,2500 | -0,203 / -0,160 |
+| lange Reihen vollendet | 3,1600 / 3,1375 | 2,9525 / 2,9800 | -0,208 / -0,158 |
+| eigene Punkte | 60,06 / 58,88 | 56,26 / 54,84 | **-3,80 / -4,05** |
+| **Strafleiste** | 8,1225 / 8,2100 | 6,5125 / 6,1425 | **-1,61 / -2,07** |
+| Margin | +3,80 / +4,05 | -3,80 / -4,05 | |
+
+**Der Knopf ist rund 0,4 volle Spalten je Partie wert** -- die Zielgroesse der ganzen Kampagne.
+Und er kauft sie sichtbar: ohne ihn ist die STRAFLEISTE niedriger (6,5 statt 8,1). Der Arm mit
+Knopf nimmt also mehr Strafpunkte in Kauf, um Spalten zu schliessen, und zahlt unterm Strich
+trotzdem 4 Punkte mehr. Das ist derselbe Tausch, den
+`project_search_depth_column_tradeoff` an der Suchtiefe beschreibt, hier am Huellen-Term.
+
+#### Verdikt nach der VORAB festgelegten Tabelle (par.14)
+
+Form haelt (weitgehend), Staerke faellt -- das ist die Zeile **"Der Knopf tut etwas anderes als
+die FORM: er bleibt, und was er tut, ist offen."** Dieser Lauf beantwortet das Offene gleich
+mit: **er baut Spalten.**
+
+**NUTZER-ENTSCHEID 2026-09-23: *"dann bleibt der knopf an."*** Damit ist die Frage aus par.14
+geschlossen: das Geruest kann NICHT weg. `envelope_search_c 1,0` bleibt Rezeptbestandteil in
+Champion-Spec und Erzeugungs-Spec.
+
+**Was damit NICHT entschieden ist:** der geteilte Sockel aus par.14b. Er war als
+Vielfalts-Massnahme gedacht, nicht als Abschaffung des Knopfs, und sein Preis ist jetzt
+beziffert statt vermutet -- siehe dort.
