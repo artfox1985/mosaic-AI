@@ -2713,6 +2713,99 @@ Netz liegt nicht mehr im Baum -- dieselbe Klasse toter Default wie in par.8h Fun
 Aufraeum-Prereg. Fuer diesen Lauf wird es nicht gebraucht (`paired_gating` bekommt die Specs
 direkt), aber das Skript ist in seinem jetzigen Zustand nicht lauffaehig.
 
+#### Zweiter Nebenbefund (2026-09-23, beim Startklarmachen): ABLESUNG 3 hat kein Instrument
+
+par.14a sagt zur Gegner-Reaktion "Instrument steht ebenfalls schon:
+`tools/probes/opponent_disruption_analysis.py`". **Das ist am 2026-09-23 geprueft und trifft
+nicht zu.** Vier Befunde, jeder einzeln nachgestellt:
+
+1. **Das Skript lief ueberhaupt nicht.** `BASIS` war `parent.parent`, zeigt seit dem Umzug der
+   Datei von `tools/` nach `tools/probes/` aber auf `tools/`. Der Importpfad wurde damit
+   `tools/tools` (ModuleNotFoundError beim ersten Aufruf), die Artefaktsuche haette danach in
+   `tools/evaluations` gegriffen: EIN fehlendes `.parent`, zwei Defekte. **Berichtigt** am
+   2026-09-23 auf `parent.parent.parent`, beide Verwendungen stimmen wieder.
+2. **Es hat keine Kommandozeile.** `main()` ist auf die zwei Artefakte
+   `paired_arena_env_opp_disruption_run1/run2` genagelt; auf die Artefakte dieses Laufs kann
+   man es nicht zeigen lassen.
+3. **Es liest ein anderes Artefaktformat.** `load()` erwartet `d["games"]` als Dict mit den
+   Armen `"0"` und `"1"` (Bauform `paired_arena_env_ab`). `paired_gating` schreibt `games` als
+   FLACHE Liste von 400 Partien -- am Artefakt `gating_v31-b01_vs_v30-b02_s20261400.json`
+   nachgesehen.
+4. **Die Seitenerkennung bricht, wenn beide Seiten Netze sind.**
+   `ni = next((i for i, n in enumerate(namen) if "euristik" not in n), 0)` sucht die Seite, die
+   NICHT "Heuristik" heisst. Das Feld `names` traegt in einem `paired_gating`-Artefakt aber
+   `["NetzA", "NetzB"]` (400 von 400 Partien im genannten Artefakt), also greift der Default und
+   Seite B wird still zur "Gegner"-Seite erklaert. Das ist die bekannte Falle
+   `project_selfplay_log_parsing_traps` ("beide Seiten heissen Netz").
+   **Reparierbar ist es:** dasselbe Artefakt traegt je Partie `side_names`
+   (z.B. `["v31-b01", "v30-b02"]`) und `board0_name`. Die Seite ist also ablesbar, nur nicht an
+   dem Feld, in das dieses Skript schaut.
+
+**Der tragende Punkt ist aber kein Werkzeugfehler, sondern ein Bauform-Unterschied.** Die
+Ursprungsmessung (`PREREG_opponent_disruption.md`) fuhr ZWEI Arme gegen DENSELBEN, festen
+Gegner (eine Heuristik, die den Knopf strukturell nicht liest). "Gegner-Plattenpunkte" war dort
+ein fester Bezugspunkt, ueber die Arme hinweg vergleichbar. **par.14 faehrt dagegen Kopf an
+Kopf**: dasselbe Netz, Spec A huellen-an gegen Spec B huellen-aus. Einen dritten, festen Gegner
+gibt es nicht -- der "Gegner" des huellen-an-Arms IST der huellen-aus-Arm. Damit faellt
+Ablesung 3 in ihrer registrierten Lesart mit den sechs Standard-Kennzahlen je Seite zusammen,
+die ohnehin Pflicht sind (CLAUDE.md).
+
+#### Dritter Nebenbefund: auch ABLESUNG 1 passt nicht auf die Eingabe, die dieser Lauf erzeugt
+
+`tools/probes/triangle_hull_coverage_probe.py` liest **Korpus-Dateien** (`--pattern` als Glob
+ueber `data/*.pkl`, Records via `corpus_io.load_records`), nicht Arena-Artefakte. Es braucht die
+Brettzustaende JE RUNDE ("Brett nach dem Runden-Tiling = erster Record der Folgerunde"), um sein
+Runden-Profil zu bilden.
+
+**Was das Gating-Artefakt traegt, am Bestandsartefakt nachgesehen:** `dome_grid` (das
+ENDBRETT je Seite, Zelle fuer Zelle mit `filled`), `score_geo` mit `col_fill`/`row_fill`,
+`floor_per_round`, `long_rows_*`, und `log` als Textzeilen. **Per-Runden-BRETTER sind NICHT
+darin** -- rundenweise liegt nur die Strafleiste vor.
+
+**ZURUECKGENOMMEN AM SELBEN TAG, eine Stunde spaeter.** Ich hatte hier geschrieben, Ablesung 1
+brauche einen neu zu bauenden Endbrett-Auswerter. **Das ist falsch, und ein einziger weiterer
+Grep hat es widerlegt** -- dieselbe Lehre wie `feedback_check_existing_tools_first`
+(arena.py-Praezedenz), diesmal innerhalb einer Stunde zweimal am selben Absatz.
+
+**Der Endbrett-Weg ist laengst gebaut und laeuft in dieser Kette bereits mit.**
+`tools/probes/arena_column_probe.py:142` importiert `triangle_hull_coverage_probe` **als
+Bibliothek** und rechnet in `:147-164` aus `dome_grid` des Arena-Artefakts:
+`huelle_innen` (kosten-gewichteter Fuellanteil der bestpassenden Huelle), `huelle_aussen`
+(Steine ausserhalb, normiert auf 56), `huelle_H` (= innen minus aussen) und
+`huelle_orientierung`. Die Sonde hat also zwei Einstiege: den Korpus-Weg ueber `--pattern`
+(Runden-Profil, braucht `.pkl`) und den Artefakt-Weg als Bibliothek (Endbrett, braucht nur das
+Gating-JSON).
+
+**Was davon stehen bleibt und was nicht:**
+
+* **Faellt:** "Ablesung 1 hat kein Instrument". Sie hat eines, und `arena_column_probe.py` wird
+  in der Sonden-Kette ohnehin je Seed aufgerufen (dort als Tor 2b). Die Formzahlen fallen ohne
+  jede Zusatzarbeit an.
+* **Bleibt:** das RUNDEN-Profil (Anteil der je Runde NEU belegten Huellenzellen) ist aus einem
+  Arena-Artefakt nicht zu gewinnen -- rundenweise liegt dort nur `floor_per_round`. Dafuer
+  braeuchte es `.pkl`-Korpora, also eigene `self_play`-Laeufe je Spec, eine andere Bauform mit
+  eigener Laufzeit.
+
+**Einschaetzung (als solche markiert, kein Befund):** fuer die Torfrage aus par.14b reicht das
+Endbrett. Ob die Huelle frueh oder spaet gefuellt wird, ist eine Verfeinerung, die den Entscheid
+"teilen oder nicht" nicht traegt.
+
+**Eine echte Unstimmigkeit bleibt und ist NICHT geprueft:** der Endbrett-Weg normiert auf
+**56**, die Gesamtkosten des DREIECKS (`arena_column_probe.py:150`), und `best_hull` waehlt
+zwischen `HULL_LEFT` und `HULL_RIGHT` des Dreiecks. Die Spec der Erzeugung faehrt aber
+`envelope_hull_form 2`, also 22 Zellen mit Gesamtkosten **62** (`knob_registry.rs:107`;
+Gegenrechnung Summe (r+1): 6+10+12+12+10+6 = 56 fuers Dreieck, plus 6 fuer die Zusatzzelle
+(5,1) bzw. (5,4) = 62). **Gemessen wird die Form also gegen das Dreieck, geformt hat der Knopf
+gegen Form 2.** Der Unterschied ist EINE Zelle von 22; ob er die Ablesung traegt oder nicht,
+ist hier ausdruecklich offen und sollte beim Auswerten benannt werden, statt still
+durchzulaufen.
+
+**Offen, Nutzer-Entscheid:** Ablesung 3 auf "Plattenpunkte je Seite aus denselben Logs"
+zurueckstufen und ausdruecklich vermerken, dass "Gegner" hier der andere Arm ist -- ODER eine
+zweite Messung mit festem Drittgegner registrieren (eigene Bauform, eigene Kosten). **Die
+Ablesungen 1 (Form) und 2 (Staerke) sind davon nicht beruehrt**; sie sind es, die den Zuschnitt
+aus par.14b gaten.
+
 ### par.14a ZWEI BENANNTE NUTZNIESSER (Nutzer 2026-09-22, nach dem Vorregistrieren)
 
 Der Nutzer hat zwei Folgen genannt, falls die Form ohne Knopf haelt. Beide sind HYPOTHESEN mit
@@ -2760,3 +2853,94 @@ der Marge (sechs Standard-Kennzahlen, CLAUDE.md).
 kein Selbstzweck. `project_search_depth_column_tradeoff` haelt fest, dass genau hier ein TAUSCH
 sitzt -- 25 bis 100 Sims bauen rund 0,6 Spalten gegen 0,34 ab 250, aber @25 verliert 11:29. Eine
 Vielfalts-Verbesserung, die Staerke kostet, ist in dieser Kampagne schon einmal gemessen worden.
+
+### par.14b DER BENANNTE ABNEHMER VON (a): ein GETEILTER Sockel in v33 (Nutzer 2026-09-23)
+
+par.14a(a) hielt die Vielfalts-Hypothese fest und schob sie als v33-Frage weiter. Der Nutzer hat
+sie am 2026-09-23 in einen konkreten Zuschnitt gegossen, waehrend der v32-Fensterbau lief:
+
+> *"je nachdem wie unser verglich ausgeht denke ich an 1350 von den 4000 spielen im sockel mit
+> huellenknopf zu machen und 2650 ohne knopf. dann kann g-1 sowie g-2 ebenfalls immer mit huelle
+> spielen"* -- zur Absicht: *"ich will dem netz damit bewusst diverses material zeigen"* -- und
+> zum Traegerkanal: *"und wir haben policy und value partien. value traegt nicht die form."*
+
+**Das Ziel ist ausdruecklich NICHT die Abschaffung des Knopfs**, sondern Material mit zwei
+Spielweisen darin. Damit ist der Abnehmer der Sonde benannt, BEVOR ihr Ergebnis vorliegt
+(CLAUDE.md, Rueckwaerts-Pruefung, hier in die Gegenrichtung angewandt).
+
+#### Zwei Bestandspruefungen, am 2026-09-23 gemacht
+
+1. **Alle Erzeugungen der Rotation liefen huellen-an.** `models/v31_generation.spec.json` traegt
+   `envelope_search_c: 1.0`. G-1 und G-2 eines v33-Fensters sind also ohne jedes Zutun
+   huellen-an; der Satz "dann kann g-1 sowie g-2 ebenfalls immer mit huelle spielen" beschreibt
+   den Ist-Zustand und verlangt nichts.
+   **Berichtigung im selben Zug:** `PREREG_v32_window.md` par.6 zaehlt den Spec-Inhalt auf und
+   schliesst mit "alles uebrige 0", ohne `envelope_search_c` zu nennen; die Datei traegt dort
+   1,0. Die Aufzaehlung sagt an dieser Stelle das Gegenteil der Datei und ist nachgezogen.
+2. **Der Nutzer-Satz "value traegt nicht die form" ist am Code bestaetigt.**
+   `engine/py/corpus_dataset.py:1618`: `if not file_policy_carrier: pol_w = 0.0` -- maskiert wird
+   AUSSCHLIESSLICH das Policy-Gewicht, Value, Punkte und `root_q` bleiben in jedem Record.
+   Die Form als nachgeahmte Spielweise laeuft damit ueber den Policy-Kanal.
+   **Die Kehrseite gehoert daneben:** der Value-Kopf trainiert weiter auf ZUSTAENDEN aus
+   huellengeformtem Spiel, auch aus den Value-Klassen. Er wird von einem Sockel-Schnitt nur
+   insoweit erreicht, wie der Sockel selbst Zustaende beisteuert.
+
+#### Drei Festlegungen, die VOR die Erzeugung gehoeren
+
+1. **Trennbarkeit (Nutzer 2026-09-23: *"trennbarkeit macht sinn"*).** Die beiden Haelften
+   muessen am DATEINAMEN unterscheidbar sein, also zwei Laeufe mit eigener Klassen-Endung und
+   eigener Spec-Datei, nicht ein Lauf, der mittendrin umschaltet. Bei `--per-file 10` sind das
+   **135 Dateien** (huellen-an) und **265 Dateien** (huellen-aus). Ein Lauf mit Umschaltung
+   traegt das Merkmal in KEINEM Record; das ist
+   `feedback_record_field_must_precede_generation`, und die Unterscheidung waere hinterher nicht
+   mehr herstellbar.
+2. **Tor 2a wechselt die Grundmenge.** Tor 2a haelt `sp_voll` der neuen Policy-Klasse gegen die
+   des Vorgaengers. Ist die neue Klasse eine Mischung und die des Vorgaengers zu 100 Prozent
+   huellen-an, zaehlen die beiden Seiten Verschiedenes. Entweder Tor 2a auf dem
+   huellen-an-Teil messen (vergleichbar, dann n = 1.350 Partien statt 4.000), oder auf der
+   Mischung und den Wechsel der Grundmenge ausdruecklich in den Bericht schreiben. Stilles
+   Weglassen waere ein Regelbruch (CLAUDE.md, Zusatz 2 zu REGEL 0).
+3. **Was die Sonde freigeben kann, und was nicht.** par.14 misst DASSELBE Netz mit Knopf gegen
+   ohne Knopf zur SPIELZEIT. Sie beantwortet, ob die Form haelt, wenn man einem auf
+   huellengeformtem Material trainierten Netz den Knopf wegnimmt. Die hier registrierte Frage
+   geht einen Schritt weiter: was passiert, wenn das MATERIAL aufhoert, durchgaengig
+   huellengeformt zu sein. Die Sonde ist damit ein TOR vor diesem Zuschnitt (faellt die Form
+   samt Staerke, wird nicht geteilt), kein Beleg fuer ihn.
+
+#### Die Dosis, je Kanal getrennt -- und eine Berichtigung
+
+Die Intervention ist die huellenfreie Haelfte: **2.650 Partien = 265 Dateien**. Sie faellt fuer
+die beiden Koepfe sehr verschieden aus, und zwar GENAU WEGEN des Nutzer-Befunds oben:
+
+| Kanal | Grundmenge | huellenfreier Anteil |
+| --- | --- | --- |
+| Policy-Kopf (traegt die Form) | 580 Traegerdateien | **265 / 580 = 45,7 %** |
+| Value-Kopf (lernt Zustaende) | 2.947 Fensterdateien | **265 / 2.947 = 9,0 %** |
+
+Die 580 sind in v32 gezaehlt (Kettenausgabe 2026-09-23: 400 neu + 135 G-1 + 45 G-2). **Dass v33
+denselben Traegerzuschnitt behaelt, ist eine ANNAHME**, kein gemessener Wert; aendert er sich,
+aendert sich die erste Zeile.
+
+**Berichtigung meiner eigenen ersten Einordnung im Chat:** ich hatte 1.350 als Dosis gerechnet
+(das ist die Haelfte MIT Knopf) und gegen das ganze Fenster gehalten, und daraus "eine sehr
+kleine erste Dosis" geschlossen. Beides falsch: die Dosis ist 2.650, und die Grundmenge des
+Kanals, um den es geht, sind die Policy-Traeger. Auf diesem Kanal ist der Schnitt **fast
+haelftig**, nicht klein. Derselbe Fehlertyp wie die beiden Faelle in der Uebergabe vom
+2026-09-23: eine Zahl gegen eine andere gehalten, ohne die Grundmengen beider Seiten
+hinzuschreiben.
+
+#### Offen, beim Anlegen der v33-Fenster-Prereg zu entscheiden
+
+* **Fuer welchen Kopf die Vielfalt gedacht ist.** Der Sockel-Schnitt liefert dem Policy-Kopf
+  45,7 Prozent huellenfreies Material, dem Value-Kopf 9,0 Prozent. par.14a(a) hatte die
+  Hypothese ueber die ZUSTANDS-Abdeckung begruendet ("der Value-Kopf lernt aus Zustaenden, also
+  ist Abdeckung sein Rohstoff") -- das ist der Kanal, der beim Sockel-Schnitt am wenigsten
+  abbekommt. Wer auch dort Vielfalt will, muss die Schwarm-Klassen mitteilen; der Nutzer hat
+  bisher nur den Sockel genannt.
+* Der Klassenname der huellen-aus-Haelfte (die Endung wandert in Fensterlisten,
+  `MOSAIC_DATA_EXCLUDE` und Traegermanifest).
+* Ob die huellen-aus-Haelfte Policy-Traeger wird. Der Traegerstatus ist eine eigene Achse
+  (`corpus_dataset.py`); faellt die Antwort anders aus, faellt die 45,7 mit ihr.
+* Die Vielfalts-Messung selbst: `tools/probes/corpus_state_diversity_probe.py` auf beiden
+  Haelften, gleiche Zaehlweise, gleicher n. Erst dann ist "diverses Material" eine Zahl und
+  nicht eine Absicht.

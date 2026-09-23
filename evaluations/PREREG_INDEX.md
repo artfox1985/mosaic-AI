@@ -77,19 +77,18 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 123 Dateien = 2 OFFEN + 109 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 123 Dateien = 1 OFFEN + 110 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (2)
+## OFFEN (1)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
-| `PREREG_v32_window.md` | Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | par.1 Zuschnitt steht, par.6 Rezept entschieden (Nutzer "Einstellungen wie v31"). par.9 ERZEUGUNG GEFAHREN 2026-09-22/23: 13 h 57 min, 1.201 Dateien, alle Klassen Exit 0. Manifest-Diff genau 4 Abweichungen (Modell, Seed, Spec, Version), Wiedervorlage am ersten Record gruen (Knoten mit Lernziel), Streurate 14,0 Prozent gegen Ziel 15, TOR 2a HAELT (sp_voll 0,977 gegen 0,955). Profil stabil. Offen: Fensterbau, Monolith, Training v32-b01, Tore 1 und 2b. |
 
-## ENTSCHIEDEN (109)
+## ENTSCHIEDEN (110)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -200,6 +199,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_v29_window.md` | Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | par.9 komplett: Erzeugung, b01-b09, Tore; v29-b03 schlug den Champion (275:215), promoviert wurde am 2026-09-18 v29-b09 (Gating 423:377, Anker 128:22, Champion-2 90:60; PREREG_minimal_strength_core.md 10.13/10.18). Generator der v30-Erzeugung v29-b11. Generationsbericht in archive/history.md. |
 | `PREREG_v30_window.md` | Traegt das v30-Fenster (Generator `v29-b11`, 888/414) einen KALT gestarteten Arm mindestens auf Champion-Niveau `v29-b09`? | NEIN. par.9: `v30-b01` kalt 404:396 = 50,50 %, Block-z +0,278, H0; der einfaktorielle Warmstart-Arm `v30-b02` 443:297 = 59,86 %, Block-z +5,360, TRAEGT (9,36 Punkte Unterschied bei gleichem Fenster, Monolith, Seed und Rezept). Tor 0 und Tor 2a gruen (sp_voll 0,90087 gegen 0,84275), Tor 2b blind (par.9). Generator fuer v31 ist `v30-b02` auf Stufe 1, seit 2026-09-19 auch Champion. |
 | `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten, und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.6 -- Erzeugung 14,66 h, Tor 2a HAELT (sp_voll 0,955 gegen 0,901), Fenster 2.947 Dateien, Training `v31-b01` warm in 58 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT: 461:339 aus 800 = 57,62 %, Block-z +4,24 auf differenzierten Werten, beide Seeds einzeln signifikant.** Tor 2b erstmals wieder verwendbar, 800/800 ohne Replay. Promotion am 2026-09-20 VOLLZOGEN: `v31-b01` ist Champion (Elo 1458 [1414; 1510], vier Kanten, keine frueh gestoppt). Generator der v32-Erzeugung. |
+| `PREREG_v32_window.md` | Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | par.10 -- Fenster 2.947 Dateien, Monolith 1,42 GB, Training `v32-b01` warm in 63 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT** nach dem vorregistrierten Kriterium (z >= +1,96 ODER gepoolt >= 52,5 Prozent): 434:366 aus 800 = 54,25 Prozent, Block-z **+2,37** auf differenzierten Blockwerten -- aber nur EIN Seed traegt einzeln (+3,26 gegen +0,10), schwaecher als v31 (+4,24, beide Seeds). Tor 2b HAELT (volle Spalten +0,005 / +0,133). Tor 2a in par.9. Offen: Promotion, Nutzer-Entscheid. |
 | `PREREG_value_rank_metric.md` | Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 |
 | `PREREG_value_scale_correction.md` | Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 |
 

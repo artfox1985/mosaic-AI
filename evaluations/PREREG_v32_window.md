@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: par.1 Zuschnitt steht, par.6 Rezept entschieden (Nutzer "Einstellungen wie v31"). par.9 ERZEUGUNG GEFAHREN 2026-09-22/23: 13 h 57 min, 1.201 Dateien, alle Klassen Exit 0. Manifest-Diff genau 4 Abweichungen (Modell, Seed, Spec, Version), Wiedervorlage am ersten Record gruen (Knoten mit Lernziel), Streurate 14,0 Prozent gegen Ziel 15, TOR 2a HAELT (sp_voll 0,977 gegen 0,955). Profil stabil. Offen: Fensterbau, Monolith, Training v32-b01, Tore 1 und 2b. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: par.10 -- Fenster 2.947 Dateien, Monolith 1,42 GB, Training `v32-b01` warm in 63 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT** nach dem vorregistrierten Kriterium (z >= +1,96 ODER gepoolt >= 52,5 Prozent): 434:366 aus 800 = 54,25 Prozent, Block-z **+2,37** auf differenzierten Blockwerten -- aber nur EIN Seed traegt einzeln (+3,26 gegen +0,10), schwaecher als v31 (+4,24, beide Seeds). Tor 2b HAELT (volle Spalten +0,005 / +0,133). Tor 2a in par.9. Offen: Promotion, Nutzer-Entscheid. -->
 
 # Vorregistrierung: das v32-Fenster
 
@@ -85,7 +85,20 @@ Die Spec ist **byte-identisch** (sha256 `4a3f9db3...`), nur nach dem GENERATOR b
 Lauf-Manifest selbsterklaerend ist. Inhalt unveraendert: `envelope_hull_form 2`,
 `envelope_projection_mode 1`, `envelope_profile [1,0; 0,92; 0,67; 0,33; 0,0]`,
 `score_utility_b 20`, `special_row6_w 1`, `start_by_search 1`, `return_order_mode 1`,
-`heuristik_variante hv1`, alles uebrige 0.
+`envelope_search_c 1,0`, `heuristik_variante hv1`, alles uebrige 0.
+
+**Berichtigt 2026-09-23:** `envelope_search_c` fehlte in dieser Aufzaehlung, die mit "alles
+uebrige 0" schliesst -- die Datei `models/v31_generation.spec.json` traegt dort aber **1,0**.
+Die Aufzaehlung sagte an dieser Stelle das Gegenteil der Datei. Der Huellenknopf war und ist in
+allen drei Klassen der Erzeugung aktiv; das ist der Bestand, auf dem
+`PREREG_geometric_envelope.md` par.14b aufsetzt.
+
+**Naheliegende Ursache, NICHT nachgewiesen:** STATUS.md Abschnitt 6 Punkt 7 haelt fest, dass
+`engine_config` im Lauf-Manifest fuer genau dieses Feld (neben `envelope_projection_mode`,
+`envelope_hull_form`, `special_row6_w`, `return_order_mode`) den Env-Default statt des
+wirksamen Spec-Werts meldet. Wer die Aufzaehlung aus dem Manifest statt aus der Spec-Datei
+zieht, liest dort 0. Die Lehre ist die alte: **fuer Spec-Inhalte die Spec-Datei lesen**, nicht
+das Manifest.
 
 Alles andere steht wie in v31: 3 x 4.000 Partien, 100 Sims, 11 Threads, `--chunk 10`,
 `--per-file 10`, `--start-slot-random-p 0.15`; Sockel `--tau-argmax-from-move 1 --deviate-prob 1.0`,
@@ -233,3 +246,113 @@ Die v31-Erzeugung lief **14,66 h** ueber alle drei Klassen. Das Training des ers
 warm in **58 min**. Der Fensterbau und der Monolith kommen dazu; der Monolith des v31-Fensters
 liegt bei 1,48 GB und wird fuer v32 neu gebaut (die beiden v31-Monolithen sind darum erst NACH
 dem Fensterbau Loeschkandidaten, `PREREG_code_cleanup_closeout.md` ist dafuer nicht zustaendig).
+
+## par.10 ERGEBNISSE DER KETTE (2026-09-23, `tools/night_v32_chain.sh`)
+
+Kette 07:27:56 bis 13:02:02 = **5 h 34 min**, exklusiv, Exit 0.
+
+### Fenster und Monolith
+
+| | v32 | v31 |
+| --- | --- | --- |
+| Fensterdateien | **2.947** | 2.947 |
+| Train / Val | 2.800 / 147 | 2.800 / 147 |
+| Policy-Traeger (Manifest) | **580** = 400 neu + 135 G-1 + 45 G-2 | 580 = 400 + 135 + 45 |
+| davon im Trainingsanteil | 529 (51 fielen in den Val-Pool) | -- |
+| Fenster-Schluessel | `1587a92e5739` | `ec851c536ffd` |
+| Monolith | **1.520.948.006 B = 1,42 GB**, Stempel geprueft | 1,48 GB |
+| Zustaende | **5.330.401** | 5.211.996 |
+| Blockbau | 1.201 neu, **662,6 s** | 4 s (Waechter hatte vorgebaut) |
+| Monolith-Merge | **611 s** | 611 s |
+
+Die Dateizahl trifft par.1 exakt. `MOSAIC_DATA_EXCLUDE` war gesetzt und meldete "0 von 2800
+ausgeschlossen" -- richtig, weil die Kette durchgehend mit expliziten Dateilisten arbeitet und
+die beiden Streudateien `selfplay_v29-b11-probe_*` gar nicht erst in der Liste stehen.
+
+### Training `v32-b01`
+
+**63 min** (07:58:16 bis 09:01:20, gegen v31 warm 58 min; KEIN sauberer Vergleich, andere
+Nebenlastlage), Exit 0. **Manifest-Diff gegen `manifest_train_v31-b01_20260920_124555.json`:
+0 unerwartete Abweichungen**, gemeldet genau `cache_file`, `file_list`, `load`, `name`, `seed`,
+`val_pool`. Ein `_brierbest` wurde geschrieben, die beste Epoche war also nicht die letzte
+(bester Value-Brier 0,1835 in Epoche 4, letzte Epoche 0,1840).
+
+**Diese Brier-Zahl ist NICHT generationsuebergreifend lesbar**: sie steht auf dem Val-Anteil des
+v32-Fensters (147 Dateien aus `^selfplay_v31-`), waehrend v31 gegen `^selfplay_v30-` validierte.
+Die vergleichbare Groesse ist der Alt-Set-Brier auf `frozen_v3` (`platt_fit.py`,
+`docs/promotion_checklist.md` Punkt 5) -- das ist die Zahl, an der die gestreifte Brier-Regel
+haengt, und sie faellt erst bei einer Promotion an.
+
+### TOR 1: `v32-b01` gegen den Champion `v31-b01` -- TRAEGT, aber schwaecher als v31
+
+Beide Seiten Champion-Spec (`frozen_champions/v31-b01/spec.json`, `envelope_search_c 1.0`),
+400 Sims, c_puct 1,5, Blockgroesse 5, Deckel 200 Paare, alpha = beta = 0,001, 10 Threads,
+`--log-games`. Beide Seeds liefen in den Deckel, **kein SPRT-Entscheid** -- die vierte
+Nachbar-Generation in Folge (par.6 der v31-Prereg zaehlte drei).
+
+| Seed | Stand | Anteil | Mittel | sd | **Block-z** | McNemar | LLR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261500 | 201:199 | 50,25 % | 0,5025 | 0,1527 | **+0,10** | p = 1,0000 | -3,604 |
+| 20261501 | 233:167 | 58,25 % | 0,5825 | 0,1599 | **+3,26** | p = 0,0012 | +5,546 |
+| **gepoolt** | **434:366** aus 800 | **54,25 %** | 0,5425 | 0,1605 | **+2,37** | | |
+
+**Der Block-z ist auf DIFFERENZIERTEN Blockwerten gerechnet** (die Felder in `blocks[]` sind
+kumulativ, `docs/pitfalls.md`), mit Summenprobe gegen `a_wins_total`/`b_wins_total` je Lauf.
+**Die Methode ist geeicht:** dasselbe Skript reproduziert die registrierten v31-Zahlen exakt
+(+3,54 / +2,42, gepoolt Mittel 0,5763, sd 0,1609, z +4,24).
+
+**Das vorregistrierte Kriterium ist erfuellt.** Wortlaut aus `PREREG_v30_window.md` par.3
+Punkt 5, ueber par.2 der v31- und dieser Prereg geerbt: *"Traegt b01 (z >= +1,96 oder gepoolt
+>= 52,5 Prozent ohne Gegenbefund)"*. Beide Zweige halten: z = +2,37 und 54,25 Prozent.
+
+**Und die Einschraenkung, die dazugehoert:** bei v31 lagen BEIDE Seeds einzeln ueber 1,96
+(+3,54 und +2,42), und das war ausdruecklich Teil des Verdikts. Hier traegt einer (+3,26) und
+der andere ist exakt H0 (+0,10). Ein gepoolter Wert ueber zwei so verschiedene Seeds ist
+schwaecher als derselbe Wert ueber zwei gleichgerichtete. Das Kriterium wird deswegen NICHT
+nachtraeglich verschaerft -- es stand vorher fest --, aber der Befund wird auch nicht staerker
+berichtet, als er ist. Praezedenz fuer die Streuung: 5,75 Prozentpunkte bei n = 400 fuer
+IDENTISCHE Konfiguration.
+
+### TOR 2b (Nicht-Fallen) -- HAELT
+
+| volle Spalten je Seite | `v32-b01` | `v31-b01` | Differenz |
+| --- | --- | --- | --- |
+| Seed 20261500 | **1,030** (+-0,073) | 1,025 (+-0,076) | +0,005 |
+| Seed 20261501 | **1,093** (+-0,075) | 0,960 (+-0,075) | +0,133 |
+
+### Die sechs Standard-Kennzahlen (CLAUDE.md), je Seite und als Differenz
+
+| Kennzahl | Seed 1500: v32 / v31 / Diff | Seed 1501: v32 / v31 / Diff |
+| --- | --- | --- |
+| Reihen (voll) | 0,142 / 0,110 / +0,032 | 0,107 / 0,110 / -0,003 |
+| Reihen (Fuellsumme) | 18,140 / 18,052 / +0,088 | 18,195 / 17,955 / +0,240 |
+| lange Reihen vollendet | 3,125 / 3,085 / +0,040 | 3,090 / 3,040 / +0,050 |
+| Spalten voll | 1,030 / 1,025 / +0,005 | 1,093 / 0,960 / **+0,133** |
+| Spalten >= 4 | 2,308 / 2,360 / -0,052 | 2,350 / 2,295 / +0,055 |
+| Spalten >= 3 | 3,308 / 3,285 / +0,022 | 3,305 / 3,272 / +0,033 |
+| hoechste Spalte | 5,695 / 5,673 / +0,022 | 5,718 / 5,635 / +0,083 |
+| Strafleiste | 6,990 / 7,348 / **-0,357** | 7,050 / 7,527 / **-0,478** |
+| eigene Punkte | 58,178 / 58,047 / +0,130 | 59,453 / 56,790 / **+2,663** |
+| Margin | +0,130 / -0,130 / +0,260 | +2,663 / -2,663 / **+5,325** |
+
+Plattenpunkte je Kriterium (Seed 1501, Mittel ueber Bretter mit aktivem Kriterium): der
+Kandidat gewinnt bei **Vertikale Reihen** (8,20 gegen 7,21), **Eckplatten** (9,30 gegen 8,88)
+und **Spezialfelder** (-9,05 gegen -9,96, also weniger Strafe); er verliert leicht bei
+Diagonale (0,49 gegen 0,56) und Mehrfarbige Felder (4,17 gegen 4,43).
+
+**Die Strafleiste faellt auf beiden Seeds** (-0,36 und -0,48) -- die einzige Kennzahl, die in
+beiden Laeufen dasselbe Vorzeichen traegt und nicht am Seed haengt.
+
+### Nebenbefund: ein stiller Nullwert in der Spaltensonde
+
+`arena_column_probe.py:160` bildet `spezialfelder_belegt` als
+`(geo.get("special_total") or 0) - (geo.get("special_empty") or 0)`. Das `score_geo` eines
+Gating-Artefakts traegt aber **nur** `col_fill` und `row_fill` (am Artefakt geprueft), also
+kommt 0 - 0 = **0** heraus -- in jedem aus einer Arena gespeisten Lauf. Am Korpus sind es
+1,29 gefuellte Spezialfelder je Seite (par.9). **Der Wert ist ein Default, keine Messung.**
+
+Rueckwaerts-Pruefung: ausser `arena_column_probe.py` rechnet nur
+`tools/probes/move_class_differential.py:399` dieselbe Zeile; **keine Prereg und kein Dokument
+stuetzt sich auf die Zahl**, es ist also nichts falsch geworden. Entweder `special_total` und
+`special_empty` wandern additiv ins `score_geo` der Arena, oder das Feld wird dort auf `None`
+gesetzt, damit es nicht als Null gelesen werden kann.

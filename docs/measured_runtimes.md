@@ -424,3 +424,28 @@ Knoten; die steht in den Records und kostet nur eine Sonde, keine Partie.
 
 **Planungsgroesse fuer eine Erzeugung unter 888/414 mit den acht Suchknoten:** rund 14 bis 15 h
 fuer 3 x 4.000 Partien @100 bei threads 11.
+
+## Generation v32, gemessen am 2026-09-23 (Kette nach der Erzeugung)
+
+`tools/night_v32_chain.sh`, exklusiv, Exit 0. Wanduhr **07:27:56 bis 13:02:02 = 5 h 34 min**.
+Maschine: dieselbe wie v31 (10 Threads in den Arenen, 6 Worker im Cache-Bau, CUDA im Training).
+
+| Schritt | Dauer | Anmerkung |
+| --- | --- | --- |
+| Tor 0, zwei Schwarm-Klassen (`corpus_sanity_check`) | 8 min 49 s | 07:28:07 - 07:36:56, je Klasse rund 4,5 min |
+| Traegermanifest, G-2-Auswahl, Fensterliste | < 1 s | 2.947 Dateien, reine Dateiarbeit |
+| **Blockbau 1.201 neue Dateien**, 6 Worker | **662,6 s = 11 min** | 2.947 Dateien abgedeckt, 2.404 lagen schon. Gegen v31 (4 s) NICHT vergleichbar: dort hatte ein Cache-Waechter waehrend der Erzeugung vorgebaut, hier lief keiner |
+| Split + **Monolith-Merge** 2.800 Bloecke | **611 s = 10 min** | 1,42 GB, Schluessel `1587a92e5739`, Stempel geprueft. v31 auf derselben Blockzahl: ebenfalls 611 s |
+| **Training `v32-b01`** warm, 12 Epochen, `--fast-loader`, Monolith per `--cache-file` | **3.784 s = 63 min** | 07:58:16 - 09:01:20, 5.330.401 Zustaende. v31 warm auf 5.211.996 Zustaenden: 58 min. **Kein sauberer Vergleich** -- andere Nebenlastlage, nicht gegeneinander kontrolliert |
+| **Tor 1, Seed 20261500** (200 Paare @400, 10 Threads, `--log-games`) | **7.188 s = 2 h 00** | 09:01:21 - 11:01:09; rund 180 s je Block zu 5 Paaren, 18,0 s je Partie |
+| Tor 2b + Plattenpunkte je Seed | < 30 s | liest den Endzustand aus dem Artefakt, kein Replay |
+| **Tor 1, Seed 20261501** | **rund 2 h 00** | 11:01:09 - 13:02:02 einschliesslich der Sonden |
+
+**Planungsgroesse fuer eine Kette nach der Erzeugung** (Fenster steht nicht vorgebaut,
+2.947 Dateien, ein Arm warm, Tor 1 mit zwei Seeds a 200 Paaren): **rund 5,5 h**. Davon sind
+4 h reines Tor 1 -- wer nur das Fenster und den Arm braucht, ist nach **1,5 h** durch.
+
+**Der Posten, an dem man spart, wenn man will:** laesst man waehrend der Erzeugung einen
+Cache-Waechter mitlaufen, faellt der Blockbau von 11 min auf Sekunden (v31-Beleg, Z.345).
+Der Waechter kostet dafuer waehrend der Erzeugung Kerne -- bei v32 lief keiner, und die
+Erzeugung war ohnehin durch Nebenlast verunreinigt.

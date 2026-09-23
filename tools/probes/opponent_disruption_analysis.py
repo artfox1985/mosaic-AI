@@ -15,7 +15,14 @@ import math
 import sys
 from pathlib import Path
 
-BASIS = Path(__file__).resolve().parent.parent
+# BASIS ist die PROJEKTWURZEL -- sie wird zweimal gebraucht: fuer den Importpfad
+# (`BASIS/tools`) und fuer die Artefakte (`BASIS/evaluations/artifacts`).
+# Bis zum 2026-09-23 stand hier `parent.parent`, was seit dem Umzug der Datei von
+# `tools/` nach `tools/probes/` auf `tools/` zeigt: der Import suchte in
+# `tools/tools` und brach mit ModuleNotFoundError ab, die Artefaktsuche haette
+# danach in `tools/evaluations` gegriffen. EIN fehlendes `.parent`, zwei Defekte.
+# Gefunden beim Vorbereiten der Huellen-Sonde (PREREG_geometric_envelope.md par.14).
+BASIS = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASIS / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402

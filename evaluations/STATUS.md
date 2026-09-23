@@ -19,11 +19,25 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**UEBERGABE 2026-09-23, 07:30 -- Sitzungswechsel nach `/mosaic-handover`.**
+**STAND 2026-09-23, 13:02 -- die v32-Kette ist durch.**
 
-**LAEUFT: NICHTS.** Prozessliste geprueft (nicht die Task-Meldungen), 0 Treffer auf
-`self_play|train.py|paired_|night_v|cargo|maturin`. Baum sauber, **7 Commits ahead von
-origin/main, nicht gepusht.**
+**LAEUFT: NICHTS.** Prozessliste geprueft, 0 Treffer. Der Ahead-Stand der Uebergabe ist
+aufgeloest: `origin/main` steht auf `main` (Reflog `update by push`), es wurde also
+zwischenzeitlich gepusht -- nicht von dieser Sitzung.
+
+**FERTIG: `tools/night_v32_chain.sh`**, 07:27:56 bis 13:02:02 = **5 h 34 min**, Exit 0.
+Vollstaendig registriert in `PREREG_v32_window.md` **par.10**. Die drei Kernzahlen:
+
+* **Fenster** 2.947 Dateien (Soll getroffen), Train 2.800 / Val 147, Monolith
+  `data/.cache_1587a92e5739.h5` 1,42 GB, 5.330.401 Zustaende, Stempel geprueft.
+* **Training `v32-b01`** warm in 63 min, **0 unerwartete Rezept-Abweichungen** gegen v31.
+* **TOR 1 TRAEGT** nach dem vorregistrierten Kriterium (`PREREG_v30_window.md` par.3 Punkt 5:
+  z >= +1,96 ODER gepoolt >= 52,5 Prozent): **434:366 aus 800 = 54,25 Prozent, Block-z +2,37**
+  auf DIFFERENZIERTEN Blockwerten, Methode an v31 geeicht (reproduziert +3,54/+2,42/+4,24 exakt).
+  **Einschraenkung, die dazugehoert:** nur EIN Seed traegt einzeln (+3,26 gegen +0,10), waehrend
+  bei v31 beide trugen. Das Kriterium wird nicht nachtraeglich verschaerft, der Befund aber auch
+  nicht staerker berichtet, als er ist.
+* **TOR 2b HAELT** (volle Spalten +0,005 und +0,133). Tor 2a hielt schon in par.9.
 
 **RAHMEN (Nutzer 2026-09-22: *"du faehrst v32"*):** v31 ist NICHT die letzte Generation. Das
 Projektende ist dreimal verschoben worden (v30, v31, jetzt v32). **Keine Generation als die letzte
@@ -36,40 +50,42 @@ Finalitaet aufbauen. Am 2026-09-21 hing genau daran eine Fehlregistrierung.
 Wiedervorlage am ersten Record gruen, Streurate 14,0 Prozent gegen Ziel 15, **Tor 2a HAELT**
 (`sp_voll` 0,977 gegen 0,955; Kriterium Nicht-Unterlegenheit). Korpusprofil stabil.
 
-### ERSTE AUFGABE DER NEUEN SITZUNG
+### WAS JETZT ANSTEHT
 
-**Reihenfolge bindend. Jeder Schritt braucht die Maschine EXKLUSIV** (CLAUDE.md "Messungen laufen
-EXKLUSIV"; ein Build zaehlt als Last, ein Commit mit Haken auch).
+**Schritte 1 bis 3 der Uebergabe sind erledigt** (Fenster, Monolith, Training, Tor 1, Tor 2b).
+Offen bleiben:
 
-1. **v32-Fenster bauen.** Bauvorlage `PREREG_v32_window.md` par.1: neu `v31-b01`, G-1 `v30-b02`,
-   G-2 `v29-b11`; **Seed 20260953**, **Val-Pool `^selfplay_v31-`**. Die Traeger-Anteile der
-   Alt-Klassen nach dem Muster aus `PREREG_v31_window.md` par.1 ziehen.
-   **Vorher `MOSAIC_DATA_EXCLUDE` setzen** (Fenster-Pinning), sonst laufen Streudateien still mit.
-   Abnahme: Dateizahl gegen par.1, Fensterliste in `data/window_v32*.txt`.
-2. **Monolith bauen**, dann **Training `v32-b01`**: **WARMSTART von `v31-b01_brierbest`**, sonst
-   rezeptgleich zu v31-b01 (par.6). v31 brauchte warm 58 min.
-   Abnahme: Rezept-Abweichungen gegen das v31-Trainingsmanifest = 0 unerwartete.
-3. **Tor 1** gegen `v31-b01` (gepaartes Gating, Blockgroesse 5, zwei Seeds, `--log-games`) und
-   **Tor 2b**. Kosten je 400er-Lauf rund 1 h 43 (`docs/measured_runtimes.md`).
-4. **ERST DANACH sind die beiden v31-Monolithen Loeschkandidaten**
-   (`data/.cache_8da26a898040.h5` 1,48 GB und `.cache_c57d3023e58b.h5` 0,07 GB). Solange das
-   v32-Fenster nicht steht, sind sie die einzige Fassung ihres Fensters. **Loeschung nur mit
-   restic-Beleg UND neuer pfadgenauer Freigabe.**
+1. **Nutzer-Entscheid: Promotion von `v32-b01`?** Tor 1 traegt nach dem vorregistrierten
+   Kriterium, ruht aber auf einem von zwei Seeds. Wer promoviert, faehrt
+   `/mosaic-champion-promotion` (kanonisch `docs/promotion_checklist.md`) -- dort haengt auch
+   der **Alt-Set-Brier auf `frozen_v3`**, also die Zahl, an der die gestreifte Brier-Regel
+   haengt. Der Trainings-Brier (0,1835) beantwortet sie NICHT: er steht auf dem Val-Anteil des
+   jeweiligen Fensters und wechselt mit der Generation die Grundmenge.
+2. **Die beiden v31-Monolithen sind JETZT Loeschkandidaten**
+   (`data/.cache_8da26a898040.h5` 1,48 GB, `.cache_c57d3023e58b.h5` 0,07 GB) -- das v32-Fenster
+   steht, sie sind nicht mehr die einzige Fassung. **Loeschung nur mit restic-Beleg UND neuer
+   pfadgenauer Freigabe**; die Freigabe vom 2026-09-22 ist verbraucht.
+3. **Huellen-Sonde**, fahrbereit als `tools/hull_probe_par14.sh` (Nutzer-Freigabe 2026-09-22
+   *"Ja plan es ein."*), rund 3,5 h. Sie prueft selbst, ob die Maschine frei und der Vergleich
+   einfaktoriell ist. Stand der Werkzeugpruefung vom 2026-09-23 in
+   `PREREG_geometric_envelope.md` par.14, Nebenbefunde 2 und 3: Ablesung 1 (Form, Endbrett) und
+   2 (Staerke) laufen mit dem Bestand, **Ablesung 3 (Gegner-Reaktion) ist ein offener
+   Nutzer-Entscheid** -- ihr Instrument ist auf eine andere Bauform gebaut.
 
-**Eingeplant, unabhaengig von 1-4 und jederzeit fahrbar:** die **Huellen-Sonde**,
-vorregistriert in `PREREG_geometric_envelope.md` **par.14/14a**, Aufbau startklar
-(`models/hull_off.spec.json` liegt, Einfaktorialitaet belegt: genau ein Feld,
-`envelope_search_c` 1,0 gegen 0,0). `paired_gating`, dasselbe Netz beidseits, zwei Seeds,
-`--log-games`; aus denselben Logs kommen DREI Ablesungen (Form, Staerke, Gegner-Reaktion).
-Kosten rund 3,5 h. Nutzer-Anlass: *"War eigentlich nur ein proxy um das Netz in eine moegliche
-Form zu leiten"* -- faellt die Form ohne Knopf nicht, kann das Geruest weg.
+**Der Abnehmer der Huellen-Sonde ist seit 2026-09-23 benannt und registriert**
+(`PREREG_geometric_envelope.md` par.14b): ein GETEILTER Sockel in v33, 1.350 Partien huellen-an
+gegen 2.650 huellen-aus, trennbar ueber eine eigene Klassen-Endung (Nutzer: *"ich will dem Netz
+damit bewusst diverses material zeigen"*). **Die Dosis faellt je Kanal sehr verschieden aus:**
+265 huellenfreie Dateien sind 45,7 Prozent der 580 Policy-TRAEGER, aber nur 9,0 Prozent der
+2.947 Fensterdateien -- weil die Value-Klassen kein Policy-Ziel tragen
+(`corpus_dataset.py:1618`) und die Form ueber den Policy-Kanal laeuft.
 
 ### FREIGABEN UND VERBOTE (woertlich)
 
 * Nutzer 2026-09-22: *"du faehrst v32"* und *"Das brauchst nicht von mir. Du faehrst die
   Einstellungen wie v31."* -- das Rezept ist entschieden, es wird nichts variiert.
 * Nutzer 2026-09-22 zur Huellen-Sonde: *"Ja plan es ein."*
-* **Kein Push ohne Anweisung.** Stand 7 ahead.
+* **Kein Push ohne Anweisung.** Stand: `main` == `origin/main` (extern gepusht, s.o.).
 * **Jede Loeschung braucht restic-Beleg UND neue pfadgenaue Freigabe.** Die Freigabe vom
   2026-09-22 (Gruppen A-D plus F) ist ausgefuehrt und damit verbraucht.
 * **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`.
