@@ -41,7 +41,36 @@
 # '/models/*' trifft nur DIREKTE Kinder -- ist das Verzeichnis wieder drin,
 # sind die Dateien darunter automatisch sichtbar.
 !/models/frozen_champions/
-!/models/frozen_heuristics/
+# `frozen_heuristics` steht hier NICHT mehr: sie fallen GANZ heraus, auch die
+# Metadaten (Nutzer-Entscheid 2026-09-23: *"frozen heuristics kommen auch raus.
+# die liefer ich ebenfalls nach wenn es notwendig ist"*). Die Elo-Zahlen der
+# Heuristik-Knoten stehen ohnehin im Register `evaluations/elo_history.csv`,
+# die Artefakte liegen im Arbeitsbaum und in restic.
+# ABER die SCHWEREN Teile bleiben draussen (Nutzer-Entscheid 2026-09-23, nach
+# der Groessenmessung: 10 Champion-Artefakte und 4 Heuristiken machten 205 der
+# 235 MB der Objektdatenbank aus, je rund 17 MB -- ONNX 10,6 plus Wheel 6,6).
+# Geloescht wurden sie im Arbeitsbaum laengst; in der HISTORIE lagen sie
+# weiter, und jede Promotion legte 17 MB drauf. Das hoert hier auf.
+#
+# WAS BLEIBT: Spec, Manifest, Golden Probe und die Wheel-Pruefsumme -- zusammen
+# rund 0,6 MB je Artefakt. Damit ist ein Artefakt weiterhin IDENTIFIZIERBAR
+# (Vertragshash, Herkunft, Golden Probe zum Nachweis) und nur nicht mehr
+# ausfuehrbar; die ausfuehrbaren Teile liegen in restic.
+#
+# WICHTIG, sonst wirkt das hier falsch: eine .gitignore-Zeile entfernt NICHTS
+# aus dem Index. Die heute getrackten Artefakte bleiben getrackt; die Regel
+# greift erst fuer das NAECHSTE. Die Altlast raeumt nur ein Historien-Umschrieb
+# (`tools/rewrite_drop_frozen_blobs.sh`).
+#
+# KEIN `git add -f` fuer kuenftige Champions (Nutzer-Entscheid 2026-09-23:
+# *"nein soll er nicht. bei bedarf stell ich die netze zur verfuegung"*).
+# Ein Klon bekommt also bewusst KEIN lauffaehiges Netz mehr -- wer eines
+# braucht, bekommt es vom Nutzer. Darum steht hier auch keine Namensliste und
+# in `docs/promotion_checklist.md` kein Nachtrag: ein Name in der .gitignore
+# veraltet mit der naechsten Promotion, und gebraucht wird er nicht.
+/models/frozen_champions/**/*.onnx
+/models/frozen_champions/**/*.pth
+/models/frozen_champions/**/*.whl
 # Stufen-Specs der Schwierigkeitsleiter (PREREG_difficulty_levels.md par.4.2).
 # Dieselbe Verzeichnisform und derselbe Grund wie darueber: es sind kleine
 # JSON-Dateien, die das Suchverhalten einer Stufe VOLLSTAENDIG beschreiben, und
@@ -130,13 +159,21 @@ scratchpad/
 *.pdf
 /evaluations/artifacts
 
-# --- Wheels INNERHALB eingefrorener Artefakte (Nutzer-Entscheid 2026-08-26) ---
-# '*.whl' oben schliesst Build-Artefakte aus, und das bleibt richtig. In einem
-# eingefrorenen Artefakt ist das Wheel aber kein Build-Abfall, sondern der
-# Traeger des Verhaltens. Diese Negation MUSS nach '*.whl' stehen: bei git
-# gewinnt die zuletzt passende Regel.
-!/models/frozen_champions/**/*.whl
-!/models/frozen_heuristics/**/*.whl
+# --- Wheels INNERHALB eingefrorener Artefakte: ZURUECKGENOMMEN 2026-09-23 ----
+# Hier standen bis zum 2026-09-23 zwei Negationen, die die Wheels wieder
+# hereinholten (Nutzer-Entscheid 2026-08-26: das Wheel sei "der Traeger des
+# Verhaltens", kein Build-Abfall). Das Argument stimmt unveraendert -- deshalb
+# liegen die Wheels weiter im Arbeitsbaum und in restic. Sie gehoeren nur nicht
+# mehr ins REPO: 10 Champion-Artefakte und 4 Heuristiken machten 205 von 235 MB
+# der Objektdatenbank aus, davon allein 6,6 MB Wheel je Artefakt.
+# Nutzer-Entscheid 2026-09-23: *"bei bedarf stell ich die netze zur verfuegung"*.
+#
+# FALLE, in die ich beim Eintragen selbst gelaufen bin: die Negation stand
+# SPAETER als meine Ausschlusszeile oben und hat sie damit ausgehebelt -- bei
+# git gewinnt die zuletzt passende Regel, wie der Kommentar hier immer schon
+# sagte. Geprueft wird das mit `git check-ignore -v --no-index <pfad>`;
+# OHNE `--no-index` schweigt der Befehl bei getrackten Dateien und sieht
+# faelschlich wie "greift nicht" aus.
 
 # --- Golden Probes eingefrorener Artefakte (Nutzer-Entscheid 2026-08-26) -----
 # '*.pkl' oben haelt den Korpus aus dem Repo, und das bleibt richtig -- er ist
@@ -145,7 +182,9 @@ scratchpad/
 # ist das Artefakt nicht mehr pruefbar, nur noch vorhanden.
 # Auch diese Negation MUSS nach '*.pkl' stehen -- letzte passende Regel gewinnt.
 !/models/frozen_champions/**/golden_probe/*.pkl
-!/models/frozen_heuristics/**/golden_probe/*.pkl
+# (die Heuristik-Zeile ist seit dem 2026-09-23 wirkungslos: ihr ELTERN-
+#  verzeichnis ist ausgeschlossen, und darin kann git nichts wieder
+#  einschliessen -- siehe Kopfkommentar zu '/models/*'.)
 
 # Mess-venv mit dem 714er-Champion-Wheel (Abnahme des 714er-Arms v24-b03 nach dem 744er-Wheel-Install, 2026-09-05)
 venv_measure714/
