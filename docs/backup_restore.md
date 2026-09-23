@@ -91,10 +91,29 @@ Aus der Ausgabe die EXAKTE Schreibweise des Pfades entnehmen und fuer die
 naechsten Schritte kopieren -- restic hat ihn so gespeichert, wie er beim
 Sichern aussah.
 
+**Die Schreibweise des Pfades ist keine Kleinigkeit** (gemessen am 2026-09-23,
+restic 0.19.1, beim Zurueckholen von `player_profiles.json` aus `bd59317e`).
+`restic ls` druckt den Pfad im UNIX-Stil mit dem Laufwerk als erstem Glied:
+
+```
+/D/OneDrive/Documents/Projekte/mosaic-AI/player_profiles.json
+```
+
+Genau diese Form wollen `dump` und `--include`. Die Windows-Schreibweise
+`D:\...\player_profiles.json` scheitert mit `path "\\D:\\..." not found in
+snapshot` -- restic haengt ihr einen Schraegstrich voran und findet nichts.
+Ein `--include` mit einem Pfad, den der Snapshot nicht so fuehrt, meldet
+dagegen KEINEN Fehler, sondern `Restored 0 files/dirs (0 B)`: ein leerer
+Erfolg, den man beim Ueberfliegen fuer einen Erfolg haelt.
+
+**In der Git-Bash** kommt eine zweite Falle dazu: MSYS uebersetzt Argumente,
+die wie Unix-Pfade aussehen, in Windows-Pfade, bevor restic sie sieht. Darum
+`MSYS_NO_PATHCONV=1` (oder `MSYS2_ARG_CONV_EXCL='*'`) voranstellen.
+
 **3. Eine einzelne Datei ansehen, ohne etwas anzufassen**
 
 ```
-restic dump <snapshot-id> "<Projektordner>\evaluations\STATUS.md" > STATUS_alt.md
+MSYS_NO_PATHCONV=1 restic dump <snapshot-id> "/D/<Projektordner>/evaluations/STATUS.md" > STATUS_alt.md
 ```
 
 Ein ganzer Ordner geht als Archiv: `restic dump -a zip <snapshot-id>
@@ -103,7 +122,7 @@ Ein ganzer Ordner geht als Archiv: `restic dump -a zip <snapshot-id>
 **4. Ordner wiederherstellen**
 
 ```
-restic restore <snapshot-id> --target <leeres-Zielverzeichnis> --include "<Projektordner>\models"
+restic restore <snapshot-id> --target <leeres-Zielverzeichnis> --include "/D/<Projektordner>/models"
 ```
 
 Vorher trocken ansehen, was kaeme:
