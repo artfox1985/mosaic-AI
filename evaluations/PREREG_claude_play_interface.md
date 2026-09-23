@@ -1446,8 +1446,18 @@ der Pool zaehlt vollstaendig, die Warnung rechnet mit dem FREIEN Platz einer tei
 Reihe, sie bleibt weg, wenn alles passt, Sonnenzuege behalten ihre Zeilenform, und ein
 kopiertes `x4` wird ignoriert. Gesamtstand der Datei: 28 Tests, gruen.
 
-**Noch offen, klein:** ein Rauchtest gegen eine LEBENDE Partie steht aus -- beim Bau lief ein
-Self-Play auf der CPU (`self_play.py --mode network`), und die Exklusivitaetsregel laesst
-daneben keinen zweiten CPU-Auftrag zu. Die Tests decken die Zustandsform ab (Mondstapel als
-Liste von Stapeln, Pool als flache Liste, beide gegen `serialize.rs:224-241` geprueft); der
-erste Zug der naechsten Partie zeigt die Zeile im Echtbetrieb.
+**RAUCHTEST GEFAHREN am 2026-09-23** (Maschine frei, Artefakt `claude_play/gsmoke3`, Seed
+20260923, drei Zuege, keine ganze Partie). Alle drei Teile im Echtbetrieb bestaetigt, jede
+Zahl von Hand gegen die Fabrikzeilen und die Musterreihen nachgerechnet:
+
+1. Nach dem ersten Mondstapel (F1 `BT`, oben Tuerkis; Pool der grossen Fabrik leer) stand in
+   der Zugliste `s m tuerkis x1 0-5|floor` -- eine Spitze, also 1, und keine Warnung, weil
+   R0 (Kapazitaet 1) genau einen Platz hat.
+2. Nach einem zweiten Stapel mit Tuerkis oben (F2 `BST`) stand dort
+   `s m tuerkis x2 0-1|3-5|floor   !! UEBERLAUF auf die Strafleiste: R0 +1`. Zwei Spitzen,
+   also 2; gewarnt wird genau fuer R0 (ein freier Platz, einer faellt), nicht fuer R1 (zwei
+   freie Plaetze, passt genau); R2 fehlt in der Zielliste, weil dort schon Gelb liegt.
+3. Der Zug `s m tuerkis x2 1` -- die Anzeigezeile mitsamt Stueckzahl kopiert -- wurde
+   angenommen und fuehrte zu R1 `T2/2` ohne Strafleiste.
+
+Damit ist par.13 abgeschlossen; es steht nichts mehr aus.

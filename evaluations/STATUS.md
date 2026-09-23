@@ -67,8 +67,8 @@ Kapitel "Promotion v31-b01" in `../archive/history.md`.
   (g09/g10 je drei leere Spezialfelder, in g09 kostete ihn das die Partie), gewinnt aber ueber
   Platzierungspunkte; und es nutzt die Null-Klammer als EROEFFNUNG -- in g10 dreizehn Ziehungen
   in Runde 1, Stand 0 bis Runde 4, 28 Ziehungen gesamt. Der Anzeige-Fix aus par.13 ist gebaut
-  (Stueckzahl und Ueberlauf-Warnung am Mondzug, neun Tests); ein Rauchtest gegen eine lebende
-  Partie steht noch aus, weil beim Bau das v32-Self-Play die CPU hatte.
+  (Stueckzahl und Ueberlauf-Warnung am Mondzug, neun Tests) und am 2026-09-23 gegen eine
+  lebende Partie rauchgetestet (par.13). Damit ist an dem Strang nichts mehr offen.
 * **Das Aufraeumen ist ABGESCHLOSSEN** (`PREREG_code_cleanup_closeout.md`, par.8i bis par.8o,
   alles am 2026-09-21). Die Rust-Punkte 9 und 10 sind GEMESSEN und begruendet nicht gebaut (der
   Plain-Tiling-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). Der letzte
