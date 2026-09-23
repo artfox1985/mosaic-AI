@@ -19,21 +19,70 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**NICHTS** (Stand 2026-09-22 10:30, Prozessliste geprueft, nicht die Task-Meldungen).
+**UEBERGABE 2026-09-23, 07:30 -- Sitzungswechsel nach `/mosaic-handover`.**
 
-**RAHMEN GEAENDERT 2026-09-22 (Nutzer: *"du faehrst v32"*):** v31 ist NICHT die letzte
-Generation. Der Generationswechsel v31 -> v32 ist gefahren (`/mosaic-generation-turnover`,
-Schritte 0 bis 6); die Erzeugung ist NICHT gestartet und braucht die Entscheide aus
-`PREREG_v32_window.md` par.6. **Keine Generation mehr als die letzte behandeln, solange es dafuer
-keine frische Aussage gibt** -- das Projektende ist dreimal verschoben worden (v30, v31, jetzt
-v32), und am 2026-09-21 hing an der Annahme bereits eine Fehlregistrierung: die
-Dosis-Nachrechnung der Rueckgabe-Reihenfolge wurde als "nicht mehr gebraucht" abgelegt und war
-einen Tag spaeter der erste Handgriff vor der v32-Erzeugung.
+**LAEUFT: NICHTS.** Prozessliste geprueft (nicht die Task-Meldungen), 0 Treffer auf
+`self_play|train.py|paired_|night_v|cargo|maturin`. Baum sauber, **7 Commits ahead von
+origin/main, nicht gepusht.**
 
-**Die Promotion von `v31-b01` ist VOLLSTAENDIG** nach `docs/promotion_checklist.md`, alle sieben
-Punkte: Champion gesetzt, vier Elo-Kanten registriert, Diagnostiken gefahren, Artefakt eingefroren
-und per Referee-Selbsttest abgenommen, STATUS und Chronik nachgezogen. Herleitung und alle Zahlen:
-Kapitel "Promotion v31-b01" in `../archive/history.md`.
+**RAHMEN (Nutzer 2026-09-22: *"du faehrst v32"*):** v31 ist NICHT die letzte Generation. Das
+Projektende ist dreimal verschoben worden (v30, v31, jetzt v32). **Keine Generation als die letzte
+behandeln, solange es dafuer keine frische Aussage gibt** -- und keine Begruendung auf der
+Finalitaet aufbauen. Am 2026-09-21 hing genau daran eine Fehlregistrierung.
+
+**FERTIG: die v32-Erzeugung** (`tools/night_v32_generate.sh`, 2026-09-22 09:44:39 bis 23:41:37 =
+13 h 57 min). 1.201 Dateien / 12.010 Partien, alle drei Klassen Exit 0. Abnahmen in
+`PREREG_v32_window.md` par.9: Manifest-Diff genau 4 Abweichungen (Modell, Seed, Spec, Version),
+Wiedervorlage am ersten Record gruen, Streurate 14,0 Prozent gegen Ziel 15, **Tor 2a HAELT**
+(`sp_voll` 0,977 gegen 0,955; Kriterium Nicht-Unterlegenheit). Korpusprofil stabil.
+
+### ERSTE AUFGABE DER NEUEN SITZUNG
+
+**Reihenfolge bindend. Jeder Schritt braucht die Maschine EXKLUSIV** (CLAUDE.md "Messungen laufen
+EXKLUSIV"; ein Build zaehlt als Last, ein Commit mit Haken auch).
+
+1. **v32-Fenster bauen.** Bauvorlage `PREREG_v32_window.md` par.1: neu `v31-b01`, G-1 `v30-b02`,
+   G-2 `v29-b11`; **Seed 20260953**, **Val-Pool `^selfplay_v31-`**. Die Traeger-Anteile der
+   Alt-Klassen nach dem Muster aus `PREREG_v31_window.md` par.1 ziehen.
+   **Vorher `MOSAIC_DATA_EXCLUDE` setzen** (Fenster-Pinning), sonst laufen Streudateien still mit.
+   Abnahme: Dateizahl gegen par.1, Fensterliste in `data/window_v32*.txt`.
+2. **Monolith bauen**, dann **Training `v32-b01`**: **WARMSTART von `v31-b01_brierbest`**, sonst
+   rezeptgleich zu v31-b01 (par.6). v31 brauchte warm 58 min.
+   Abnahme: Rezept-Abweichungen gegen das v31-Trainingsmanifest = 0 unerwartete.
+3. **Tor 1** gegen `v31-b01` (gepaartes Gating, Blockgroesse 5, zwei Seeds, `--log-games`) und
+   **Tor 2b**. Kosten je 400er-Lauf rund 1 h 43 (`docs/measured_runtimes.md`).
+4. **ERST DANACH sind die beiden v31-Monolithen Loeschkandidaten**
+   (`data/.cache_8da26a898040.h5` 1,48 GB und `.cache_c57d3023e58b.h5` 0,07 GB). Solange das
+   v32-Fenster nicht steht, sind sie die einzige Fassung ihres Fensters. **Loeschung nur mit
+   restic-Beleg UND neuer pfadgenauer Freigabe.**
+
+**Eingeplant, unabhaengig von 1-4 und jederzeit fahrbar:** die **Huellen-Sonde**,
+vorregistriert in `PREREG_geometric_envelope.md` **par.14/14a**, Aufbau startklar
+(`models/hull_off.spec.json` liegt, Einfaktorialitaet belegt: genau ein Feld,
+`envelope_search_c` 1,0 gegen 0,0). `paired_gating`, dasselbe Netz beidseits, zwei Seeds,
+`--log-games`; aus denselben Logs kommen DREI Ablesungen (Form, Staerke, Gegner-Reaktion).
+Kosten rund 3,5 h. Nutzer-Anlass: *"War eigentlich nur ein proxy um das Netz in eine moegliche
+Form zu leiten"* -- faellt die Form ohne Knopf nicht, kann das Geruest weg.
+
+### FREIGABEN UND VERBOTE (woertlich)
+
+* Nutzer 2026-09-22: *"du faehrst v32"* und *"Das brauchst nicht von mir. Du faehrst die
+  Einstellungen wie v31."* -- das Rezept ist entschieden, es wird nichts variiert.
+* Nutzer 2026-09-22 zur Huellen-Sonde: *"Ja plan es ein."*
+* **Kein Push ohne Anweisung.** Stand 7 ahead.
+* **Jede Loeschung braucht restic-Beleg UND neue pfadgenaue Freigabe.** Die Freigabe vom
+  2026-09-22 (Gruppen A-D plus F) ist ausgefuehrt und damit verbraucht.
+* **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`.
+* **Kein Commit waehrend eines Wanduhr-Laufs** -- der Haken faehrt 215 Tests und geht in die
+  Messgroesse. Bei der v32-Erzeugung ist das passiert (Claude-Partien g09/g10 und ein Commit
+  liefen hinein); die 13 h 57 min sind darum KEINE saubere Vergleichsgroesse zu v31s 14,66 h.
+
+### OFFENE NUTZER-ENTSCHEIDE
+
+* **Brier-Regel gestreift** bei der v31-Promotion (0,22919 gegen 0,22804, +0,5 Prozent relativ,
+  zweite Generation in Folge; kein Intervall). Fundstelle: Punkt 1 unten.
+* **Schwierigkeitsleiter** (`PREREG_difficulty_levels.md`): ganze Leiter auf den letzten Champion
+  vertagt, seit 2026-09-14 offen.
 
 ### ZWEI OFFENE PUNKTE AUS DER PROMOTION
 

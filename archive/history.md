@@ -21602,3 +21602,35 @@ Damit ist `PREREG_claude_play_interface.md` ENTSCHIEDEN. Bilanz der Reihe: zehn 
 den jeweils amtierenden Champion, keine Siegquote (wechselnde Gegner, ungleiche Sicht), aber
 zwei Befunde, die keine Arena liefert -- die Null-Klammer als Eroeffnung und die
 unzuverlaessige Bedienung der aktiven Wertungsplatten. Offene Preregs damit bei 2.
+
+# Uebergabe 2026-09-23, 07:30 (Sitzungswechsel)
+
+**Anlass:** `/mosaic-handover` auf Nutzer-Anweisung; die v32-Erzeugung ist durch, die Kette
+danach gehoert in eine frische Sitzung.
+
+**Seit dem letzten Eintrag registriert:** der Generationswechsel v31 -> v32 (eigenes Kapitel),
+die v32-Erzeugung mit allen Abnahmen (`PREREG_v32_window.md` par.9), R4b und R5 am Champion samt
+Zonen-Sonde (`PREREG_r4_value_calibration.md` par.20/21, `PREREG_r5_value_calibration.md`
+par.14), die Vorregistrierung der Huellen-Sonde (`PREREG_geometric_envelope.md` par.14/14a) und
+Version 1.1 mit dem berichtigten Tiling-Cache-Schluessel.
+
+**Zwei eigene Zahlen zurueckgenommen, beide am 2026-09-23:**
+
+1. **Die Dosis-Herleitung der Rueckgabe-Streuung.** Ich hatte die Gelegenheitsrate mit 28,0
+   Prozent gegen registrierte 17,75 gehalten und daraus `p = 0,54` abgeleitet. Die Zahlen zaehlen
+   Verschiedenes -- 17,75 meint Gelegenheiten mit mindestens DREI Restplatten, meine 28,0 den
+   Knoten in `valid_actions`, also ab ZWEI. Mit einer Zaehlweise an beiden Korpora: 22,5 gegen
+   23,5 Prozent, Streurate 12,0 gegen 14,0 bei Ziel 15. Die Dosis war richtig eingestellt.
+2. **Der k6-Befund.** Ich hatte "-9,39 Punkte, Ertrag > 0 in 0,0 Prozent" als auffaelligen Posten
+   registriert. Platte 7 ist eine REINE Strafplatte ("-3 pts per Spezialfeld left empty",
+   Handbuch Zeile 192) -- ein positiver Ertrag ist definitionsgemaess unmoeglich. Und die Zahl
+   der gefuellten Spezialfelder (1,29) ist exakt das Nebenprodukt der Plattenvollendung
+   (2,53 fertige Platten mal 0,5 Anteil mit Spezialfeld = 1,27). Die Deutung "Formtreue auf
+   Kosten der Punktequellen" ist damit nicht belegt.
+
+**Beide Male war der Mechanismus derselbe:** eine Zahl gegen eine andere gehalten, ohne n,
+GRUNDMENGE und EINHEIT gegeneinander zu pruefen -- und beim ersten Mal stand der Vorbehalt sogar
+im selben Absatz. Genau davor warnt CLAUDE.md Zusatz 2.
+
+**Stand bei der Uebergabe:** nichts laeuft, Baum sauber, 7 Commits ahead (nicht gepusht),
+1.201 v32-Korpusdateien, kein v32-Fenster. Die naechsten Schritte stehen in STATUS Abschnitt 1.

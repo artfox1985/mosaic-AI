@@ -182,18 +182,50 @@ Artefakt: `evaluations/artifacts/corpus_sanity_v31-b01-policy.json`, Laufzeit 35
 
 **Das Profil ist stabil** -- keine Kennzahl bewegt sich ueber ihr Intervall hinaus.
 
-### Ein Posten, der seit zwei Generationen unveraendert liegt
+### k6 Spezialfelder: meine Feststellung von gestern war leer, nachgerechnet 2026-09-23
 
-Die Punkte je Wertungsplatte sind bis auf die zweite Stelle dieselben. Auffaellig bleibt **k6
-Spezialfelder: -9,39 Punkte, Ertrag > 0 in 0,0 Prozent von 1.499 Partien** (v30-b02: -9,41 und
-ebenfalls 0,0 Prozent). In ZWEI vollen Generationen hat keine Seite aus dieser Platte je einen
-positiven Ertrag gezogen.
+Ich hatte registriert, `k6` stehe bei -9,39 Punkten mit "Ertrag > 0 in 0,0 Prozent von 1.499
+Partien", und das neben den Claude-Partien-Befund der leeren Spezialfelder gestellt.
+**Nutzer-Einwand: *"das ist praktisch auch schwer moeglich. brauchst es nur mal statistisch
+durchrechnen."*** Er hat recht, gleich zweifach.
 
-Das deckt sich mit dem Befund aus den Claude-Partien (`PREREG_claude_play_interface.md`,
-2026-09-22: "das Netz bedient die aktiven Wertungsplatten unzuverlaessig, g09/g10 je drei leere
-Spezialfelder") und mit `project_special_tile_yield_remeasure`. **Es ist hier nur festgehalten,
-nicht gedeutet** -- ob -9,39 eine Strafe fuer unbelegte Felder ist oder ein Rechenartefakt der
-Zuordnung, ist in dieser Prereg nicht geprueft.
+**1. Die Platte kann gar nichts Positives zahlen.** `docs/engine_manual.md` Zeile 192, Platte 7:
+**"-3 pts per Spezialfeld left empty"** -- eine reine Strafplatte ohne positiven Term. Das
+Maximum ist **0**. "Ertrag > 0 in 0,0 Prozent" ist damit keine Beobachtung, sondern die
+Definition. Ich habe eine leere Feststellung als auffaelligen Posten registriert.
+
+**2. Die Zahl der gefuellten Spezialfelder ist exakt das erwartete Nebenprodukt.** Ein
+Spezialfeld schaltet laut Handbuch (Abschnitt 5) NUR frei, wenn die anderen drei Zellen
+DERSELBEN Platte gefuellt sind; die Spezialfliese wird dann automatisch gelegt, ohne Wahl.
+
+Gemessen am v32-Korpus (200 abgeschlossene Partien, 400 Seiten, letzter Record je Partie):
+
+| | je Seite |
+| --- | --- |
+| Spezialfelder auf dem eigenen Brett | **4,50** (9 im Spiel, auf zwei Seiten verteilt) |
+| davon gefuellt | **1,29** |
+| leer | 3,21 -> **-9,62 Pkt** (abgerechnet -9,39) |
+| belegte Zellen von 36 | **17,54** |
+| vollstaendig gefuellte Platten von 9 | **2,53** |
+
+**Die Vorhersage aus der Regel:** 2,53 fertige Platten mal dem Anteil, der ein Spezialfeld traegt
+(4,5 von 9 = 0,5), ergibt **1,27**. **Gemessen: 1,29.** Das Netz laesst die Spezialfelder nicht
+liegen -- es fuellt sie genau so oft, wie es Platten fertigstellt.
+
+**Der bindende Engpass ist ein anderer:** nur 17,54 von 36 Zellen werden ueberhaupt belegt. Um
+`k6` auf 0 zu bringen, muessten alle 4,5 Spezialfeld-Platten fertig werden, also allein 13,5
+regulaere Zellen von 17,5 verfuegbaren -- praktisch das ganze Budget, und damit keine Spalten
+mehr, waehrend Platte 2 sieben Punkte je Spalte zahlt.
+
+**Was damit faellt:** die Deutung "Formtreue auf Kosten der Punktequellen", die ich zum
+Dreiecks-Muster und zum Claude-Partien-Befund gezogen hatte. Die Spezialfelder folgen der
+PLATTENVOLLENDUNG, nicht der Form. Der Claude-Befund (drei leere Spezialfelder je Partie) bleibt
+richtig -- er ist nur kein Hinweis auf eine Schwaeche, sondern die Normallage.
+
+**Was NICHT faellt:** `project_column_completion_structural_weakness` (der Champion vollendet
+wenige Spalten) und der Befund aus `PREREG_special_tile_yield.md`, dass beim Plattenlohn etwas
+liegen bleibt. Beide reden ueber die VOLLENDUNG, und 2,53 von 9 Platten ist genau die Groesse,
+an der sie haengen. Hier ist nur die Brucke zwischen Spezialfeldern und Huelle gekappt.
 
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`, damit der Start planbar ist)
 
