@@ -23,7 +23,10 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich in
 `../archive/history.md`, dazu der Generationsbericht v32.
 
-**LAEUFT: NICHTS.**
+**LAEUFT: die v33-Erzeugung** (`bash tools/night_v33_generate.sh`, Harness-Hintergrundaufgabe,
+gestartet 2026-09-25 direkt nach dem Commit, der diese Zeile traegt). Rund 14 h exklusiv:
+**nichts anderes starten, kein Commit, kein Build**. Fortschritt steht in der Aufgabenausgabe;
+Dateien je Klasse zaehlen mit `ls data/ | grep -c "^selfplay_v32-b01-<klasse>_"`.
 
 **Champion `v32-b01_brierbest`** seit 2026-09-25 (`PREREG_v32_window.md` par.11), eingefroren
 unter `models/frozen_champions/v32-b01`; Anker-Drift und -Konservierung gruen auf dem
@@ -41,12 +44,9 @@ Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
 (`v32_generation.spec.json`, `v32_generation_nohull.spec.json`, `v33_gating.spec.json`), jede in
 genau einem Feld von ihrer Vorlage verschieden. Nichts gestartet.
 
-**Braucht den Nutzer (par.6):**
-1. **Klassenname** der huellenfreien Schwarm-a-Klasse: Vorschlag `value-tempc-nohull`.
-2. **Tor 1 mit `start_by_search: 1` beidseits** (`models/v33_gating.spec.json`): Vorschlag ja,
-   damit die gemessene Identitaet die spaetere Champion-Spec traegt (`PREREG_start_dome_choice.md`
-   par.12).
-3. **Freigabe der Erzeugung** (rund 14 h exklusiv, danach die Kette rund 5,5 h).
+**Entschieden 2026-09-25** (*"1 und 2 wie vorgeschlagen, starte die Erzeugung"*):
+Klassenname `value-tempc-nohull`, Tor 1 beidseits mit `start_by_search: 1`
+(`models/v33_gating.spec.json`), Erzeugung freigegeben.
 
 **Vor dem Start pruefen** (Ablauf Punkt 7): Maschine frei, App bleibt offen, Skripte als DATEI
 starten (`bash tools/night_v33_generate.sh`), keine Pipe.
@@ -152,7 +152,7 @@ ist herausrotiert und geloescht. Seed 20260957, Val-Pool `^selfplay_v32-`, 580 T
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v33_window` | NEU 2026-09-25; par.6 wartet auf zwei Entscheide und die Freigabe der Erzeugung |
+| `v33_window` | NEU 2026-09-25; par.6 entschieden, Erzeugung laeuft seit 2026-09-25 |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
 Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v32_window`

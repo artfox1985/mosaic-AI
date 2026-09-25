@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ist VORLAGE: Rezept wie v32, dazu Schwarm a ohne Huellenknopf (entschieden, PREREG_geometric_envelope.md par.14d); offen sind der Klassenname und die Tor-1-Spec mit start_by_search. Nichts erzeugt, nichts gemessen. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung freigegeben und gestartet 2026-09-25 (par.9). -->
 
 # Vorregistrierung: das v33-Fenster
 
@@ -91,7 +91,11 @@ unveraendert** (Referenz `models/manifest_train_v32-b01_20260923_075819.json`): 
 Die Kette diffed das Trainings-Manifest gegen diese Referenz; erwartet sind genau `load`, `name`,
 `file_list`, `cache_file`, `seed`, `val_pool`.
 
-### ZWEI ENTSCHEIDE, die dir gehoeren
+### ZWEI ENTSCHEIDE -- GEFALLEN 2026-09-25
+
+**Nutzer: *"1 und 2 wie vorgeschlagen, starte die Erzeugung"*.** Damit gilt: Klassenname
+`value-tempc-nohull`, Tor 1 auf `models/v33_gating.spec.json` beidseits, und die Erzeugung ist
+freigegeben. Die Begruendungen, wie sie vorgelegt waren:
 
 1. **Klassenname `value-tempc-nohull`** statt Weiterfuehrung von `value-tempc`. Fuer den neuen
    Namen spricht: ab v33 traegt jede spaetere Fensterliste den Unterschied im Dateinamen, und die
@@ -107,7 +111,7 @@ Die Kette diffed das Trainings-Manifest gegen diese Referenz; erwartet sind gena
    Tor-1-Gegner `v32-b01` spielt dann mit einer Spec, auf der er nicht promoviert wurde -- fair,
    weil beidseits gleich, aber eine andere Konfiguration als die seiner eigenen Kanten.
 
-**Und die Freigabe der Erzeugung selbst** (Ablauf Punkt 7: der Skill endet mit der Vorlage).
+**Die Freigabe der Erzeugung** ist mit demselben Satz erteilt.
 
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`)
 

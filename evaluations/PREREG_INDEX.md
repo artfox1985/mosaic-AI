@@ -87,7 +87,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
-| `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ist VORLAGE: Rezept wie v32, dazu Schwarm a ohne Huellenknopf (entschieden, PREREG_geometric_envelope.md par.14d); offen sind der Klassenname und die Tor-1-Spec mit start_by_search. Nichts erzeugt, nichts gemessen. |
+| `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung freigegeben und gestartet 2026-09-25 (par.9). |
 
 ## ENTSCHIEDEN (110)
 
