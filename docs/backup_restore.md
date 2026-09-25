@@ -96,7 +96,7 @@ restic 0.19.1, beim Zurueckholen von `player_profiles.json` aus `bd59317e`).
 `restic ls` druckt den Pfad im UNIX-Stil mit dem Laufwerk als erstem Glied:
 
 ```
-/D/OneDrive/Documents/Projekte/mosaic-AI/player_profiles.json
+/D/<Pfad unter dem Laufwerk>/<Projektordner>/player_profiles.json
 ```
 
 Genau diese Form wollen `dump` und `--include`. Die Windows-Schreibweise

@@ -20,6 +20,7 @@ cd "$REPO_ROOT" || exit 1
 
 ZERO_SHA="0000000000000000000000000000000000000000"
 ENGINE_SRC_CHANGED=""
+FULL_TEST=""
 PRIVACY_HITS=""
 
 # Rechnerstruktur-Waechter (CLAUDE.md, Abschnitt "Oeffentliches Repo: keine
@@ -57,6 +58,35 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     if [ "$local_sha" = "$ZERO_SHA" ]; then
         continue  # Ref wird geloescht -- nichts zu pruefen
     fi
+    # --- BASIS UNBEKANNT (2026-09-25) -----------------------------------------
+    # Bis hierher rechnete der Haken seinen Pruefbereich als `remote..local`,
+    # und jedes `git diff` darauf lief mit `2>/dev/null`. Kennt das lokale Repo
+    # den Remote-Stand NICHT -- nach dem Historien-Umschrieb vom 2026-09-23,
+    # oder bei einem nie geholten Remote --, scheitert dieser diff still, liefert
+    # eine leere Liste, und BEIDE Waechter lassen durch: kein Engine-Test, kein
+    # Rechnerstruktur-Scan. Gefunden beim ersten Push nach dem Umschrieb; ein
+    # absoluter Pfad in docs/backup_restore.md waere dabei unbemerkt
+    # hinausgegangen.
+    #
+    # Derselbe Fehlertyp steckte im Fall NEUER Remote-Branch: dort war
+    # `RANGE="$local_sha"`, und `git diff --name-only <commit> -- engine/src/`
+    # vergleicht den Commit mit dem ARBEITSBAUM, nicht den Branch mit nichts.
+    #
+    # Beide Faelle pruefen jetzt VOLL: Rechnerstruktur ueber den ganzen Baum des
+    # gepushten Stands, Engine-Test ohne Herabstufung auf Kompilieren. Lieber
+    # einmal zu viel testen als einen Push durchwinken, dessen Inhalt niemand
+    # angesehen hat.
+    FULL_CHECK=""
+    if [ "$remote_sha" = "$ZERO_SHA" ]; then
+        FULL_CHECK="neuer Remote-Branch"
+    elif ! git cat-file -e "${remote_sha}^{commit}" 2>/dev/null < /dev/null; then
+        FULL_CHECK="Remote-Stand ${remote_sha} ist lokal unbekannt (Umschrieb oder nie geholt)"
+    fi
+    if [ -n "$FULL_CHECK" ]; then
+        echo "pre-push: $FULL_CHECK -- pruefe den GANZEN Baum statt eines Bereichs." >&2
+        FULL_TEST="yes"
+    fi
+
     if [ "$remote_sha" = "$ZERO_SHA" ]; then
         RANGE="$local_sha"  # neuer Remote-Branch: kompletten Branch pruefen
     else
@@ -72,7 +102,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     # NICHT umgeschrieben, Alt-Treffer duerfen also nicht blockieren.
     # `< /dev/null` an den Kommandosubstitutionen: die erben sonst den stdin
     # der Schleife und koennten die noch ungelesenen Ref-Zeilen fressen.
-    if [ "$remote_sha" = "$ZERO_SHA" ]; then
+    if [ -n "$FULL_CHECK" ]; then
         PRIVACY_FILES=$(git ls-tree -r --name-only "$local_sha" \
                             2>/dev/null < /dev/null)
     else
@@ -95,7 +125,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 "
     fi
 
-    if [ -n "$(git diff --name-only "$RANGE" -- engine/src/ 2>/dev/null)" ]; then
+    if [ -n "$FULL_CHECK" ]; then
+        ENGINE_SRC_CHANGED="yes"
+    elif [ -n "$(git diff --name-only "$RANGE" -- engine/src/ 2>/dev/null)" ]; then
         ENGINE_SRC_CHANGED="yes"
         # Nutzer-Wunsch 2026-08-11: "bei aenderungen im logtext brauch ich keinen
         # engine cargo build check". Nicht ganz weglassen, sondern von TESTEN auf
@@ -114,6 +146,10 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         fi
     fi
 done
+
+# Eine volle Pruefung (Basis unbekannt) darf nie auf Kompilieren herabgestuft
+# werden -- auch nicht durch eine zweite Ref im selben Push.
+[ -n "$FULL_TEST" ] && NUR_LOGTEXT=""
 
 # Rechnerstruktur-Waechter zuerst auswerten: er gilt fuer JEDEN Push, nicht
 # nur fuer engine/src/-Aenderungen.
