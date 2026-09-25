@@ -14,7 +14,9 @@ in einem isolierten Wheel-Export ohne .git oder mit altem Wheel ohne die neue
 pyo3-Funktion) -- ein Manifest-Fehler darf den eigentlichen Self-Play-Lauf NIE
 verhindern.
 """
+import hashlib
 import json
+from pathlib import Path
 
 from config import BASE_DIR, DATA_DIR
 
@@ -57,6 +59,45 @@ def _engine_config() -> dict:
         return {"_error": f"engine_config_json nicht verfügbar: {e!r}"}
 
 
+def _spec_block(spec_path) -> dict | None:
+    """Pfad, sha256 und INHALT der Spec-Datei, mit der der Lauf gefahren ist.
+
+    Anlass (STATUS 6 Punkt 7, geprueft 2026-09-13; Nutzer-Auftrag 2026-09-25):
+    `engine_config` meldet fuer die Spec-Felder `envelope_search_c`,
+    `envelope_projection_mode`, `envelope_hull_form`, `special_row6_w` und
+    `return_order_mode` den ENV-Default, nicht den wirksamen Spec-Wert -- die
+    Spec wird je Seite in der Spielschleife geladen, `engine_config_json` sieht
+    davon nichts. Am 2026-09-23 hat genau das eine falsche Aufzaehlung in
+    `PREREG_v32_window.md` par.6 erzeugt ("alles uebrige 0", die Datei trug
+    `envelope_search_c 1,0`).
+
+    Bisher stand im Manifest nur der PFAD. Eine Datei unter demselben Namen
+    kann sich aendern; der sha256 haelt fest, WELCHE es war, und der Inhalt
+    macht die Frage "mit welchen Knoepfen lief das?" ohne die Datei
+    beantwortbar. Ab v33 laufen zwei Klassen mit verschiedenen Specs
+    (`PREREG_geometric_envelope.md` par.14d); das Manifest ist dann die Stelle,
+    an der man sie auseinanderhaelt.
+
+    Additiv und best-effort wie der Rest dieser Datei: `engine_config` bleibt
+    unveraendert, damit alte und neue Manifeste diffbar bleiben, und ein
+    Lesefehler landet als `_error` im Block statt den Lauf zu stoppen.
+    """
+    if not spec_path:
+        return None
+    path = Path(spec_path)
+    if not path.is_absolute() and not path.exists():
+        path = BASE_DIR / path
+    try:
+        raw = path.read_bytes()
+        return {
+            "path": str(spec_path),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "content": json.loads(raw.decode("utf-8")),
+        }
+    except Exception as e:
+        return {"path": str(spec_path), "_error": repr(e)}
+
+
 def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict) -> None:
     """Schreibt `data/manifest_<version>_<timestamp>.json` neben die
     generierten .pkl-Dateien."""
@@ -67,6 +108,7 @@ def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict) -
         "git_commit": _git_commit_hash(),
         "git_dirty": _git_is_dirty(),
         "engine_config": _engine_config(),
+        "spec_file": _spec_block(cli_args.get("spec")),
     }
     path = DATA_DIR / f"manifest_{version_name}_{run_timestamp}.json"
     try:

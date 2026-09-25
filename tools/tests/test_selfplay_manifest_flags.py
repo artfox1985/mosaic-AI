@@ -110,5 +110,49 @@ class SelfPlayManifestFlags(unittest.TestCase):
             )
 
 
+
+class SpecFileBlock(unittest.TestCase):
+    """Das Manifest haelt Pfad, sha256 und INHALT der Spec (Nutzer-Auftrag 2026-09-25).
+
+    `engine_config` meldet fuer Spec-Felder den Env-Default statt des wirksamen
+    Werts (STATUS 6 Punkt 7); am 2026-09-23 ist daraus eine falsche Aufzaehlung
+    in einer Prereg geworden. Dieser Block ist die Stelle, an der der wirksame
+    Wert steht -- der Test haelt fest, dass er dort AUCH steht.
+    """
+
+    def setUp(self):
+        import sys
+        sys.path.insert(0, str(REPO))
+        from selfplay_manifest import _spec_block
+        self.spec_block = _spec_block
+
+    def test_content_and_sha256_match_the_file(self):
+        import hashlib
+        import json
+        import tempfile
+        spec = {"envelope_search_c": 1.0, "return_order_mode": 1}
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "x.spec.json"
+            path.write_text(json.dumps(spec), encoding="utf-8")
+            block = self.spec_block(str(path))
+            raw = path.read_bytes()
+        self.assertEqual(block["path"], str(path))
+        self.assertEqual(block["sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(block["content"], spec)
+
+    def test_unreadable_spec_is_recorded_not_raised(self):
+        """Best-effort: ein Manifest-Fehler darf den Lauf NIE verhindern."""
+        block = self.spec_block("models/gibt_es_nicht_2026_09_25.spec.json")
+        self.assertIn("_error", block)
+        self.assertNotIn("content", block)
+
+    def test_no_spec_means_no_block(self):
+        self.assertIsNone(self.spec_block(None))
+        self.assertIsNone(self.spec_block(""))
+
+    def test_manifest_writes_the_block(self):
+        text = (REPO / "selfplay_manifest.py").read_text(encoding="utf-8")
+        self.assertIn('"spec_file": _spec_block(cli_args.get("spec"))', text)
+
 if __name__ == "__main__":
     unittest.main()
