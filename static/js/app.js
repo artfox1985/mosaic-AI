@@ -343,9 +343,16 @@ async function triggerAIMove() {
   try {
     await new Promise(r => setTimeout(r, 600));
 
-    // Loop: KI zieht solange sie dran ist (max 20 Züge gegen Endlosloop)
+    // Loop: KI zieht solange sie dran ist. Der Deckel schuetzt nur gegen einen
+    // Endlosloop, er ist KEINE Zuglaenge. Bis 2026-09-25 stand er auf 20 -- seit
+    // die Netz-KI den Stapelzug Teilzug fuer Teilzug entscheidet
+    // (PREREG_dome_return_order.md par.14), ist jedes Weiterziehen ein eigener
+    // Schritt, dazu Slot, Rueckgabe und Rotation, und am Mondknoten bis zu vier
+    // Wahlen. Bei 0 Punkten ist Ziehen kostenlos (docs/engine_manual.md, "further
+    // draws are effectively free"); ein Deckel von 20 liefe dann mitten im Zug aus,
+    // und die Partie stuende, weil der Mensch nicht am Zug ist.
     let safety = 0;
-    while (aiIsDue() && safety++ < 20) {
+    while (aiIsDue() && safety++ < 200) {
       const d = await api('/ai/move');
       if (!d.ok) {
         // Kein Fehler anzeigen wenn KI einfach nicht dran ist

@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: GEBAUT ja (Knoten 411-413 in Aktionsraum, Encoder, Suche, Korpus). TRAEGT nein: A/B 74:76 und 74:76, Vorzeichentest p=1,0 (par.9); erklaert durch den VORAB registrierten Deckel aus par.8a -- der Value-Kopf sieht nur die TYP-Folge, 93 bzw. 85 Prozent der Paare spielen dasselbe. Der Knopf bleibt (Massstab Vollstaendigkeit, nicht Elo), Default 0. Dosis-Nachrechnung an der v31-Erzeugung eingeloest (par.13): 28,0 Prozent der Sockel-Partien haben eine Gelegenheit gegen 17,75 an v30, Knoten durchgehend mit Lernziel. Nutzer-Entscheid 2026-09-21: geschlossen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: GEBAUT ja (Knoten 411-413 in Aktionsraum, Encoder, Suche, Korpus). TRAEGT nein: 74:76 und 74:76, p=1,0 (par.9); der Deckel stand vorab in par.8a, 93 bzw. 85 Prozent der Paare spielen dasselbe. Knopf bleibt, Default 0 (par.13). Dosis 0,81 belegt (par.13). par.14: die GUI setzte das Knoten-Tor nie und spielte an drei Stellen eine andere Entitaet als die Messung -- seit 2026-09-25 gebaut, Anker gruen, Rauchtest gruen (par.14b). -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -1422,3 +1422,153 @@ eine Typ-Folge zeigen. Das ist eine andere Frage als die dieser Prereg, und par.
 weitere Stufe" bereits als Nutzer-Entscheid registriert. Das A/B mit mehr Partien zu wiederholen
 wuerde am 93-Prozent-Split nichts aendern: Paare, die nichts unterscheiden, werden durch mehr
 Partien nicht informativ.
+
+## par.14 DIE GUI LAEUFT AM KNOTEN-TOR VORBEI (gefunden 2026-09-25, Nutzer-Frage)
+
+**Anlass war eine Nutzer-Frage beim Champion-Wechsel v31 -> v32**, nicht eine Messung:
+*"sprich der champion nutzt zwei modes nicht? die freie wahl der startkuppel und die rueckgabe
+der stapel?"* Die Champion-Spec traegt `return_order_mode` nicht, und die naheliegende Antwort
+waere gewesen: dann gilt Default 0, also Ziehreihenfolge. **Die Antwort ist fuer Arena und GUI
+verschieden, und das ist der Befund.**
+
+### Der Code
+
+Seit R3 (par.12.9) entscheidet die Rueckgabe nicht mehr der Sammelaufloeser, sondern ein eigener
+Suchknoten -- aber nur hinter einem Tor:
+
+| Stelle | Inhalt |
+| --- | --- |
+| `game.rs:692` `return_order_node_applies` | `state.extended_action_nodes[current_player] && rest_len >= 2` |
+| `net_mcts.rs:77` `net_supports_extended_action_nodes` | `net.policy_width() >= NUM_ACTIONS` (= 414) |
+| `self_play.rs:3820` | setzt das Tor je Seite aus genau dieser Pruefung |
+| `state.rs:577` | Default `[false; NUM_PLAYERS]`, Test `game.rs:1375` "Default ist AUS" |
+| `py.rs` | **setzt das Tor nirgends** (Grep: 0 Treffer) |
+
+**Folge:** derselbe Champion spielt zwei verschiedene Spiele. In Arena, Gating und Self-Play ist
+er ein 414er-Netz, das Tor steht offen, und er entscheidet die Rueckgabe als eigenen Suchknoten
+(IDs 411-413) mit eigener Besuchsverteilung. In der GUI steht das Tor aus, der Sammelaufloeser
+laeuft (`py.rs:1045`, `py.rs:360`), und `return_order_mode` aus der Umgebung entscheidet -- bei
+fehlendem Spec-Feld also Ziehreihenfolge.
+
+**Die Spec erreicht die GUI dabei sehr wohl:** `server.py` loest die Champion-Spec auf und setzt
+sie ueber `spec_env.apply_spec_env` in die `MOSAIC_*`-Knoepfe, und `return_order_mode` steht in
+der Abbildung. Der Bruch sitzt nicht an der Spec, sondern am Tor.
+
+### Warum das kein Schoenheitsfehler ist
+
+Es ist derselbe Typ wie der Vorfall v25-b01 bis v27-b01 (Champion-Spec fuer den Server nicht
+auffindbar, `docs/promotion_checklist.md` Punkt 1): **die GUI spielt eine andere Entitaet als
+die, die gemessen wurde.** Wer im Browser gegen den Champion spielt, spielt nicht gegen den
+Champion der Elo-Leiter. Und es ist eine Korrektheitsfrage, keine Elo-Frage -- eine Arena sieht
+den Unterschied nie, weil dort beide Seiten am selben Tor haengen (CLAUDE.md, "Symmetrische
+Defekte sieht keine Arena").
+
+### Nutzer-Entscheid 2026-09-25
+
+*"eigener punkt, die gui muss spielen wie gemessen."* Die Korrektur ist damit beauftragt:
+`py.rs` setzt das Tor fuer die KI-Seite aus derselben Pruefung wie `self_play.rs:3820`.
+
+**Reichweite, damit beim Bauen niemand zu weit schneidet:** das Tor haengt am SPIELER
+(`extended_action_nodes[current_player]`). Die menschliche Seite hat kein Netz, ihr Tor bleibt
+aus -- es entsteht also kein neuer Entscheid, den die Oberflaeche anzeigen muesste.
+
+**Noch nicht gebaut** (Stand 2026-09-25). Der Bau ist ein Engine-Eingriff und zieht Wheel-Neubau
+und Anker-Invarianz nach sich; er laeuft deshalb NACH dem Champion-Wechsel v32-b01, damit die
+Promotions-Kanten nicht ueber einen Wheel-Wechsel hinweg gemessen werden.
+
+### par.14a BAUSTAND 2026-09-25 (Quelltext geschrieben, NICHT kompiliert, nichts gemessen)
+
+**Berichtigung zu par.14 selbst:** dort steht, die GUI weiche bei der RUECKGABE ab. Das Tor
+`extended_action_nodes` regelt aber DREI Dinge (`game.rs:642-649`: "BEIDE haengen an demselben
+Tor", dazu `stack_move_decided_by_loop`, `game.rs:709`):
+
+| | Arena, Gating, Self-Play (gemessen) | GUI bis 2026-09-25 |
+| --- | --- | --- |
+| Mondstapel-Reihenfolge (406-410) | eigener Suchknoten | kanonisch, ohne Wahl |
+| Stapelzug | Teilzug fuer Teilzug, jeder mit eigener Suche | in EINEM Stueck aufgeloest |
+| Rueckgabe (411-413) | eigener Suchknoten | `return_order_mode` aus der Umgebung |
+
+Die GUI-KI spielte also an drei Stellen einen anderen Agenten als den gemessenen, nicht an einer.
+
+**Gebaut (Quelltext):**
+
+1. `engine/src/py.rs` `ai_drafting_net_step`: setzt vor der Suche
+   `extended_action_nodes[current_player]` aus `net_supports_extended_action_nodes(net)`,
+   also aus derselben Pruefung wie `self_play.rs:3820`. Je Schritt neu, weil eine neue Partie
+   oder ein geladener Spielstand das Feld zuruecksetzt (`serialize.rs:1274`). Die Methode ruft
+   `server.py` nur fuer `_ai_player`; die Seite des Menschen bleibt aus.
+2. `static/js/app.js` `triggerAIMove`: Schrittdeckel je KI-Zug **20 -> 200**. Mit offenem Tor ist
+   jedes Weiterziehen ein eigener `/api/ai/move`-Aufruf, und bei 0 Punkten ist Ziehen kostenlos
+   (`docs/engine_manual.md`, Abschnitt A). Ein Deckel von 20 liefe dann mitten im Stapelzug aus,
+   und die Partie stuende -- der Mensch ist nicht am Zug, und nichts ruft die KI erneut.
+3. `engine/src/knob_registry.rs`: drei veraltete Aussagen berichtigt (Muenze je Rueckgabe ist
+   par.11c-ENTSCHIEDEN, nicht "noch nicht nachgezogen"; die Streuung sitzt seit 2026-09-19 auch
+   im Knoten-Weg; die GUI-Netz-KI hat jetzt das Tor).
+
+**Geprueft vor dem Bau:**
+
+* **Mehrschrittigkeit traegt.** Das Frontend ruft nach, solange die KI am Zug ist
+  (`while (aiIsDue() ...)`); `current_player` wechselt im Stapelzug erst mit der Rotation
+  (`game.rs:705`) und am Mondknoten erst nach der Wahl (`game.rs:938`).
+* **Alle Knoten-Aktionen sind fuer die JSON-Ausgabe beschriftet** (`mcts.rs` `label_search_move`:
+  `DrawStackPeek`, `ChooseDrawStackSlot`, `ChooseDomeRotation`, `ChooseMoonTop`,
+  `ChooseReturnFirst`); das Frontend wertet `ai_action` nicht aus.
+* **Keine neue Informationsluecke fuer den Menschen.** Regel (`docs/engine_manual.md`, Abschnitt
+  A): der Gegner sieht die Vorderseiten der gezogenen Platten und die Platzierung, NICHT die
+  Rueckgabe-Reihenfolge. Der oeffentliche Zustand traegt keine Stapelreihenfolge, nur Anzahl,
+  TYP der obersten Platte (den zeigen die Rueckseiten) und die Vorderseiten in
+  `pending_stack_draw` (`serialize.rs:411-423`). Das Feld `action` der KI-Antwort trug schon
+  VOR dieser Aenderung den vollstaendig aufgeloesten Stapelzug samt `return_order`
+  (`py.rs:1072`) -- dieser Kanal ist also nicht neu. Neu ist allein, dass die Vorderseiten der
+  aufgedeckten Platten einige Schritte frueher sichtbar werden. Das ist unschaedlich: der
+  Mensch trifft waehrend des KI-Zugs keinen Entscheid, und beim Aufhoeren werden sie ohnehin
+  aufgedeckt.
+
+**Offen bis zum Bau** (nach dem Champion-Wechsel, nicht ueber die Promotions-Kanten hinweg):
+`cargo test --release --no-run` (examples/benches), Lib-Tests, Wheel, Anker-Invarianz Drift und
+Konservierung, und ein Rauchtest gegen eine lebende Partie, in der die KI mindestens einen
+Stapelzug und einen Mondknoten spielt. **UNGEPRUEFT** ist dabei, ob die Protokoll-Luecke, die
+`py.rs` fuer den aufgeloesten Stapelzug beschreibt (`PREREG_action_id_logging.md` S2), sich damit
+von selbst schliesst -- das zeigt erst das Spiel-Log des Rauchtests.
+
+### par.14b GEBAUT UND ABGENOMMEN (2026-09-25, nach dem Champion-Wechsel v32-b01)
+
+Gebaut nach der Promotion, damit keine Promotions-Kante ueber einen Wheel-Wechsel hinweg gemessen
+wurde. Das eingefrorene Artefakt `v32-b01` traegt das Wheel VOR dieser Aenderung (`e11ea6d5...`);
+live ist seither `46b5dfed...` (Paketversion unveraendert 1.1.0).
+
+| Tor | Ergebnis |
+| --- | --- |
+| `cargo test --release --no-run` (examples, benches) | gruen, ohne Warnung, 53 s |
+| Lib-Tests | **693 bestanden, 0 fehlgeschlagen** (20 ignoriert), darin die Netz-Paritaets-Fixture im frischen Prozess |
+| Vertragshash, Breiten | unveraendert `6ef829e564c58bd5`, 888/414 |
+| Anker-Drift (`verify_frozen_heuristic.py`, lebendes Wheel) | **GRUEN**, 1.763 Schritte Feld fuer Feld gleich (`anchor_drift_2026-09-25_gui_gate.json`) |
+| Anker-Konservierung (`--venv`) | **GRUEN**, 1.763 Schritte (`anchor_conservation_2026-09-25_gui_gate.json`) |
+| Rauchtest `tools/probes/gui_node_gate_smoke.py`, 4 Partien, 100 Sims | **GRUEN** (`gui_node_gate_smoke.json`) |
+
+**Rauchtest, die Zahlen** (Grundmenge: 4 ganze Partien ueber `PyGame.ai_step_net_json`, denselben
+Einstieg wie `/api/ai/move`; Einheit: KI-Entscheidungen in der Drafting-Phase):
+
+* Netz-KI: **54** Mondwahlen (11 bis 16 je Partie), **20** einzelne Peek-Schritte, **13**
+  Slot-Wahlen, **1** Rueckgabeknoten. Hoechstens **7** KI-Schritte in einem Zug, weit unter dem
+  Frontend-Deckel von 200.
+* Menschenseite (Heuristik-Pfad ohne Netz): **0** Mondwahlen, **0** Rueckgabeknoten in allen vier
+  Partien. Das Tor bleibt dort zu.
+
+**Berichtigung am eigenen Instrument, im selben Zug:** der erste Lauf meldete die Menschenseite ROT,
+weil die Sonde `choose_draw_stack_slot` als tor-exklusiv zaehlte. Das ist falsch: der
+Heuristik-Pfad der GUI wendet jede Aktion einzeln an (`py.rs` `ai_drafting_step`: *"Bei
+DrawStackPeek endet der Zug nicht; ein Folgeaufruf dieser Methode ... entscheidet dann"*) und
+spielt den Stapelzug darum schon immer in Teilzuegen. Tor-exklusiv sind nur Mond- und
+Rueckgabeknoten (`game.rs:684`, `game.rs:692`). Die Partien beider Laeufe sind je Seed
+zaehlgleich; geaendert hat sich allein das Kriterium.
+
+**Server-Probe:** nach dem Neustart meldet die Konsole *"Champion-Spec
+v32-b01_brierbest.spec.json"*, `/api/champion` liefert `v32-b01_brierbest`. Eine Partie im
+Browser ist NICHT gespielt worden -- der Rauchtest faehrt denselben Rust-Einstieg, den
+`/api/ai/move` aufruft; ungeprueft bleibt allein die Frontend-Schleife selbst, deren Deckel jetzt
+200 statt 20 ist.
+
+**Offen aus par.14a:** ob sich die Protokoll-Luecke fuer den aufgeloesten Stapelzug
+(`PREREG_action_id_logging.md` S2) damit schliesst, ist NICHT geprueft -- die Sonde liest die
+Aktionen aus den Antworten, nicht aus dem Spiel-Log.

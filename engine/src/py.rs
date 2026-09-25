@@ -962,6 +962,28 @@ impl PyGame {
         let net = self.net.as_ref().ok_or_else(|| {
             PyValueError::new_err("Kein Netz geladen — load_net() zuvor aufrufen.")
         })?;
+        // `PREREG_dome_return_order.md` par.14 (Nutzer 2026-09-25: "die gui muss
+        // spielen wie gemessen"): dasselbe Tor wie in der Spielschleife
+        // (`self_play.rs:3820`), aus derselben Pruefung. Ohne diese Zeile stand
+        // `extended_action_nodes` hier immer auf `false` (`state.rs:577`), und die
+        // GUI-KI spielte an DREI Stellen einen anderen Agenten als den gemessenen:
+        // Mondstapel-Reihenfolge kanonisch statt gesucht (406-410), Stapelzug in
+        // einem Stueck aufgeloest statt Teilzug fuer Teilzug, Rueckgabe per
+        // `return_order_mode` statt als eigener Suchknoten (411-413).
+        //
+        // Gesetzt wird es fuer den Spieler AM ZUG, also die KI -- diese Methode ruft
+        // `server.py` nur fuer `_ai_player` (`/api/ai/move`). Die Seite des Menschen
+        // bleibt aus: sie hat kein Netz, und ihr Stapelzug laeuft weiter ueber
+        // `apply_dome_stack_choose`. Je Schritt neu gesetzt statt einmal beim Laden,
+        // weil eine neue Partie oder ein geladener Spielstand das Feld zuruecksetzt
+        // (`serialize.rs:1274`).
+        //
+        // Der Stapelzug wird damit zu mehreren `/api/ai/move`-Aufrufen; das Frontend
+        // ruft nach, solange die KI am Zug ist (`app.js` triggerAIMove), und
+        // `current_player` wechselt erst mit der Rotation (`game.rs:705`).
+        let pi = self.game.state.current_player;
+        self.game.state.extended_action_nodes[pi] =
+            net_mcts::net_supports_extended_action_nodes(net);
         let actions = drafting_actions(&self.game.state);
         if actions.is_empty() {
             return Ok(json!({
