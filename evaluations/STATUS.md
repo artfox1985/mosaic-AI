@@ -39,8 +39,10 @@ und -Konservierung gruen, 693 Lib-Tests gruen):
   vom gemessenen Agenten ab. Rauchtest gruen.
 * **Das Lauf-Manifest traegt Spec-Inhalt und sha256** (`selfplay_manifest.py` `spec_file`), noetig,
   sobald v33 zwei Specs faehrt (siehe unten). Erledigt damit Abschnitt 6 Punkt 7.
-* **Der pre-push-Haken laesst bei unbekannter Basis nicht mehr still durch** -- nach dem
-  Umschrieb vom 2026-09-23 haetten beide Waechter ungeprueft durchgewinkt.
+* **Der pre-push-Haken laesst bei unbekannter Basis nicht mehr still durch.** Erreichbar war das
+  bei einem Force-Push, dessen Remote-Stand lokal fehlt; dann haetten beide Waechter ungeprueft
+  durchgewinkt. (Beim Push-Versuch vom 2026-09-25 lief der Haken gar nicht: Git hat den
+  Nicht-Fast-Forward clientseitig abgewiesen.)
 * `frozen_referee_match.py` und `gumbel_scale_calibration.py` schreiben ihren `laufzeit`-Block.
 
 ### WAS JETZT ANSTEHT (v33)
@@ -289,7 +291,11 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
   alte Historie samt 227 MB als Merge zurueck. Mit Lease auf den am 2026-09-25 per
   `git ls-remote` gepruefte GitHub-Stand (lokal `7b128e35`, in `.git/filter-repo/commit-map`):
   `git push --force-with-lease=main:165d1243de1485092b0d2b70541ce93f365e01e7 origin main`.
-  Kein `git fetch` vorher: der zoege die alten Objekte wieder ins lokale Repo.
+  **Lokal ist das Repo derzeit wieder 227 MiB gross:** die Desktop-App hat `origin` am
+  2026-09-23 um 18:49, zehn Minuten nach dem Umschrieb, im Hintergrund geholt
+  (`refs/remotes/origin/main` = `165d1243`), und damit die alte Historie zurueck in den Pack
+  gezogen. Gemergt ist nichts. NACH dem Force-Push schrumpft es erst wieder mit
+  `git reflog expire --expire=now --all` und `git gc --prune=now`.
 - Keine neuen Netzkoepfe; nicht jeden Arm in die Elo-Leiter.
 
 ## 8. BEFUNDE, die eine Nachschau brauchen

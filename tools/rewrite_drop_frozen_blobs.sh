@@ -56,6 +56,14 @@
 #    WER DAS HIER NOCHMAL FAEHRT: vorher `git status` lesen und JEDE nicht
 #    committete Aenderung sichern, nicht nur die Pfade im Filter.
 #
+# 5. **Die Desktop-App holt `origin` im Hintergrund, sobald er wieder eingetragen
+#    ist** -- am 2026-09-23 zehn Minuten nach dem Lauf (Reflog: `fetch --porcelain
+#    ... --refmap=`). Das zieht die ALTE Historie samt der getilgten Blobs zurueck
+#    in den Pack (33,7 -> wieder 227 MiB lokal), bis der Force-Push GitHub
+#    ueberschrieben hat; erst danach `reflog expire` und `gc --prune=now`.
+#    Wer die 33,7 MiB halten will, pusht UNMITTELBAR nach dem Umschrieb oder
+#    traegt `origin` erst zum Push wieder ein.
+#
 # ------------------------------------------------------- VORBEDINGUNGEN -----
 #
 # a) **Keine zweite Sitzung auf dem Baum.** Ein Umschrieb waehrend einer

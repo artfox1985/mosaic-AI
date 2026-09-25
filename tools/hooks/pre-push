@@ -64,9 +64,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     # den Remote-Stand NICHT -- nach dem Historien-Umschrieb vom 2026-09-23,
     # oder bei einem nie geholten Remote --, scheitert dieser diff still, liefert
     # eine leere Liste, und BEIDE Waechter lassen durch: kein Engine-Test, kein
-    # Rechnerstruktur-Scan. Gefunden beim ersten Push nach dem Umschrieb; ein
-    # absoluter Pfad in docs/backup_restore.md waere dabei unbemerkt
-    # hinausgegangen.
+    # Rechnerstruktur-Scan.
+    #
+    # ERREICHBAR ist das beim FORCE-Push: ein abgewiesener Nicht-Fast-Forward-Ref
+    # wird dem Haken gar nicht erst uebergeben, ein erzwungener schon -- auch wenn
+    # das lokale Repo den Remote-Stand nie gesehen hat (--force-with-lease=<ref>:<sha>
+    # braucht das Objekt nicht). BERICHTIGT 2026-09-25: hier stand zuerst, der
+    # erste Push-Versuch nach dem Umschrieb vom 2026-09-23 habe den Fall ausgeloest.
+    # Das war falsch -- die Desktop-App hatte origin zehn Minuten nach dem Umschrieb
+    # im Hintergrund geholt, der Remote-Stand war lokal bekannt, und Git hat den
+    # Push schon clientseitig abgewiesen, ohne den Haken zu fragen. Die Luecke ist
+    # trotzdem echt: der empfohlene Force-Push OHNE vorherigen Fetch haette sie
+    # getroffen, und mit ihm einen absoluten Pfad in docs/backup_restore.md.
     #
     # Derselbe Fehlertyp steckte im Fall NEUER Remote-Branch: dort war
     # `RANGE="$local_sha"`, und `git diff --name-only <commit> -- engine/src/`
