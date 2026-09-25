@@ -57,7 +57,8 @@ und -Konservierung gruen, 693 Lib-Tests gruen):
    **`v29-b11` faellt heraus.** Seeds nach dem Vierer-Schritt HERGELEITET, beim Anlegen der
    v33-Prereg zu pruefen: Erzeugung 20260942/43/44, Fenster 20260957.
 3. **Champion-Spec der Generation v33:** `start_by_search: 1` eintragen (par.12, Wiedervorlage).
-4. **Push** der umgeschriebenen Historie: nur als Force-Push, Befehl in Abschnitt 7.
+4. **ERLEDIGT 2026-09-25: die umgeschriebene Historie ist gepusht** (Nutzer, Force-Push mit
+   Lease); GitHub steht auf dem lokalen `main`. Ab jetzt wieder normale Pushes.
 
 **Vormerken fuer den v34-Wechsel:** R4 und R4b stehen fuer die Paarung auf
 `data/selfplay_v30-b02-policy_*` (72 Zustaende, Seed 20260803). Diese Generation rotiert beim
@@ -210,10 +211,10 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
    `docs/promotion_checklist.md` Punkt 5. OFFEN bleibt nur, ob sie ab v33 Pflicht sind oder je
    Promotion erfragt werden.
 
-6. **Push der umgeschriebenen Historie.** GitHub steht auf `165d1243`, lokal umgeschrieben als
-   `7b128e35` -- es liegt dort also nichts, was hier fehlt. Ein normaler Push wird abgewiesen (so
-   geschehen 2026-09-25); **NIE `git pull`**, das holte die alte Historie samt 227 MB zurueck.
-   Befehl in Abschnitt 7. Der Nutzer pusht selbst.
+6. **ERLEDIGT 2026-09-25: Push der umgeschriebenen Historie.** GitHub stand auf `165d1243`
+   (lokal umgeschrieben `7b128e35`), der Nutzer hat mit Lease darauf gepusht; seither steht
+   GitHub auf dem lokalen `main`. Ein bestehender Klon auf einem anderen Rechner muss NEU
+   geklont werden -- ein `git pull` dort holte die alte Historie zurueck.
 
 ### Aeltere, weiterhin offene Punkte (unveraendert uebernommen)
 
@@ -287,16 +288,13 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
   noch im Arbeitsbaum und in restic. Ein frischer Klon hat damit kein lauffaehiges Netz -- der
   Nutzer stellt eines bereit, wenn es gebraucht wird. **Kein `git add -f`** fuer kuenftige
   Champions. Die Elo-Zahlen der Heuristik-Knoten stehen im Register `elo_history.csv`.
-  Der Umschrieb hat JEDEN Commit-Hash ersetzt: bestehende Klons sind ungueltig, und der noch
-  ausstehende Push ist ein Force-Push (nur auf Anweisung). **Nie `git pull`** -- das holte die
-  alte Historie samt 227 MB als Merge zurueck. Mit Lease auf den am 2026-09-25 per
-  `git ls-remote` gepruefte GitHub-Stand (lokal `7b128e35`, in `.git/filter-repo/commit-map`):
-  `git push --force-with-lease=main:165d1243de1485092b0d2b70541ce93f365e01e7 origin main`.
-  **Lokal ist das Repo derzeit wieder 227 MiB gross:** die Desktop-App hat `origin` am
-  2026-09-23 um 18:49, zehn Minuten nach dem Umschrieb, im Hintergrund geholt
-  (`refs/remotes/origin/main` = `165d1243`), und damit die alte Historie zurueck in den Pack
-  gezogen. Gemergt ist nichts. NACH dem Force-Push schrumpft es erst wieder mit
-  `git reflog expire --expire=now --all` und `git gc --prune=now`.
+  Der Umschrieb hat JEDEN Commit-Hash ersetzt: bestehende Klons sind ungueltig. Der
+  Force-Push ist am 2026-09-25 erfolgt. Danach lokal `reflog expire` und `gc --prune=now`:
+  **33,89 MiB, 17.472 Objekte, `git fsck` sauber.** Zwischendurch lag das Repo lokal wieder
+  bei 227 MiB, weil die Desktop-App `origin` zehn Minuten nach dem Umschrieb im Hintergrund
+  geholt hatte (Kopf von `tools/rewrite_drop_frozen_blobs.sh`, Folge 5). `git gc` fragt in
+  einem Terminal bei jedem gesperrten Objektverzeichnis "Should I try again?"; aus einer
+  nicht-interaktiven Shell (stdin nicht am Terminal) laeuft es ohne Nachfrage durch.
 - Keine neuen Netzkoepfe; nicht jeden Arm in die Elo-Leiter.
 
 ## 8. BEFUNDE, die eine Nachschau brauchen
