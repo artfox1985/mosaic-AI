@@ -1,0 +1,56 @@
+{
+  "champion": "v32-b01_brierbest",
+  "freeze_date": "2026-09-25",
+  "preliminary": false,
+  "name_dialect": "hv",
+  "model_file": "model.onnx",
+  "pth_file": "model.pth",
+  "spec_file": "spec.json",
+  "model_source": "models/alphazero_v32-b01_brierbest.onnx",
+  "spec_source": "models/v32-b01_brierbest.spec.json",
+  "spec_note": "Byte-gleich mit frozen_champions/v31-b01/spec.json (sha256 4f5e5969...), also der Spec, auf der Tor 1 BEIDSEITS lief. Traegt weder start_by_search noch return_order_mode: Nutzer-Entscheid 2026-09-25, v32 wie gemessen promoten, start_by_search ab der v33-Champion-Spec (PREREG_start_dome_choice.md par.12).",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 2,
+    "special_row6_w": 1.0,
+    "heuristik_variante": "hv1"
+  },
+  "input_size": 888,
+  "num_actions": 414,
+  "model_contract_hash_at_training": "6ef829e564c58bd5",
+  "engine_input_size_live": 888,
+  "engine_num_actions_live": 414,
+  "contract_hash": "6ef829e564c58bd5",
+  "engine_version": "1.1.0",
+  "breiten_note": "Modell und Wheel sind DECKUNGSGLEICH (888/414). Das Wheel ist byte-identisch mit dem zur Einfrierzeit installierten (direct_url.json sha256 e11ea6d5713e07349926d90f13ed193e31fc421abfe7e48453d873a210422499) und ist dasselbe, unter dem v32-b01 trainiert (manifest_train engine_version 1.1.0) und gemessen wurde: Tor 1 am 2026-09-23, Anker- und Champion-2-Kante am 2026-09-25. 1.1.0 traegt den berichtigten Tiling-Cache-Schluessel (CHANGELOG v1.1-alpha31).",
+  "wheels": [
+    "mosaic_rust-1.1.0-cp314-cp314-win_amd64.whl"
+  ],
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, pip install --no-deps aus der Wheel-Kopie plus numpy/onnxruntime"
+  },
+  "training_manifest": "models/manifest_train_v32-b01_20260923_075819.json",
+  "prereg": "evaluations/PREREG_v32_window.md",
+  "wheel_sha256": "e11ea6d5713e07349926d90f13ed193e31fc421abfe7e48453d873a210422499",
+  "display_name": "Tessa",
+  "display_name_note": "Informativ. Die GUI liest den Anzeigenamen NICHT aus dem Artefakt, sondern aus static/js/app.js (AI_DISPLAY_NAME).",
+  "repo_note": "model.onnx, model.pth und das Wheel sind seit 2026-09-23 NICHT im Repo (.gitignore, Nutzer-Entscheid: 'bei bedarf stell ich die netze zur verfuegung'); getrackt werden Spec, Manifest, Golden Probe und wheel.sha256. Die ausfuehrbaren Teile liegen in restic.",
+  "golden_probe_note": "tools/build_frozen_golden_probe.py --per-round 2 --sims 400 --c-puct 1.5 --seed-base 916001 --probe-seed-base 916101 --max-games 40 auf dem Wheel 1.1.0: 10 Sonden, davon 3 mit pending_dome_choice, 40 Partien, 1.109 s einkernig (2026-09-25).",
+  "selftest": "frozen_referee_match --n-games 2 aus dem venv (--no-index --no-deps, nur mosaic_rust 1.1.0, direct_url sha256 e11ea6d5...): Handshake GRUEN, Golden-Selbsttest 10 Sonden 0 Abweichungen, zwei Echtpartien; evaluations/artifacts/referee_selftest_v32-b01.json."
+}

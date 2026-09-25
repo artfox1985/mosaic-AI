@@ -797,6 +797,7 @@ def main() -> int:
     }
 
     t_start = time.perf_counter()
+    t_mono = time.monotonic()
     if len(blocks) == 1:
         # Seriell im ELTERNPROZESS -- die bereits gestarteten Worker werden
         # weiterbenutzt, kein zweiter Start. Bestandsverhalten.
@@ -890,6 +891,29 @@ def main() -> int:
     result["wins_a"] = wins_a
     result["wins_b"] = wins_b
     result["draws"] = draws
+
+    # CLAUDE.md ("Laufzeiten messen, nicht schaetzen", 2026-08-25): der
+    # `laufzeit`-Pflichtblock. Nachgezogen 2026-09-25 -- bis dahin trug dieses
+    # Artefakt nur `elapsed_s`, und betroffen war damit JEDE Anker- und
+    # Champion-2-Kante jeder Promotion.
+    #
+    # ZWEI Startmarken, und das ist kein Versehen: `t_start` ist ein
+    # `perf_counter()`, der Helfer rechnet gegen `time.monotonic()`. Die beiden
+    # Uhren haben verschiedene Epochen -- `t_start` hier hineinzureichen ergaebe
+    # eine stille Unsinnszahl statt eines Fehlers. `elapsed_s` bleibt
+    # unveraendert an seiner Uhr.
+    #
+    # `cpu_s` bleibt null: die Last der Gegenseite liegt in den Worker-
+    # PROZESSEN, und `time.process_time()` summiert Kindprozesse nicht mit
+    # (Begruendung im Modul-Docstring von tools/runtime_block.py).
+    _tools_dir = str(REPO / "tools")
+    if _tools_dir not in sys.path:
+        sys.path.insert(0, _tools_dir)
+    from runtime_block import laufzeit_block
+
+    result["laufzeit"] = laufzeit_block(
+        t_mono, cpu_start=None, threads=args.workers, n_games=len(seeds)
+    )
 
     # Name aus dem Artefakt, nicht aus einem Feld, das nur eine Sorte kennt:
     # ein Heuristik-Manifest hat kein `champion`, die Datei hiess deshalb

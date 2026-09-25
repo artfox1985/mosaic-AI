@@ -57,6 +57,7 @@ import json
 import pickle
 import statistics as stats
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -82,14 +83,33 @@ def quantile(xs, q):
     return s[lo] + (s[hi] - s[lo]) * (i - lo)
 
 
+def _runtime_block(t0: float, c0: float, n_states: int) -> dict:
+    """`laufzeit`-Block ueber den gemeinsamen Helfer; sequenziell, ein Prozess."""
+    tools_dir = str(ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    from runtime_block import laufzeit_block
+    return laufzeit_block(t0, cpu_start=c0, threads=1, n_units=n_states, unit="zustand")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--model", default="v18_best")
     p.add_argument("--sims", type=int, default=400)
     p.add_argument("--n-states", type=int, default=150)
-    p.add_argument("--out", default="evaluations/artifacts/gumbel_scale_calibration.json")
+    # Default MIT Modellname (2026-09-25): der alte feste Pfad hat das v31-b01-Ergebnis
+    # unter einem Namen ohne Modell abgelegt, und jeder spaetere Lauf ohne --out
+    # haette es still ueberschrieben.
+    p.add_argument("--out", default=None,
+                   help="Default: evaluations/artifacts/gumbel_scale_calibration_<model>.json")
     args = p.parse_args()
+    if args.out is None:
+        args.out = f"evaluations/artifacts/gumbel_scale_calibration_{args.model}.json"
+    # CLAUDE.md "Laufzeiten messen, nicht schaetzen": Pflichtblock, nachgezogen
+    # 2026-09-25 -- das Werkzeug laeuft bei jeder Promotion (Liste Punkt 5c) und
+    # schrieb seine Dauer bis dahin nirgends hin.
+    t0, c0 = time.monotonic(), time.process_time()
 
     import mosaic_rust as mr
 
@@ -205,6 +225,7 @@ def main() -> None:
         "ratio_sigma_over_prior_median": med_ratio,
         "c_scale_for_equal_weight": (C_SCALE / med_ratio) if med_ratio and med_ratio == med_ratio else None,
         "ratio_by_round": {str(r): quantile(v, 0.5) for r, v in per_round.items()},
+        "laufzeit": _runtime_block(t0, c0, len(dq_all) + skipped),
     }, indent=2), encoding="utf-8")
     print(f"\nErgebnis: {out}")
 

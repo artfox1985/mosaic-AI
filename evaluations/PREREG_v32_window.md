@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: par.10 -- Fenster 2.947 Dateien, Monolith 1,42 GB, Training `v32-b01` warm in 63 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT** nach dem vorregistrierten Kriterium (z >= +1,96 ODER gepoolt >= 52,5 Prozent): 434:366 aus 800 = 54,25 Prozent, Block-z **+2,37** auf differenzierten Blockwerten -- aber nur EIN Seed traegt einzeln (+3,26 gegen +0,10), schwaecher als v31 (+4,24, beide Seeds). Tor 2b HAELT (volle Spalten +0,005 / +0,133). Tor 2a in par.9. Offen: Promotion, Nutzer-Entscheid. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: Fenster 2.947 Dateien, Training `v32-b01` warm in 63 min (par.10). TOR 1 TRAEGT nach Vorregistrierung: 434:366 = 54,25 Prozent, Block-z +2,37 -- aber nur ein Seed einzeln (+3,26 gegen +0,10). PROMOVIERT 2026-09-25 (par.11): Elo 1480 [1431; 1529] gegen 1450 des Vorgaengers, Champion-2 94:56 trifft die transitive Erwartung, alle Pflicht-Diagnostiken gepaart gegen v31 und unauffaellig; Spec unveraendert, Startkuppel-Suche erst ab v33. -->
 
 # Vorregistrierung: das v32-Fenster
 
@@ -356,3 +356,105 @@ Rueckwaerts-Pruefung: ausser `arena_column_probe.py` rechnet nur
 stuetzt sich auf die Zahl**, es ist also nichts falsch geworden. Entweder `special_total` und
 `special_empty` wandern additiv ins `score_geo` der Arena, oder das Feld wird dort auf `None`
 gesetzt, damit es nicht als Null gelesen werden kann.
+
+## par.11 PROMOTION: `v32-b01_brierbest` ist Champion (2026-09-25)
+
+**Nutzer-Entscheid:** Aufruf `/mosaic-champion-promotion`; auf die Vorlage, die Startkuppel dabei
+einzuschalten: *"Erst promoten wie gemessen, Knopf ab v33"* (`PREREG_start_dome_choice.md`
+par.12). Die Champion-Spec ist damit **byte-gleich** mit der, auf der Tor 1 beidseits lief
+(`frozen_champions/v31-b01/spec.json`, sha256 `4f5e5969...`), und liegt als
+`models/v32-b01_brierbest.spec.json` fuer den Server auffindbar.
+
+### Die drei Elo-Kanten (`docs/promotion_checklist.md` Punkte 2-4), keine frueh gestoppt
+
+| Kante | Stand | Instrument | Bemerkung |
+| --- | --- | --- | --- |
+| Gating gegen `v31-b01` | 201:199 und 233:167 = **434:366** | paired_gating, 2 Seeds | par.10; zwei Registerzeilen mit Seed-Bloecken |
+| Anker `hv4_anchor` @150 | **43:7** (n = 50 fest) | frozen_referee_match, 6 Worker | Worker **150 Sims, c_puct 0,3 ausdruecklich gesetzt** -- der Werkzeug-Default waere 400/1,5; Handshake ROT (Cross-Aera, vorgesehen), Golden-Selbsttest GRUEN; 418,6 s |
+| Champion-2 gegen `v30-b02` | **94:56** (n = 150) | frozen_referee_match, 6 Worker | Handshake GRUEN, binomial p = 0,0024; 2.377,5 s |
+
+**Die Champion-2-Kante trifft die transitive Erwartung**, anders als bei v31. Herleitung, nicht
+gemessen: aus den gepoolten Tor-1-Kanten (+29,6 Elo v32/v31, +53,4 Elo v31/v30) folgen +83,0 Elo,
+also **61,7 Prozent**; gemessen **62,7**.
+
+**Nebenlast waehrend der Champion-2-Kante, gemeldet und aufgeklaert:** ein `grep -rn` des
+Koordinators lief etwa 08:50 bis 08:54 ueber das Repo samt `data/` mit. Die Partien der
+Listenindizes 44 bis 71 (alles, was im Fenster fertig wurde oder lief) wurden mit denselben Seeds
+und derselben Paritaet wiederholt: **28 von 28 identisch** in Seite, Anzug, Punkten, Sieger und
+Schrittzahl (`champion2_v32-b01_vs_v30-b02_rerun_44-71.json`). Die Kante ist nicht kontaminiert,
+und der Referee ist unter dieser Last nachweislich deterministisch.
+
+**Leiter** (Segment 2, Anker fix 1000, Block-Bootstrap):
+
+| Knoten | Elo | KI95 | Partien |
+| --- | --- | --- | --- |
+| **`v32-b01@400`** | **1480** | [1431; 1529] | 1.000 |
+| `v31-b01@400` | 1450 | [1406; 1496] | 1.800 |
+| `v30-b02@400` | 1411 | [1371; 1453] | 1.890 |
+
++30 Elo gegen den Vorgaenger, die Intervalle ueberlappen -- passend zu einem Tor 1, das auf einem
+von zwei Seeds ruhte.
+
+**Standard-Kennzahlen:** fuer den Kandidaten vollstaendig an der Hauptkante in par.10 (800
+gepaarte Partien, je Seed). Fuer die beiden Referee-Kanten hier Punkte und Marge aus den
+Artefakten: Anker v32 **59,52** gegen 42,20, Marge **+17,32** (sd 15,2, n = 50); Champion-2 v32
+**57,23** gegen 52,83, Marge **+4,41** (sd 18,9, n = 150). Reihen, Spalten, Strafleiste und
+Plattenpunkte dieser zwei Kanten sind NICHT ausgewertet: die Werkzeuge
+(`plate_points_from_arena.py`, `arena_column_probe.py`) lesen das Format der gepaarten Arena, nicht
+das des Referees. Die vollen Partie-Logs liegen aber in beiden Artefakten (`games[].log`), die
+Groessen sind also ohne Neulauf nachziehbar.
+
+### Pflicht-Diagnostiken (Punkt 5), jede GEPAART gegen v31-b01
+
+| | v31-b01 | **v32-b01** | Paarungs-Beleg |
+| --- | --- | --- | --- |
+| R4: Value-Kopf Steigung / R2 | 0,454 / 0,414 | 0,456 / 0,408 | 72 von 72 Zustaenden identisch in `game_id`, `true_margin`, `true_winprob` |
+| R4: Punkte-Kopf Steigung / R2 | 1,193 / 0,312 | 1,250 / 0,327 | dieselben |
+| R4: Vorzeichen-Anker | 50/70 | 50/70 | dieselben |
+| R4b: Trunk -> Marge / Siegwahrscheinlichkeit (LOO-R2) | 0,940 / 0,927 | **0,940 / 0,910** | Eingabe-Sonde 0,087 / 0,034 auf beiden Seiten identisch |
+| R4b: Koepfe realisiert (Margenskala) | -2,18 | -2,28 | Decke 0,983 beide |
+| R5: Value-Daempfung (Steigung) / R2 | 0,146 / 0,309 | **0,177** / 0,328 | Kennlinie BITGLEICH (a = -0,78786, b = 0,39438), je 139 Paare |
+| R5: Punkte-Kopf Steigung / R2 | 1,088 / 0,372 | 1,068 / 0,378 | dieselben |
+| Platt `frozen_v3`: A / B / Brier | -0,0261 / 0,6006 / 0,22919 | **-0,0127 / 0,5989 / 0,22864** | v31 reproduziert seine eingetragenen Werte EXAKT |
+| Platt `frozen_v1` (Trend): B / Brier | 0,5489 / 0,26266 | 0,5462 / 0,26181 | dieselben Laeufe |
+| sigma/Prior, Median (Runden 1-4) | 1,899 (1,52/2,10/1,94/2,03) | **1,743** (1,17/1,98/2,62/2,13) | 233 verwertbare von 300 Zustaenden beide |
+
+**Lesart, knapp:** unveraendert der Befund, den R4b fuer v31 geliefert hat -- der Trunk traegt die
+Endspiel-Information, das Auslesen verliert sie; die Engstelle ist weder Encoder noch Kapazitaet.
+Die R5-Daempfung ist leicht kleiner, liegt aber weit unter dem unverzerrten 1,0; ein Intervall
+traegt das Werkzeug nicht aus, und 139 Paare aus 24 Zustaenden sind geklumpt -- Richtung, kein
+Befund. Die **Brier-Regel haelt** (0,22864 gegen 0,22919). Die sigma/Prior-Kennzahl bleibt unter
+3; die c_visit/c_scale-Familie oeffnet sich NICHT.
+
+**Substrat-Vorbehalt:** R4/R4b stehen fuer die Paarung auf `selfplay_v30-b02-policy_*`, also auf
+Zustaenden zweier Generationen zurueck; R5 und Platt auf den eingefrorenen Sets. Das ist die
+Bedingung der Vergleichbarkeit und wird so benannt, nicht verschwiegen.
+
+**Laufzeiten** (in den Artefakten): R4 2.756,1 s, R4b 42,5 s, R5 877,7 s, sigma/Prior 707,5 s.
+
+### 5b-5d und Punkt 7
+
+* **5b Anzeige-Kalibrierung:** `server.py` `_DISPLAY_CAL_A/_B` auf -0,0127 / 0,5989.
+* **5d Netz-Paritaets-Fixture:** neu erzeugt, `champion=v32-b01_brierbest hash=180b582713f6259c`;
+  im frischen Prozess ohne Umgebungsvariable gruen (693 Lib-Tests bestanden).
+* **Punkt 7, eingefrorenes Artefakt `models/frozen_champions/v32-b01/`:** Wheel **1.1.0**,
+  sha256 `e11ea6d5...`, byte-gleich mit dem installierten zur Mess- und Trainingszeit
+  (`direct_url.json`); Golden Probe 10 Sonden (3 mit offener Kuppelwahl), 1.109 s, 40 Partien;
+  venv ohne Netz (`--no-index --no-deps`, nur `mosaic_rust`); Referee-Selbsttest GRUEN (Handshake,
+  10/10, zwei Echtpartien). **`.onnx`, `.pth` und Wheel sind per `.gitignore` NICHT im Repo** --
+  das erste Artefakt unter der Regel vom 2026-09-23.
+* **Zwei-Champion-Regel:** `frozen_champions/v30-b02/` geloescht (Nutzer-Freigabe 2026-09-25),
+  Beleg restic-Snapshot **`4137c235`**, alle 7 sicherungswuerdigen Dateien mit gleicher Groesse
+  nachgewiesen; das `venv/` ist per `backup_excludes.txt` ausgenommen. Vorher geprueft: keine
+  Junction und kein Symlink im Baum (die 3.455 ReparsePoint-Treffer sind OneDrive-Platzhalter).
+* **Server-Neustart:** Konsolenzeile *"Champion-Spec v32-b01_brierbest.spec.json"* mit
+  `MOSAIC_ENVELOPE_SEARCH_C=1.0` und Form 2, keine Ueberstimmung; `/api/champion` meldet
+  `v32-b01_brierbest`.
+
+### Werkzeug-Befunde dieser Promotion
+
+* `tools/frozen_referee_match.py` schrieb den `laufzeit`-Pflichtblock nicht (nur `elapsed_s`);
+  betroffen war JEDE Anker- und Champion-2-Kante. Nachgezogen; Falle dabei: der Referee misst mit
+  `perf_counter()`, der Helfer rechnet gegen `monotonic()` -- zwei Epochen.
+* `tools/gumbel_scale_calibration.py` schrieb ihn ebenfalls nicht, und sein fester Default-Pfad
+  hat das v31-Ergebnis unter einem Namen ohne Modell abgelegt. Beides nachgezogen.

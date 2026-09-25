@@ -19,232 +19,93 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**STAND 2026-09-23, 13:02 -- die v32-Kette ist durch.**
+**STAND 2026-09-25 -- der Champion-Wechsel `v31-b01` -> `v32-b01` ist abgeschlossen.**
+Der fruehere Abschnitt 1 (Stand 2026-09-23) steht woertlich in `../archive/history.md`.
 
-**LAEUFT: NICHTS.** Prozessliste geprueft, 0 Treffer. Der Ahead-Stand der Uebergabe ist
-aufgeloest: `origin/main` steht auf `main` (Reflog `update by push`), es wurde also
-zwischenzeitlich gepusht -- nicht von dieser Sitzung.
+**LAEUFT: NICHTS.**
 
-**FERTIG: `tools/night_v32_chain.sh`**, 07:27:56 bis 13:02:02 = **5 h 34 min**, Exit 0.
-Vollstaendig registriert in `PREREG_v32_window.md` **par.10**. Die drei Kernzahlen:
+**FERTIG: Promotion `v32-b01_brierbest`**, alle Punkte von `docs/promotion_checklist.md`,
+vollstaendig in `PREREG_v32_window.md` **par.11**. Elo **1480 [1431; 1529]** gegen 1450 des
+Vorgaengers; Champion-2 94:56 trifft die transitive Erwartung; R4, R4b, R5, Platt und sigma/Prior
+auf Nutzer-Anweisung gefahren und alle GEPAART gegen v31. Spec unveraendert (Startkuppel-Suche
+erst ab v33, `PREREG_start_dome_choice.md` par.12). `frozen_champions/` traegt `v31-b01` und
+`v32-b01`; `v30-b02` ist geloescht (restic `4137c235`).
 
-* **Fenster** 2.947 Dateien (Soll getroffen), Train 2.800 / Val 147, Monolith
-  `data/.cache_1587a92e5739.h5` 1,42 GB, 5.330.401 Zustaende, Stempel geprueft.
-* **Training `v32-b01`** warm in 63 min, **0 unerwartete Rezept-Abweichungen** gegen v31.
-* **TOR 1 TRAEGT** nach dem vorregistrierten Kriterium (`PREREG_v30_window.md` par.3 Punkt 5:
-  z >= +1,96 ODER gepoolt >= 52,5 Prozent): **434:366 aus 800 = 54,25 Prozent, Block-z +2,37**
-  auf DIFFERENZIERTEN Blockwerten, Methode an v31 geeicht (reproduziert +3,54/+2,42/+4,24 exakt).
-  **Einschraenkung, die dazugehoert:** nur EIN Seed traegt einzeln (+3,26 gegen +0,10), waehrend
-  bei v31 beide trugen. Das Kriterium wird nicht nachtraeglich verschaerft, der Befund aber auch
-  nicht staerker berichtet, als er ist.
-* **TOR 2b HAELT** (volle Spalten +0,005 und +0,133). Tor 2a hielt schon in par.9.
+**FERTIG im selben Zug** (Wheel live `46b5dfed...`, Paketversion 1.1.0 unveraendert; Anker-Drift
+und -Konservierung gruen, 693 Lib-Tests gruen):
 
-**RAHMEN (Nutzer 2026-09-22: *"du faehrst v32"*):** v31 ist NICHT die letzte Generation. Das
-Projektende ist dreimal verschoben worden (v30, v31, jetzt v32). **Keine Generation als die letzte
-behandeln, solange es dafuer keine frische Aussage gibt** -- und keine Begruendung auf der
-Finalitaet aufbauen. Am 2026-09-21 hing genau daran eine Fehlregistrierung.
+* **Die GUI-KI spielt wie gemessen** (`PREREG_dome_return_order.md` par.14-14b). `py.rs` setzte
+  das Tor `extended_action_nodes` nie; die Browser-KI wich bei Mondstapel, Stapelzug und Rueckgabe
+  vom gemessenen Agenten ab. Rauchtest gruen.
+* **Das Lauf-Manifest traegt Spec-Inhalt und sha256** (`selfplay_manifest.py` `spec_file`), noetig,
+  sobald v33 zwei Specs faehrt (siehe unten). Erledigt damit Abschnitt 6 Punkt 7.
+* **Der pre-push-Haken laesst bei unbekannter Basis nicht mehr still durch** -- nach dem
+  Umschrieb vom 2026-09-23 haetten beide Waechter ungeprueft durchgewinkt.
+* `frozen_referee_match.py` und `gumbel_scale_calibration.py` schreiben ihren `laufzeit`-Block.
 
-**FERTIG: die v32-Erzeugung** (`tools/night_v32_generate.sh`, 2026-09-22 09:44:39 bis 23:41:37 =
-13 h 57 min). 1.201 Dateien / 12.010 Partien, alle drei Klassen Exit 0. Abnahmen in
-`PREREG_v32_window.md` par.9: Manifest-Diff genau 4 Abweichungen (Modell, Seed, Spec, Version),
-Wiedervorlage am ersten Record gruen, Streurate 14,0 Prozent gegen Ziel 15, **Tor 2a HAELT**
-(`sp_voll` 0,977 gegen 0,955; Kriterium Nicht-Unterlegenheit). Korpusprofil stabil.
+### WAS JETZT ANSTEHT (v33)
 
-### WAS JETZT ANSTEHT
+1. **Nutzer-Entscheid vor der Erzeugung: WELCHE Schwarm-Klasse ohne Huellenknopf laeuft**
+   (`PREREG_geometric_envelope.md` par.14d). Entschieden ist: der Sockel bleibt ganz und
+   huellen-an, EINE der beiden Schwarm-Klassen (`value-tempc` oder `value-excursion`, je 4.000)
+   faehrt mit `envelope_search_c 0,0` -- also eine zweite Spec-Datei fuer genau diese Klasse.
+2. **`/mosaic-generation-turnover` VOR dem v33-Self-Play.** Generator `v32-b01` ist eingefroren.
+   Rotation: G = `v32-b01`, G-1 `v31-b01` (die v32-Erzeugung), G-2 `v30-b02` (die v31-Erzeugung);
+   **`v29-b11` faellt heraus.** Seeds nach dem Vierer-Schritt HERGELEITET, beim Anlegen der
+   v33-Prereg zu pruefen: Erzeugung 20260942/43/44, Fenster 20260957.
+3. **Champion-Spec der Generation v33:** `start_by_search: 1` eintragen (par.12, Wiedervorlage).
+4. **Push** der umgeschriebenen Historie: nur als Force-Push, Befehl in Abschnitt 7.
 
-**Schritte 1 bis 3 der Uebergabe sind erledigt** (Fenster, Monolith, Training, Tor 1, Tor 2b).
-Offen bleiben:
-
-1. **Nutzer-Entscheid: Promotion von `v32-b01`?** Tor 1 traegt nach dem vorregistrierten
-   Kriterium, ruht aber auf einem von zwei Seeds. Wer promoviert, faehrt
-   `/mosaic-champion-promotion` (kanonisch `docs/promotion_checklist.md`) -- dort haengt auch
-   der **Alt-Set-Brier auf `frozen_v3`**, also die Zahl, an der die gestreifte Brier-Regel
-   haengt. Der Trainings-Brier (0,1835) beantwortet sie NICHT: er steht auf dem Val-Anteil des
-   jeweiligen Fensters und wechselt mit der Generation die Grundmenge.
-2. **ERLEDIGT 2026-09-23: die beiden v31-Monolithen sind geloescht**
-   (`data/.cache_8da26a898040.h5` 1,48 GB und `.cache_c57d3023e58b.h5` 0,07 GB), auf
-   pfadgenaue Nutzer-Anweisung, zweimal gegeben (*"Loesch die Monolithen"*, nach Einwand
-   bekraeftigt mit *"Wie gross die Platte ist steht nicht zur Debatte. Loesch den cache"*).
-   `data/` liegt danach bei 6,2 GB, uebrig sind die beiden v32-Caches
-   (`.cache_1587a92e5739.h5` 1,42 GB Monolith, `.cache_813d90612a2b.h5` 0,07 GB Val).
-
-   **OHNE restic-Beleg, und das ist kein Versaeumnis, sondern strukturell:**
-   `tools/backup_excludes.txt` schliesst `*.h5` pauschal aus, weil Trainingscaches als
-   "jederzeit nachbaubar" gelten. Fuer diesen Monolithen stimmte das nicht mehr -- von den
-   2.800 Quelldateien seines Trainingsanteils fehlten **545 im Baum** (nachgezaehlt: 400
-   `v28-b02-policy` plus 145 `v28-b02-value-excursion`, am 2026-09-22 herausrotiert und
-   geloescht). Er war damit der Trainingssatz des amtierenden Champions `v31-b01` in seiner
-   letzten vorhandenen Form.
-
-   **Rueckweg, falls er je gebraucht wird:** `v28-b02` aus dem restic-Snapshot `bb2d8bad`
-   zurueckholen (1.201 `.pkl`, in par.1 der v32-Prereg belegt; `*.pkl` WIRD gesichert), dann
-   Bloecke bauen (rund 11 min fuer 1.201 Dateien) und `build_cache_incremental.py --merge-out`
-   gegen `data/window_v31_train.txt` fahren (rund 10 min). Die drei v31-Fensterlisten liegen
-   im Baum, sind aber **nicht git-getrackt** -- wer sie verliert, verliert das Rezept.
-
-   **Die Lehre fuer die Ausschlussliste:** "regenerierbar" ist keine Eigenschaft des
-   DATEITYPS, sondern des Zustands seiner Quellen. Ein Monolith wird unwiederbringlich in dem
-   Moment, in dem seine Quellgeneration herausrotiert -- und `*.h5` faellt trotzdem weiter
-   pauschal aus der Sicherung. Wer kuenftig eine Generation loescht, sollte im selben Zug
-   entscheiden, was mit den Monolithen geschieht, die auf ihr stehen.
-3. **ERLEDIGT 2026-09-23: die Huellen-Sonde ist gefahren** (`tools/hull_probe_par14.sh`,
-   13:15:57 bis 17:09:22 = 3 h 53 min, Exit 0). Ergebnis und Entscheid in
-   `PREREG_geometric_envelope.md` **par.14c**.
-   **Der Knopf traegt:** dasselbe Netz beidseits, nur die Spec getauscht -- mit Knopf
-   **462:338 = 57,75 Prozent, Block-z +3,94**, BEIDE Seeds einzeln signifikant (+2,59 / +2,95).
-   **Die Form haelt ohne Knopf weitgehend** (Huellenfuellung 0,79 -> 0,72 bei unveraendertem
-   Aussenanteil) -- der eingelernte Prior traegt den groesseren Teil.
-   **Was der Knopf stattdessen tut: er baut Spalten.** 1,14 gegen 0,77 volle Spalten je Partie
-   (**-0,4**), 4 Punkte Margin, und er kauft das mit rund 2 Punkten mehr Strafleiste.
-   **NUTZER-ENTSCHEID: *"dann bleibt der knopf an."*** `envelope_search_c 1,0` bleibt in
-   Champion- und Erzeugungs-Spec. Damit ist par.14 geschlossen.
-   **Ablesung 3 (Gegner-Reaktion) ist NICHT gefahren** -- ihr Instrument ist auf eine andere
-   Bauform gebaut (par.14, Nebenbefund 2), und in einem Kopf-an-Kopf-Lauf waere "der Gegner"
-   der jeweils andere Arm. Weiterhin offener Nutzer-Entscheid, falls die Frage noch zaehlt.
-
-**Der Abnehmer der Huellen-Sonde ist seit 2026-09-23 benannt und registriert**
-(`PREREG_geometric_envelope.md` par.14b): ein GETEILTER Sockel in v33, 1.350 Partien huellen-an
-gegen 2.650 huellen-aus, trennbar ueber eine eigene Klassen-Endung (Nutzer: *"ich will dem Netz
-damit bewusst diverses material zeigen"*). **Die Dosis faellt je Kanal sehr verschieden aus:**
-265 huellenfreie Dateien sind 45,7 Prozent der 580 Policy-TRAEGER, aber nur 9,0 Prozent der
-2.947 Fensterdateien -- weil die Value-Klassen kein Policy-Ziel tragen
-(`corpus_dataset.py:1618`) und die Form ueber den Policy-Kanal laeuft.
+**Vormerken fuer den v34-Wechsel:** R4 und R4b stehen fuer die Paarung auf
+`data/selfplay_v30-b02-policy_*` (72 Zustaende, Seed 20260803). Diese Generation rotiert beim
+v34-Wechsel heraus -- wer die Zeitreihe weiter gepaart fuehren will, sichert vorher die 72
+Zustaende, sonst endet die Vergleichbarkeit mit dem Korpus.
 
 ### FREIGABEN UND VERBOTE (woertlich)
 
-* Nutzer 2026-09-22: *"du faehrst v32"* und *"Das brauchst nicht von mir. Du faehrst die
-  Einstellungen wie v31."* -- das Rezept ist entschieden, es wird nichts variiert.
-* Nutzer 2026-09-22 zur Huellen-Sonde: *"Ja plan es ein."*
-* **Kein Push ohne Anweisung.** Stand: `main` == `origin/main` (extern gepusht, s.o.).
-* **Jede Loeschung braucht restic-Beleg UND neue pfadgenaue Freigabe.** Die Freigabe vom
-  2026-09-22 (Gruppen A-D plus F) ist ausgefuehrt und damit verbraucht.
-* **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`.
-* **Kein Commit waehrend eines Wanduhr-Laufs** -- der Haken faehrt 215 Tests und geht in die
-  Messgroesse. Bei der v32-Erzeugung ist das passiert (Claude-Partien g09/g10 und ein Commit
-  liefen hinein); die 13 h 57 min sind darum KEINE saubere Vergleichsgroesse zu v31s 14,66 h.
-
-### OFFENE NUTZER-ENTSCHEIDE
-
-* **Brier-Regel gestreift** bei der v31-Promotion (0,22919 gegen 0,22804, +0,5 Prozent relativ,
-  zweite Generation in Folge; kein Intervall). Fundstelle: Punkt 1 unten.
-* **Schwierigkeitsleiter** (`PREREG_difficulty_levels.md`): ganze Leiter auf den letzten Champion
-  vertagt, seit 2026-09-14 offen.
-
-### ZWEI OFFENE PUNKTE AUS DER PROMOTION
-
-1. **Brier-Regel gestreift** (par.3 Punkt 7d): 0,22919 gegen 0,22804 des Vorgaengers, +0,5 Prozent
-   relativ. Zweite Generation in Folge, aber deutlich weniger als die +2,7 Prozent bei `v30-b02`.
-   Ein Intervall dazu liegt NICHT vor.
-2. **R4b ist am 2026-09-21 am Schluss-Champion GEFAHREN** (`PREREG_r4_value_calibration.md`
-   par.20, Nutzer-Auftrag). Kein Nachziehen, sondern eine neue Messung: das alte Artefakt zieht
-   sein Substrat aus dem geloeschten v18-Korpus. Ergebnis: der v20-Befund "beide Koepfe blind"
-   gilt fuer `v31-b01` NICHT mehr (Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt
-   50,0 Prozent). NEUER Befund: der Punkte-Kopf ueberschiesst um Faktor 2,1 in der Streuung.
-   Kein gepaarter Vergleich (anderes Substrat, andere Decke), n=72 indikativ.
-   **R5 ebenfalls gefahren** (`PREREG_r5_value_calibration.md` par.14) -- und anders als R4b
-   GEPAART: gleiches eingefrorenes Eval-Set, gleiche Stellgroessen wie die Altlaeufe, Kennlinie
-   bitgleich, ein Faktor unterscheidet die Zeilen. Die Daempfung des Value-Kopfs ist von 0,0859
-   auf 0,1459 gestiegen und damit kleiner geworden, aber NICHT weg (1,0 waere unverzerrt); R2
-   0,309 statt 0,147. Der Punkte-Kopf ueberschiesst neuerdings (1,088 statt 0,973) -- dieselbe
-   Richtung wie in R4b, also zwei unabhaengige Sonden mit demselben Vorzeichenwechsel.
-   **Damit ist der offene Punkt 2 der Promotionsliste erledigt.**
-
-### WAS ALS NAECHSTES ANSTEHT
-
-* **Die v32-Erzeugung** (`PREREG_v32_window.md`). par.1 Zuschnitt steht (neu `v31-b01`, G-1
-  `v30-b02`, G-2 `v29-b11`, Seed 20260953, Val-Pool `^selfplay_v31-`); **par.6 Rezept ist offen**
-  und braucht Nutzer-Entscheide: Startgewicht (Warmstart ist der belegte Weg), Knoepfe und Spec,
-  Zahl der Arme -- und die **Dosis der Rueckgabe-Streuung**: `p = 0,81` ist an v30 geeicht
-  (17,75 Prozent Gelegenheit), an v31 gemessen sind es 28,0 Prozent, hergeleitet laegen rund 0,54 an.
-* **Claude-Partien-Prereg GESCHLOSSEN** (2026-09-22). Die drei letzten Partien g08-g10
-  (`PREREG_claude_play_interface.md` par.7): gegen `v31-b01_brierbest` @400 steht es **1:2** (71:101, 49:28, 46:72), Claude als
-  Zweitspieler. Zwei Befunde: das Netz bedient die aktiven Wertungsplatten NICHT zuverlaessig
-  (g09/g10 je drei leere Spezialfelder, in g09 kostete ihn das die Partie), gewinnt aber ueber
-  Platzierungspunkte; und es nutzt die Null-Klammer als EROEFFNUNG -- in g10 dreizehn Ziehungen
-  in Runde 1, Stand 0 bis Runde 4, 28 Ziehungen gesamt. Der Anzeige-Fix aus par.13 ist gebaut
-  (Stueckzahl und Ueberlauf-Warnung am Mondzug, neun Tests) und am 2026-09-23 gegen eine
-  lebende Partie rauchgetestet (par.13). Damit ist an dem Strang nichts mehr offen.
-* **Das Aufraeumen ist ABGESCHLOSSEN** (`PREREG_code_cleanup_closeout.md`, par.8i bis par.8o,
-  alles am 2026-09-21). Die Rust-Punkte 9 und 10 sind GEMESSEN und begruendet nicht gebaut (der
-  Plain-Tiling-Cache trifft zu 96,9 Prozent, der Gewinn ist darauf gedeckelt). Der letzte
-  Nutzer-Entscheid ist gefallen: der Inversions-Pfad in `round_transition_resample` ist raus
-  (432 Zeilen, sieben Tests, kein Verbraucher), der Vorwaerts-Pfad bleibt -- `r4_value_calibration`
-  haengt daran. Vertragshash unveraendert, Anker-Drift identisch.
-  `tools/build_frozen_golden_probe.py` meldet seit dem 2026-09-21 Fortschritt (Sammelphase je
-  Partie mit Fuellstand je Runde, Sonden mit Laufzeit, alles mit `flush`) -- vorher lief es bis
-  zu 22 Minuten stumm.
-* **Letzter restic-Snapshot mit Beleg** und der Abschlussbericht.
-
-**Erledigt am 2026-09-21:** die zehn Punkte aus par.8g als EIN Rust-Buendel (par.8i) -- neun
-Beispiele unter `engine/examples/` und die drei toten E2E-Skripte unter `engine/` entfernt, der
-Cache-Messtest auf `#[ignore]`, die Groessen-Basislinie nachgezogen; **drei Punkte nach Pruefung
-abgelehnt** (der Stolperdraht am Fenster-Schluessel hat gehalten, die Tiling-Geometrie-Sonde lebt,
-und der Nutzen der zwei Konventions-Teile IST die bessere Fehlermeldung). Alle Tore gruen,
-Anker-Drift 1.763 Schritte identisch. **Neu ungedeckt:** die HTTP-Routen von `server.py` haben
-keine automatische E2E-Abdeckung mehr; die drei Skripte waren rot, weil ihre eigene Zugwahl die
-seit v30 neuen Knotentypen nicht kennt.
-
-**Erledigt am 2026-09-20 nach der Promotion:** die Umbenennung auf Tessa in allen drei
-Schritten (Manifestfeld, Frontend ueber die Konstante `AI_DISPLAY_NAME`, README), das
-portable Bundle neu gebaut und am laufenden Bild geprueft, und die Loeschung von
-`frozen_champions/v29-b09`.
-
-### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
-
-* Nutzer 2026-09-19: *"Dann mach das und fahr die self plays fuer v31"* -- die Erzeugung laeuft;
-  der Start der Trainingskette ist NICHT freigegeben (vorlegen).
-* Nutzer 2026-09-19: Loeschfreigabe fuer den v27-b01-Korpus, die zwoelf Ketten-Skripte und beide
-  Monolithen -- ausgefuehrt und verbraucht. Jede weitere Loeschung braucht restic-Beleg UND neue
-  pfadgenaue Freigabe.
-* Kein Push ohne Anweisung. Kein Commit waehrend eines Wanduhr-Messlaufs; neben Self-Play und
-  Training ist der Sekunden-Hook hingenommen.
-* Messungen exklusiv; GPU-Training plus EIN CPU-Auftrag erlaubt; Builds zaehlen als Last. Ketten
-  als DATEI starten, gehaertete Warteschleife, keine Pipes hinter langen Laeufen.
-* Keine neuen Preregs, keine neuen Netzkoepfe. Nie den Projektordner verlassen. Laufzeiten ins
-  Artefakt; sechs Standard-Kennzahlen in jedem Messbericht.
-* Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
-
-### OFFENE NUTZER-ENTSCHEIDE (Fundstellen in Abschnitt 6)
-
-Budget-Knopf fuer die Hilfsknoten als WIRKUNGS-Frage (Abschnitt 6 Punkt 2); Gruppe B des
-Aufraeumens (Punkt 3); R5/R4b-Sonden ziehen oder die Checklisten-Zeile kuerzen (Punkt 5);
-die drei GUI-Stellen im System-Sinn ("KI-Debugger", "KI-Einstellungen") und die Fehlertexte in
-`server.py` -- mit umbenennen oder als System-Begriff stehen lassen.
+* Nutzer 2026-09-25: *"2 und 3 machen, bei 4 nimm a. fuer 1 machst 4000 schwarm spiele ohne
+  huellenknopf. welche von den 2 x 4000 wir nehmen koennen wir uns noch ueberlegen"*.
+* Nutzer 2026-09-25: *"v30-b02 kannst loeschen"* -- ausgefuehrt und verbraucht. Jede weitere
+  Loeschung braucht restic-Beleg UND neue pfadgenaue Freigabe.
+* **Kein Push ohne Anweisung.** Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
+* **Kein Commit waehrend eines Wanduhr-Laufs.** Messungen exklusiv; ein Build zaehlt als Last --
+  und ein `grep -rn` ueber `data/` auch (Vorfall 2026-09-25, Champion-2-Kante, per Wiederholung
+  als folgenlos belegt).
 
 ## 2. CHAMPION UND LEITER
 
-**Champion laut `models/champion.txt`: `v31-b01_brierbest`** (Promotion 2026-09-20), nach aussen
-**Tessa**. **Elo 1458 [1414; 1510]** aus 1.000 Partien im Leitersegment 2, Anker `hv4_anchor`
-fix 1000, Bradley-Terry mit Block-Bootstrap. **Keine seiner vier Kanten ist frueh gestoppt.**
+**Champion laut `models/champion.txt`: `v32-b01_brierbest`** (Promotion 2026-09-25), nach aussen
+**Tessa** (der Anzeigename steht fest in `static/js/app.js`, er wandert mit jedem Champion mit).
+**Elo 1480 [1431; 1529]** aus 1.000 Partien im Leitersegment 2, Anker `hv4_anchor` fix 1000,
+Bradley-Terry mit Block-Bootstrap. **Keine seiner vier Kanten ist frueh gestoppt.**
 
-Vier Kanten tragen ihn: Gating gegen `v30-b02` 461:339 = 57,62 Prozent ueber zwei Seeds
-(Block-z +4,24 auf differenzierten Werten), Anker `hv4_anchor` @150 mit n = 50 auf 45:5,
-Champion-2 gegen `v29-b09` 79:71. **Die Champion-2-Kante liegt unter der transitiven Erwartung**
-(52,7 statt rund 65 Prozent); unpaariertes Instrument, n = 150, nicht signifikant, Handshake
-GRUEN. Herleitung im Kapitel "Promotion v31-b01" in `../archive/history.md`.
+Vier Kanten tragen ihn: Gating gegen `v31-b01` 434:366 ueber zwei Seeds (Block-z +2,37, aber nur
+EIN Seed einzeln signifikant: +3,26 gegen +0,10), Anker @150 mit n = 50 auf 43:7, Champion-2 gegen
+`v30-b02` 94:56 (binomial p = 0,0024) -- die Champion-2-Kante trifft diesmal die transitive
+Erwartung (61,7 hergeleitet, 62,7 gemessen). Herleitung: `PREREG_v32_window.md` par.11.
 
-| Modell | Elo | KI95 | Spiele | Frueh-Stopp-Kanten |
-| --- | --- | --- | --- | --- |
-| **v31-b01@400 (Champion, Tessa)** | **1458** | **[1414; 1510]** | **1.000** | **0 von 4** |
-| v29-b11@400 | 1439 | [1388; 1493] | 350 | 1 von 1 |
-| v30-b02@400 | 1420 | [1382; 1463] | 1.740 | 1 von 6 |
-| v29-b03@400 | 1378 | [1339; 1424] | 640 | 3 von 4 |
-| v30-b01@400 | 1368 | [1322; 1418] | 800 | 0 von 2 |
-| v29-b09@400 | 1364 | [1328; 1404] | 3.140 | 2 von 10 |
-| v28-b02@400 | 1345 | [1314; 1382] | 4.100 | 6 von 18 |
+| Modell | Elo | KI95 | Partien |
+| --- | --- | --- | --- |
+| **v32-b01@400 (Champion, Tessa)** | **1480** | **[1431; 1529]** | **1.000** |
+| v31-b01@400 | 1450 | [1406; 1496] | 1.800 |
+| v30-b02@400 | 1411 | [1371; 1453] | 1.890 |
+| Heuristik_hv4_anchor@150 (Anker) | 1000 | fix | 1.700 |
 
-**Engine-Stand:** Wheel **1.1.0** (0.1.0 -> 1.0.0 mit dem v31-Champion, 1.1.0 am 2026-09-21 mit dem berichtigten Tiling-Cache-Schluessel), Vertragshash
-unveraendert `6ef829e564c58bd5`, 888/414. Die Version geht weder in den Hash noch in einen
-Cache-Schluessel noch in den Handshake ein -- belegt am lebenden Objekt (Golden Probe 10/10 ueber
-den Versionswechsel, Anker-Drift gruen).
+Die uebrigen Knoten stehen im Bericht von `tools/elo_tracker.py report`; das Primaerregister ist
+`evaluations/elo_history.csv`.
 
-**Eingefrorene Artefakte:** `models/frozen_champions/` traegt genau `v30-b02` und `v31-b01`
-(Zwei-Champion-Regel). **`v29-b09` ist am 2026-09-20 geloescht**, Beleg restic-Snapshot
-`cc0d2a15` (7 sicherungswuerdige Dateien; das `venv/` ist per `backup_excludes.txt` ausgenommen
-und aus dem mitgesicherten Wheel neu baubar). Seine zehn Kanten stehen unveraendert im Register,
-der Knoten bleibt bei 1364 [1328; 1404] aus 3.140 Partien. **Folge, bewusst in Kauf genommen:**
-die auffaellige Champion-2-Kante (52,7 Prozent) laesst sich ohne Rueckholung aus restic nicht mehr
-mit DEMSELBEN Wheel nachfahren.
+**Engine-Stand:** Paketversion **1.1.0**, Vertragshash `6ef829e564c58bd5`, 888/414. Live ist seit
+2026-09-25 das Wheel `46b5dfed...` (GUI-Tor, `PREREG_dome_return_order.md` par.14b); gemessen und
+eingefroren wurde `v32-b01` auf `e11ea6d5...`. Beide tragen dieselbe Versionsnummer -- die Version
+geht weder in den Hash noch in einen Cache-Schluessel noch in den Handshake ein, und das Artefakt
+identifiziert sein Wheel ueber den sha256. Anker-Drift und -Konservierung ueber den Wechsel gruen.
+
+**Eingefrorene Artefakte:** `models/frozen_champions/` traegt genau `v31-b01` und `v32-b01`
+(Zwei-Champion-Regel). **`v30-b02` ist am 2026-09-25 geloescht**, Beleg restic-Snapshot
+`4137c235` (7 von 7 sicherungswuerdigen Dateien mit gleicher Groesse; das `venv/` ist per
+`backup_excludes.txt` ausgenommen und aus dem mitgesicherten Wheel neu baubar). Seine Kanten
+stehen unveraendert im Register. **Seit dem 2026-09-23 sind `.onnx`, `.pth` und Wheels der
+Artefakte NICHT im Repo** -- getrackt werden Spec, Manifest, Golden Probe und `wheel.sha256`.
 
 ## 3. LAUFZEITEN (gemessen, Planungsgroessen; Details in `../docs/measured_runtimes.md`)
 
@@ -330,38 +191,39 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
    Reihenfolge zwischen den Zwillingen vertauscht (`dome.rs:250-273`, Quelle
    `docs/bonus_chips_colors.csv`). Wertung und Netz-Eingabe sind davon unberuehrt (Bitmaske bzw.
    Farb-Flags); Arbeit kostet es in `round5.rs:281` (ein Zufallsast zu viel) und
-   `tiling_solver.rs:331` (Cache-Fehlgriffe). **Die Anzeige-Haelfte ist am 2026-09-19 gebaut**
-   (`static/js/app.js`, Helfer `chipColors`); die Engine-Haelfte aendert Records und gehoert an
-   einen Generationswechsel.
+   `tiling_solver.rs:331` (Cache-Fehlgriffe). **Die Chip-Kanonisierung ist in Anzeige UND Engine gebaut** (2026-09-19/20, CHANGELOG
+   v1.0-alpha31, `PREREG_code_cleanup_closeout.md` par.8e); offen sind nur die beiden anderen
+   Teile, der Wrapper und die drei Spec-Felder.
 
-4. **Die Golden Probe des Elo-Ankers meldet ab jetzt dauerhaft ROT** (`PREREG_code_cleanup_closeout.md`
-   par.8e). Sie traegt Records der alten Bonuschip-Schreibweise; die Kanonisierung vom 2026-09-20 aendert
-   den serialisierten Zustand, NICHT das Spiel -- belegt Feld fuer Feld ueber 1.763 Schritte, alle
-   Zugfelder gleich. Drei Wege: (a) der Pruefer normalisiert die Farblisten beidseits
-   (Koordinator-Empfehlung, Vorbehalt: eng begrenzen, sonst schluckt der Waechter kuenftig echte
-   Unterschiede), (b) Golden Probe neu erzeugen (verliert die Faehigkeit, aeltere Drift zu melden),
-   (c) nichts tun und das ROT dokumentieren (abgeraten). **Bis dahin: die Drift-Pruefung vom
-   2026-09-20 ist inhaltlich bestanden.**
+4. **ERLEDIGT: die Golden Probe des Ankers ist nicht mehr dauerhaft ROT.** Weg (a) ist seit dem
+   2026-09-20 gebaut (Commit `a9302ecb`, *"Drift-Pruefer normalisiert Bonuschip-Farben, eng
+   begrenzt"*: `_first_divergence` ordnet nur die Felder `colors` und `unused_chip_colors`, nur
+   Listen reiner Zeichenketten). Dieser Eintrag stand danach noch fuenf Tage als offen hier; der
+   Nutzer hat am 2026-09-25 (a) bestaetigt, und die Anker-Drift ist am selben Tag ueber 1.763
+   Schritte gruen.
 
-5. **R5- und R4b-Sonden der Promotionsliste** werden seit v24-b06 nicht gefahren, ihre Werkzeuge
-   sind auf die v18-Aera voreingestellt. Entweder auf den aktuellen Kontrakt ziehen und wieder
-   Pflicht, oder die Zeile auf "Platt und Alt-Set-Brier" kuerzen (`docs/promotion_checklist.md`
-   Punkt 5).
+5. **R5- und R4b-Sonden der Promotionsliste:** fuer `v32-b01` auf Nutzer-Anweisung gefahren
+   (*"r5 und r4b mitfahren"*, 2026-09-25), alle GEPAART gegen v31; die Aufrufe stehen jetzt in
+   `docs/promotion_checklist.md` Punkt 5. OFFEN bleibt nur, ob sie ab v33 Pflicht sind oder je
+   Promotion erfragt werden.
 
-6. **Push.** Stand 2026-09-21: **0 Commits vor `origin/main`** (der Nutzer hat gepusht),
-   Arbeitsbaum sauber. Kein Push ohne Anweisung; der Nutzer pusht selbst.
+6. **Push der umgeschriebenen Historie.** GitHub steht auf `165d1243`, lokal umgeschrieben als
+   `7b128e35` -- es liegt dort also nichts, was hier fehlt. Ein normaler Push wird abgewiesen (so
+   geschehen 2026-09-25); **NIE `git pull`**, das holte die alte Historie samt 227 MB zurueck.
+   Befehl in Abschnitt 7. Der Nutzer pusht selbst.
 
 ### Aeltere, weiterhin offene Punkte (unveraendert uebernommen)
 
-6. **Brier-Regel gerissen** (`PREREG_v30_window.md` par.3 Punkt 7d): der Brier von `v30-b02`
-   steigt auf 0,26196 gegen 0,25507 des Bezugs `v29-b11`, und aus genau diesem Fit kommt die
-   Anzeige-Kalibrierung. Der Arm mit dem schlechteren Brier gewinnt die Arena; `frozen_eval_set`
-   stammt aus einer aelteren Verteilung.
+6. **Brier-Regel:** bei `v30-b02` gerissen (0,26196 gegen 0,25507 auf `frozen_v1`), bei `v31-b01`
+   gestreift (0,22919 gegen 0,22804 auf `frozen_v3`). **Bei `v32-b01` haelt sie**: 0,22864 gegen
+   0,22919, im selben Lauf gemessen, und v31 reproduziert dabei seinen Wert exakt
+   (`PREREG_v32_window.md` par.11). Offen bleibt der Grundsatzpunkt: `frozen_eval_set` stammt aus
+   einer aelteren Verteilung.
 
-7. **Manifest meldet Spec-Felder falsch** (geprueft 2026-09-13): `engine_config` zeigt fuer
-   `envelope_search_c`, `envelope_projection_mode`, `envelope_hull_form`, `special_row6_w` und
-   `return_order_mode` den Env-Default statt des wirksamen Spec-Werts. Kein Belegverlust, jedes
-   Manifest nennt den Spec-Pfad. Vorschlag: Spec-Inhalt plus sha256 additiv ins Manifest.
+7. **ERLEDIGT 2026-09-25: das Manifest traegt die Spec.** `engine_config` meldet weiterhin den
+   Env-Default (bewusst unveraendert, damit alte und neue Manifeste diffbar bleiben), daneben steht
+   jetzt `spec_file` mit Pfad, sha256 und Inhalt (`selfplay_manifest.py`, vier Tests). Anlass zum
+   Bau war v33, das zwei Specs faehrt (`PREREG_geometric_envelope.md` par.14d).
 
 8. **Sichtluecke bei den gezogenen Stapelplatten** (`stack_top_feature` par.16/16a): die
    Vorderseiten sind erst NACH dem Aufhoeren bekannt. (a) Die Aktionsliste verraet sie ueber die
@@ -423,7 +285,11 @@ ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 
   Nutzer stellt eines bereit, wenn es gebraucht wird. **Kein `git add -f`** fuer kuenftige
   Champions. Die Elo-Zahlen der Heuristik-Knoten stehen im Register `elo_history.csv`.
   Der Umschrieb hat JEDEN Commit-Hash ersetzt: bestehende Klons sind ungueltig, und der noch
-  ausstehende Push ist ein Force-Push (nur auf Anweisung).
+  ausstehende Push ist ein Force-Push (nur auf Anweisung). **Nie `git pull`** -- das holte die
+  alte Historie samt 227 MB als Merge zurueck. Mit Lease auf den am 2026-09-25 per
+  `git ls-remote` gepruefte GitHub-Stand (lokal `7b128e35`, in `.git/filter-repo/commit-map`):
+  `git push --force-with-lease=main:165d1243de1485092b0d2b70541ce93f365e01e7 origin main`.
+  Kein `git fetch` vorher: der zoege die alten Objekte wieder ins lokale Repo.
 - Keine neuen Netzkoepfe; nicht jeden Arm in die Elo-Leiter.
 
 ## 8. BEFUNDE, die eine Nachschau brauchen

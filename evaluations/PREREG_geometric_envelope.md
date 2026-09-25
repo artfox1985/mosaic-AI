@@ -3021,3 +3021,39 @@ Champion-Spec und Erzeugungs-Spec.
 **Was damit NICHT entschieden ist:** der geteilte Sockel aus par.14b. Er war als
 Vielfalts-Massnahme gedacht, nicht als Abschaffung des Knopfs, und sein Preis ist jetzt
 beziffert statt vermutet -- siehe dort.
+
+### par.14d NUTZER-ENTSCHEID 2026-09-25: der Sockel bleibt ganz, ein SCHWARM laeuft ohne Knopf
+
+Auf die Vorlage beim Champion-Wechsel v31 -> v32 (der Preis aus par.14c, dazu die Frage, ob die
+huellenfreie Haelfte Policy-Traeger wird): *"fuer 1 machst 4000 schwarm spiele ohne
+huellenknopf. welche von den 2 x 4000 wir nehmen koennen wir uns noch ueberlegen"*, praezisiert
+*"nur haben wir 8000 spiele im schwarm, einmal mit ausflug, einmal mit strang"*.
+
+**Damit ersetzt:** der geteilte Sockel aus par.14b (1.350 an / 2.650 aus).
+
+| Klasse | Partien | Huellenknopf | Policy-Traeger |
+| --- | --- | --- | --- |
+| Sockel | 4.000 | **an** (unveraendert) | ja |
+| Schwarm, eine der beiden Klassen | 4.000 | **aus** | nein (value-only) |
+| Schwarm, die andere | 4.000 | an | nein |
+
+**Was das an par.14b aendert:**
+
+* **Die Policy imitiert kein huellenfreies Spiel.** Der Traegerkanal (580 Dateien in v32) bleibt
+  zu 100 Prozent huellen-an. Der Preis aus par.14c (462:338, 0,4 volle Spalten) faellt damit
+  nicht auf den Kanal, der die Form nachahmt.
+* **Die Vielfalt geht an den Kanal, auf den die Hypothese in par.14a(a) urspruenglich zielte**,
+  die Zustandsabdeckung des Value-Kopfs. Grundmenge Fensterdateien, Einheit Dateien zu je 10
+  Partien: **hoechstens 400 von 2.947 = 13,6 Prozent**, und das nur, wenn die GANZE Klasse ins
+  Fenster geht und das v33-Fenster die v32-Groesse behaelt. Beides ist UNGEPRUEFT -- wie viele
+  Dateien einer neuen Value-Klasse ins Fenster kommen, legt erst der Zuschnitt fest.
+* **Tor 2a bleibt unberuehrt**: es misst den Sockel, und der ist wie bisher huellen-an. Die
+  Grundmengen-Frage aus par.14b Punkt 2 entfaellt.
+* **Trennbarkeit ist geschenkt**: die Klasse hat ohnehin eigene Endung und eigenen Lauf. Neu ist
+  nur eine zweite Spec-Datei fuer diese eine Klasse, in der `envelope_search_c` auf 0,0 steht.
+
+**Offen und VOR der Erzeugung zu entscheiden: welche der beiden Schwarm-Klassen.**
+`value-tempc` spielt durchgehend temperiert (`--action-temp 2`), `value-excursion` weicht einmal
+ab und spielt danach argmax ohne Wurzelrauschen. Die Vielfaltsmessung
+(`tools/probes/corpus_state_diversity_probe.py`, par.14b letzter Punkt) bleibt als Abnahme
+vorgesehen.

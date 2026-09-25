@@ -48,6 +48,16 @@ Gedaechtnis:
    Anker IST dieser Knoten: `ANCHOR_NAME = "Heuristik_hv4_anchor"`); die
    Knoepfe liegen in dessen `spec.json` (elo_tracker `--knobs`).
 
+   **Die Worker-Parameter AUSDRUECKLICH setzen** (nachgetragen 2026-09-25):
+   `--sims-worker 150 --c-puct-worker 0.3`. `tools/frozen_referee_match.py` hat als Default
+   400 / 1,5 -- das ist die Einstellung eines NETZ-Artefakts, nicht die des Ankers. Genau so
+   ist am 2026-09-12 schon einmal eine Anker-Kante falsch gelaufen
+   (`archive/elo_history_segment2_anchor_mislabelled.csv`). Vorbild v32-b01:
+
+   ```
+   python -u tools/frozen_referee_match.py --artifact-dir models/frozen_heuristics/hv4_anchor --model-a models/alphazero_<neu>.onnx --spec-a models/<neu>.spec.json --sims-a 400 --c-puct-a 1.5 --sims-worker 150 --c-puct-worker 0.3 --n-games 50 --seed-base <neu> --workers 6 --force-cross-era --out evaluations/artifacts/anchor_<neu>_vs_hv4_anchor.json
+   ```
+
    **Aera-Regel (Nutzer-Entscheid 2026-08-29): Cross-Aera ist der
    Normalfall.** Das im Artefakt mitgelieferte Wheel wird NICHT bei jedem
    Motorschritt nachgezogen -- es ist das Selbst-Invarianz-Instrument des
@@ -80,6 +90,23 @@ Gedaechtnis:
    die Zeile wird auf "Platt und Alt-Set-Brier" gekuerzt. Bis dahin gilt, was
    seit v24 praktiziert wird -- aber jetzt sichtbar statt stillschweigend.
 
+   **Stand 2026-09-25:** fuer `v32-b01` auf Nutzer-Anweisung gefahren (*"r5 und r4b
+   mitfahren"*), alle GEPAART gegen den Vorgaenger. Gepaart heisst: dasselbe Substrat wie beim
+   Vorgaenger-Lauf -- also die Parameter aus dessen ARTEFAKT lesen, nicht aus den Defaults.
+   Die Aufrufe von v32 (Rezept und Seeds wie bei v31):
+
+   ```
+   python -X utf8 -u tools/r4_value_calibration.py --models models/alphazero_<neu>.pth --sims 400 --c-puct 1.5 --n-states 72 --k-refills 16 --data-glob "data/selfplay_v30-b02-policy_*.pkl" --state-seed 20260803 --n-bootstrap 1000 --out evaluations/artifacts/r4_value_calibration_<neu>_n72.json
+   python -X utf8 -u tools/r4b_zone_probe.py --r4b-json evaluations/artifacts/r4_value_calibration_<neu>_n72.json --model-key models/alphazero_<neu>.pth --out evaluations/artifacts/r4b_zone_probe_<neu>.json
+   python -X utf8 -u tools/r5_value_calibration.py --eval-set evaluations/frozen_eval_set.pkl --models models/alphazero_<neu>.pth --sims 400 --c-puct 1.5 --n-states 24 --n-combos 6 --curve-n-states 233 --seed 1000 --out evaluations/artifacts/r5_value_calibration_<neu>.json
+   ```
+
+   **Paarungs-Belege, je einer:** R4 -- `game_id`, `true_margin`, `true_winprob` Zustand fuer
+   Zustand identisch; R5 -- die Kennlinie (a, b) bitgleich. Kosten gemessen: R4 2.756 s
+   einkernig, R4b 43 s, R5 878 s. **R4-Substrat rotiert beim v34-Wechsel heraus**
+   (`selfplay_v30-b02-*`); danach ist die Reihe nur noch gepaart, wenn die 72 Zustaende vorher
+   gesichert wurden.
+
    5b. **Anzeige-Kalibrierung nachziehen**: Platt-Parameter A/B des NEUEN
    Champions in `server.py` (`_DISPLAY_CAL_A/_B`) eintragen -- sie sind
    modellspezifisch (gemessene Drift: v19 B=1,93 / t34 0,97 / v21 0,906).
@@ -95,7 +122,9 @@ Gedaechtnis:
 
    5c. **sigma/Prior-Balance messen** (seit 2026-08-09, aus Task G):
    `tools/gumbel_scale_calibration.py --model <neu> --sims 400
-   --n-states 300`, ~10 min. Der Aera-Wechsel v18->v21 hat das Verhaeltnis
+   --n-states 300` (gemessen 2026-09-25: 708 s). Seit 2026-09-25 heisst die Ausgabe nach dem
+   Modell; vorher schrieb jeder Lauf ohne `--out` in denselben Pfad, und das v31-Ergebnis steht
+   deshalb unter `gumbel_scale_calibration.json`. Der Aera-Wechsel v18->v21 hat das Verhaeltnis
    von 1,232 auf 2,287 verschoben; R3 lag mit 2,972 praktisch auf der
    Schwelle. **Ueberschreitet die Gesamt-Kennzahl 3, oeffnet sich die
    c_visit/c_scale-Familie per REGEL wieder** (kein Ermessen) -- zugleich
@@ -138,6 +167,18 @@ Gedaechtnis:
    KeyError). Dazu die Wheel-sha256 und der Beleg, dass das live installierte
    Wheel dasselbe ist (`site-packages/.../direct_url.json`), sonst ist unklar,
    auf welchem Wheel die Golden Probe entstand.
+
+   **Seit 2026-09-23 gehen `.onnx`, `.pth` und das Wheel des Artefakts NICHT ins Repo**
+   (`.gitignore`, Nutzer-Entscheid); getrackt werden Spec, Manifest, Golden Probe und
+   `wheel.sha256`. **Kein `git add -f`.** Pruefen mit `git check-ignore -v --no-index <pfad>` --
+   ohne `--no-index` schweigt der Befehl bei getrackten Dateien.
+   **Das venv braucht kein Netz:** der Worker importiert nur `mosaic_rust` (das v31-venv traegt
+   nichts sonst). `python -m venv <artefakt>/venv`, dann
+   `<artefakt>/venv/Scripts/python.exe -m pip install --no-index --no-deps <artefakt>/<wheel>`.
+   **Zwei-Champion-Regel:** der vorvorletzte Champion faellt aus `frozen_champions/` -- nur mit
+   restic-Beleg je Datei und pfadgenauer Nutzer-Freigabe; vor dem Loeschen auf echte Links
+   pruefen (`LinkType` Junction/SymbolicLink, NICHT das blosse ReparsePoint-Attribut -- das
+   traegt unter OneDrive fast jede Datei).
 
 **Merkregel aus einem echten Vorfall:** Elo-Fragen am Primaerregister
 `evaluations/elo_history.csv` pruefen, nicht an Chronik-Texten -- eine

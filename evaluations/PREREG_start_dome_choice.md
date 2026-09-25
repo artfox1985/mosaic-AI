@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: ABGESCHLOSSEN 2026-09-13 (par.10). Handregel legt immer (0,0), fuer Heuristiken der beste Slot (par.9). Such-Start gebaut, zweimal gemessen (par.9e): 91:99 und 81:89, Punkte und Spalten gleich, andere Praeferenz; Platte/Rotation kein Hebel (par.9f). Streuung 0,15 und Such-Start ins v29-Rezept (v29_window par.6b); Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik. Lohnt es, den Zug zu befreien? | Beleg: ABGESCHLOSSEN 2026-09-13 (par.10). Handregel legt immer (0,0), die Suche zu 93 Prozent (2,0); zweimal gemessen gleichwertig (par.9e: 91:99, McNemar p=0,67), Platte/Rotation kein Hebel (par.9f). Such-Start und Streuung 0,15 ins v29-Rezept. par.12 (2026-09-25): der Knopf steht seither in jeder ERZEUGUNGS-Spec und in keiner CHAMPION-Spec -- der Champion lernt von (2,0) und spielt von (0,0). Nutzer-Entscheid: v32 wie gemessen promoten, `start_by_search: 1` ab der v33-Champion-Spec. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -903,3 +903,51 @@ Konservierung gruen.
 die v29-Records tragen die Phase weiterhin als `drafting`, weil sie vor dem Bau erzeugt wurden.
 Ab der naechsten Erzeugung sieht das Netz die Startsetzung als solche.
 
+
+## par.12 DER KNOPF STEHT IN DER ERZEUGUNG, NICHT IM CHAMPION (gefunden 2026-09-25)
+
+**Gefunden beim Champion-Wechsel v31 -> v32, durch eine Nutzer-Frage**, nicht aus dieser Prereg
+heraus: *"sprich der champion nutzt zwei modes nicht? die freie wahl der startkuppel und die
+rueckgabe der stapel?"*
+
+### Der Bestand, ausgezaehlt ueber alle Spec-Dateien
+
+| Spec | `start_by_search` |
+| --- | --- |
+| `models/v30_generation.spec.json`, `v31_generation.spec.json` | **1** |
+| `models/start_by_search_on*.spec.json` (die A/B-Specs) | 1 |
+| `frozen_champions/v30-b02/spec.json`, `v31-b01/spec.json` | **fehlt (= 0)** |
+| `models/v32-b01_brierbest.spec.json` | **fehlt (= 0)** |
+| alle uebrigen 36 Specs im Baum | fehlt |
+
+**Der Entscheid war das Gegenteil.** par.9c haelt am 2026-09-12 fest: *"im Spiel entscheidet die
+Suche, nicht die Handregel"*. In `tools/night_v29_generate.sh` und die Nachfolger ist er
+gewandert, in keine Champion-Spec.
+
+### Was das bedeutet
+
+Die Handregel legt **immer (0,0)** (par.9: 190 von 190). Die Suche legt zu **93 Prozent (2,0)**
+(par.9e: 177 von 190). Seit der v29-Erzeugung entsteht der Korpus also ueberwiegend auf
+(2,0)-Brettern, waehrend der Champion selbst jede Partie von (0,0) beginnt. Trainingsverteilung
+und Spielverhalten laufen am allerersten Entscheid der Partie auseinander.
+
+**Die Staerke ist davon nicht betroffen, gemessen:** 91:99, McNemar p = 0,67, gepaarte Differenz
+-0,08 [-0,37; +0,20] (par.9e) -- gleichwertig, und par.9c begruendet den Knopf ausdruecklich
+nicht mit Elo, sondern damit, dass die Wahl zum Plan des Spielers passen soll.
+
+**Kein Code fehlt.** `server.py` loest die Champion-Spec auf und setzt sie ueber
+`spec_env.apply_spec_env` in die `MOSAIC_*`-Knoepfe; `start_by_search` steht in der Abbildung.
+Ein Feld in der Champion-Spec genuegt, in der GUI wie in der Arena.
+
+### Nutzer-Entscheid 2026-09-25
+
+*"auch die startkuppel soll aktiv sein"*, auf Vorlage der Folgen dann: **erst promoten wie
+gemessen, Knopf ab v33.**
+
+`v32-b01` wird also mit der Spec Champion, auf der Tor 1 gelaufen ist (Knopf aus, beide Seiten).
+Grund: die Spec gehoert zur gemessenen Identitaet, und eine Kanten-Familie eines Leiterknotens
+wird nicht ueber zwei verschiedene Specs gemischt.
+
+**WIEDERVORLAGE:** wer die Champion-Spec der Generation v33 schreibt, traegt dort
+`start_by_search: 1` ein. Damit deckt sich zum ersten Mal, wovon der Champion lernt, mit dem,
+was er spielt.
