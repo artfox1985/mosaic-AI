@@ -77,16 +77,17 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 123 Dateien = 1 OFFEN + 110 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 124 Dateien = 2 OFFEN + 110 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (1)
+## OFFEN (2)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
+| `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ist VORLAGE: Rezept wie v32, dazu Schwarm a ohne Huellenknopf (entschieden, PREREG_geometric_envelope.md par.14d); offen sind der Klassenname und die Tor-1-Spec mit start_by_search. Nichts erzeugt, nichts gemessen. |
 
 ## ENTSCHIEDEN (110)
 

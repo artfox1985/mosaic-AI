@@ -187,6 +187,16 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
 Weitere Arme ab `v29-b12` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
 
+**Reserviert 2026-09-25 (Generationswechsel v32 -> v33):**
+**`v33-b01`** (erster Arm der Generation v33 auf dem v33-Fenster; Generator der Erzeugung ist
+`v32-b01_brierbest`, der amtierende Champion -- v32 hatte EINEN Arm). Fensterzuschnitt nach der
+Rotationsregel: neu `v32-b01`, G-1 `v31-b01`, G-2 `v30-b02`; `v29-b11` ist am 2026-09-25 mit
+Freigabe geloescht. Seed **20260957**, Val-Pool `^selfplay_v32-`.
+**Neue Klassen-Endung `value-tempc-nohull`** fuer Schwarm a, der ab v33 ohne Huellenknopf laeuft
+(`PREREG_geometric_envelope.md` par.14d); vorgeschlagen in `PREREG_v33_window.md` par.6, gilt erst
+mit dem Nutzer-Entscheid dort. Die Endung ist ein KLASSEN-Name, kein Knopf-Suffix am Arm (Regel
+oben bleibt). Weitere Arme ab `v33-b02` nur mit eigener Registrierung.
+
 **Reserviert 2026-09-22 (Generationswechsel v31 -> v32):**
 **`v32-b01`** (erster Arm der Generation v32 auf dem v32-Fenster; Generator der Erzeugung ist
 `v31-b01_brierbest`, der amtierende Champion -- v31 hatte EINEN Arm, damit greift

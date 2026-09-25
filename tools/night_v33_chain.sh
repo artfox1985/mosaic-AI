@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
-# v32-Kette: Tor 0 der beiden Schwarm-Klassen, Traeger-Manifest, G-2-Auswahl, Fenster,
-# Bloecke, Monolith, Training v32-b01 WARM, Tor 1 gegen den Champion v31-b01,
+# v33-Kette: Tor 0 der beiden Schwarm-Klassen, Traeger-Manifest, G-2-Auswahl, Fenster,
+# Bloecke, Monolith, Training v33-b01 WARM, Tor 1 gegen den Champion v32-b01,
 # Tor 2b (Spaltensonde), Plattenpunkte.
-# Vorlage: tools/night_v31_chain.sh (Historie, Commit b3f6086d^). Zuschnitt und Lesart:
-# evaluations/PREREG_v32_window.md par.1 (Zuschnitt), par.6 (Rezept), par.9 (Erzeugung).
+# Vorlage: tools/night_v32_chain.sh (am 2026-09-25 geloescht, Git-Historie). Zuschnitt und
+# Lesart: evaluations/PREREG_v33_window.md par.1 (Zuschnitt), par.6 (Rezept), par.9 (Erzeugung).
 #
-# WAS SICH GEGEN v31 AENDERT, und nur das:
-#   1. Generator `v31-b01`, G-1 `v30-b02`, G-2 `v29-b11`; `v28-b02` ist herausrotiert
-#      und am 2026-09-22 geloescht (par.1).
-#   2. Seed 20260953, Val-Pool `^selfplay_v31-` (Vierer-Schritt, docs/generation_loop.md).
-#   3. Warmstart von `v31-b01_brierbest`; Tor-1-Gegner ist `v31-b01` (zugleich Champion).
-#   4. Tor-1-Seeds 20261500/20261501 (Hunderter-Schritt: v30 1300/01, v31 1400/01).
-#   5. KEIN Manifest-Diff, KEINE Wiedervorlage, KEIN Tor 2a in dieser Kette: alle drei sind
-#      am 2026-09-22/23 gefahren und in par.9 registriert (Diff genau 4 Abweichungen,
-#      Wiedervorlage gruen, Tor 2a HAELT mit sp_voll 0,977 gegen 0,955).
-#   6. Tor 0 laeuft nur noch fuer die beiden SCHWARM-Klassen; die Policy-Klasse hat ihr
-#      Artefakt schon (evaluations/artifacts/corpus_sanity_v31-b01-policy.json).
+# WAS SICH GEGEN v32 AENDERT, und nur das:
+#   1. Generator `v32-b01`, G-1 `v31-b01`, G-2 `v30-b02`; `v29-b11` ist herausrotiert
+#      und am 2026-09-25 geloescht (par.1).
+#   2. Seed 20260957, Val-Pool `^selfplay_v32-` (Vierer-Schritt, docs/generation_loop.md).
+#   3. Warmstart von `v32-b01_brierbest`; Tor-1-Gegner ist `v32-b01` (zugleich Champion).
+#   4. Tor-1-Seeds 20261600/20261601 (Hunderter-Schritt: v31 1400/01, v32 1500/01).
+#   5. Schwarm a der neuen Generation heisst `value-tempc-nohull` und lief OHNE
+#      Huellenknopf (PREREG_geometric_envelope.md par.14d); im Fenster steht er dort, wo
+#      bisher `value-tempc` stand. G-1 (`v31-b01`) traegt noch das alte `value-tempc`.
+#   6. Tor 1 laeuft auf `models/v33_gating.spec.json` BEIDSEITS: die Champion-Spec von
+#      v32-b01 plus `start_by_search: 1` (PREREG_start_dome_choice.md par.12, "Knopf ab
+#      v33"). So ist die gemessene Identitaet die, die bei einer Promotion spielt.
+#   7. KEIN Manifest-Diff, KEINE Wiedervorlage, KEIN Tor 2a in dieser Kette: alle drei
+#      gehoeren direkt hinter die Erzeugung und stehen in par.9.
 #
 # DAS TRAININGS-REZEPT IST UNVERAENDERT und stammt nicht aus diesem Skript, sondern aus
-#   models/manifest_train_v31-b01_20260920_124555.json (cli_args). Nutzer 2026-09-22:
-#   "Das brauchst nicht von mir. Du faehrst die Einstellungen wie v31."
+#   models/manifest_train_v32-b01_20260923_075819.json (cli_args).
 #
 # KEINE PIPE hinter langen Laeufen, keine eigene Umleitung (CLAUDE.md "Lange Laeufe NIE in
 #   eine Pipe"): mit run_in_background OHNE Pipe starten, als DATEI.
@@ -28,21 +30,21 @@ cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 
 ART=evaluations/artifacts
-SEED=20260953
-GEN=v31-b01                                                  # Generator, Namensstamm der neuen Klassen
-G1=v30-b02                                                   # G-1 (die v31-Erzeugung)
-G2=v29-b11                                                   # G-2 (die v30-Erzeugung)
+SEED=20260957
+GEN=v32-b01                                                  # Generator, Namensstamm der neuen Klassen
+G1=v31-b01                                                   # G-1 (die v32-Erzeugung)
+G2=v30-b02                                                   # G-2 (die v31-Erzeugung)
 G2_SWARM_PATTERN="selfplay_${G2}-value-excursion_*.pkl"      # par.1, Ausflug-Haelfte
-CHAMP=models/alphazero_v31-b01_brierbest.onnx                # Tor-1-Gegner = amtierender Champion
-ARM=v32-b01
-LOAD=v31-b01_brierbest
-REF_TRAIN_MANIFEST=models/manifest_train_v31-b01_20260920_124555.json
+CHAMP=models/alphazero_v32-b01_brierbest.onnx                # Tor-1-Gegner = amtierender Champion
+ARM=v33-b01
+LOAD=v32-b01_brierbest
+REF_TRAIN_MANIFEST=models/manifest_train_v32-b01_20260923_075819.json
 
 # --- Umgebung der ganzen Kette ---------------------------------------------------------
 export MOSAIC_IGNORE_POLICY_TARGET_VALID=1
-export MOSAIC_VAL_POOL='^selfplay_v31-'
+export MOSAIC_VAL_POOL='^selfplay_v32-'
 export MOSAIC_FEATURES_FROM_RUST=1
-export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v32.json
+export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v33.json
 # Fenster-Pinning (feedback_window_pinning_during_generation): Messdateien duerfen nie still
 # mitlaufen. Die Kette arbeitet zusaetzlich durchgaengig mit expliziten Dateilisten.
 export MOSAIC_DATA_EXCLUDE='selfplay_v29-b11-probe_,selfplay_depth,selfplay_s4states,selfplay_tor2a'
@@ -55,9 +57,9 @@ grep -q "FEATURE_FORMULA_VERSION" config.py || { echo "ABBRUCH: FEATURE_FORMULA_
 python -X utf8 -c "import config,sys; sys.exit(0 if (config.INPUT_SIZE,config.NUM_ACTIONS)==(888,414) else 3)" \
   || { echo "ABBRUCH: config.py traegt nicht INPUT_SIZE 888 / NUM_ACTIONS 414"; exit 3; }
 
-SPEC=models/frozen_champions/v31-b01/spec.json
-[ -f "$SPEC" ] || { echo "ABBRUCH: Champion-Spec $SPEC fehlt"; exit 4; }
-echo "== v32-KETTE, Champion-Spec: $SPEC   Start $(date +%F' '%H:%M:%S)"
+SPEC=models/v33_gating.spec.json      # Champion-Spec v32-b01 + start_by_search 1 (Aenderung 6)
+[ -f "$SPEC" ] || { echo "ABBRUCH: Tor-1-Spec $SPEC fehlt"; exit 4; }
+echo "== v33-KETTE, Tor-1-Spec: $SPEC   Start $(date +%F' '%H:%M:%S)"
 
 . "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
 warte_frei() { wait_for_free_cpu "$1"; }
@@ -69,14 +71,14 @@ sleep 10
 
 echo ""
 echo "== 1) Tor 0 der beiden Schwarm-Klassen (Policy-Klasse liegt aus par.9) $(date +%H:%M:%S)"
-for k in ${GEN}-value-tempc ${GEN}-value-excursion; do
+for k in ${GEN}-value-tempc-nohull ${GEN}-value-excursion; do
   python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_${k}_*.pkl" \
     --out "$ART/corpus_sanity_${k}.json"
   echo "   $k Exit $? ($(date +%H:%M:%S))"
 done
 
 echo ""
-echo "== 2) Traeger-Manifest v32 (580 = 400 neu + 135 G-1 + 45 G-2) $(date +%H:%M:%S)"
+echo "== 2) Traeger-Manifest v33 (580 = 400 neu + 135 G-1 + 45 G-2) $(date +%H:%M:%S)"
 python -X utf8 tools/generate_carrier_manifest.py \
   --pattern "selfplay_${G2}-policy_*.pkl" --n-files 45 --seed $SEED \
   --include-glob "selfplay_${GEN}-policy_*.pkl" \
@@ -100,20 +102,20 @@ echo ""
 echo "== 3) Schwarm G-2: 145 aus $G2_SWARM_PATTERN $(date +%H:%M:%S)"
 python -X utf8 tools/generate_carrier_manifest.py \
   --pattern "$G2_SWARM_PATTERN" --n-files 145 --seed $SEED \
-  --list-out data/v29_swarm_pick_v32.txt --out v29_swarm_pick_v32_manifest.json
-echo "   gewaehlt: $(grep -vc '^#' data/v29_swarm_pick_v32.txt) (Soll 145)"
+  --list-out data/v30_swarm_pick_v33.txt --out v30_swarm_pick_v33_manifest.json
+echo "   gewaehlt: $(grep -vc '^#' data/v30_swarm_pick_v33.txt) (Soll 145)"
 
 echo ""
-echo "== 4) Fensterliste data/window_v32.txt $(date +%H:%M:%S)"
+echo "== 4) Fensterliste data/window_v33.txt $(date +%H:%M:%S)"
 python -X utf8 - "$GEN" "$G1" "$G2" <<'PYEOF'
 import glob, os, sys
 gen, g1, g2 = sys.argv[1:4]
 def klasse(stamm):
     return sorted(os.path.basename(p) for p in glob.glob(f"data/selfplay_{stamm}_*.pkl"))
-neu_pol, neu_tmp, neu_exc = klasse(f"{gen}-policy"), klasse(f"{gen}-value-tempc"), klasse(f"{gen}-value-excursion")
+neu_pol, neu_tmp, neu_exc = klasse(f"{gen}-policy"), klasse(f"{gen}-value-tempc-nohull"), klasse(f"{gen}-value-excursion")
 g1_pol, g1_tmp, g1_exc = klasse(f"{g1}-policy"), klasse(f"{g1}-value-tempc"), klasse(f"{g1}-value-excursion")
 g2_pol = klasse(f"{g2}-policy")
-g2_val = [l.strip() for l in open("data/v29_swarm_pick_v32.txt", encoding="utf-8")
+g2_val = [l.strip() for l in open("data/v30_swarm_pick_v33.txt", encoding="utf-8")
           if l.strip() and not l.startswith("#")]
 zahlen = (len(neu_pol), len(neu_tmp), len(neu_exc), len(g1_pol), len(g1_tmp),
           len(g1_exc), len(g2_pol), len(g2_val))
@@ -127,12 +129,12 @@ allf = neu_pol + neu_tmp + neu_exc + g1_pol + g1_tmp + g1_exc + g2_pol + g2_val
 fehlt = [b for b in allf if not os.path.exists(os.path.join("data", b))]
 assert not fehlt, fehlt[:5]
 assert len(allf) == len(set(allf)), "Doppelte im Fenster"
-with open("data/window_v32.txt", "w", encoding="utf-8", newline="\n") as fh:
-    fh.write(f"# v32-Fenster (PREREG_v32_window.md par.1): 400 Sockel + 400 temperiert + "
+with open("data/window_v33.txt", "w", encoding="utf-8", newline="\n") as fh:
+    fh.write(f"# v33-Fenster (PREREG_v33_window.md par.1): 400 Sockel + 400 temperiert OHNE Huelle + "
              f"{len(neu_exc)} Ausflug (neu, Generator {gen}) + 400 G-1-policy + "
              f"{len(g1_tmp)+len(g1_exc)} G-1-value + 400 G-2-policy + 145 G-2-value (Ausflug)\n")
     fh.write("\n".join(allf) + "\n")
-print(f"window_v32.txt: {len(allf)} Dateien (Soll 2.947)")
+print(f"window_v33.txt: {len(allf)} Dateien (Soll 2.947)")
 PYEOF
 RC=$?
 [ $RC -eq 0 ] || { echo "STOPP: Fensterbau gescheitert"; exit 11; }
@@ -142,23 +144,23 @@ echo ""
 echo "== 5) Bloecke fuers Fenster UNTER der Trainings-Umgebung (888, Formel-Version) $(date +%F' '%H:%M:%S)"
 T0=$(date +%s)
 python -X utf8 -u tools/build_cache_incremental.py --data-dir data --encoder 2d \
-  --value-target-variant nortv --workers 6 --file-list data/window_v32.txt
+  --value-target-variant nortv --workers 6 --file-list data/window_v33.txt
 echo "   Exit $? ($(date +%H:%M:%S)); Bloecke: $(( $(date +%s) - T0 )) s Wanduhr"
 
 echo ""
 echo "== 6) Trainingsanteil, Fenster-Schluessel, Monolith $(date +%H:%M:%S)"
-python -X utf8 tools/window_train_split.py --file-list data/window_v32.txt --val-frac 0.05 \
+python -X utf8 tools/window_train_split.py --file-list data/window_v33.txt --val-frac 0.05 \
   --val-pool "$MOSAIC_VAL_POOL" --encoder 2d --value-target-variant nortv \
-  --train-list-out data/window_v32_train.txt --val-list-out data/window_v32_val.txt \
-  > "$ART/v32_split.txt"
-cat "$ART/v32_split.txt"
-KEY=$(grep -o "Fenster-Schluessel des Trainingsanteils: [0-9a-f]*" "$ART/v32_split.txt" | awk '{print $NF}')
+  --train-list-out data/window_v33_train.txt --val-list-out data/window_v33_val.txt \
+  > "$ART/v33_split.txt"
+cat "$ART/v33_split.txt"
+KEY=$(grep -o "Fenster-Schluessel des Trainingsanteils: [0-9a-f]*" "$ART/v33_split.txt" | awk '{print $NF}')
 [ -n "$KEY" ] || { echo "STOPP: kein Schluessel"; exit 13; }
 echo "KEY=$KEY"
 CACHE="data/.cache_${KEY}.h5"
 T0=$(date +%s)
 python -X utf8 -u tools/build_cache_incremental.py --data-dir data --encoder 2d \
-  --value-target-variant nortv --workers 6 --file-list data/window_v32_train.txt \
+  --value-target-variant nortv --workers 6 --file-list data/window_v33_train.txt \
   --merge-out "$CACHE"
 echo "   Exit $? ($(date +%H:%M:%S)); Merge: $(( $(date +%s) - T0 )) s Wanduhr"
 [ -f "$CACHE" ] || { echo "STOPP: Monolith fehlt"; exit 14; }
@@ -175,7 +177,7 @@ echo ""
 echo "== 7) Training $ARM -- WARMSTART von $LOAD $(date +%F' '%H:%M:%S)"
 echo "   Umgebung: CARRIER_MANIFEST=$MOSAIC_CARRIER_MANIFEST VAL_POOL=$MOSAIC_VAL_POOL FROM_RUST=$MOSAIC_FEATURES_FROM_RUST"
 python -X utf8 -u train.py --name "$ARM" --load "$LOAD" \
-  --file-list data/window_v32.txt --cache-file "$CACHE" \
+  --file-list data/window_v33.txt --cache-file "$CACHE" \
   --epochs 12 --lr 5e-05 --lr-schedule cosine --lr-t-max 12 \
   --val-frac 0.05 --encoder 2d --value-head wdl --value-target-variant nortv \
   --value-target-lambda 0.7 --ownership-head-2d --ownership-weight 0.0 \
@@ -185,7 +187,7 @@ python -X utf8 -u train.py --name "$ARM" --load "$LOAD" \
 echo "   Training Exit $? ($(date +%H:%M:%S))"
 
 echo ""
-echo "== 7b) Manifest-Diff des TRAININGS gegen das v31-b01-Rezept $(date +%H:%M:%S)"
+echo "== 7b) Manifest-Diff des TRAININGS gegen das v32-b01-Rezept $(date +%H:%M:%S)"
 python -X utf8 - "$ARM" "$REF_TRAIN_MANIFEST" <<'PYEOF'
 import glob, io, json, sys
 arm, ref_path = sys.argv[1], sys.argv[2]
@@ -201,7 +203,7 @@ for k in sorted(set(ref) | set(neu)):
         mark = "" if k in erwartet else "  <== STOPP"
         if k not in erwartet:
             unerwartet.append(k)
-        print(f"   cli_args.{k}: v31-b01={ref.get(k)!r} -> {arm}={neu.get(k)!r}{mark}")
+        print(f"   cli_args.{k}: v32-b01={ref.get(k)!r} -> {arm}={neu.get(k)!r}{mark}")
 print(f"   Unerwartete Abweichungen: {len(unerwartet)} (erwartet sind genau {sorted(erwartet)})")
 PYEOF
 
@@ -220,7 +222,7 @@ echo ""
 echo "== 8) Tor 1: $ARM gegen den Champion $GEN, zwei Seeds a 200 Paaren $(date +%F' '%H:%M:%S)"
 echo "   Modell A: $A"; ls -l "$A"
 echo "   Modell B: $CHAMP   Spec beidseits: $SPEC"
-for S in 20261500 20261501; do
+for S in 20261600 20261601; do
   OUT="$ART/gating_${ARM}_vs_${GEN}_s${S}.json"
   echo ""
   echo "===== Seed $S $(date +%H:%M:%S)"
@@ -239,8 +241,8 @@ for S in 20261500 20261501; do
 done
 
 echo ""
-echo "########## v32-KETTE FERTIG $(date +%F' '%H:%M:%S)"
-echo "   Faellig danach (PREREG_v32_window.md par.2):"
+echo "########## v33-KETTE FERTIG $(date +%F' '%H:%M:%S)"
+echo "   Faellig danach (PREREG_v33_window.md par.2):"
 echo "   - Verdikt auf BLOCK-Ebene (z-Wert auf DIFFERENZIERTEN Blockwerten -- die Felder in"
 echo "     blocks[] sind KUMULATIV, docs/pitfalls.md), nicht nur gepoolt"
 echo "   - sechs Standard-Kennzahlen je Seite und als Differenz (CLAUDE.md)"

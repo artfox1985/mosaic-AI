@@ -19,62 +19,51 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**STAND 2026-09-25 -- der Champion-Wechsel `v31-b01` -> `v32-b01` ist abgeschlossen.**
-Der fruehere Abschnitt 1 (Stand 2026-09-23) steht woertlich in `../archive/history.md`.
+**STAND 2026-09-25 -- Generationswechsel v32 -> v33 abgeschlossen, die Erzeugung wartet auf
+Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich in
+`../archive/history.md`, dazu der Generationsbericht v32.
 
 **LAEUFT: NICHTS.**
 
-**FERTIG: Promotion `v32-b01_brierbest`**, alle Punkte von `docs/promotion_checklist.md`,
-vollstaendig in `PREREG_v32_window.md` **par.11**. Elo **1480 [1431; 1529]** gegen 1450 des
-Vorgaengers; Champion-2 94:56 trifft die transitive Erwartung; R4, R4b, R5, Platt und sigma/Prior
-auf Nutzer-Anweisung gefahren und alle GEPAART gegen v31. Spec unveraendert (Startkuppel-Suche
-erst ab v33, `PREREG_start_dome_choice.md` par.12). `frozen_champions/` traegt `v31-b01` und
-`v32-b01`; `v30-b02` ist geloescht (restic `4137c235`).
+**Champion `v32-b01_brierbest`** seit 2026-09-25 (`PREREG_v32_window.md` par.11), eingefroren
+unter `models/frozen_champions/v32-b01`; Anker-Drift und -Konservierung gruen auf dem
+aktuellen Wheel `46b5dfed...`.
 
-**FERTIG im selben Zug** (Wheel live `46b5dfed...`, Paketversion 1.1.0 unveraendert; Anker-Drift
-und -Konservierung gruen, 693 Lib-Tests gruen):
+**Aufgeraeumt** (Freigabe 2026-09-25, Gruppen A-F; Beleg restic-Snapshot **`373b8404`**,
+`verify_backup.ps1` gruen, `-Deep` auf Nutzer-Entscheid nicht gefahren): Korpus `v29-b11`, die
+v32-Fenstercaches (ohne Beleg, `*.h5` ist ausgeschlossen), 1.203 verwaiste Bloecke, Modelle ohne
+Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
+`cache_inventory.py --orphans` leer. **Das Modell `v29-b11` bleibt:** keine restic-Laufmarke.
 
-* **Die GUI-KI spielt wie gemessen** (`PREREG_dome_return_order.md` par.14-14b). `py.rs` setzte
-  das Tor `extended_action_nodes` nie; die Browser-KI wich bei Mondstapel, Stapelzug und Rueckgabe
-  vom gemessenen Agenten ab. Rauchtest gruen.
-* **Das Lauf-Manifest traegt Spec-Inhalt und sha256** (`selfplay_manifest.py` `spec_file`), noetig,
-  sobald v33 zwei Specs faehrt (siehe unten). Erledigt damit Abschnitt 6 Punkt 7.
-* **Der pre-push-Haken laesst bei unbekannter Basis nicht mehr still durch.** Erreichbar war das
-  bei einem Force-Push, dessen Remote-Stand lokal fehlt; dann haetten beide Waechter ungeprueft
-  durchgewinkt. (Beim Push-Versuch vom 2026-09-25 lief der Haken gar nicht: Git hat den
-  Nicht-Fast-Forward clientseitig abgewiesen.)
-* `frozen_referee_match.py` und `gumbel_scale_calibration.py` schreiben ihren `laufzeit`-Block.
+### WAS JETZT ANSTEHT: die v33-Erzeugung (`PREREG_v33_window.md`)
 
-### WAS JETZT ANSTEHT (v33)
+**Bereit:** `tools/night_v33_generate.sh` und `tools/night_v33_chain.sh`, drei Spec-Dateien
+(`v32_generation.spec.json`, `v32_generation_nohull.spec.json`, `v33_gating.spec.json`), jede in
+genau einem Feld von ihrer Vorlage verschieden. Nichts gestartet.
 
-1. **ENTSCHIEDEN 2026-09-25: Schwarm a (`value-tempc`) laeuft ohne Huellenknopf**, Sockel und
-   Ausflug bleiben huellen-an (`PREREG_geometric_envelope.md` par.14d). Grund: der Ausflug ist
-   die einzige Klasse mit unverzerrten Value-Zielen, der temperierte Schwarm hat sie ohnehin
-   verzerrt. Fuer die Erzeugung: eine zweite Spec-Datei (`envelope_search_c: 0.0`) nur am
-   Aufruf von Schwarm a. Abnahme: Vielfaltssonde gegen den temperierten Schwarm von G-1.
-2. **`/mosaic-generation-turnover` VOR dem v33-Self-Play.** Generator `v32-b01` ist eingefroren.
-   Rotation: G = `v32-b01`, G-1 `v31-b01` (die v32-Erzeugung), G-2 `v30-b02` (die v31-Erzeugung);
-   **`v29-b11` faellt heraus.** Seeds nach dem Vierer-Schritt HERGELEITET, beim Anlegen der
-   v33-Prereg zu pruefen: Erzeugung 20260942/43/44, Fenster 20260957.
-3. **Champion-Spec der Generation v33:** `start_by_search: 1` eintragen (par.12, Wiedervorlage).
-4. **ERLEDIGT 2026-09-25: die umgeschriebene Historie ist gepusht** (Nutzer, Force-Push mit
-   Lease); GitHub steht auf dem lokalen `main`. Ab jetzt wieder normale Pushes.
+**Braucht den Nutzer (par.6):**
+1. **Klassenname** der huellenfreien Schwarm-a-Klasse: Vorschlag `value-tempc-nohull`.
+2. **Tor 1 mit `start_by_search: 1` beidseits** (`models/v33_gating.spec.json`): Vorschlag ja,
+   damit die gemessene Identitaet die spaetere Champion-Spec traegt (`PREREG_start_dome_choice.md`
+   par.12).
+3. **Freigabe der Erzeugung** (rund 14 h exklusiv, danach die Kette rund 5,5 h).
 
-**Vormerken fuer den v34-Wechsel:** R4 und R4b stehen fuer die Paarung auf
-`data/selfplay_v30-b02-policy_*` (72 Zustaende, Seed 20260803). Diese Generation rotiert beim
-v34-Wechsel heraus -- wer die Zeitreihe weiter gepaart fuehren will, sichert vorher die 72
-Zustaende, sonst endet die Vergleichbarkeit mit dem Korpus.
+**Vor dem Start pruefen** (Ablauf Punkt 7): Maschine frei, App bleibt offen, Skripte als DATEI
+starten (`bash tools/night_v33_generate.sh`), keine Pipe.
+
+**Vormerken fuer den v34-Wechsel:** R4/R4b stehen fuer die Paarung auf
+`data/selfplay_v30-b02-policy_*` (72 Zustaende, Seed 20260803); diese Generation rotiert dann
+heraus. Wer die Reihe gepaart fortfuehren will, sichert vorher die 72 Zustaende.
 
 ### FREIGABEN UND VERBOTE (woertlich)
 
 * Nutzer 2026-09-25: *"2 und 3 machen, bei 4 nimm a. fuer 1 machst 4000 schwarm spiele ohne
-  huellenknopf. welche von den 2 x 4000 wir nehmen koennen wir uns noch ueberlegen"*.
-* Nutzer 2026-09-25: *"v30-b02 kannst loeschen"* -- ausgefuehrt und verbraucht. Jede weitere
-  Loeschung braucht restic-Beleg UND neue pfadgenaue Freigabe.
+  huellenknopf"*; auf die Einschaetzung zur Klasse: *"ja, trag es ein"* (temperiert ohne Knopf).
+* Nutzer 2026-09-25: Loeschfreigabe A-F im Generationswechsel -- ausgefuehrt und verbraucht.
+  Jede weitere Loeschung braucht restic-Beleg UND neue pfadgenaue Freigabe.
 * **Kein Push ohne Anweisung.** Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
 * **Kein Commit waehrend eines Wanduhr-Laufs.** Messungen exklusiv; ein Build zaehlt als Last --
-  und ein `grep -rn` ueber `data/` auch (Vorfall 2026-09-25, Champion-2-Kante, per Wiederholung
-  als folgenlos belegt).
+  und ein `grep -rn` ueber `data/` auch.
 
 ## 2. CHAMPION UND LEITER
 
@@ -122,10 +111,10 @@ Artefakte NICHT im Repo** -- getrackt werden Spec, Manifest, Golden Probe und `w
 | Training Warmstart 12 Epochen, 4,89 Mio Samples, 888/414 | **5.573 s = 1,55 h** (gebremst) | v30-b02, lief neben der b01-Arena; exklusiv frueher 57 min |
 | Training KALTSTART 12 Epochen, 888/414 | **3.652 s = 1,01 h** | v30-b01; die alte ANNAHME 2,3-2,6 h stammte aus einer anderen Encoder-Aera |
 | Tor 1 je Seed, 200 Paare @400, 10 Threads, mit Logs | **5.719 s** exklusiv / 6.940-7.468 s gebremst | 14,3 s je Partie exklusiv, 17,4-18,7 s gebremst |
-| Anker-Kante n = 50 | **430 s** | seit 2026-09-19 die Groesse der Promotionsliste; n = 150 war 1.250-1.280 s |
-| Champion-2-Kante n = 150 | **2.489 s = 41,5 min** | |
+| Anker-Kante n = 50 | **418,6 s** (v32) / 430 s (v30) | seit 2026-09-19 die Groesse der Promotionsliste; n = 150 war 1.250-1.280 s |
+| Champion-2-Kante n = 150 | **2.377,5 s** (v32) / 2.489 s (v30) | 6 Worker |
 | Champion-Kanten je Kandidat gesamt | rund 3,5 h | 2 x Gating plus Anker plus Champion-2 |
-| Promotion nach Checkliste (inkl. Golden-Probe 22 min) | 38 min | v29-Messung |
+| Promotion nach Checkliste MIT R4/R4b/R5 (ohne Tor 1) | **rund 2,3 h** (8.289 s, v32) | ohne R4/R4b/R5: 38 min (v29); R4 allein 46 min |
 | Netz-Gesundheit komplett (Normen, tote Einheiten, offline, Platt) | rund 30 min | v30 |
 | Voller Build: Lib-Tests, `--no-run`, Fixtures, Wheel | rund 5 min | `--no-run` allein 56 s |
 | Anker-Drift / Anker-Konservierung | 22,4 s / 16,6 s | je 1.763 Schritte |
@@ -133,46 +122,42 @@ Artefakte NICHT im Repo** -- getrackt werden Spec, Manifest, Golden Probe und `w
 
 ## 4. SPEC UND REZEPT
 
-**Champion-Spec** `models/frozen_champions/v30-b02/spec.json`. **Erzeugungs-Spec**
-`models/v30_generation.spec.json` (= `start_by_search_on.spec.json` plus `return_order_mode: 1`);
-sie traegt auch die v31-Erzeugung.
+**Champion-Spec** `models/frozen_champions/v32-b01/spec.json` (= `models/v32-b01_brierbest.spec.json`,
+byte-gleich mit der von `v31-b01`, sha256 `4f5e5969...`). Sie traegt **weder `start_by_search`
+noch `return_order_mode`**; die Startkuppel-Suche kommt ab v33 (`PREREG_start_dome_choice.md`
+par.12), vorbereitet als `models/v33_gating.spec.json` fuer Tor 1 (Entscheid offen,
+`PREREG_v33_window.md` par.6).
 
-**Engine-Stand:** INPUT_SIZE **888**, NUM_ACTIONS **414**, Vertragshash `6ef829e564c58bd5`
-(unveraendert durch Gruppe A des Aufraeumens). Suchknoten: Mond 406-410, Rueckgabe 411-413,
-Slot und Rotation als eigene Knoten mit Policy-Ziel. **Die Rueckgabe-Streuung sitzt seit
-2026-09-19 im KNOTEN-Weg** (`self_play.rs`, eigener Seed-Unterscheider), die Maske dazu in
-`engine/py/corpus_dataset.py` als eigene Bedingung auf `return_order_randomized` -- nicht ueber
-`policy_target_valid`, weil beide Ketten `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` fahren.
+**Erzeugungs-Spec** `models/v32_generation.spec.json`, byte-gleich mit der v30/v31-Fassung
+(sha256 `4a3f9db3...`, = `start_by_search_on.spec.json` plus `return_order_mode: 1`). **Ab v33
+faehrt Schwarm a `models/v32_generation_nohull.spec.json`** -- identisch bis auf
+`envelope_search_c: 0.0` (`PREREG_geometric_envelope.md` par.14d).
 
-**Das v30-Rezept, belegt:** b03-Rezept mit `--moon-loss-weight 0`, `--ownership-weight 0` mit
-`--ownership-head-2d`, ohne `--endgame-head`, `--opp-points-head` bleibt, 12 Epochen, lr 5e-05
-cosine mit `--lr-t-max 12`, lambda 0,7, `--select-by-brier`, `--fast-loader`.
+**Engine-Stand:** INPUT_SIZE **888**, NUM_ACTIONS **414**, Vertragshash `6ef829e564c58bd5`,
+Paketversion 1.1.0, live das Wheel `46b5dfed...` (mit dem GUI-Tor; der Self-Play-Pfad ist davon
+unberuehrt). Suchknoten: Mond 406-410, Rueckgabe 411-413, Slot und Rotation als eigene Knoten mit
+Policy-Ziel. Die Rueckgabe-Streuung sitzt seit 2026-09-19 im KNOTEN-Weg, die Maske dazu in
+`engine/py/corpus_dataset.py` als eigene Bedingung auf `return_order_randomized`.
 
-**Was v30 daran entschieden hat:** der KALTSTART ist widerlegt. Gleiches Fenster, gleicher
-Monolith, gleicher Seed, gleiches Rezept, einziger Unterschied der Start -- 404:396 kalt gegen
-443:297 warm, **9,36 Prozentpunkte**. Fuer v31 heisst das: **Warmstart von
-`v30-b02_brierbest`**, kein Kaltstart mehr ohne eigenen Anlass.
+**Das Rezept seit v30, belegt:** Warmstart vom amtierenden Champion, `--moon-loss-weight 0`,
+`--ownership-weight 0` mit `--ownership-head-2d`, `--opp-points-head`, 12 Epochen, lr 5e-05 cosine
+mit `--lr-t-max 12`, lambda 0,7, `--select-by-brier`, `--fast-loader`. Der Kaltstart ist
+widerlegt (v30: 404:396 kalt gegen 443:297 warm, 9,36 Prozentpunkte).
 
-**v31-Fenster** (`PREREG_v31_window.md` par.1): 2.947 Dateien aus `v30-b02` neu (1.201),
-`v29-b11` als G-1 und `v28-b02` als G-2; `v27-b01` ist herausrotiert und geloescht. Seed
-20260949, Val-Pool `^selfplay_v30-`, 580 Traeger. Die acht neuen Knoten sind erstmals in den
-beiden juengsten Generationen belegt, also rund 81,6 Prozent des Fensters (HERLEITUNG aus par.1,
-nicht am Korpus nachgezaehlt).
+**v33-Fenster** (`PREREG_v33_window.md` par.1): Soll 2.947 Dateien -- neu `v32-b01` (1.201, mit
+`value-tempc-nohull`), G-1 `v31-b01` (1.201), G-2 `v30-b02` (400 policy + 145 Ausflug); `v29-b11`
+ist herausrotiert und geloescht. Seed 20260957, Val-Pool `^selfplay_v32-`, 580 Traeger.
 
-## 5. PREREG-BESTAND (2 OFFEN laut Index 2026-09-22; Ziel rund 7)
+## 5. PREREG-BESTAND (2 OFFEN laut Index 2026-09-25; Ziel rund 7)
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v32_window` | der laufende Zyklus selbst; Erzeugung laeuft seit 2026-09-22 |
+| `v33_window` | NEU 2026-09-25; par.6 wartet auf zwei Entscheide und die Freigabe der Erzeugung |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
-Am 2026-09-22 geschlossen: `claude_play_interface` (zehn Partien gespielt, Anzeige-Fix par.13
-gebaut). Davor bereits auf ENTSCHIEDEN gezogen und darum aus der Tabelle raus: `v31_window`,
-`dome_return_order`, `code_cleanup_closeout`.
-
-Beim Generationswechsel am 2026-09-19 nachgezogen: die Koepfe von `v30_window` (auf
-ENTSCHEIDEN), `code_cleanup_closeout` (Gruppe A) und `dome_return_order` (Dosis 0,81), danach
-`python tools/generate_prereg_index.py`.
+Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v32_window`
+(par.11 Promotion), `dome_return_order` (par.14-14b GUI-Tor), `start_dome_choice` (par.12),
+`geometric_envelope` (par.14d Schwarm a ohne Knopf); danach `python tools/generate_prereg_index.py`.
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 

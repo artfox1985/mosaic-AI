@@ -468,3 +468,26 @@ der Term kostet praktisch nichts (er ist ein `tanh` auf dem fertigen Blattwert).
 
 **Planungsgroesse fuer eine Spec-A/B-Sonde am Champion** (dasselbe Netz, ein Feld Unterschied,
 zwei Seeds a 200 Paaren @400, 10 Threads): **rund 4 h**. Ein Seed allein: 2 h.
+
+## Promotion v32-b01 und GUI-Tor, gemessen am 2026-09-25, exklusiv
+
+Alle Zahlen aus dem `laufzeit`-Block bzw. `elapsed_s` des jeweiligen Artefakts, ausser wo die
+Quelle genannt ist.
+
+| Lauf | Umfang | Threads/Worker | Wanduhr | Quelle |
+| --- | --- | --- | --- | --- |
+| Anker-Kante (frozen_referee_match) | 50 Partien, Worker @150 | 6 Worker | **418,6 s** | `elapsed_s` |
+| Champion-2-Kante (frozen_referee_match) | 150 Partien @400 | 6 Worker | **2.377,5 s** (15,85 s je Partie) | `laufzeit` |
+| R4-Kalibrierung | 72 Zustaende x 16 Refills @400 | 1 | **2.756,1 s** (38,3 s je Zustand) | `laufzeit` |
+| R4b-Zonensonde | 72 Zustaende | 1 | **42,5 s** | `laufzeit` |
+| R5-Kalibrierung | 139 Paare | 1 | **877,7 s** (6,31 s je Paar) | `laufzeit` |
+| sigma/Prior (gumbel_scale_calibration) | 300 Zustaende @400 | 1 | **707,5 s** | Harness-Zeitstempel, von Hand nachgetragen |
+| Golden Probe des Artefakts | 40 Partien, 10 Sonden @400 | 1 | **1.109 s** | Konsolenausgabe |
+| `cargo test --release --no-run` nach Engine-Aenderung | Lib, examples, benches | alle | **53 s** | Konsolenausgabe |
+| Lib-Tests `cargo test --release` | 693 Tests | alle | **81 s** | Konsolenausgabe |
+| pre-push-Haken, voller Zweig | 693 Tests | alle | **94 s** (Budget laut Kopf < 90 s) | Konsolenausgabe |
+
+**Planungsgroesse Promotion komplett** (die drei Kanten ausser Tor 1, alle Pflicht-Diagnostiken
+samt R4/R4b/R5, Einfrieren): rund **2,3 h** reine Rechenzeit (8.289 s), sequenziell. Den groessten Posten
+tragen R4 (46 min) und die Champion-2-Kante (40 min).
+
