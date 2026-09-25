@@ -47,10 +47,11 @@ und -Konservierung gruen, 693 Lib-Tests gruen):
 
 ### WAS JETZT ANSTEHT (v33)
 
-1. **Nutzer-Entscheid vor der Erzeugung: WELCHE Schwarm-Klasse ohne Huellenknopf laeuft**
-   (`PREREG_geometric_envelope.md` par.14d). Entschieden ist: der Sockel bleibt ganz und
-   huellen-an, EINE der beiden Schwarm-Klassen (`value-tempc` oder `value-excursion`, je 4.000)
-   faehrt mit `envelope_search_c 0,0` -- also eine zweite Spec-Datei fuer genau diese Klasse.
+1. **ENTSCHIEDEN 2026-09-25: Schwarm a (`value-tempc`) laeuft ohne Huellenknopf**, Sockel und
+   Ausflug bleiben huellen-an (`PREREG_geometric_envelope.md` par.14d). Grund: der Ausflug ist
+   die einzige Klasse mit unverzerrten Value-Zielen, der temperierte Schwarm hat sie ohnehin
+   verzerrt. Fuer die Erzeugung: eine zweite Spec-Datei (`envelope_search_c: 0.0`) nur am
+   Aufruf von Schwarm a. Abnahme: Vielfaltssonde gegen den temperierten Schwarm von G-1.
 2. **`/mosaic-generation-turnover` VOR dem v33-Self-Play.** Generator `v32-b01` ist eingefroren.
    Rotation: G = `v32-b01`, G-1 `v31-b01` (die v32-Erzeugung), G-2 `v30-b02` (die v31-Erzeugung);
    **`v29-b11` faellt heraus.** Seeds nach dem Vierer-Schritt HERGELEITET, beim Anlegen der

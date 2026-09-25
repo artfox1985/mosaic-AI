@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13), Rezeptbestandteil seit v24-b07. **par.14 GEFAHREN 2026-09-23**, dasselbe Netz beidseits, nur die Spec getauscht: mit Knopf **462:338 = 57,75 Prozent, Block-z +3,94**, beide Seeds einzeln signifikant. Die Form haelt ohne Knopf weitgehend (0,79 -> 0,72), der Knopf ist aber **0,4 volle Spalten und 4 Punkte** je Partie wert. **Nutzer-Entscheid: der Knopf bleibt an** (par.14c). Offen: der geteilte Sockel (par.14b). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13), Rezeptbestandteil seit v24-b07. **par.14 GEFAHREN 2026-09-23**, dasselbe Netz beidseits, nur die Spec getauscht: mit Knopf **462:338, Block-z +3,94**; die Form haelt auch ohne ihn, der Knopf ist **0,4 volle Spalten** je Partie wert. **Nutzer-Entscheid: der Knopf bleibt an** (par.14c). Statt des geteilten Sockels (par.14b): ab v33 laeuft Schwarm a (temperiert) ohne Knopf, Ausflug und Sockel bleiben an (par.14d). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -3052,8 +3052,34 @@ huellenknopf. welche von den 2 x 4000 wir nehmen koennen wir uns noch ueberlegen
 * **Trennbarkeit ist geschenkt**: die Klasse hat ohnehin eigene Endung und eigenen Lauf. Neu ist
   nur eine zweite Spec-Datei fuer diese eine Klasse, in der `envelope_search_c` auf 0,0 steht.
 
-**Offen und VOR der Erzeugung zu entscheiden: welche der beiden Schwarm-Klassen.**
-`value-tempc` spielt durchgehend temperiert (`--action-temp 2`), `value-excursion` weicht einmal
-ab und spielt danach argmax ohne Wurzelrauschen. Die Vielfaltsmessung
-(`tools/probes/corpus_state_diversity_probe.py`, par.14b letzter Punkt) bleibt als Abnahme
-vorgesehen.
+**ENTSCHIEDEN 2026-09-25: `value-tempc` (Schwarm a) laeuft ohne Huellenknopf,
+`value-excursion` (Schwarm b) bleibt huellen-an.** Koordinator-Empfehlung auf Nutzer-Frage
+(*"das war die frage an deine einschaetzung"*), Nutzer: *"ja, trag es ein"*.
+
+**Begruendung: die Rollen, fuer die die beiden Klassen gebaut sind** (`PREREG_v25_window.md`,
+Zusammensetzung der Value-Masse): der Ausflug liefert "saubere Ziele aus abweichenden
+Stellungen" -- er weicht einmal ab und spielt danach argmax zu Ende, sein Ziel ist also der Wert
+der Stellung unter dem Spiel des Champions. Der temperierte Schwarm liefert "breite Abdeckung,
+verzerrte Ziele", mit Temperatur 2 im ganzen Pfad. Ohne Knopf spielt dasselbe Netz messbar
+anders (par.14c: 0,4 volle Spalten und 4 Punkte je Partie weniger). Im Ausflug wuerde das Ziel
+damit zum Wert unter einem spaltenaermeren Spiel -- eine systematische Verzerrung in genau der
+Groesse, auf die die Kampagne zielt, und in der EINZIGEN Klasse mit unverzerrten Zielen. Im
+temperierten Schwarm sind die Ziele ohnehin verzerrt; dort kostet der Schnitt am wenigsten.
+
+**Der Gegenpunkt, ausdruecklich festgehalten:** der Vielfaltsgewinn faellt im temperierten
+Schwarm vermutlich KLEINER aus, weil Temperatur 2 die Zugwahl schon so stark verwischt, dass die
+Verschiebung durch den Knopf teilweise darin untergeht. UNGEMESSEN.
+
+**Abnahme, daran geknuepft:** die Vielfaltssonde (`tools/probes/corpus_state_diversity_probe.py`)
+auf dem huellenfreien temperierten Schwarm von v33 gegen den temperierten Schwarm von G-1 (die
+v32-Erzeugung, huellen-an). **Vorbehalt:** die beiden unterscheiden sich AUCH im Generator
+(`v32-b01` gegen `v31-b01`), der Vergleich ist also nicht rein einfaktoriell. **Zeigt die Sonde
+praktisch keinen Unterschied, war der temperierte Schwarm der falsche Ort** -- dann steht fuer
+v34 die Frage, den Ausflug trotz Zielverzerrung zu nehmen oder die Idee fallen zu lassen.
+**Noch zu klaeren beim Anlegen der Abnahme:** das Werkzeug nimmt zwei VERZEICHNISSE
+(`<dir_a> <dir_b>`), die Korpora liegen aber nach Klasse benannt flach in `data/`.
+
+**Fuer die Erzeugung heisst das:** eine zweite Spec-Datei, identisch mit der Erzeugungs-Spec bis
+auf `envelope_search_c: 0.0`, NUR am Aufruf von Schwarm a; Sockel und Schwarm b behalten die
+bisherige. Das Lauf-Manifest haelt die Spec seit 2026-09-25 mit Inhalt und sha256 fest
+(`selfplay_manifest.py` `spec_file`), die Klassen sind also auch hinterher auseinanderzuhalten.
