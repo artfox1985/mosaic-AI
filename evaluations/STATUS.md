@@ -26,7 +26,12 @@ Nutzer-Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich i
 **FERTIG: die v33-Erzeugung** (`bash tools/night_v33_generate.sh`), Exit 0 am 2026-09-26
 04:23:55. Dateien gezaehlt: `policy` 400, `value-tempc-nohull` 400, `value-excursion` 401; letzte
 Klasse 4.000 Partien in 13.753,9 s (3,43 s je Partie, threads 11, laut Aufgabenausgabe und Manifest).
-Naechster Schritt: Pflichtpruefungen (Fahrplan 2), dann Bewerter-Vortests Stufe 1 (2a).
+**Pflichtpruefungen GRUEN** (`PREREG_v33_window.md` par.9): Manifest-Diff, Wiedervorlage, Tor 2a
+`sp_voll` 0,966 gegen 0,977 (haelt, erstmals leicht fallend). **Vielfaltssonde: +1,1 Prozent**,
+der Knopf bringt im temperierten Schwarm praktisch keine Vielfalt (`PREREG_geometric_envelope.md`
+par.14e). **Bewerter-Vortests Stufe 1 gefahren** (`PREREG_evaluator_pretests.md` par.8a): E1
+gleich gut, Arm kommt wegen der Kosten; E2 besteht (+0,00213 Brier); E3 tot; der Kopf schlaegt im
+Mittelspiel den linearen Leser. **Die Maschine ist frei, die Kette wartet auf Nutzer-Go.**
 
 **Champion `v32-b01_brierbest`** seit 2026-09-25 (`PREREG_v32_window.md` par.11), eingefroren
 unter `models/frozen_champions/v32-b01`; Anker-Drift und -Konservierung gruen auf dem
@@ -41,9 +46,9 @@ Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
 ### FAHRPLAN (eingetaktet 2026-09-25, Nutzer: *"Registrieren das so vor und takte es ein"*)
 
 1. **ERLEDIGT: v33-Erzeugung** (siehe oben), fertig 2026-09-26 04:23:55.
-2. **Pflichtpruefungen der Erzeugung** (`PREREG_v33_window.md` par.9): Manifest-Diff je Klasse,
+2. **ERLEDIGT: Pflichtpruefungen der Erzeugung** (`PREREG_v33_window.md` par.9): Manifest-Diff je Klasse,
    Wiedervorlage am ersten Record, Tor 0, Tor 2a am Sockel, Vielfaltssonde an Schwarm a.
-2a. **Bewerter-Vortests Stufe 1** (`PREREG_evaluator_pretests.md` par.3/par.4; Nutzer 2026-09-25:
+2a. **ERLEDIGT: Bewerter-Vortests Stufe 1** (`PREREG_evaluator_pretests.md` par.3/par.4; Nutzer 2026-09-25:
     *"Ja Takte deinen Vorschlag so ein"*): offline auf dem Champion, 60 Val-Dateien aus
     `window_v32_val.txt`, kein Build. E1 (Einpass-Konsum statt geflipptem zweiten Pass) wird nur
     gelesen, sein Arm kommt sicher; E2 (Margen-Schwellen) und E3 (Rundenschicht) muessen gegen
@@ -276,6 +281,14 @@ Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v3
     eingebaut): ein dritter Seed kostet rund 2 h, nur wenn die ersten zwei sich widersprechen.
     Er aendert ein Verdikt nur in knappen Faellen, weil das Kriterium auch "gepoolt >= 52,5
     Prozent" durchlaesst. VOR dem Start der v33-Kette zu entscheiden.
+
+16. **v34: Schwarm a wieder mit Huellenknopf?** Die Vielfaltssonde zeigt ohne Knopf nur +1,1
+    Prozent verschiedene Zustaende (`PREREG_geometric_envelope.md` par.14e); der Zweck, fuer den
+    der Knopf dort ausgeschaltet wurde, ist damit kaum erfuellt. Zum v34-Wechsel.
+
+17. **v34: E2-Arm (Margen-Schwellen am WDL-Logit).** Vortest bestanden (+0,00213 Brier an einem
+    LINEAREN Leser, `PREREG_evaluator_pretests.md` par.8a); ob er dem Kopf hilft, zeigt nur ein
+    Arm. Bau rund ein halber Tag, Arm rund 4,5 h. Zuschnitt in der v34-Fenster-Prereg.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

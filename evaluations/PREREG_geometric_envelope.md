@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13), Rezeptbestandteil seit v24-b07. **par.14 GEFAHREN 2026-09-23**, dasselbe Netz beidseits, nur die Spec getauscht: mit Knopf **462:338, Block-z +3,94**; die Form haelt auch ohne ihn, der Knopf ist **0,4 volle Spalten** je Partie wert. **Nutzer-Entscheid: der Knopf bleibt an** (par.14c). Statt des geteilten Sockels (par.14b): ab v33 laeuft Schwarm a (temperiert) ohne Knopf, Ausflug und Sockel bleiben an (par.14d). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen (par.13), Rezeptbestandteil seit v24-b07. **par.14 GEFAHREN 2026-09-23**, dasselbe Netz beidseits, nur die Spec getauscht: mit Knopf **462:338, Block-z +3,94**; die Form haelt auch ohne ihn, der Knopf ist **0,4 volle Spalten** je Partie wert. **Nutzer-Entscheid: der Knopf bleibt an** (par.14c). Ab v33 laeuft Schwarm a ohne Knopf (par.14d); die Vielfaltssonde zeigt dort nur +1,1 Prozent Zustaende (par.14e), v34-Entscheid offen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -3083,3 +3083,23 @@ v34 die Frage, den Ausflug trotz Zielverzerrung zu nehmen oder die Idee fallen z
 auf `envelope_search_c: 0.0`, NUR am Aufruf von Schwarm a; Sockel und Schwarm b behalten die
 bisherige. Das Lauf-Manifest haelt die Spec seit 2026-09-25 mit Inhalt und sha256 fest
 (`selfplay_manifest.py` `spec_file`), die Klassen sind also auch hinterher auseinanderzuhalten.
+
+### par.14e ERGEBNIS der Vielfaltssonde (gefahren 2026-09-26)
+
+`tools/probes/corpus_state_diversity_probe.py` auf `v32-b01-value-tempc-nohull` (v33-Erzeugung,
+ohne Knopf) gegen `v31-b01-value-tempc` (v32-Erzeugung, mit Knopf), je 4.000 Partien, Einheit
+verschiedene (Runde, Brettmaske)-Zustaende: **100.894 gegen 99.775 = +1,1 Prozent**; verschiedene
+Endbretter 96,7 gegen 95,9 Prozent von je 8.000 Seiten. Artefakt
+`evaluations/artifacts/diversity_v32-b01-tempc-nohull_vs_v31-b01-tempc.json`, 4.482,8 s.
+
+**Lesart nach par.14d: praktisch kein Unterschied.** Der vorab benannte Gegenpunkt trifft zu:
+Temperatur 2 verwischt die Zugwahl so stark, dass der Knopf in diesem Schwarm kaum zusaetzliche
+Stellungen erzeugt. Der Vorbehalt (verschiedene Generatoren) koennte einen Knopf-Effekt nur dann
+verdecken, wenn der Generatorwechsel die Vielfalt gleichzeitig in die Gegenrichtung verschoben hat;
+UNGEPRUEFT, eine Kontrolle mit dem reinen Generatorwechsel (v30 -> v31, beide mit Knopf) ist nicht
+gefahren.
+
+**Offen fuer v34 (Nutzer-Entscheid):** ob Schwarm a wieder mit Knopf laeuft. Die Frage aus
+par.14a(a), ob huellenfreies Spiel dem Value-Kopf Abdeckung bringt, ist an diesem Ort mit
+"kaum" beantwortet; der andere Ort (Ausflug) ist in par.14d aus einem Grund der Ziel-Verzerrung
+ausgeschlossen worden.

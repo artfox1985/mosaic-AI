@@ -491,3 +491,15 @@ Quelle genannt ist.
 samt R4/R4b/R5, Einfrieren): rund **2,3 h** reine Rechenzeit (8.289 s), sequenziell. Den groessten Posten
 tragen R4 (46 min) und die Champion-2-Kante (40 min).
 
+
+## Generation v33, Erzeugung und Pflichtpruefungen, gemessen am 2026-09-25/26, exklusiv
+
+| Lauf | Umfang | Threads | Wanduhr | Quelle |
+| --- | --- | --- | --- | --- |
+| Erzeugung Sockel `v32-b01-policy` | 4.000 Partien | 11 | **16.577,0 s** (4,14 s je Partie) | Manifest `laufzeit` |
+| Erzeugung Schwarm a `value-tempc-nohull` | 4.000 Partien | 11 | **16.436,1 s** (4,11 s) | Manifest |
+| Erzeugung Schwarm b `value-excursion` | 4.000 Partien | 11 | **13.753,9 s** (3,43 s; v32: 4,36 s, Ursache ungeklaert) | Manifest |
+| Wiedervorlage `count_new_nodes_in_corpus.py` | je 10 Dateien | 1 | **7-10 s** je Klasse | Konsolenausgabe |
+| Tor 2a `corpus_sanity_check.py` | 400 Dateien, 4.000 Partien | 1 | **278,7 s** | Konsolenausgabe |
+| Vielfaltssonde, zwei Arme | je 4.000 Partien | 1 | **4.482,8 s** (!) | Artefakt; teurer als erwartet, vor dem naechsten Einsatz `--n` verkleinern |
+| Bewerter-Vortests Stufe 1 | 60 Dateien, 86.190 Zustaende | 11 | **495,2 s** (Extraktion 330,6 s) | Artefakt `laufzeit` |

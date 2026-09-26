@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: angelegt 2026-09-25, nichts gefahren. Stufe 1 (offline, par.3/par.4) nach der v33-Erzeugung vor dem Kettenstart; Stufe 2 (E1-Arm, E4-Vortest, par.5) nach Kette und b02. E1 bekommt seinen Arm unabhaengig vom Vortest (Nutzer-Entscheid, par.1). -->
+<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: Stufe 1 gefahren 2026-09-26 (par.8): E1 gleich gut (Brier-Differenz -0,00012, CI um 0), Arm kommt wegen der Kosten; E2 BESTEHT (+0,00213); E3 TOT (global besser in allen Runden). Stufe 2 (E1-Arm, E4) nach Kette und b02 (par.5). -->
 
 # Vorregistrierung: Vortests fuer den Bewerter (E1-E4)
 
@@ -178,4 +178,55 @@ hier.
 
 ## par.8 Ergebnisse
 
-(noch leer)
+### par.8a Stufe 1, gefahren 2026-09-26 (exklusiv, 495,2 s)
+
+Artefakt `evaluations/artifacts/evaluator_pretests_stage1_v32-b01_brierbest.json`. Substrat wie
+par.2: 60 Dateien, **86.190 Drafting-Zustaende**, davon 24.533 mit bekannten Rueckgabe-Bloecken,
+0 Records mit abweichendem Zieher. Alle Streuangaben Block-Bootstrap ueber die 60 Dateien. Einmal
+lief waehrend der Extraktion `generate_prereg_index.py` daneben (Sekunden); die Rechnung ist
+deterministisch, betroffen waere nur die Laufzeit.
+
+**E1 (par.3), Primaerstratum ohne Bloecke, n = 48.799 Zustaende in Runde 1-4:**
+
+| Runde | Versatz d = p_z + p_f - 1 | B_e1 - B_flip |
+| --- | --- | --- |
+| 1 | **+0,0450** [+0,0412; +0,0489] | -0,00030 [-0,00148; +0,00091] |
+| 2 | +0,0119 [+0,0050; +0,0185] | -0,00034 [-0,00140; +0,00066] |
+| 3 | +0,0329 [+0,0224; +0,0428] | +0,00049 [-0,00068; +0,00170] |
+| 4 | -0,0083 [-0,0193; +0,0030] | -0,00012 [-0,00144; +0,00122] |
+| 1-4 | **+0,0231** [+0,0182; +0,0279] | **-0,00012** [-0,00066; +0,00042] |
+| 5 (berichtet) | +0,0215 | -0,00200 [-0,00300; -0,00106] |
+
+**Lesart nach par.3: gleich gut in dieser Aufloesung.** Die Einpass-Naeherung ist gegen den
+Ausgang so genau wie der geflippte Pass; der zweite Pass traegt keine messbare Zusatzinformation.
+Dafuer ist er systematisch OPTIMISTISCH: die beiden Siegwahrscheinlichkeiten eines Zustands
+summieren sich im Mittel zu 1,023, in Runde 1 zu 1,045 (Richtung wie der v21-Bootstrap-Befund,
+`PREREG_heuristic_v2_long_rows.md:1235-1240`, dort 1,13-1,14 auf anderer Grundmenge). Der
+Versatz schwankt je Runde, hebt sich also zwischen Geschwistern verschiedener Folgezieher nicht
+sicher weg (Herleitung, nicht gemessen). Im Stratum mit Bloecken (Flip dort NICHT suchtreu)
+gleiche Richtung, B_e1 - B_flip = -0,00082 [-0,00184; +0,00016]. **Folge:** der E1-Arm (par.5b)
+kommt wie entschieden; sein Hauptmotiv ist der Kostengewinn, eine Staerke-Erwartung traegt der
+Vortest nicht.
+
+**Kontrollprobe (par.4):** Brier(Leser, Zufalls-Trunk) - Brier(Leser, Champion) = **+0,0426**
+[+0,0346; +0,0505], n = 73.332 (Runde 1-4, alle Leser mit gueltiger Vorhersage). **Der Trunk
+traegt**, die Leser-Vortests sind zulaessig.
+
+**Berichtsgroesse Kopf gegen Leser** (Brier gegen den Sieg): der KOPF ist in jeder Runde BESSER
+als der lineare Leser auf seiner eigenen Eingabe, um 0,0077-0,0159 (alle CIs unter 0). Im
+Mittelspiel ist also KEIN Auslese-Verlust gegen den Ausgang nachweisbar; der R4b-Befund (Trunk
+liest die EXAKTE Marge besser als die Koepfe) ist endspiel- und zielspezifisch. Das korrigiert
+die Einordnung "die Koepfe verlieren, was der Trunk weiss" fuer das Mittelspiel.
+
+**E2 (par.4):** Brier(a) - Brier(b) = **+0,00213** [+0,00048; +0,00370], n = 73.332.
+**BESTEHT** nach der registrierten Regel (Mittel >= 0,0012 und CI > 0). Einschraenkung, vorab
+nicht bedacht und darum hier ausdruecklich: beide Leser sind linear und liegen rund 0,01 Brier
+hinter dem Kopf. Belegt ist, dass die Margen-Schwellen einem LINEAREN Siegwert-Leser helfen; ob
+sie dem nichtlinearen, gemeinsam trainierten Kopf helfen, beantwortet erst der Arm (par.6). Die
+untere CI-Grenze liegt bei 0,4 Verdopplungs-Aequivalenten, der Punktwert bei 1,8.
+
+**E3 (par.4):** der Rundenleser ist in JEDER Runde schlechter als der globale (Runde 1-4:
+-0,0069 bis -0,0206, alle CIs unter 0; Runde 5 -0,0024, CI um 0). **TOT** nach der Regel
+(0 von 4 Runden bestanden). Plausibler Grund (Herleitung): ein Fuenftel der Daten je Leser kostet
+mehr, als die Phasen-Anpassung bringt. Ein Rundenumbau der letzten Schicht im Netz teilt den
+Trunk und waere nicht ganz dasselbe; der Vortest traegt ihn trotzdem nicht.

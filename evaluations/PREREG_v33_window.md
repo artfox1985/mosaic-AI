@@ -209,7 +209,7 @@ Erzeugung: v31 **14,66 h** ohne Nebenlast, v32 **13 h 57** mit Nebenlast (keine 
 Vergleichsgroesse). Kette: v32 **5 h 34** (Fenster, Monolith, Training 63 min, Tor 1 zwei Seeds).
 Zusammen also rund **20 h** bis zum Tor-1-Verdikt.
 
-## par.9 ERZEUGUNG (noch leer)
+## par.9 ERZEUGUNG (gefahren 2026-09-25/26)
 
 Pflichtpruefungen direkt nach der Erzeugung, je Klasse:
 * **Manifest-Diff** gegen `manifest_v32-b01...` bzw. die v32-Erzeugung: erwartet `model`, `seed`,
@@ -217,3 +217,17 @@ Pflichtpruefungen direkt nach der Erzeugung, je Klasse:
   0,0 (der Block `spec_file` ist neu, er fehlt in den v32-Manifesten ganz).
 * **Wiedervorlage am ersten Record** (Mond- und Rueckgabeknoten mit Lernziel, wie v32 par.9).
 * **Tor 0** je Klasse, **Tor 2a** am Sockel, **Vielfaltssonde** an Schwarm a (par.3).
+
+**Erzeugung:** `tools/night_v33_generate.sh`, Exit 0 am 2026-09-26 04:23:55, Dateien gezaehlt:
+`policy` 400, `value-tempc-nohull` 400, `value-excursion` 401. Laufzeiten aus den Manifesten
+(je 4.000 Partien, threads 11): 16.577,0 s / 16.436,1 s / 13.753,9 s, zusammen **12,99 h**.
+Der Ausflug lief mit 3,43 s je Partie deutlich schneller als bei v32 (4,36 s); Ursache
+UNGEKLAERT, nichts lief daneben.
+
+| Pruefung | Ergebnis |
+| --- | --- |
+| Manifest-Diff je Klasse gegen die v32-Erzeugung (`manifest_v31-b01-*`) | **GRUEN**: je 11 Felder, davon inhaltlich genau `cli_args.model`, `.seed`, `.spec`, `.version` und `version`; der Rest ist `git_commit`, `laufzeit.*`, `run_timestamp`. `spec_file` ist neu; `content.envelope_search_c` = **0,0** bei `value-tempc-nohull` (sha `ada4238c`), **1,0** bei Sockel und Ausflug (sha `4a3f9db3`). Kein stiller Default. |
+| Wiedervorlage am Record (`tools/count_new_nodes_in_corpus.py`, je 10 Dateien, Seed 20260945) | **GRUEN** in allen drei Klassen: Mondknoten 406-410 mit Ziel in 11,63 / 11,95 / 11,39 % der Records, Rueckgabeknoten 411-413 in 40 / 17 / 18 Records, 0 Records mit leerem Policy-Ziel. Artefakte `new_nodes_v32-b01-*.json` |
+| **Tor 2a** (`corpus_sanity_check.py`, Sockel, n = 8.000 Seiten) | `sp_voll` **0,966 (+-0,017)** gegen **0,977 (+-0,017)** bei `v31-b01` -- **HAELT** (Nicht-Unterlegenheit); erstmals seit v25 mit Richtung nach unten (-0,011, innerhalb der Streuung). Artefakt `corpus_sanity_v32-b01-policy.json`, 278,7 s |
+| **Vielfaltssonde** Schwarm a (par.3) | verschiedene (Runde, Brettmaske)-Zustaende **100.894** ohne Knopf gegen **99.775** mit Knopf (G-1), je 4.000 Partien: **+1,1 %**; Endbretter 96,7 % gegen 95,9 % verschieden. **Praktisch kein Unterschied** -- nach der Leseregel in par.3 war der temperierte Schwarm der falsche Ort fuer den Knopf (der vorab benannte Gegenpunkt aus `PREREG_geometric_envelope.md` par.14d trifft zu). Eine Generator-Kontrolle (v30 -> v31) ist nicht gefahren: sie kann +1,1 % nicht mehr zu einem Befund machen. Artefakt `diversity_v32-b01-tempc-nohull_vs_v31-b01-tempc.json`, **4.482,8 s** |
+| **Tor 0** der Schwarm-Klassen | laeuft als Schritt 1 der Kette (`night_v33_chain.sh`) |

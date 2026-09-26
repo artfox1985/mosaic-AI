@@ -2,6 +2,9 @@
 
 **Weiterverarbeitung:** E1-E4 sind am 2026-09-25 in `PREREG_evaluator_pretests.md` eingetaktet
 (Vortests vor jedem Arm; E1 bekommt seinen Arm auf Nutzer-Entscheid sicher).
+**Stufe 1 gefahren 2026-09-26** (dort par.8a): E1 gleich gut, E2 besteht, E3 tot; und der
+Kopf schlaegt im Mittelspiel den linearen Leser seiner Eingabe, die Auslese-Luecke aus 2.1 ist
+endspiel- und zielspezifisch.
 
 **Datum:** 2026-09-25. **Auftrag (Koordinator, auf Nutzer-Feedback):** Literatur plus Code-Lesen
 zur Frage, wie die ARCHITEKTUR des Bewerters optimiert werden kann. Vier Teilfragen: (A)

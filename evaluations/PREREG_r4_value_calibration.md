@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: v20-Aera "kein Befund". AM SCHLUSS-CHAMPION NACHGEFAHREN 2026-09-21: par.20 Kalibrierung (Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt 50,0 Prozent; NEU: der Punkte-Kopf UEBERSCHIESST, Steigung 1,19, sd 40,2 gegen wahre 18,8). par.21 Zonen-Sonde: eindeutig Hypothese (b) -- der TRUNK traegt die Information fast vollstaendig (LOO-R2 0,940 gegen Decke 0,983), die Roh-Eingabe linear nicht (0,087), die Koepfe liefern -2,18. Der Engpass ist der AUSLESEPFAD, nicht Encoder oder Kapazitaet -- und das war bei v20 schon so (Trunk 0,912). Nicht gepaart, n=72 indikativ. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie kalibriert ist der Value-/Punkte-Kopf am Runde-4-Ende gegen gesampelte exakte Ground Truth (Task #27-Folge)? | Beleg: v20-Aera "kein Befund". AM SCHLUSS-CHAMPION NACHGEFAHREN 2026-09-21: par.20 Kalibrierung (Value-Kopf R2 0,414 statt 0,008, Vorzeichen-Anker 71,4 statt 50,0 Prozent; NEU: der Punkte-Kopf UEBERSCHIESST, Steigung 1,19, sd 40,2 gegen wahre 18,8). par.21 Zonen-Sonde: eindeutig Hypothese (b) -- der TRUNK traegt die Information fast vollstaendig (LOO-R2 0,940 gegen Decke 0,983), die Roh-Eingabe linear nicht (0,087), die Koepfe liefern -2,18. Engpass AUSLESEPFAD fuer die exakte R4-Marge (v20: Trunk 0,912); im Mittelspiel gegen den Ausgang schlaegt der Kopf den linearen Leser (par.22). Nicht gepaart, n=72 indikativ. -->
 
 # Vorregistrierung: Runde-4-Ende-Value-Kalibrierung gegen gesampelte exakte Ground Truth (Chance-Knoten-Erwartung)
 
@@ -471,3 +471,13 @@ gelesen (bei mehreren Modellen bricht sie ab statt zu raten). Der Ausgabename wa
 genagelt -- er haette den naechsten Lauf still ueberschrieben oder falsch etikettiert und wird
 jetzt aus dem Modellnamen abgeleitet. Dazu Herkunftsfelder (`referenz_json`, `model_key`,
 `substrat`) und der `laufzeit`-Block.
+
+### par.22 Einordnung durch den Mittelspiel-Vortest (2026-09-26)
+
+`PREREG_evaluator_pretests.md` par.8a hat auf 86.190 Drafting-Zustaenden (Runde 1-5, Val-Menge
+des Champions `v32-b01`) den Value-Kopf gegen einen LINEAREN Leser auf seiner eigenen Eingabe
+(dem 512-breiten Trunk) gehalten, Ziel der realisierte Sieg: der **Kopf ist in jeder Runde um
+0,0077-0,0159 Brier besser** (CIs ueber Dateibloecke alle unter 0). Der Satz aus par.21 "der
+Engpass ist der AUSLESEPFAD" gilt damit fuer das, was par.21 gemessen hat -- die EXAKTE Marge am
+Ende von Runde 4, n = 72 --, nicht als allgemeine Aussage ueber den Kopf. Gegen den Ausgang im
+Mittelspiel ist kein Auslese-Verlust nachweisbar.
