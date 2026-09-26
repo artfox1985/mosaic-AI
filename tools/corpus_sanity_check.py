@@ -75,6 +75,10 @@ def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
 
     # Je Partie und Seite die Endgroessen einsammeln.
     zeilen_voll, zeilen_fuell, sp_voll, sp_ge4, sp_ge3, sp_max = [], [], [], [], [], []
+    # Je SPALTENINDEX c0..c5 (Nutzer 2026-09-26): die Summe voller Spalten verdeckt, WO
+    # gebaut wird -- gemessen lagen alle vollen Spalten in c0/c1, c5 praktisch nie.
+    col_full_by_index = [[] for _ in range(6)]
+    col_fill_by_index = [[] for _ in range(6)]
     punkte, margin, floor_steine = [], [], []
     platten = {i: [] for i in range(8)}
     aktiv = {i: 0 for i in range(8)}
@@ -96,6 +100,10 @@ def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
             sp_ge4.append(sum(1 for x in cf if x >= 4))
             sp_ge3.append(sum(1 for x in cf if x >= 3))
             sp_max.append(max(cf) if cf else 0)
+            if len(cf) == 6:
+                for c in range(6):
+                    col_full_by_index[c].append(1 if cf[c] >= 6 else 0)
+                    col_fill_by_index[c].append(cf[c])
             punkte.append(sc[pi])
             margin.append(sc[pi] - sc[1 - pi])
             floor_steine.append(floor_je_seite.get((gid, pi), 0))
@@ -117,6 +125,11 @@ def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
           f"| >=4 {mw(sp_ge4):.2f} | >=3 {mw(sp_ge3):.2f} | hoechste {mw(sp_max):.2f}/6")
     print(f"   Seiten mit >= 1 voller Spalte: {sides_with_full_column} "
           f"von {len(sp_voll)}")
+    if col_full_by_index[0]:
+        print("   je Spalte voll    : " + "  ".join(
+            f"c{c} {mw(col_full_by_index[c]):.3f}" for c in range(6)))
+        print("   je Spalte Fuellung: " + "  ".join(
+            f"c{c} {mw(col_fill_by_index[c]):.2f}" for c in range(6)))
     print(f"3) Strafleiste      : {mw(floor_steine):.2f} +- {ci(floor_steine):.2f} Steine je Partie und Seite")
     print(f"5) Eigene Punkte    : {mw(punkte):.2f} +- {ci(punkte):.2f}")
     print(f"6) Margin           : {mw(margin):.2f} (per Konstruktion 0 im Mittel ueber beide Seiten)")
@@ -138,6 +151,10 @@ def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
                 zeilen_voll_ci=ci(zeilen_voll), zeilen_fuell=mw(zeilen_fuell),
                 sp_voll_ci=ci(sp_voll), sp_ge4=mw(sp_ge4), sp_ge3=mw(sp_ge3),
                 sp_max=mw(sp_max), floor_ci=ci(floor_steine),
+                sp_voll_je_spalte=[mw(col_full_by_index[c]) if col_full_by_index[c] else None
+                                   for c in range(6)],
+                fuellung_je_spalte=[mw(col_fill_by_index[c]) if col_fill_by_index[c] else None
+                                    for c in range(6)],
                 sides_with_full_column=sides_with_full_column,
                 punkte_ci=ci(punkte), margin=mw(margin),
                 platten={KRIT[i]: {"aktiv_in_partien": aktiv[i], "punkte": mw(platten[i]),

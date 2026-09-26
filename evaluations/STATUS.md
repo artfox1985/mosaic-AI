@@ -33,10 +33,25 @@ par.14e). **Bewerter-Vortests Stufe 1 gefahren** (`PREREG_evaluator_pretests.md`
 gleich gut, Arm kommt wegen der Kosten; E2 besteht (+0,00213 Brier); E3 tot; der Kopf schlaegt im
 Mittelspiel den linearen Leser.
 
-**LAEUFT seit 2026-09-26: v33-Kette, danach b02** (`bash tools/night_v33_chain.sh && bash
-tools/night_v33_b02.sh`, Harness-Hintergrundaufgabe; Nutzer-Go *"Setz es um wie vorgeschlagen"*,
-Stufenregel gilt). Nichts anderes starten, kein Build, kein Commit. Stufe 2 der Vortests braucht
-einen Build und kommt erst danach.
+**v33-Kette FERTIG 13:33.** Training v33-b01 61 min, Tor 1 **420:380 = 52,50 Prozent, Block-z +1,41**:
+das Kriterium "gepoolt >= 52,5" ist GENAU AUF DER KANTE erfuellt, statistisch nicht gesichert
+(`PREREG_v33_window.md` par.10). **Promotion: Nutzer-Entscheid**, Vorschlag erst nach dem b02-A/B.
+
+**NEBENLAST-VERSTOSS 2026-09-26 (Koordinator, sofort gemeldet):** waehrend des b02-A/B (seit
+14:17, Seed 20261651 ab 15:32) liefen ab etwa 15:47 drei Python-Auswertungen ueber 30-150
+Korpusdateien (je rund 1 min; Spalten je Index, Startplatten-Auszaehlung) plus Kurzaufrufe
+(Index-Generator, Datei-Edits). Irrtum: das A/B wurde fuer GPU-Training gehalten. Betroffen ist
+**Seed 20261651, grob Block 5-15**; Seed 20261650 war vorher fertig. **ERLEDIGT:** exklusive
+Wiederholung von Seed 20261651, Block 1-17 (das ganze Lastfenster) auf Blockebene IDENTISCH, dann
+abgebrochen; der Seed gilt. Statt des Rests laeuft auf Nutzer-Hinweis ein **Entscheidungsseed
+20261652** (fester Umfang, `PREREG_v33_window.md` par.6a Nachtrag), danach b03.
+
+**LAEUFT: b02-Arm** (`tools/night_v33_b02.sh`, im selben Hintergrundauftrag wie die Kette):
+Training, dann A/B gegen b01 (2 Seeds a 200 Paare). Nichts anderes starten, kein Build, kein Commit.
+Danach **b03** (`PREREG_v33_window.md` par.6b, Nutzer 2026-09-26): 4.000 Schwarm-Partien MEHR vom
+Generator v32-b01, Fenster je nach b02-Ergebnis, A/B gegen b01, rund 9,5 h; Klasse **`value-wegc`**
+(Sockel-Einstellung, value-only; der Ausflug wird gezielt abzweigend umgebaut). Dann Vortest gezieltes Abzweigen (`PREREG_targeted_branching.md`)
+und die Wheel-Runde (Stufe 2 der Bewerter-Vortests, Review-Fixes, Spiegelknopf `PREREG_tie_mirror.md`).
 
 **Champion `v32-b01_brierbest`** seit 2026-09-25 (`PREREG_v32_window.md` par.11), eingefroren
 unter `models/frozen_champions/v32-b01`; Anker-Drift und -Konservierung gruen auf dem
@@ -71,6 +86,35 @@ Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
     den E1-Laufzeitknopf und einen pyo3-Export fuer E4, Anker-Invarianz, E1-Kostentor (je 100
     Partien) und E1-Arm (Champion mit/ohne Knopf, 2 Seeds a 200 Paare), dann E4-Vortest. Das
     Ergebnis entscheidet, ob die v34-Erzeugung mit Einpass-Konsum faehrt.
+3d. **Paket der v33-Generation nach der Wheel-Runde** (Nutzer 2026-09-26: *"Dann haben wir ein
+    schoenes Paket fuer diese generation"*): E1-Arm (`PREREG_evaluator_pretests.md` par.5),
+    Vortest gezieltes Abzweigen (`PREREG_targeted_branching.md`), **R5 Netz gegen Loeser**
+    (`PREREG_r5_net_vs_solver.md`, NEU: A/B desselben Champions, braucht den Schalter
+    `r5_net_solver` je Seite aus der Wheel-Runde), Spiegelknopf in der v34-Erzeugung
+    (`PREREG_tie_mirror.md`).
+3c. **Code-Review vom 2026-09-26 umsetzen** (Nutzer: *"Mach das"*; Review als Claude-Docs-Dokument
+    "Code-Review mosaic-AI", 23 Befunde; Nachpruefung lesend nach
+    `evaluations/review/code_review_2026-09-26_verification.md`). IN DERSELBEN Wheel-Runde wie 3b,
+    damit die Anker-Invarianz nur einmal faellt: (1) "Validierung vor Mutation" #1-5 plus #6
+    (`is_over`) mit Tests, (2) #18 Export und #19 pre-push, (3) #8 (Pfad `moon_order_variants: 2`,
+    nicht im Rezept, aber in den Diagnose-Specs `models/moon_order_post2|scale0|scale1.spec.json`:
+    der Stufe-3-Nullbefund in `PREREG_moon_stack_order.md` ist unter dem Leck gemessen), #10 `/api/stack/peek`, #21 `debug=True`.
+    **#9 (Heuristik-MCTS determinisiert nicht): BLEIBT SO** (Nutzer 2026-09-26: *"Zu 9: lass es
+    so."*). Der Anker `hv4_anchor` bleibt unveraendert; das Leck ist Teil seiner Definition.
+    **#14 EINGETAKTET** (Nutzer 2026-09-26: *"Takte es ein"*): am Abzweig des Ausflugs mit `ex_rng`
+    neu mischen, was KEINER der beiden Spieler kennt (Beutelreihenfolge, unbekannter Stapelteil,
+    verdeckte Chips); was ein Spieler rechtmaessig weiss (eigener Rueckgabeblock), bleibt stehen.
+    Grund: der Ausflug soll eine unabhaengige Stichprobe der Zukunft sein, heute zieht er bis zum
+    naechsten Turm-Nachfuellen dieselben Fliesen wie die Hauptpartie. Kein Arm, Korrektheitsfix;
+    vor der v34-Erzeugung. Weg C ist nicht betroffen (weicht IN der Hauptpartie ab, kein Zwilling).
+    Nachpruefung liegt vor (`code_review_2026-09-26_verification.md`): 21 bestaetigt, #7 teilweise
+    (Referee prueft, `referee.rs:911-967`), #6 wirkt nicht auf Self-Play/Arena (dort `Phase::End`).
+    **Beruehren Messungen/Korpus:** #9 (alle Anker-Kanten), #13 (Label-Sampling zieht aus dem
+    Partie-RNG, `self_play.rs:3785-3789`), #14 (Ausflug teilt die verdeckte Zukunft der
+    Hauptpartie), #16 (Rueckfall-One-hot; `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` macht die
+    einfache Markierung wirkungslos), #18 (Export im laufenden Training: Ausgabe auf
+    Shape-Mismatch pruefen), #23 (Panics im Netz-Self-Play verschwinden als Watchdog-"Deadline",
+    `self_play.rs:6335-6346`: stiller Auswahleffekt).
 4. **Traegt Tor 1: `/mosaic-champion-promotion`** mit `models/v33_gating.spec.json` als
    Champion-Spec (Startkuppel-Suche an).
 5. **v34-Wechsel:** Rezeptfrage VOLUMEN (Abschnitt 6, Punkt 14). Dazu vormerken: das R4-Substrat

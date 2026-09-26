@@ -3060,15 +3060,16 @@ huellenknopf. welche von den 2 x 4000 wir nehmen koennen wir uns noch ueberlegen
 Zusammensetzung der Value-Masse): der Ausflug liefert "saubere Ziele aus abweichenden
 Stellungen" -- er weicht einmal ab und spielt danach argmax zu Ende, sein Ziel ist also der Wert
 der Stellung unter dem Spiel des Champions. Der temperierte Schwarm liefert "breite Abdeckung,
-verzerrte Ziele", mit Temperatur 2 im ganzen Pfad. Ohne Knopf spielt dasselbe Netz messbar
+verzerrte Ziele", mit aktionsabhaengiger Temperatur (Modus 2, T 0,2-0,8, berichtigt in par.14e) im ganzen Pfad. Ohne Knopf spielt dasselbe Netz messbar
 anders (par.14c: 0,4 volle Spalten und 4 Punkte je Partie weniger). Im Ausflug wuerde das Ziel
 damit zum Wert unter einem spaltenaermeren Spiel -- eine systematische Verzerrung in genau der
 Groesse, auf die die Kampagne zielt, und in der EINZIGEN Klasse mit unverzerrten Zielen. Im
 temperierten Schwarm sind die Ziele ohnehin verzerrt; dort kostet der Schnitt am wenigsten.
 
 **Der Gegenpunkt, ausdruecklich festgehalten:** der Vielfaltsgewinn faellt im temperierten
-Schwarm vermutlich KLEINER aus, weil Temperatur 2 die Zugwahl schon so stark verwischt, dass die
-Verschiebung durch den Knopf teilweise darin untergeht. UNGEMESSEN.
+Schwarm vermutlich KLEINER aus, weil die Verschiebung durch den Knopf in der Temperatur
+teilweise untergeht. UNGEMESSEN. (Die Annahme, die Temperatur "verwische" stark, ist in par.14e
+berichtigt: Modus 2, T 0,2-0,8, schaerfer als die Besuchsverteilung.)
 
 **Abnahme, daran geknuepft:** die Vielfaltssonde (`tools/probes/corpus_state_diversity_probe.py`)
 auf dem huellenfreien temperierten Schwarm von v33 gegen den temperierten Schwarm von G-1 (die
@@ -3092,9 +3093,18 @@ verschiedene (Runde, Brettmaske)-Zustaende: **100.894 gegen 99.775 = +1,1 Prozen
 Endbretter 96,7 gegen 95,9 Prozent von je 8.000 Seiten. Artefakt
 `evaluations/artifacts/diversity_v32-b01-tempc-nohull_vs_v31-b01-tempc.json`, 4.482,8 s.
 
-**Lesart nach par.14d: praktisch kein Unterschied.** Der vorab benannte Gegenpunkt trifft zu:
-Temperatur 2 verwischt die Zugwahl so stark, dass der Knopf in diesem Schwarm kaum zusaetzliche
-Stellungen erzeugt. Der Vorbehalt (verschiedene Generatoren) koennte einen Knopf-Effekt nur dann
+**Lesart nach par.14d: praktisch kein Unterschied.**
+
+**BERICHTIGUNG 2026-09-26 (am Code geprueft):** "Temperatur 2" in par.14d und hier war eine
+Fehllesung. `--action-temp 2` ist der MODUS 2 der aktionsabhaengigen Temperatur, nicht T = 2:
+`self_play.rs:467-496` `action_temp_smooth`, T logarithmisch von 0,2 bei 2 Aktionen bis 0,8 bei
+72 Aktionen, gekappt, Gewichte `visits^(1/T)`. Alle T liegen unter 1, die Zugwahl ist also
+SCHAERFER als die rohe Besuchsverteilung, nur weicher als argmax, und haengt allein an der
+Aktionszahl der Entscheidung, nicht an der Runde. Die Erklaerung "die Temperatur verwischt den
+Knopf" ist damit nicht getragen; warum der Knopf hier kaum Vielfalt bringt, ist OFFEN. Eine
+naheliegende Herleitung (ungeprueft): der Knopf verschiebt vor allem, WELCHE Seite gebaut wird
+(Huellenwahl, `PREREG_tie_mirror.md`), und die Brettmasken-Vielfalt misst nicht die Seite,
+sondern die Zahl verschiedener Belegungen. Der Vorbehalt (verschiedene Generatoren) koennte einen Knopf-Effekt nur dann
 verdecken, wenn der Generatorwechsel die Vielfalt gleichzeitig in die Gegenrichtung verschoben hat;
 UNGEPRUEFT, eine Kontrolle mit dem reinen Generatorwechsel (v30 -> v31, beide mit Knopf) ist nicht
 gefahren.

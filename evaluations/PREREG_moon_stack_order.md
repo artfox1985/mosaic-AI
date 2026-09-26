@@ -1828,3 +1828,16 @@ Kostentor, A/B, Record-Stichprobe) laeuft in `tools/night_v30_wheel_acceptance.s
 P.16 `designs_ordered` 577 Records (nur wo ein eigener Block liegt), Mondknoten 406-410 in `valid_actions` 478 / in
 `policy` 424, Rueckgabeknoten 411-413 11 / 11, Rotation 640 / 640, Slot 8.132. Der v30-Korpus traegt die neuen
 Merkmale und Knoten mit Lernziel; nichts faellt nach v31.
+
+## par.13 NACHTRAG 2026-09-26: Stufe 3 lief unter einem Informationsleck
+
+Code-Review vom 2026-09-26, Befund #8, am Code nachgeprueft
+(`evaluations/review/code_review_2026-09-26_verification.md`): `moon_order_post_search` baut den
+Suchbaum auf `next` (Gegner am Zug), und die Determinisierung nimmt `viewer = current_player`.
+Gesucht wird also aus Gegnersicht: die Rueckgabe-Bloecke des Gegners stehen in echter Reihenfolge
+(Orakel), der eigene Block wird gemischt. Der Pfad ist nur mit `moon_order_variants: 2` aktiv, und
+genau den tragen die Diagnose-Specs `models/moon_order_post2.spec.json`, `moon_order_scale0` und
+`moon_order_scale1`. **Der Nullbefund aus Stufe 3 (12.3b) ist damit unter diesem Leck gemessen.**
+Das Rezept faehrt `moon_order_variants` 1, dort wirkt der Defekt nicht. Ob Stufe 3 nach dem Fix
+neu gemessen wird, ist offen; der Hebel war flach, und der Fix ist korrektheitshalber ohnehin
+faellig (Fahrplan 3c in STATUS).

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen 2026-09-26 (par.9). Tor 1 mit Stufenregel, fuer v33 entschieden (par.2a). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen (par.9). Tor 1 GENAU AUF DER KANTE: 420:380 = 52,50 %, Block-z +1,41, formal getragen (par.10). b02 ohne alten Schwarm: 574:516, z +1,76, kein messbarer Beitrag (par.6a). b03 (+4.000 frisch) und b04 (nur frische Wertziele) laufen (par.6b/6c). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). -->
 
 # Vorregistrierung: das v33-Fenster
 
@@ -206,6 +206,140 @@ den amtierenden Champion; b02 braeuchte dafuer ein eigenes Tor 1.
 Geschaetzt (HERLEITUNG aus v32, nicht gemessen): Merge rund 7 min, Training rund 45 min, A/B
 2 x rund 2 h -- zusammen rund 5 h, also der Gegenwert von rund 4.400 Self-Play-Partien.
 
+**NACHTRAG 2026-09-26, 17:55, VOR dem dritten Seed: Entscheidungsseed.** Die beiden Seeds
+widersprechen sich: 20261650 **134:156, Block-z -1,61** (SPRT-Fruehstopp nach 145 von 200 Paaren,
+29 Bloecke), 20261651 **229:171, Block-z +3,09** (40 Bloecke); gepoolt +1,45 (69 Bloecke).
+In Seed 20261651 lief ab etwa Block 6 bis 17 Nebenlast des Koordinators (STATUS); eine exklusive
+Wiederholung ergab **Block 1-17 IDENTISCH** zum Original (kumulative Siege und Paar-Aufteilung je
+Block, 17 von 17) und wurde danach abgebrochen (Artefakt-Teillauf
+`ab_v33-b02_vs_v33-b01_s20261651_rerun.json` unvollstaendig). Das Lastfenster ist damit
+abgedeckt; **Seed 20261651 gilt unveraendert.** Nutzer: *"Ob der
+rerun von b02 sinnvoll ist wage ich zu bezweifeln. Da waere ein entscheidungseed sinnvoller
+gewesen"*. **Daher: dritter Seed 20261652, fester Umfang 200 Paare** (SPRT-Schranken bei
+alpha = beta = 1e-12, praktisch unerreichbar). **Verdikt:** gepoolter Block-z ueber ALLE DREI Seeds
+mit der Leseregel oben (<= -1,96 / >= +1,96 / dazwischen). Die Einzel-z werden berichtet.
+
+### par.6a ERGEBNIS (2026-09-26, 14:17-19:53)
+
+Training `v33-b02` 13:39-14:17 (brierbest Epoche 3, `val_brier` 0,1835 gegen b01 0,1837 auf
+derselben Val-Menge). A/B `v33-b02` gegen `v33-b01`, Spec `v33_gating` beidseits, Blockgroesse 5:
+
+| Seed | b02 : b01 | Bloecke | Block-z | volle Spalten b02 / b01 |
+| --- | --- | --- | --- | --- |
+| 20261650 | 134:156 | 29 (SPRT-Fruehstopp nach 145 Paaren) | -1,61 | 1,007 / 1,000 |
+| 20261651 | 229:171 | 40 (Nebenlast Block 6-17; Wiederholung Block 1-17 identisch) | +3,09 | 1,078 / 0,948 |
+| 20261652 (Entscheidungsseed, fester Umfang) | 211:189 | 40 | +1,00 | 1,083 / 1,048 |
+| **gepoolt** | **574:516** | 109 | **+1,76** | |
+
+**Verdikt nach der Leseregel: DAZWISCHEN -- kein messbarer Beitrag des alten Schwarms.** b02 ist
+bei gleicher Staerke das billigere Fenster (Nutzer-Entscheid fuer v34). Richtung: b02 liegt in zwei
+von drei Seeds vorn und baut leicht mehr volle Spalten; das ist keine Freigabe fuer "alter Schwarm
+schadet". Einschraenkung par.6b: getestet ist alter SCHWARM, nicht altes Material. Elo-Register:
+drei Zeilen 2026-09-26. **Folge fuer b03 (par.6b): Basis b02, Gegner b01.**
+
+## par.6b DRITTER ARM `v33-b03`: 4.000 Schwarm-Partien MEHR aus der aktuellen Generation (registriert 2026-09-26, VOR dem b02-Ergebnis)
+
+**Nutzer 2026-09-26:** *"Je nachdem was bei b02 rauskommt wuerd ich b03 registrieren mit 4000 mehr
+schwarmdaten aus der aktuellen Generation"*. b02 misst, was WENIGER Schwarm kostet (ohne G-1/G-2),
+b03 misst, was MEHR Schwarm vom aktuellen Generator bringt. Zusammen beantworten sie die Frage
+"mehr Spiele?" in dieser Aera (die Volumenbelege `PREREG_corpus_dose.md` und task36 stammen aus
+der v20-Aera).
+
+**Material:** 4.000 zusaetzliche Partien vom Generator `v32-b01_brierbest` (derselbe wie die
+v33-Erzeugung, also "aktuelle Generation"). **Klasse ENTSCHIEDEN 2026-09-26: `value-wegc`** --
+die Sockel-Einstellung (`--tau-argmax-from-move 1 --deviate-prob 1.0 --start-slot-random-p 0.15
+--return-order-random-p 0.81`, Spec `models/v32_generation.spec.json`, 100 Sims) mit
+`--value-only`, eigener Seed 20260945. Nutzer: *"Die frage ist dann eigentlich nur, Ausflug oder.
+Weg c"*, auf die Vorlage *"Ausserdem wollen wir die Ausflug klasse ja umbauen vom abzweigort"*.
+Begruendung (am Korpus nachgezaehlt 2026-09-26): die Ausflug-Klasse speichert PAARE (je Datei
+5 Hauptpartien ohne Abweichung plus 5 Ausfluege `_x1`), deren verdeckte Zukunft geteilt ist
+(Review-Befund #14); aus 4.000 Ausflugs-Partien werden nur 2.000 Abzweige. Weg C liefert 4.000
+unabhaengige, je einmal abgewichene Partien mit argmax-Fortsetzung (unverzerrtes Ziel), und der
+Ausflug wird ohnehin beim Abzweigort umgebaut (`PREREG_targeted_branching.md`). Kosten gemessen am
+Sockel: 16.577 s je 4.000 Partien.
+
+**Zuschnitt, abhaengig vom b02-Ergebnis (par.6a):**
+* b02 **z <= -1,96** (aelterer Schwarm traegt): **b03 = Fenster von b01 + die 4.000 neuen**.
+* b02 **z >= +1,96** (aelterer Schwarm schadet): **b03 = Fenster von b02 + die 4.000 neuen**
+  (nur frisches Material, dafuer mehr davon).
+* **dazwischen:** b03 = Fenster von b02 + die 4.000 neuen (gleich stark und billiger als der alte
+  Schwarm; b03 prueft, ob frisches Volumen traegt, wo altes es nicht tat). Nutzer kann vor dem Start
+  anders entscheiden.
+
+**Alles andere wie b01:** dieselbe Val-Menge (die neuen Dateien gehen ganz ins Training; das
+Skript prueft die Val-Liste byte-gleich wie `night_v33_b02.sh`), dasselbe Rezept, Startgewicht,
+Trainings-Seed 20260957, `--val-frac` dynamisch, Tor-1-Spec `models/v33_gating.spec.json`.
+
+**Messung:** A/B **b03 gegen b01**, zwei Seeds (20261660, 20261661) a 200 Paare, Blockgroesse 5,
+`--log-games`, Block-z ueber `tools/gating_block_z.py`. **Fester Umfang:** SPRT-Schranken bei
+alpha = beta = 1e-12 (+-27,6), bei 200 Paaren praktisch unerreichbar -- das b02-A/B hatte mit
+0,001 Seed 1 nach 145 von 200 Paaren gestoppt. Skript: `tools/night_v33_b03.sh b01|b02`.
+**Leseregel, VORAB:** z >= +1,96: **mehr frischer Schwarm traegt** -> v34 bekommt die zusaetzliche
+Klasse (Kosten rund +4 h Erzeugung je Generation). Dazwischen: Volumen ist in dieser Aera kein
+Hebel mehr; der naechste Kandidat ist das gezielte Abzweigen (`PREREG_targeted_branching.md`).
+z <= -1,96: mehr Material schadet -- dann Diagnose vor jeder weiteren Fensterentscheidung.
+
+**NACHTRAG 2026-09-26, VOR dem b02-Verdikt: GEGNER von b03 bedingt** (Nutzer auf die Frage, was ein
+b02-Sieg aussagt: *"Weniger Schwarm besser? Weniger Schwarm alter Champs besser?"*, auf die
+Vorlage: *"Mach das"*). Ein b02-Sieg vermischt zwei Ursachen -- weniger Schwarm ueberhaupt (der
+Sockel wiegt mehr) und alter Schwarm (Wertziele unter schwaecherem Spiel). Getrennt werden sie nur,
+wenn b03 dann gegen b02 spielt:
+* **b02 gepoolt z >= +1,96 (ueber alle drei Seeds, par.6a Nachtrag):** Basis b02, **Gegner b02**.
+  b03 gewinnt -> frisches Volumen traegt, am alten Schwarm schadete das ALTER; gleich -> mehr
+  Schwarm bringt nichts, der Anteil ist ausgereizt; b03 verliert -> WENIGER Schwarm ist an sich
+  besser, der Sockel soll mehr Gewicht haben. Gleiche Schwellen (+-1,96).
+* **sonst:** Basis nach der Regel oben, Gegner b01, Leseregel wie oben.
+Aufruf: `bash tools/night_v33_b03.sh <basis b01|b02> <gegner b01|b02>`; der Manifest-Diff des
+Trainings vergleicht unabhaengig vom Gegner gegen das b01-Rezept.
+
+**EINSCHRAENKUNG (Nutzer 2026-09-26: *"Nur sind im Schwarm von b02 noch immer maskierte policy games
+von g-1 und g-2 drinnen"*):** das b02-Fenster enthaelt weiter ALTES Value-Material ueber den
+Sockel von G-1 und G-2 (je 400 Dateien; davon 620 policy-maskiert, also reine Wertziele, 265 G-1 und
+355 G-2, plus 180 Policy-Traeger, 135 + 45; Traeger-Assert `night_v33_chain.sh` Schritt 2).
+**b02 gegen b01 testet damit "alter SCHWARM", nicht "altes Material"**; ein Alters-Schluss aus
+b02 oder b03 gilt nur fuer den Schwarm. Ein sauberer Alterstest waere ein eigener Arm
+(Vorschlag `v33-b04`): b02-Fenster minus die 620 policy-maskierten alten Sockel-Dateien, die 180
+alten Traeger bleiben (Policy wie v32). Registriert als par.6c.
+
+## par.6c VIERTER ARM `v33-b04`: nur frische Wertziele (registriert 2026-09-26, VOR jedem b04-Lauf)
+
+**Nutzer 2026-09-26:** *"Mal schauen was b03 bringt. Sauberer waere es"*, dann *"Bzw. Kannst b04
+parallel trainieren"* und *"Das kann nebenbei laufen"*.
+
+**Frage:** schadet ALTES Value-Material an sich (Wertziele unter dem Spiel schwaecherer
+Generatoren)? b02 hat nur den alten SCHWARM entfernt (par.6b Einschraenkung).
+
+**Fenster:** `data/window_v33_b02.txt` minus die **policy-maskierten** Sockel-Dateien von G-1
+(`selfplay_v31-b01-policy_*`) und G-2 (`selfplay_v30-b02-policy_*`), also alle alten Sockel-Dateien,
+die NICHT in `data/policy_carrier_manifest_v33.json` stehen. **Soll: 620 entfernt (265 G-1, 355
+G-2), 180 alte Traeger bleiben (135 + 45)**; das Skript bricht bei Abweichung ab. Die Policy lernt
+damit exakt wie in b01/b02 (dieselben 580 Traeger); das Value-Material stammt bis auf die 180
+alten Traeger nur aus der aktuellen Generation.
+
+**Alles andere wie b02:** dieselbe Val-Menge (alte Sockel-Dateien liegen nicht im Pool
+`^selfplay_v32-`, `--val-frac` dynamisch, Abbruch bei nicht byte-gleicher Val-Liste), Rezept,
+Warmstart `v32-b01_brierbest`, Trainings-Seed 20260957.
+
+**Messung: b04 gegen b02** (einziger Unterschied die 620 Dateien), zwei Seeds (20261680, 20261681)
+a 200 Paare, fester Umfang (SPRT alpha = beta = 1e-12), Blockgroesse 5, `--log-games`, Block-z ueber
+`tools/gating_block_z.py`. **Leseregel, VORAB (A = b04):**
+* z >= +1,96: **altes Value-Material schadet** -> v34-Fenster ohne alte Nicht-Traeger.
+* z <= -1,96: **altes Value-Material traegt** (Fenstertiefe hilft) -> bleibt.
+* dazwischen: kein messbarer Beitrag -> v34 kann es weglassen (billiger), Nutzer-Entscheid.
+
+**Ablauf, parallel zu b03** (`tools/night_v33_b03_b04.sh`, working_rules "GPU und CPU duerfen
+parallel"): b04-Fenster und Monolith vor der b03-Erzeugung; b04-Training (GPU) WAEHREND der
+b03-Erzeugung (CPU, 10 statt 11 Threads); b04-A/B (CPU) WAEHREND des b03-Trainings (GPU); danach
+b03-A/B. Laufzeiten dieser parallelen Schritte sind als *unter Nebenlast* markiert und keine
+Planungsgroessen. **Kosten** (Herleitung aus b02): Fenster/Monolith rund 10 min, Training rund
+45 min, A/B rund 3,4 h -- zusaetzlich zu b03 rund 10 min Maschinenzeit, der Rest faellt in
+Parallelphasen.
+
+**Kosten (Herleitung aus par.9 und der v33-Kette):** Erzeugung rund 4,6 h (Sockel-Einstellung
+16.577 s je 4.000 Partien), Bloecke, Monolith und Training rund 1,5 h, A/B rund 3,4 h: **rund 9,5 h**. Laeuft mit
+dem heutigen Wheel, also VOR der Wheel-Runde (E1, E4, Review-Fixes, Spiegelknopf); die verschiebt
+sich entsprechend.
+
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`)
 
 Erzeugung: v31 **14,66 h** ohne Nebenlast, v32 **13 h 57** mit Nebenlast (keine saubere
@@ -234,3 +368,32 @@ UNGEKLAERT, nichts lief daneben.
 | **Tor 2a** (`corpus_sanity_check.py`, Sockel, n = 8.000 Seiten) | `sp_voll` **0,966 (+-0,017)** gegen **0,977 (+-0,017)** bei `v31-b01` -- **HAELT** (Nicht-Unterlegenheit); erstmals seit v25 mit Richtung nach unten (-0,011, innerhalb der Streuung). Artefakt `corpus_sanity_v32-b01-policy.json`, 278,7 s |
 | **Vielfaltssonde** Schwarm a (par.3) | verschiedene (Runde, Brettmaske)-Zustaende **100.894** ohne Knopf gegen **99.775** mit Knopf (G-1), je 4.000 Partien: **+1,1 %**; Endbretter 96,7 % gegen 95,9 % verschieden. **Praktisch kein Unterschied** -- nach der Leseregel in par.3 war der temperierte Schwarm der falsche Ort fuer den Knopf (der vorab benannte Gegenpunkt aus `PREREG_geometric_envelope.md` par.14d trifft zu). Eine Generator-Kontrolle (v30 -> v31) ist nicht gefahren: sie kann +1,1 % nicht mehr zu einem Befund machen. Artefakt `diversity_v32-b01-tempc-nohull_vs_v31-b01-tempc.json`, **4.482,8 s** |
 | **Tor 0** der Schwarm-Klassen | laeuft als Schritt 1 der Kette (`night_v33_chain.sh`) |
+
+## par.10 TOR 1 (gefahren 2026-09-26, 10:07-13:33, `tools/night_v33_chain.sh`)
+
+`v33-b01_brierbest` gegen den Champion `v32-b01_brierbest`, Spec `models/v33_gating.spec.json`
+beidseits (Startkuppel-Suche an), je Seed 200 Paare, Blockgroesse 5, SPRT ohne Entscheid (Deckel).
+Block-z aus `tools/gating_block_z.py` (Kette Schritt 8b), Elo-Register 2026-09-26 (zwei Zeilen).
+
+| Seed | v33-b01 : v32-b01 | Block-z | gepaarte Diff je Paar | volle Spalten je Seite (Tor 2b) | Punkte |
+| --- | --- | --- | --- | --- | --- |
+| 20261600 | **212:188** | +1,32 | +0,120 [-0,066; +0,306] | 1,045 gegen 0,988 | 59,14 gegen 57,52 |
+| 20261601 | **208:192** | +0,73 | +0,080 [-0,108; +0,268] | 1,003 gegen 1,133 | 59,94 gegen 60,23 |
+| gepoolt | **420:380 = 52,50 %** | **+1,41** | | 1,024 gegen 1,060 | |
+
+Stufenregel (par.2a): kein Seed einzeln >= +1,96, also kein dritter Seed.
+
+**Verdikt nach par.2: das Kriterium "gepoolt >= 52,5 Prozent ohne Gegenbefund" ist GENAU AUF DER
+KANTE erfuellt** (420 von 800; eine Partie weniger haette es gerissen). Statistisch ist der
+Vorsprung nicht gesichert (z +1,41). Tor 2b zeigt keinen einheitlichen Befund: Seed 1 mehr volle
+Spalten, Seed 2 weniger (-0,13, einzeln nicht signifikant bei +-0,07 je Seite); gepoolt liegt v33
+leicht darunter. Als Gegenbefund im Sinne von par.2 ist das nicht registriert, als Warnzeichen
+schon. Der Sprung ist kleiner als bei v32 (54,25 %, z +2,37).
+
+**Tor 0 der Schwarm-Klassen** (Kette Schritt 1, `corpus_sanity_check.py`, je 4.000 Partien):
+`value-tempc-nohull` 0,598 volle Spalten je Seite, 42,41 Punkte; `value-excursion` 1,036 / 55,30.
+Beide Exit 0.
+
+**Promotion:** Nutzer-Entscheid. Vorschlag des Koordinators: erst nach dem b02-A/B (par.6a),
+das heute Abend fertig ist -- traegt b02 gegen b01, ist b02 der Kandidat, und die Promotion kostet
+nur einmal rund 2,3 h.

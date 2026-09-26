@@ -198,7 +198,10 @@ Freigabe geloescht. Seed **20260957**, Val-Pool `^selfplay_v32-`.
 oben bleibt).
 **`v33-b02`** (registriert 2026-09-25, `PREREG_v33_window.md` par.6a): dasselbe Rezept wie b01,
 Fenster OHNE den Schwarm aus G-1 und G-2 (rund 2.001 statt 2.947 Dateien); A/B gegen b01, entscheidet
-das v34-Fenster, nicht den v33-Champion. Weitere Arme ab `v33-b03` nur mit eigener Registrierung.
+das v34-Fenster, nicht den v33-Champion. **`v33-b03`** (registriert 2026-09-26, `PREREG_v33_window.md` par.6b): Fenster von b01 oder b02
+(je nach b02-Ergebnis) plus 4.000 zusaetzliche Schwarm-Partien vom Generator `v32-b01`, Seed
+20260945, neue Klasse **`value-wegc`** (Dateien `selfplay_v32-b01-value-wegc_*`): Sockel-Einstellung
+(argmax plus genau eine Weg-C-Abweichung) mit `--value-only`. Weitere Arme ab `v33-b04` nur mit eigener Registrierung.
 
 **Reserviert 2026-09-22 (Generationswechsel v31 -> v32):**
 **`v32-b01`** (erster Arm der Generation v32 auf dem v32-Fenster; Generator der Erzeugung ist
