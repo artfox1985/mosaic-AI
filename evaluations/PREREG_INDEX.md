@@ -77,17 +77,18 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 124 Dateien = 2 OFFEN + 110 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 127 Dateien = 3 OFFEN + 110 ENTSCHIEDEN + 14 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (2)
+## OFFEN (3)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
-| `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung freigegeben und gestartet 2026-09-25 (par.9). |
+| `PREREG_evaluator_pretests.md` | Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | angelegt 2026-09-25, nichts gefahren. Stufe 1 (offline, par.3/par.4) nach der v33-Erzeugung vor dem Kettenstart; Stufe 2 (E1-Arm, E4-Vortest, par.5) nach Kette und b02. E1 bekommt seinen Arm unabhaengig vom Vortest (Nutzer-Entscheid, par.1). |
+| `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung laeuft seit 2026-09-25 (par.9). Tor 1 mit Stufenregel (par.2a). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). |
 
 ## ENTSCHIEDEN (110)
 
@@ -204,7 +205,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_value_rank_metric.md` | Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 |
 | `PREREG_value_scale_correction.md` | Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 |
 
-## UEBERHOLT (12)
+## UEBERHOLT (14)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -218,8 +219,10 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_plate_head.md` | Lernt ein eigener Kopf die Endwertung je Wertungsplatte (8 Kriterien x eigene/Gegner-Seite, Verlust auf die aktiven maskiert) gut genug, um spaeter die Blattbewertung plattenbewusst zu machen? | Der plate_head wurde am 2026-08-10 gebaut und wieder ENTFERNT -- der Ownership-Kopf ist der Randlayer (STATUS-Architektur). Gegenstandslos (festgestellt 2026-08-20). |
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | Nichts gebaut. Der Hebel fuer den Spaltenbau sitzt in der SUCHE (K3-P, PREREG_geometric_envelope.md par.8.7/11: Champion seit 2026-09-04), nicht im Aktions-Signal; der Ownership-Kopf ist geschlossen (Gewicht 0). Nutzer-Entscheid 2026-09-05: UEBERHOLT. |
 | `PREREG_task28_power_extension.md` | Konfirmiert eine frische Stichprobe den la20-Denial-Effekt, und wo liegt der Kipppunkt (λ in {0;0,5;1;2;3;5})? | Praemisse (realer Effekt) entfiel: der scheinbare Widerspruch der Konfirmationsstichprobe war ein Block-Korrelations-Artefakt, kein echter Effekt in irgendeine Richtung -- Kipppunkt-Kartierung dadurch gegenstandslos gestrichen; `archive/history.md` Z. ~7278-7313 |
+| `PREREG_training_seed_arms.md` | Traegt der Trainings-Seed so viel Staerke, dass mehrere Seed-Arme je Generation den Sprung vergroessern? | ZURUECKGEZOGEN am Tag der Anlage (par.6). Widerspricht dem Nutzer-Entscheid vom 2026-09-10 (Seed gleich innerhalb einer Generation), der Seed-Sweep vom 2026-07-28 hat die Frage schon bearbeitet, und die Mehrkosten (+2,1 h Training, +6 h Tor 1) kaufen mehr als 4.000 Self-Play-Partien. Nichts gefahren. |
 | `PREREG_uncertainty_guided_selfplay.md` | Bringt es Staerke, Self-Play-Startstellungen dort zu waehlen, wo das Netz nachweislich unsicher ist UND diese Unsicherheit die Zugwahl kippen kann, statt kuratiert oder zufaellig? | Entwurf, nichts gebaut; GEFALTET in PREREG_start_position_seeding.md par.8 (2026-09-05): Stufe 1 (Warteschlange offline aus root_q/root_child_q, Tor G) haengt am b03-Befund des Seeding-Schwarms; eine eigene Datei entsteht erst, wenn b03 traegt. Nutzer-Entscheid 2026-09-05. |
 | `PREREG_uvfa_plate_regime.md` | Lernt das Netz SELEKTIVEN Plattenbau, wenn das Bau-Regime als NETZ-EINGABE konditioniert wird (UVFA-Muster: Zwangsseite=1/frei=0 auf dem vorhandenen Asym-Korpus), statt als unsichtbarer Kontext -- und wird das Flag zur Spielzeit ein tragfaehiger Stil-Regler? | Entwurf, nichts gebaut. Die Asym-Korpora (Zwangsseite) sind geloescht (2026-09-01/04), und der Weg zum selektiven Plattenbau laeuft ueber die Suche (K3-P), nicht ueber eine Regime-Konditionierung des Netzes. Nutzer-Entscheid 2026-09-05: UEBERHOLT. |
+| `PREREG_value_readout.md` | Verliert der Value-Kopf Information, die sein Trunk traegt -- und ist der Hebel das Kopf-Training oder mehr Value-Material? | ZURUECKGEZOGEN am Tag der Anlage (par.6). Jeder Zweig, den die Diagnose oeffnen koennte, ist schon gefahren (eingefrorener Trunk, Nachlabeln, Kapazitaet, lambda, Punkte-Kopf); die Antwort der Kampagne auf den gedaempften Kopf ist die Huelle. Das Volumen ist ein belegter Hebel, keine Testfrage (corpus_dose, task36). Nichts gefahren. |
 
 <!-- END GENERATED PREREG TABLES -->
 

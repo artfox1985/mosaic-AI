@@ -219,11 +219,12 @@ echo "##### TRAINING DURCH $(date +%F' '%H:%M:%S) -- Modell $A"
 
 warte_frei "Tor 1"
 echo ""
-echo "== 8) Tor 1: $ARM gegen den Champion $GEN, zwei Seeds a 200 Paaren $(date +%F' '%H:%M:%S)"
+echo "== 8) Tor 1: $ARM gegen den Champion $GEN, zwei Seeds a 200 Paaren, Stufenregel par.2a $(date +%F' '%H:%M:%S)"
 echo "   Modell A: $A"; ls -l "$A"
 echo "   Modell B: $CHAMP   Spec beidseits: $SPEC"
-for S in 20261600 20261601; do
-  OUT="$ART/gating_${ARM}_vs_${GEN}_s${S}.json"
+tor1_seed() {
+  local S="$1"
+  local OUT="$ART/gating_${ARM}_vs_${GEN}_s${S}.json"
   echo ""
   echo "===== Seed $S $(date +%H:%M:%S)"
   python -X utf8 -u tools/paired_gating.py \
@@ -238,7 +239,35 @@ for S in 20261600 20261601; do
   echo "-- Plattenpunkte je Kriterium (Blockgroesse 5)"
   python -X utf8 -u tools/plate_points_from_arena.py "$OUT" --block 5 \
     --out "$ART/plate_points_${ARM}_vs_${GEN}_s${S}.json"
+}
+
+for S in 20261600 20261601; do
+  tor1_seed "$S"
 done
+
+# PREREG_v33_window.md par.2a: ein dritter Seed GENAU DANN, wenn genau einer der beiden
+# ersten einzeln Block-z >= +1,96 erreicht. Rechnung ueber tools/gating_block_z.py
+# (geeicht gegen die registrierten Werte von v31 und v32).
+echo ""
+echo "== 8b) Stufenregel (par.2a): widersprechen sich die beiden Seeds? $(date +%H:%M:%S)"
+python -X utf8 tools/gating_block_z.py \
+  "$ART/gating_${ARM}_vs_${GEN}_s20261600.json" "$ART/gating_${ARM}_vs_${GEN}_s20261601.json"
+N_SIG=$(python -X utf8 tools/gating_block_z.py --json \
+  "$ART/gating_${ARM}_vs_${GEN}_s20261600.json" "$ART/gating_${ARM}_vs_${GEN}_s20261601.json" \
+  | python -c "import sys,json; d=json.load(sys.stdin); print(sum(r['z'] >= 1.96 for r in d['per_seed']))")
+echo "   Seeds einzeln >= +1,96: ${N_SIG:-?} von 2"
+if [ "$N_SIG" = "1" ]; then
+  echo "   -> Widerspruch: dritter Seed 20261602 laeuft (par.2a Punkt 3)"
+  warte_frei "Tor 1, dritter Seed"
+  tor1_seed 20261602
+  echo ""
+  echo "== 8c) Verdikt-Grundlage: gepoolt ueber alle drei Seeds (par.2a Punkt 4)"
+  python -X utf8 tools/gating_block_z.py "$ART"/gating_${ARM}_vs_${GEN}_s2026160[012].json
+elif [ -z "$N_SIG" ]; then
+  echo "   STOPP: Block-z nicht berechenbar -- Stufenregel von Hand anwenden"
+else
+  echo "   -> kein Widerspruch, Verdikt auf zwei Seeds (par.2a Punkt 1)"
+fi
 
 echo ""
 echo "########## v33-KETTE FERTIG $(date +%F' '%H:%M:%S)"

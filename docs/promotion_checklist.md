@@ -71,7 +71,7 @@ Gedaechtnis:
 4. Elo-Kante **Champion-2** (der Vorvorgaenger, @400) -- der Punkt, der bei
    v20 UND v21 zunaechst fehlte; ohne ihn ruht die Elo-Schaetzung auf zu
    wenigen Kanten (v21 nach dem Gating: CI +-90 Punkte).
-5. Pflicht-Diagnostiken am Sieger (Platt, R5, Alt-Set-Brier, R4b) +
+5. Pflicht-Diagnostiken am Sieger (Platt, Alt-Set-Brier, R4 mit R4b) +
    Eintrag in die #29-Buchfuehrung.
 
    **BEFUND 2026-09-19: R5 und R4b werden seit v24-b06 NICHT mehr gefahren**,
@@ -90,6 +90,12 @@ Gedaechtnis:
    die Zeile wird auf "Platt und Alt-Set-Brier" gekuerzt. Bis dahin gilt, was
    seit v24 praktiziert wird -- aber jetzt sichtbar statt stillschweigend.
 
+   **R5 IST SEIT 2026-09-25 KEINE PFLICHT MEHR** (Nutzer: *"Runde 5 ist doch irrelevant. Das
+   spielt der solver"*, dann *"Ja nimm es raus"*). In Runde 5 entscheidet der exakte Loeser
+   (`round5.rs`); was der Value-Kopf dort ausgibt, fuehrt keinen Zug. R5 mass also eine
+   Kalibrierung ohne Spielwirkung (878 s je Promotion). R4 und R4b bleiben: das Ende von Runde 4
+   bewertet noch der Kopf. Das Werkzeug `tools/r5_value_calibration.py` bleibt im Baum.
+
    **Stand 2026-09-25:** fuer `v32-b01` auf Nutzer-Anweisung gefahren (*"r5 und r4b
    mitfahren"*), alle GEPAART gegen den Vorgaenger. Gepaart heisst: dasselbe Substrat wie beim
    Vorgaenger-Lauf -- also die Parameter aus dessen ARTEFAKT lesen, nicht aus den Defaults.
@@ -98,12 +104,10 @@ Gedaechtnis:
    ```
    python -X utf8 -u tools/r4_value_calibration.py --models models/alphazero_<neu>.pth --sims 400 --c-puct 1.5 --n-states 72 --k-refills 16 --data-glob "data/selfplay_v30-b02-policy_*.pkl" --state-seed 20260803 --n-bootstrap 1000 --out evaluations/artifacts/r4_value_calibration_<neu>_n72.json
    python -X utf8 -u tools/r4b_zone_probe.py --r4b-json evaluations/artifacts/r4_value_calibration_<neu>_n72.json --model-key models/alphazero_<neu>.pth --out evaluations/artifacts/r4b_zone_probe_<neu>.json
-   python -X utf8 -u tools/r5_value_calibration.py --eval-set evaluations/frozen_eval_set.pkl --models models/alphazero_<neu>.pth --sims 400 --c-puct 1.5 --n-states 24 --n-combos 6 --curve-n-states 233 --seed 1000 --out evaluations/artifacts/r5_value_calibration_<neu>.json
    ```
 
    **Paarungs-Belege, je einer:** R4 -- `game_id`, `true_margin`, `true_winprob` Zustand fuer
-   Zustand identisch; R5 -- die Kennlinie (a, b) bitgleich. Kosten gemessen: R4 2.756 s
-   einkernig, R4b 43 s, R5 878 s. **R4-Substrat rotiert beim v34-Wechsel heraus**
+   Zustand identisch. Kosten gemessen: R4 2.756 s einkernig, R4b 43 s. **R4-Substrat rotiert beim v34-Wechsel heraus**
    (`selfplay_v30-b02-*`); danach ist die Reihe nur noch gepaart, wenn die 72 Zustaende vorher
    gesichert wurden.
 

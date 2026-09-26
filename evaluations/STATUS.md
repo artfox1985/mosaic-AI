@@ -19,14 +19,14 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**STAND 2026-09-25 -- Generationswechsel v32 -> v33 abgeschlossen, die Erzeugung wartet auf
-Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich in
+**STAND 2026-09-26 -- v33-Erzeugung fertig, Pflichtpruefungen und Vortests stehen an; die Kette wartet auf
+Nutzer-Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich in
 `../archive/history.md`, dazu der Generationsbericht v32.
 
-**LAEUFT: die v33-Erzeugung** (`bash tools/night_v33_generate.sh`, Harness-Hintergrundaufgabe,
-gestartet 2026-09-25 direkt nach dem Commit, der diese Zeile traegt). Rund 14 h exklusiv:
-**nichts anderes starten, kein Commit, kein Build**. Fortschritt steht in der Aufgabenausgabe;
-Dateien je Klasse zaehlen mit `ls data/ | grep -c "^selfplay_v32-b01-<klasse>_"`.
+**FERTIG: die v33-Erzeugung** (`bash tools/night_v33_generate.sh`), Exit 0 am 2026-09-26
+04:23:55. Dateien gezaehlt: `policy` 400, `value-tempc-nohull` 400, `value-excursion` 401; letzte
+Klasse 4.000 Partien in 13.753,9 s (3,43 s je Partie, threads 11, laut Aufgabenausgabe und Manifest).
+Naechster Schritt: Pflichtpruefungen (Fahrplan 2), dann Bewerter-Vortests Stufe 1 (2a).
 
 **Champion `v32-b01_brierbest`** seit 2026-09-25 (`PREREG_v32_window.md` par.11), eingefroren
 unter `models/frozen_champions/v32-b01`; Anker-Drift und -Konservierung gruen auf dem
@@ -38,22 +38,42 @@ v32-Fenstercaches (ohne Beleg, `*.h5` ist ausgeschlossen), 1.203 verwaiste Bloec
 Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
 `cache_inventory.py --orphans` leer. **Das Modell `v29-b11` bleibt:** keine restic-Laufmarke.
 
-### WAS JETZT ANSTEHT: die v33-Erzeugung (`PREREG_v33_window.md`)
+### FAHRPLAN (eingetaktet 2026-09-25, Nutzer: *"Registrieren das so vor und takte es ein"*)
 
-**Bereit:** `tools/night_v33_generate.sh` und `tools/night_v33_chain.sh`, drei Spec-Dateien
-(`v32_generation.spec.json`, `v32_generation_nohull.spec.json`, `v33_gating.spec.json`), jede in
-genau einem Feld von ihrer Vorlage verschieden. Nichts gestartet.
+1. **ERLEDIGT: v33-Erzeugung** (siehe oben), fertig 2026-09-26 04:23:55.
+2. **Pflichtpruefungen der Erzeugung** (`PREREG_v33_window.md` par.9): Manifest-Diff je Klasse,
+   Wiedervorlage am ersten Record, Tor 0, Tor 2a am Sockel, Vielfaltssonde an Schwarm a.
+2a. **Bewerter-Vortests Stufe 1** (`PREREG_evaluator_pretests.md` par.3/par.4; Nutzer 2026-09-25:
+    *"Ja Takte deinen Vorschlag so ein"*): offline auf dem Champion, 60 Val-Dateien aus
+    `window_v32_val.txt`, kein Build. E1 (Einpass-Konsum statt geflipptem zweiten Pass) wird nur
+    gelesen, sein Arm kommt sicher; E2 (Margen-Schwellen) und E3 (Rundenschicht) muessen gegen
+    Zufalls-Trunk und die Schwelle 0,0012 Brier bestehen. Laufzeit ungemessen, Block im Artefakt.
+    Werkzeug wird vorher geschrieben, laeuft erst nach Punkt 2.
+3. **v33-Kette auf Nutzer-Freigabe** (`bash tools/night_v33_chain.sh`). Tor 1 mit der
+   **Stufenregel** aus par.2a: ein dritter Seed (20261602, rund +2 h) genau dann, wenn genau einer
+   der beiden ersten einzeln Block-z >= +1,96 erreicht. Rechnung `tools/gating_block_z.py`,
+   geeicht an v31/v32 (6 von 6 exakt).
+3a. **Im Anschluss an die Kette: `bash tools/night_v33_b02.sh`** (Nutzer: *"Dann fahr Im Anschluss
+    eine a/b Partie mit weniger Schwarm Anteil"*, `PREREG_v33_window.md` par.6a). Arm `v33-b02` mit
+    Fenster ohne den Schwarm aus G-1/G-2, gleiche Val-Menge, dann A/B gegen b01 (2 Seeds a 200
+    Paare). Beantwortet, ob aelterer Schwarm traegt. Rund 5 h, HERLEITUNG aus v32.
+3b. **Bewerter-Vortests Stufe 2** (`PREREG_evaluator_pretests.md` par.5): EINE Wheel-Runde fuer
+    den E1-Laufzeitknopf und einen pyo3-Export fuer E4, Anker-Invarianz, E1-Kostentor (je 100
+    Partien) und E1-Arm (Champion mit/ohne Knopf, 2 Seeds a 200 Paare), dann E4-Vortest. Das
+    Ergebnis entscheidet, ob die v34-Erzeugung mit Einpass-Konsum faehrt.
+4. **Traegt Tor 1: `/mosaic-champion-promotion`** mit `models/v33_gating.spec.json` als
+   Champion-Spec (Startkuppel-Suche an).
+5. **v34-Wechsel:** Rezeptfrage VOLUMEN (Abschnitt 6, Punkt 14). Dazu vormerken: das R4-Substrat
+   `selfplay_v30-b02-policy_*` rotiert dann heraus -- vorher die 72 Zustaende sichern, sonst endet
+   die gepaarte R4/R4b-Reihe.
 
-**Entschieden 2026-09-25** (*"1 und 2 wie vorgeschlagen, starte die Erzeugung"*):
-Klassenname `value-tempc-nohull`, Tor 1 beidseits mit `start_by_search: 1`
-(`models/v33_gating.spec.json`), Erzeugung freigegeben.
+**Zurueckgezogen am selben Tag** (Nutzer: *"Mehrkosten sind kritisch abzuwaegen ... nichts fahren,
+was schon getestet wurde"*): `PREREG_training_seed_arms.md` und `PREREG_value_readout.md`, beide
+UEBERHOLT mit der Liste dessen, was schon gemessen ist. Nichts davon ist gelaufen.
 
-**Vor dem Start pruefen** (Ablauf Punkt 7): Maschine frei, App bleibt offen, Skripte als DATEI
-starten (`bash tools/night_v33_generate.sh`), keine Pipe.
-
-**Vormerken fuer den v34-Wechsel:** R4/R4b stehen fuer die Paarung auf
-`data/selfplay_v30-b02-policy_*` (72 Zustaende, Seed 20260803); diese Generation rotiert dann
-heraus. Wer die Reihe gepaart fortfuehren will, sichert vorher die 72 Zustaende.
+**Committet am 2026-09-26 nach der Erzeugung:** par.2a samt Kettenerweiterung, par.6a samt
+`tools/night_v33_b02.sh`, `tools/gating_block_z.py`, die zwei zurueckgezogenen Preregs, die
+R5-Streichung, `PREREG_evaluator_pretests.md` samt Werkzeug und Recherche-Bericht.
 
 ### FREIGABEN UND VERBOTE (woertlich)
 
@@ -148,11 +168,12 @@ widerlegt (v30: 404:396 kalt gegen 443:297 warm, 9,36 Prozentpunkte).
 `value-tempc-nohull`), G-1 `v31-b01` (1.201), G-2 `v30-b02` (400 policy + 145 Ausflug); `v29-b11`
 ist herausrotiert und geloescht. Seed 20260957, Val-Pool `^selfplay_v32-`, 580 Traeger.
 
-## 5. PREREG-BESTAND (2 OFFEN laut Index 2026-09-25; Ziel rund 7)
+## 5. PREREG-BESTAND (3 OFFEN laut Index 2026-09-25; Ziel rund 7)
 
 | Prereg | Was noch aussteht |
 | --- | --- |
 | `v33_window` | NEU 2026-09-25; par.6 entschieden, Erzeugung laeuft seit 2026-09-25 |
+| `evaluator_pretests` | NEU 2026-09-25; Stufe 1 nach der Erzeugung, Stufe 2 nach Kette und b02 (Fahrplan 2a/3b) |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
 Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v32_window`
@@ -238,6 +259,23 @@ Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v3
 
 13. **Kleinkram:** die Dry-Artefakte `evaluations/artifacts/_dry_*.json` vom Sonden-Bau koennen
     weg (Verzeichnis ist git-ignoriert).
+
+14. **v34-Rezept: mehr Partien je Generation?** Der einzige Hebel aus der Ideenliste vom
+    2026-09-25, der schon BELEGT ist: mehr Korpus traegt in Orakel und Arena
+    (`PREREG_corpus_dose.md`, 900 gegen 450 Dateien, 479:321, p < 0,0001), und der Value-Kopf
+    saettigt nicht (`PREREG_task36_value_saturation.md`, jede Verdopplung rund 0,0012 Brier).
+    Beide aus einer aelteren Aera. Preis: je 4.000 Partien rund 4,5 h Erzeugung (v32). Keine
+    Testfrage, sondern ein Budget-Entscheid -- gehoert in par.6 der v34-Fenster-Prereg.
+    **Eingegrenzt 2026-09-25 (Nutzer: *"Mehr sockel bringt nichts denk ich. Policy ist
+    gesaettigt"*), belegt:** Task #36 fand die Policy-Gegenkurve "flach (daten-gesaettigt)"
+    (`PREREG_task36_value_saturation.md`). Mehr Volumen also NUR als Schwarm (value-only).
+    Offen fuer v34: ob ueberhaupt, und welche Klasse -- der Ausflug liefert unverzerrte Ziele,
+    der temperierte Schwarm Breite; die Vielfaltssonde an `value-tempc-nohull` (v33 par.9)
+    liefert dazu die erste Zahl.
+15. **Stufenregel fuer Tor 1 behalten?** (`PREREG_v33_window.md` par.2a, in der v33-Kette
+    eingebaut): ein dritter Seed kostet rund 2 h, nur wenn die ersten zwei sich widersprechen.
+    Er aendert ein Verdikt nur in knappen Faellen, weil das Kriterium auch "gepoolt >= 52,5
+    Prozent" durchlaesst. VOR dem Start der v33-Kette zu entscheiden.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

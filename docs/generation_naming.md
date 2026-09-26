@@ -195,7 +195,10 @@ Freigabe geloescht. Seed **20260957**, Val-Pool `^selfplay_v32-`.
 **Neue Klassen-Endung `value-tempc-nohull`** fuer Schwarm a, der ab v33 ohne Huellenknopf laeuft
 (`PREREG_geometric_envelope.md` par.14d); vom Nutzer am 2026-09-25 bestaetigt
 (`PREREG_v33_window.md` par.6). Die Endung ist ein KLASSEN-Name, kein Knopf-Suffix am Arm (Regel
-oben bleibt). Weitere Arme ab `v33-b02` nur mit eigener Registrierung.
+oben bleibt).
+**`v33-b02`** (registriert 2026-09-25, `PREREG_v33_window.md` par.6a): dasselbe Rezept wie b01,
+Fenster OHNE den Schwarm aus G-1 und G-2 (rund 2.001 statt 2.947 Dateien); A/B gegen b01, entscheidet
+das v34-Fenster, nicht den v33-Champion. Weitere Arme ab `v33-b03` nur mit eigener Registrierung.
 
 **Reserviert 2026-09-22 (Generationswechsel v31 -> v32):**
 **`v32-b01`** (erster Arm der Generation v32 auf dem v32-Fenster; Generator der Erzeugung ist

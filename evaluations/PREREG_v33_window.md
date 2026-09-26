@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung freigegeben und gestartet 2026-09-25 (par.9). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung laeuft seit 2026-09-25 (par.9). Tor 1 mit Stufenregel (par.2a). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). -->
 
 # Vorregistrierung: das v33-Fenster
 
@@ -45,6 +45,41 @@ gegen den des Vorgaengers (Nicht-Unterlegenheit). **Tor 2b** volle Spalten im To
 
 **Tor 2a bleibt vergleichbar**, obwohl sich ein Schwarm aendert: es misst den SOCKEL, und der
 laeuft wie bisher mit Huellenknopf (`PREREG_geometric_envelope.md` par.14d).
+
+### par.2a STUFENREGEL FUER TOR 1: ein dritter Seed, wenn die beiden ersten sich widersprechen
+
+**Registriert 2026-09-25, VOR jedem Tor-1-Lauf dieser Generation** (Nutzer: *"Registrieren das so
+vor und takte es ein"*). Anlass ist die gemessene Aufloesung, nicht ein Wunschergebnis:
+
+* Ein Tor 1 aus zwei Seeds hat 80 Bloecke; bei v32 lag die Block-sd bei 0,1605, der
+  Standardfehler des gepoolten Anteils also bei **0,1605 / sqrt(80) = 1,8 Prozentpunkten**
+  (Herleitung aus par.10 der v32-Prereg; sie reproduziert dort z = +2,37). Ein echter Sprung von
+  3 Punkten landet damit im Mittel bei z = 1,7 -- unter der Schwelle.
+* Die Seeds streuen stark: v32 +0,10 gegen +3,26, v31 +3,54 gegen +2,42.
+
+**Die Regel:**
+
+1. Tor 1 laeuft wie in par.2 auf den Seeds 20261600 und 20261601.
+2. **Ausloeser:** GENAU EINER der beiden Seeds erreicht einzeln Block-z >= +1,96. (v32 haette
+   ausgeloest, v31 nicht.)
+3. Dann laeuft **Seed 20261602** mit identischen Einstellungen.
+4. **Verdikt:** gepoolter Block-z ueber ALLE gelaufenen Seeds, mit dem unveraenderten Kriterium
+   aus par.2 (z >= +1,96 oder gepoolt >= 52,5 Prozent, ohne Gegenbefund). Alle Einzel-z werden
+   berichtet.
+5. Rechnung: `tools/gating_block_z.py`, geeicht am 2026-09-25 gegen die sechs registrierten
+   Werte von v31 und v32 (`--check-v31-v32`, 6 von 6 exakt).
+
+**Was die Regel NICHT ist, ehrlich benannt:** ein fester Umfang. Sie fuegt Daten nur im
+Widerspruchsfall hinzu; ihr Fehler erster Art ist damit nicht genau der eines Tests mit festem n.
+Bewusst in Kauf genommen, weil der dritte Seed in BEIDE Richtungen wirken kann (ein Widerspruch
+kann gepoolt auch unter die Schwelle fallen) und weil ein fester dritter Seed jede Generation
+rund 2 h kostete (v32: 7.251 s je Seed). Ob die Regel Pflicht fuer spaetere Generationen wird,
+entscheidet sich nach diesem Einsatz, nicht jetzt.
+
+**Zur Entscheidung gestellt, noch am selben Tag** (Nutzer: *"Mehrkosten sind kritisch
+abzuwaegen"*): ob die Regel fuer v33 ueberhaupt gilt, entscheidet der Nutzer VOR dem Start der
+Kette (`STATUS.md` Abschnitt 6, Punkt 15). Faellt sie, wird der Block 8b aus `night_v33_chain.sh`
+entfernt, bevor die Kette startet.
 
 ## par.3 DER EINE INHALTLICHE UNTERSCHIED ZU v32
 
@@ -112,6 +147,61 @@ freigegeben. Die Begruendungen, wie sie vorgelegt waren:
    weil beidseits gleich, aber eine andere Konfiguration als die seiner eigenen Kanten.
 
 **Die Freigabe der Erzeugung** ist mit demselben Satz erteilt.
+
+## par.6a ZWEITER ARM `v33-b02`: nur der Schwarm des Generators (registriert 2026-09-25, VOR jedem Lauf)
+
+**Nutzer:** *"Ich bin mir nicht sicher ob ein groesseres trainingsfenster hilft. Der value head ist
+klein und schlussendlich ist es nur eine regression"*, dann *"Dann fahr Im Anschluss eine a/b
+Partie mit weniger Schwarm Anteil (zb nur die 8000 vom aktuellen champ)"*.
+
+**Die Frage:** traegt der AELTERE Schwarm (G-1 und G-2) im Fenster zur Staerke bei, oder ist er
+Ballast? Belegt ist bisher nur, dass mehr Partien DERSELBEN Aera helfen (Task #36,
+`PREREG_corpus_dose.md`, beide aus einer aelteren Encoder-Aera); ob mehr ALTE Partien helfen, ist
+ungemessen, und "Aera >> Dosis" (`PREREG_v25_window.md`) spricht eher dagegen.
+
+**Der eine Unterschied zu b01:** das Fenster verliert den Schwarm aus G-1 und G-2.
+
+| Fenster | b01 (par.1) | **b02** |
+| --- | --- | --- |
+| neu `v32-b01`: policy / tempc-nohull / Ausflug | 400 / 400 / ~401 | 400 / 400 / ~401 (gleich) |
+| G-1 `v31-b01`: policy | 400 | 400 (gleich) |
+| G-1 `v31-b01`: tempc / Ausflug | 400 / 401 | **0 / 0** |
+| G-2 `v30-b02`: policy | 400 | 400 (gleich) |
+| G-2 `v30-b02`: Ausflug (Seed-Auswahl) | 145 | **0** |
+| **Summe** | **2.947** | **2.001** |
+
+Policy-Traeger unveraendert (580, dasselbe Manifest). Gleiches Rezept, gleicher Warmstart
+(`v32-b01_brierbest`), gleicher Trainings-Seed. **Die Val-Menge ist IDENTISCH:** die Aufteilung
+zieht n_val = round(N * val_frac) aus demselben Pool (`^selfplay_v32-`, 1.201 Dateien in beiden
+Fenstern) mit festem Seed (`tools/window_train_split.py` Z.78-83, `train.py` Z.1430); das Skript
+rechnet `--val-frac` fuer b02 aus der TATSAECHLICHEN b01-Val-Liste und der tatsaechlichen
+b02-Fenstergroesse (bei 2.947/2.001 Dateien: 147 Val-Dateien), damit n_val gleich ist -- ein
+fester Wert haette bei einer anderen Ausflug-Dateizahl eine andere Val-Menge ergeben. Das Skript bricht ab, wenn die Val-Liste nicht
+byte-gleich zu `data/window_v33_val.txt` ist. **Unvermeidliche Nebenfolge, benannt:** mit weniger
+Daten macht dieselbe Epochenzahl weniger Gradientenschritte -- das GEHOERT zur Frage "weniger
+Material", es ist kein Stoerfaktor, der sich abstellen liesse.
+
+**Messung:** gepaartes A/B `v33-b02` gegen `v33-b01`, beide mit `models/v33_gating.spec.json`, 400
+Sims, zwei Seeds (20261650, 20261651) a 200 Paare, Blockgroesse 5, `--log-games`, Block-z ueber
+`tools/gating_block_z.py` (A = b02).
+
+**Leseregel, VORAB:**
+
+* **z <= -1,96: der aeltere Schwarm TRAEGT.** Fenstertiefe hilft dem Value-Kopf; Volumen bleibt der
+  Hebel, auch aelteres.
+* **z >= +1,96: der aeltere Schwarm SCHADET.** Die v34-Fenster werden ohne ihn gebaut.
+* **dazwischen: kein messbarer Beitrag.** Dann ist b02 bei gleicher Staerke das billigere Fenster
+  (rund ein Drittel weniger Dateien, kuerzerer Merge und kuerzeres Training); ob es ab v34 Rezept
+  wird, entscheidet der Nutzer.
+* Zweitrangig, berichtet: Val-Brier beider Arme (identische Val-Menge) und die sechs
+  Standard-Kennzahlen.
+
+**Was das A/B NICHT entscheidet:** den v33-Champion. Eine Promotion laeuft nur ueber Tor 1 gegen
+den amtierenden Champion; b02 braeuchte dafuer ein eigenes Tor 1.
+
+**Wann und was es kostet:** im Anschluss an die v33-Kette, `bash tools/night_v33_b02.sh`.
+Geschaetzt (HERLEITUNG aus v32, nicht gemessen): Merge rund 7 min, Training rund 45 min, A/B
+2 x rund 2 h -- zusammen rund 5 h, also der Gegenwert von rund 4.400 Self-Play-Partien.
 
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`)
 
