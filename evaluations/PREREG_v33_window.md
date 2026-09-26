@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung laeuft seit 2026-09-25 (par.9). Tor 1 mit Stufenregel (par.2a). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen 2026-09-26 (par.9). Tor 1 mit Stufenregel, fuer v33 entschieden (par.2a). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). -->
 
 # Vorregistrierung: das v33-Fenster
 
@@ -80,6 +80,9 @@ entscheidet sich nach diesem Einsatz, nicht jetzt.
 abzuwaegen"*): ob die Regel fuer v33 ueberhaupt gilt, entscheidet der Nutzer VOR dem Start der
 Kette (`STATUS.md` Abschnitt 6, Punkt 15). Faellt sie, wird der Block 8b aus `night_v33_chain.sh`
 entfernt, bevor die Kette startet.
+
+**ENTSCHIEDEN 2026-09-26: die Regel gilt fuer v33** (Nutzer auf die Vorlage mit Stufenregel und
+Kettenstart: *"Setz es um wie vorgeschlagen"*). Block 8b bleibt in der Kette.
 
 ## par.3 DER EINE INHALTLICHE UNTERSCHIED ZU v32
 

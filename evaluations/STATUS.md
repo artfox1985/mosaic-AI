@@ -31,7 +31,12 @@ Klasse 4.000 Partien in 13.753,9 s (3,43 s je Partie, threads 11, laut Aufgabena
 der Knopf bringt im temperierten Schwarm praktisch keine Vielfalt (`PREREG_geometric_envelope.md`
 par.14e). **Bewerter-Vortests Stufe 1 gefahren** (`PREREG_evaluator_pretests.md` par.8a): E1
 gleich gut, Arm kommt wegen der Kosten; E2 besteht (+0,00213 Brier); E3 tot; der Kopf schlaegt im
-Mittelspiel den linearen Leser. **Die Maschine ist frei, die Kette wartet auf Nutzer-Go.**
+Mittelspiel den linearen Leser.
+
+**LAEUFT seit 2026-09-26: v33-Kette, danach b02** (`bash tools/night_v33_chain.sh && bash
+tools/night_v33_b02.sh`, Harness-Hintergrundaufgabe; Nutzer-Go *"Setz es um wie vorgeschlagen"*,
+Stufenregel gilt). Nichts anderes starten, kein Build, kein Commit. Stufe 2 der Vortests braucht
+einen Build und kommt erst danach.
 
 **Champion `v32-b01_brierbest`** seit 2026-09-25 (`PREREG_v32_window.md` par.11), eingefroren
 unter `models/frozen_champions/v32-b01`; Anker-Drift und -Konservierung gruen auf dem
@@ -277,7 +282,7 @@ Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v3
     Offen fuer v34: ob ueberhaupt, und welche Klasse -- der Ausflug liefert unverzerrte Ziele,
     der temperierte Schwarm Breite; die Vielfaltssonde an `value-tempc-nohull` (v33 par.9)
     liefert dazu die erste Zahl.
-15. **Stufenregel fuer Tor 1 behalten?** (`PREREG_v33_window.md` par.2a, in der v33-Kette
+15. **ENTSCHIEDEN 2026-09-26: Stufenregel gilt fuer v33** (Nutzer: *"Setz es um wie vorgeschlagen"*). Frueher offen: **Stufenregel fuer Tor 1 behalten?** (`PREREG_v33_window.md` par.2a, in der v33-Kette
     eingebaut): ein dritter Seed kostet rund 2 h, nur wenn die ersten zwei sich widersprechen.
     Er aendert ein Verdikt nur in knappen Faellen, weil das Kriterium auch "gepoolt >= 52,5
     Prozent" durchlaesst. VOR dem Start der v33-Kette zu entscheiden.
