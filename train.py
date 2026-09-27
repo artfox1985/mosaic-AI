@@ -10,6 +10,33 @@ try:
 except Exception:
     pass
 
+# Rezeptdatei (docs/working_rules.md "Rezeptdatei statt langer Flag-Listen";
+# Klasse = Trainings-ARM). Das `env` des Rezepts muss stehen, BEVOR ein Modul
+# `MOSAIC_*` beim Import liest: `config` (MOSAIC_DATA_DIR, config.py:28),
+# `neural_net` (MOSAIC_IGNORE_POLICY_TARGET_VALID, MOSAIC_FEATURES_FROM_RUST
+# beim Import, engine/py/neural_net.py), und damit alles darunter
+# (`freeze_trunk`, `train_manifest`, `corpus_dataset`). Darum VOR `import torch`
+# und vor dem ersten Projekt-Import. Nur im Hauptprozess: DataLoader-Worker
+# (spawn) importieren das Modul als `__mp_main__` neu und erben die Umgebung.
+from tools.recipe_config import (RecipeError, apply_recipe_env_from_argv,  # noqa: E402
+                                 apply_to_parser, check_engine_config, manifest_block)
+
+# Variablen, die train.py SELBST aus einem Flag setzt (am Ende dieser Datei):
+# im Rezept das FLAG setzen, nicht die Variable -- sonst zwei Quellen.
+RECIPE_RESERVED_ENV = {
+    "MOSAIC_MOON_TARGET_SOURCE": "moon_target_source",
+}
+
+_RECIPE_PRE = None
+if __name__ == "__main__":
+    try:
+        _RECIPE_PRE = apply_recipe_env_from_argv(
+            tool="train",
+            reserved={name: f"setzt train.py aus dem Flag; im Rezept den Schluessel {dest!r} "
+                            f"verwenden" for name, dest in RECIPE_RESERVED_ENV.items()})
+    except RecipeError as _e:
+        raise SystemExit(f"❌ Rezept abgelehnt: {_e}")
+
 import torch
 import math
 import glob
@@ -1088,7 +1115,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
           moon_target_source="label",
           file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0,
-          resume=False, epoch_checkpoint=True, fast_loader=False):
+          resume=False, epoch_checkpoint=True, fast_loader=False,
+          overwrite_model=False, recipe_info=None):
     # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
     # Zwischenstand wird VOR dem teuren Daten-Laden gelesen: fehlt er, soll
     # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
@@ -1101,6 +1129,24 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if _stop_file.exists():
         sys.exit(f"❌ Stopp-Datei {_stop_file} liegt schon vor dem Start -- entfernen und neu "
                  f"starten (sie wuerde den Lauf sonst nach der ersten Epoche pausieren).")
+    # Code-Review 2026-09-26 #23: die Ergebnis-Checkpoints (final, _best,
+    # _brierbest; Abschnitt 6 unten) wurden ohne Existenz-Waechter
+    # ueberschrieben -- ein zweiter Lauf unter demselben --name ersetzte still
+    # ein gemessenes Modell, und ein altes `_best` konnte neben einem neuen
+    # finalen Stand liegen bleiben (der neue Lauf schreibt `_best` nur, wenn es
+    # vom finalen abweicht). Abbruch VOR dem teuren Datenaufbau, ausser mit
+    # --overwrite-model. `--resume` ist ausgenommen: er setzt ABSICHTLICH einen
+    # Lauf desselben Namens fort, und ein Segment, das nach dem Speichern (etwa
+    # im ONNX-Export) starb, muss den finalen Stand erneut schreiben duerfen.
+    # Der Zwischenstand `_resume.pth` ist keine Ergebnisdatei und nicht betroffen.
+    if not resume and not overwrite_model:
+        _existing = [p for p in (MODELS_DIR / f"alphazero_{version_name}{suffix}.pth"
+                                 for suffix in ("", "_best", "_brierbest")) if p.exists()]
+        if _existing:
+            sys.exit("❌ Unter --name " + repr(version_name) + " liegen schon Ergebnis-Checkpoints: "
+                     + ", ".join(p.name for p in _existing)
+                     + " -- Abbruch, damit kein gemessenes Modell still ersetzt wird. Neuen "
+                       "Namen waehlen oder ausdruecklich --overwrite-model setzen.")
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -1382,6 +1428,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "points_dist_bins": points_dist_bins,
         "head_warmstart": bool(head_warmstart),
         "epoch_checkpoint": bool(epoch_checkpoint),
+        # Code-Review #23: ob der Lauf bestehende Checkpoints ersetzen durfte.
+        "overwrite_model": bool(overwrite_model),
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -1392,8 +1440,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     _manifest_files = all_files
     if _excl:
         _manifest_files = [f for f in all_files if not _re.search(_excl, _os.path.basename(f))]
+    # Rezeptdatei: Block (Pfad, sha256, Arm, Inhalt, Abweichungen) nur mit
+    # --recipe, sonst None; `mosaic_env` schreibt write_train_manifest immer.
+    _recipe_block = (None if recipe_info is None else
+                     manifest_block(recipe_info["recipe"], recipe_info["recipe"].path,
+                                    recipe_info.get("class"), recipe_info.get("overrides")))
+    if _recipe_block is not None and recipe_info.get("engine_config_check") is not None:
+        _recipe_block["engine_config_check"] = recipe_info["engine_config_check"]
     write_train_manifest(version_name, _cli_args, corpus_composition(_manifest_files), _run_timestamp,
-                          policy_carriers=policy_carrier_report(_manifest_files, _SELFPLAY_FILENAME_RE))
+                          policy_carriers=policy_carrier_report(_manifest_files, _SELFPLAY_FILENAME_RE),
+                          recipe=_recipe_block)
 
     val_files = []
     train_files = None  # wird unten IMMER gesetzt (A8: kein stiller Ordner-Glob mehr)
@@ -3198,8 +3254,43 @@ if __name__ == "__main__":
                              "und ohne --train-file-limit. Gilt NUR fuer den Trainings-Datensatz; "
                              "der Val-Split behaelt seinen eigenen Cache. STANDARD None = "
                              "Bestandsverhalten unveraendert.")
+    parser.add_argument("--overwrite-model", dest="overwrite_model", action="store_true",
+                        help="Code-Review 2026-09-26 #23: bestehende Ergebnis-Checkpoints "
+                             "models/alphazero_<name>[_best|_brierbest].pth ausdruecklich "
+                             "ueberschreiben. Ohne das Flag bricht der Lauf VOR dem Datenaufbau "
+                             "ab, sobald einer davon existiert. --resume ist ausgenommen (setzt "
+                             "absichtlich denselben Namen fort).")
 
-    args = parser.parse_args()
+    # Rezeptdatei: EIN zusaetzlicher Schritt statt des direkten parse_args-Aufrufs --
+    # ohne --recipe ein normaler parse_args (plus --recipe/--class).
+    try:
+        args, _recipe_overrides = apply_to_parser(
+            parser, None,
+            _RECIPE_PRE["recipe"] if _RECIPE_PRE else None,
+            _RECIPE_PRE["class"] if _RECIPE_PRE else None,
+            tool="train")
+    except RecipeError as e:
+        parser.error(str(e))
+    # `apply_to_parser` hebt `required` fuer Rezept-dests auf; null im Rezept
+    # (Platzhalter) darf daraus keinen Lauf ohne Namen machen.
+    if args.name is None:
+        parser.error("--name fehlt (im Rezept null oder nicht gesetzt)")
+    _recipe_info = None
+    if _RECIPE_PRE is not None:
+        _recipe_info = {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
+                        "overrides": _recipe_overrides}
+        # Waechter wie im Self-Play: hat das Rezept `expect_engine_config`,
+        # wird es gegen das geladene Wheel geprueft, bevor Daten geladen werden.
+        _expected = _RECIPE_PRE["recipe"].get("expect_engine_config") or {}
+        if _expected:
+            import mosaic_rust as _mr_check
+            _deviations = check_engine_config(json.loads(_mr_check.engine_config_json()), _expected)
+            if _deviations:
+                raise SystemExit("❌ Rezept-Waechter: engine_config weicht vom Rezept "
+                                 "(expect_engine_config) ab -- Abbruch vor dem Training:\n  - "
+                                 + "\n  - ".join(_deviations))
+            _recipe_info["engine_config_check"] = {"expected": _expected, "deviations": [],
+                                                   "source": "train.py-Prozess"}
 
     # Der BLOCK-Schluessel liest den Schalter aus der Umgebung
     # (file_cache_key._moon_target_source_key) -- ohne dieses Setzen wuerde ein
@@ -3231,4 +3322,5 @@ if __name__ == "__main__":
           surprise_alpha=args.surprise_alpha,
           surprise_confidence_min=args.surprise_confidence_min,
           resume=args.resume, epoch_checkpoint=not args.no_epoch_checkpoint,
-          fast_loader=args.fast_loader)
+          fast_loader=args.fast_loader, overwrite_model=args.overwrite_model,
+          recipe_info=_recipe_info)

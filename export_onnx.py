@@ -60,7 +60,64 @@ from neural_net import (MosaicNet, Mosaic2DNet, points_dist_bins_from_state,  # 
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
 
-def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
+class PartialLoadError(RuntimeError):
+    """Der Checkpoint passt nicht vollstaendig auf das gebaute Modell.
+
+    Bewusst eine `Exception` (kein SystemExit): der Auto-Export am Ende von
+    `train.py` (Abschnitt 7) faengt `Exception` und meldet "ONNX-Export
+    uebersprungen", der Trainingslauf endet dann regulaer (Snapshot, Laufzeit,
+    Zwischenstand-Loeschung laufen weiter) -- es entsteht nur KEIN .onnx. Ein
+    SystemExit wuerde dort vorbeifliegen und den Rest des Laufs abschneiden."""
+
+
+def load_state_checked(model, state: dict, allow_partial: bool, label: str) -> None:
+    """Checkpoint-Gewichte laden und das Ergebnis AUSWERTEN (Code-Review
+    2026-09-26 #18).
+
+    Bis dahin wurden Shape-Abweichungen herausgefiltert, `load_state_dict(
+    strict=False)` lief, und das Ergebnis (fehlende und unerwartete Schluessel)
+    wurde nicht angesehen: ein Kopf, der im Checkpoint anders aussah, startete
+    ZUFAELLIG und wurde exportiert -- die Rust-Paritaetsreferenz (.ref.txt)
+    entsteht aus demselben Modell und faengt das nicht. Jetzt drei Klassen:
+
+    * Shape-Abweichung (Schluessel in beiden, Form verschieden) -> startet zufaellig,
+    * im Modell, nicht im Checkpoint -> startet zufaellig,
+    * im Checkpoint, nicht im Modell -> Gewichte fallen weg (ein Kopf fehlt im Export).
+
+    Jede davon ist ein ABBRUCH (`PartialLoadError`), ausser mit
+    `allow_partial=True` (CLI `--allow-partial-load`); dann das alte Verhalten
+    mit vollstaendiger Liste auf der Konsole. Der gewollte Anwendungsfall dafuer
+    sind Alt-Checkpoints aus der value-head-losen Zwischenphase (v1-v6), deren
+    fehlende Koepfe zufaellig starten DUERFEN, weil die Suche sie nicht liest.
+    Herleitung, ungemessen: aktuelle Checkpoints laden verlustfrei, weil
+    `train.py` (Modellbau vor dem Warm-Start) und die Kopf-Erkennung hier
+    dieselben Konstruktor-Argumente benutzen.
+    """
+    new_state = model.state_dict()
+    skipped = [k for k in state if k in new_state and tuple(state[k].shape) != tuple(new_state[k].shape)]
+    loadable = {k: v for k, v in state.items() if k not in skipped}
+    missing = sorted(k for k in new_state if k not in state)
+    unexpected = sorted(k for k in state if k not in new_state)
+    problems = []
+    if skipped:
+        problems.append("Shape-Mismatch, startet zufaellig: "
+                        + ", ".join(f"{k} (Checkpoint {tuple(state[k].shape)}, Modell "
+                                    f"{tuple(new_state[k].shape)})" for k in skipped))
+    if missing:
+        problems.append("im Modell, nicht im Checkpoint, startet zufaellig: " + ", ".join(missing))
+    if unexpected:
+        problems.append("im Checkpoint, nicht im Modell, faellt weg: " + ", ".join(unexpected))
+    if problems and not allow_partial:
+        raise PartialLoadError(
+            f"Export {label}: Checkpoint passt nicht vollstaendig auf das Modell -- ABBRUCH "
+            f"(nur mit --allow-partial-load wird trotzdem exportiert):\n  - "
+            + "\n  - ".join(problems))
+    for p in problems:
+        print(f"⚠️  --allow-partial-load ({label}): {p}")
+    model.load_state_dict(loadable, strict=False)
+
+
+def _export_flat(version: str, ckpt: dict, opset: int, allow_partial_load: bool = False) -> Path:
     """Bestehender Flach-Zweig (`MosaicNet`) -- UNVERÄNDERT ggü. vor Task #11
     Phase 2, nur aus `export()` herausgezogen (nimmt jetzt das bereits
     geladene `ckpt`-Dict entgegen statt selbst `torch.load` aufzurufen)."""
@@ -91,26 +148,20 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
 
     # Konjunktions-Erweiterung des Ownership-Kopfs: MUSS mitgezogen werden --
     # sonst baut der Export einen 72-breiten Kopf, der Checkpoint traegt 122,
-    # und der Shape-Mismatch-Zweig unten wuerde den Kopf STILL zufaellig
-    # initialisiert exportieren.
+    # und der Shape-Mismatch-Zweig unten haette den Kopf bis zu Code-Review #18
+    # STILL zufaellig initialisiert exportiert (heute: Abbruch, load_state_checked).
     cj_head = conjunction_head_present(state)
 
     model = MosaicNet(input_size=in_size, num_actions=NUM_ACTIONS, hidden_size=hs, policy_hidden=ph,
                       points_dist_bins=points_dist_bins_from_state(state), opp_points_head=opp_head,
                       endgame_head=eg_head, conjunction_head=cj_head,
                       value_head_variant=value_head_variant)
-    new_state = model.state_dict()
     # Checkpoints aus der value-head-losen Zwischenphase haben KEINE
-    # value_head.*/points_head.*-Keys -- strict=False laesst diese Heads
-    # dann einfach zufallsinitialisiert (kein Ziel dafuer im alten Checkpoint).
-    # Shape-Mismatches bei den verbleibenden, gemeinsamen Keys (z.B.
-    # body.0.weight bei geaendertem INPUT_SIZE) werden weiterhin explizit
-    # rausgefiltert, sonst wuerde load_state_dict crashen.
-    skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
-    if skipped:
-        print(f"⚠️  Shape-Mismatch (alte Head-Architektur?), startet zufällig: {', '.join(skipped)}")
-        state = {k: v for k, v in state.items() if k not in skipped}
-    model.load_state_dict(state, strict=False)
+    # value_head.*/points_head.*-Keys, und Shape-Mismatches bei gemeinsamen
+    # Keys (z.B. body.0.weight bei geaendertem INPUT_SIZE) liessen die
+    # betroffenen Teile zufaellig starten. Seit Code-Review #18 ist beides ein
+    # Abbruch, ausser mit --allow-partial-load (siehe load_state_checked).
+    load_state_checked(model, state, allow_partial_load, f"{version} (flat)")
     model.eval()
 
     # Ausgabenamen/-achsen abhaengig vom Verteilungs-Kopf (Task #12): bei
@@ -172,7 +223,7 @@ def _export_flat(version: str, ckpt: dict, opset: int) -> Path:
     return out
 
 
-def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
+def _export_2d(version: str, ckpt: dict, opset: int, allow_partial_load: bool = False) -> Path:
     """Task #11 Phase 2 (M2.1): 2D-Zweig (`Mosaic2DNet`) -- ZWEI ONNX-Graph-
     Inputs (`planes` [batch,76,6,6], `state` [batch,708]), Reihenfolge Planes
     ZUERST (muss zu `net.rs::InputLayout::PlanesPlusFlat`/`detect_layout`
@@ -205,12 +256,8 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
                         endgame_head=eg_head, conjunction_head=conjunction_head_present(state),
                         ownership_head_2d=ownership_head_2d_present(state),
                         value_head_variant=value_head_variant)
-    new_state = model.state_dict()
-    skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]
-    if skipped:
-        print(f"⚠️  Shape-Mismatch (2D-Architektur weicht ab?), startet zufällig: {', '.join(skipped)}")
-        state = {k: v for k, v in state.items() if k not in skipped}
-    model.load_state_dict(state, strict=False)
+    # Code-Review #18: siehe load_state_checked -- Abbruch statt stillem Zufallskopf.
+    load_state_checked(model, state, allow_partial_load, f"{version} (2d)")
     model.eval()
 
     out_names = ["policy", "value", "moon", "points", "ownership"]
@@ -264,7 +311,10 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
     return out
 
 
-def export(version: str, opset: int = 13) -> Path:
+def export(version: str, opset: int = 13, allow_partial_load: bool = False) -> Path:
+    """`allow_partial_load` (Code-Review #18): Default False = ein Checkpoint,
+    der nicht vollstaendig auf das Modell passt, wirft `PartialLoadError`
+    statt mit Zufallskopf zu exportieren (siehe `load_state_checked`)."""
     pth = MODELS_DIR / f"alphazero_{version}.pth"
     if not pth.exists():
         raise SystemExit(f"❌ Modell nicht gefunden: {pth}")
@@ -272,13 +322,22 @@ def export(version: str, opset: int = 13) -> Path:
     ckpt = torch.load(str(pth), map_location="cpu")
     encoder = encoder_from_state_dict(ckpt["model_state"])
     if encoder == "2d":
-        return _export_2d(version, ckpt, opset)
-    return _export_flat(version, ckpt, opset)
+        return _export_2d(version, ckpt, opset, allow_partial_load)
+    return _export_flat(version, ckpt, opset, allow_partial_load)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="MosaicNet/Mosaic2DNet .pth → ONNX")
     ap.add_argument("--version", required=True, help="z.B. s100")
     ap.add_argument("--opset", type=int, default=13)
+    ap.add_argument("--allow-partial-load", action="store_true",
+                    help="Code-Review #18: auch exportieren, wenn der Checkpoint nicht "
+                         "vollstaendig auf das Modell passt (Shape-Abweichung, fehlende oder "
+                         "ueberzaehlige Schluessel) -- betroffene Teile starten dann ZUFAELLIG. "
+                         "Nur fuer Alt-Checkpoints mit bekannt fehlenden Koepfen. Ohne das Flag: "
+                         "Abbruch mit vollstaendiger Liste.")
     args = ap.parse_args()
-    export(args.version, args.opset)
+    try:
+        export(args.version, args.opset, allow_partial_load=args.allow_partial_load)
+    except PartialLoadError as e:
+        raise SystemExit(f"❌ {e}")

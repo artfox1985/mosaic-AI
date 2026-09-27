@@ -70,19 +70,52 @@ def load_records_fh(fh):
     return pickle.load(fh)
 
 
+def _temp_path_for(path) -> str:
+    """Temporaerer Name im SELBEN Ordner (os.replace ist nur innerhalb eines
+    Dateisystems atomar). Fuehrender Punkt und Endung `.tmp`: der Name trifft
+    weder `*.pkl` (corpus_files, Cache-Schluessel, MOSAIC_DATA_EXCLUDE) noch
+    die Zaehlungen der Ketten (`ls data/ | grep -c "^selfplay_..."`). Die PID
+    trennt parallele Schreiber derselben Zieldatei."""
+    directory, name = os.path.split(os.fspath(path))
+    return os.path.join(directory, f".{name}.{os.getpid()}.tmp")
+
+
 def dump_records(path, obj, compress=True) -> None:
-    """Schreibt eine Korpus-Datei. Standard komprimiert, Name bleibt `.pkl`."""
-    if compress:
-        with open(path, "wb") as f:
-            with gzip.GzipFile(fileobj=f, mode="wb", compresslevel=COMPRESS_LEVEL,
-                               # mtime=0: sonst steckt die Uhrzeit im gzip-Kopf und
-                               # zwei Laeufe mit gleichem Inhalt ergaeben
-                               # verschiedene Bytes. Reproduzierbarkeit vor Kosmetik.
-                               mtime=0) as g:
-                pickle.dump(obj, g)
-    else:
-        with open(path, "wb") as f:
-            pickle.dump(obj, f)
+    """Schreibt eine Korpus-Datei. Standard komprimiert, Name bleibt `.pkl`.
+
+    ATOMAR (Code-Review 2026-09-26 #23): erst in eine temporaere Datei daneben,
+    dann `os.replace`. Vorher schrieb `open(path, "wb")` direkt -- ein Abbruch
+    mitten im Schreiben (Kill, Standby, voller Datentraeger) hinterliess eine
+    abgeschnittene `.pkl` unter dem endgueltigen Namen, die jeder Glob als
+    fertigen Korpus mitnahm. Jetzt gibt es die Datei entweder vollstaendig oder
+    gar nicht; ein Rest bleibt hoechstens als `.<name>.<pid>.tmp` liegen und
+    wird bei einem Fehler hier selbst entfernt. Inhalt und Bytes unveraendert."""
+    tmp = _temp_path_for(path)
+    try:
+        with open(tmp, "wb") as f:
+            if compress:
+                # filename=: der gzip-Kopf traegt den Dateinamen (FNAME, ohne
+                # Pfad). Ohne diese Angabe nahme GzipFile ihn aus `f.name`, also
+                # den temporaeren Namen samt PID -- die Bytes wichen dann vom
+                # Bestand ab und zwischen zwei Laeufen voneinander.
+                with gzip.GzipFile(filename=os.fspath(path), fileobj=f, mode="wb",
+                                   compresslevel=COMPRESS_LEVEL,
+                                   # mtime=0: sonst steckt die Uhrzeit im gzip-Kopf und
+                                   # zwei Laeufe mit gleichem Inhalt ergaeben
+                                   # verschiedene Bytes. Reproduzierbarkeit vor Kosmetik.
+                                   mtime=0) as g:
+                    pickle.dump(obj, g)
+            else:
+                pickle.dump(obj, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def corpus_files(data_dir, pattern="*.pkl"):

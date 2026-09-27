@@ -14,6 +14,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from config import DATA_DIR, MODELS_DIR, VALUE_WEIGHT, POINTS_WEIGHT
 from neural_net import (TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
                         VALUE_SCHEMA_VERSION)
+# `tools.recipe_config` liegt unter der Repo-Wurzel; die steht beim Start von
+# train.py ohnehin in sys.path. Angehaengt statt vorangestellt, damit nichts
+# anderes ueberdeckt wird, wenn ein Werkzeug aus einem anderen Ordner importiert.
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.append(str(Path(__file__).resolve().parent))
+from tools.recipe_config import mosaic_env_snapshot  # noqa: E402
 
 
 def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
@@ -253,9 +259,14 @@ def append_train_cache_file(version_name, run_timestamp, cache_file_info) -> Non
 
 
 def write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp,
-                          policy_carriers=None) -> None:
+                          policy_carriers=None, recipe=None) -> None:
     """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
-    Korpus-Zusammensetzung auf Konsole."""
+    Korpus-Zusammensetzung auf Konsole.
+
+    Rezeptdatei (docs/working_rules.md), beide Felder ADDITIV hinter den
+    bisherigen: `recipe` = Block aus `tools/recipe_config.manifest_block`
+    (None ohne Rezept), `mosaic_env` = IMMER alle `MOSAIC_*` des Prozesses zum
+    Schreibzeitpunkt."""
     manifest = {
         "version": version_name,
         "run_timestamp": run_timestamp,
@@ -272,6 +283,8 @@ def write_train_manifest(version_name, cli_args, corpus_composition, run_timesta
         },
         "corpus_composition": corpus_composition,
         "policy_carriers": policy_carriers,
+        "recipe": recipe,
+        "mosaic_env": mosaic_env_snapshot(),
     }
     path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
     try:

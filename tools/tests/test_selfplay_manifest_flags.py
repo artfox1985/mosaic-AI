@@ -45,6 +45,10 @@ WORKER_ENV = {
     "return-order-random-p": "MOSAIC_RETURN_ORDER_RANDOM_P",
     "deviate-prob": "MOSAIC_DEVIATE_PROB",
     "excursion-prob": "MOSAIC_EXCURSION_PROB",
+    # Fahrplan 3e (2026-09-27): nur bei gegebenem Flag gesetzt, aber ebenfalls im Worker.
+    "tie-mirror-p": "MOSAIC_TIE_MIRROR_P",
+    "label-rng-split": "MOSAIC_LABEL_RNG_SPLIT",
+    "excursion-reshuffle": "MOSAIC_EXCURSION_RESHUFFLE",
 }
 
 
@@ -54,7 +58,9 @@ def argparse_flags(text: str) -> list[str]:
 
 def manifest_keys(text: str) -> set[str]:
     start = text.index("_write_run_manifest(version_name, run_timestamp, {")
-    end = text.index("\n    })\n", start)  # Ende des Dict-Literals
+    # Ende des Dict-Literals: die Zeile mit 4 Leerzeichen und `}`. Seit
+    # 2026-09-27 folgt dort `, recipe=...)` (Rezeptdatei), vorher `)`.
+    end = text.index("\n    }", start)
     body = "\n".join(
         ln for ln in text[start:end].splitlines() if not ln.lstrip().startswith("#")
     )

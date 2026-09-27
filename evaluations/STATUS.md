@@ -68,6 +68,16 @@ v32-Fenstercaches (ohne Beleg, `*.h5` ist ausgeschlossen), 1.203 verwaiste Bloec
 Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
 `cache_inventory.py --orphans` leer. **Das Modell `v29-b11` bleibt:** keine restic-Laufmarke.
 
+### RICHTUNG (Nutzer-Entscheid 2026-09-27)
+
+*"Mir scheint wir kommen mit unserer aktuellen Suche und Netz Architektur an die Decke. Somit werden
+wir v34 noch fahren und uns dann ueberlegen welche alternativen Ansaetze es gibt."* Belegt durch:
+Tor 1 v33 nur auf der Kante (52,50 %), Fensterarme b02/b03/b04 ohne Unterschied (Menge und Alter des
+Value-Materials kein Hebel), Suche seit v28 bei 400 Sims gesaettigt. **v34 ist die letzte Generation
+dieser Architektur**; sie nimmt das Paket mit (Spiegelknopf, E1/R5 nach ihren A/B, E2- und E4-Arm,
+gezieltes Abzweigen nach der Policy-Diskrepanz `PREREG_targeted_branching.md` par.7). Danach:
+alternative Ansaetze pruefen, bevor eine v35 geplant wird.
+
 ### FAHRPLAN (eingetaktet 2026-09-25, Nutzer: *"Registrieren das so vor und takte es ein"*)
 
 1. **ERLEDIGT: v33-Erzeugung** (siehe oben), fertig 2026-09-26 04:23:55.
@@ -113,7 +123,10 @@ Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
     Anker-Invarianz muss das als bitgleich bestaetigen.
     **Review #5 NICHT umgesetzt:** `tools/analyze_game_log.py:1026-1043` erzeugt Teil-Mond-Entnahmen
     absichtlich als Rettungskandidaten fuers Nachspielen alter Menschenpartien (auch
-    `/api/debug/replay_log`); ein Fix braucht einen Schalter nur fuer den Replayer -- Nutzer-Entscheid.
+    `/api/debug/replay_log`); ein Fix braucht einen Schalter nur fuer den Replayer. **GESCHLOSSEN, wird
+    nicht umgesetzt** (Nutzer 2026-09-27: *"Dann weg mit dem schalter"*): kein legaler Pfad
+    erzeugt die Teilformen, Training und Messungen sind unberuehrt; einziger Nutzen waere Haertung der
+    lokalen API gegen handgeschickte Zuege. v34-Fenster: Entscheid nach dem b02-Tor 1 (Nutzer).
     **Review #17 aendert legale Eingaben gewollt:** `json_to_state` liest `first_player_next_round`,
     betrifft Diagnose-/Seeding-Pfade (Merkmal P.15), nicht die Trainingsmerkmale aus Records.
     **Folgen fuer Tools** (beim Nachzug pruefen): `gui_node_gate_smoke.py` spielt jetzt ganz Runde 5,

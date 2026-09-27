@@ -21,6 +21,10 @@
 # Messaufbaus, nicht Beiwerk. Vier winzige JSON, und ohne sie laesst sich ein
 # Arm-Vergleich nicht wiederholen.
 !/models/*.spec.json
+# Rezeptdateien (docs/working_rules.md "Rezeptdatei statt langer Flag-Listen"):
+# sie beschreiben den LAUF einer Generation und "werden mit der Generation
+# versioniert"; ohne diese Zeile blieben sie still ungetrackt (2026-09-27).
+!/models/*.recipe.json
 
 # --- Eingefrorene Artefakte (Nutzer-Entscheid 2026-08-26) --------------------
 # Ein eingefrorener Champion oder Lehrer ist kein Modell, sondern ein

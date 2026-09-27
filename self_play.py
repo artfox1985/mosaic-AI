@@ -34,6 +34,48 @@ try:
 except Exception:
     pass
 
+# Rezeptdatei (docs/working_rules.md, Arbeitskonventionen, "Rezeptdatei statt
+# langer Flag-Listen"). Das `env` des Rezepts muss stehen, BEVOR `config`
+# importiert wird (liest MOSAIC_DATA_DIR beim Import, config.py:28) und bevor
+# `mosaic_rust` einen OnceLock-Getter liest. Darum hier, vor allen
+# Projekt-Importen; `tools/recipe_config.py` braucht nur die Standardbibliothek.
+#
+# Nur im HAUPTprozess (`__name__ == "__main__"`): die Chunk-Kinder
+# (`mp.Process`, unter Windows spawn) importieren dieses Modul als
+# `__mp_main__` neu und erben die Umgebung des Elternprozesses beim Start --
+# ein zweites Anwenden faende die Variablen schon gesetzt vor.
+from tools.recipe_config import (RecipeError, apply_recipe_env_from_argv,  # noqa: E402
+                                 apply_to_parser, check_engine_config, manifest_block)
+
+# Variablen, die dieses Werkzeug SELBST aus einem Flag setzt (Worker
+# `_worker_run_chunk`). Stuende eine davon im `env` eines Rezepts, gaebe es zwei
+# Quellen fuer denselben Knopf, und der Worker ueberschriebe die des Rezepts
+# still. Das Rezept setzt darum das FLAG (Schluessel = argparse-dest, hier der
+# Wert), nie die Variable; `apply_env` bricht mit diesem Hinweis ab.
+RECIPE_RESERVED_ENV = {
+    "MOSAIC_TAU_ARGMAX_FROM_MOVE": "tau_argmax_from_move",
+    "MOSAIC_DEVIATE_PROB": "deviate_prob",
+    "MOSAIC_DEVIATE_CANDIDATES": "deviate_candidates",
+    "MOSAIC_ACTION_TEMP": "action_temp",
+    "MOSAIC_EXCURSION_PROB": "excursion_prob",
+    "MOSAIC_EXCURSION_PROFILE": "excursion_profile",
+    "MOSAIC_START_SLOT_RANDOM_P": "start_slot_random_p",
+    "MOSAIC_RETURN_ORDER_RANDOM_P": "return_order_random_p",
+    "MOSAIC_TIE_MIRROR_P": "tie_mirror_p",
+    "MOSAIC_LABEL_RNG_SPLIT": "label_rng_split",
+    "MOSAIC_EXCURSION_RESHUFFLE": "excursion_reshuffle",
+}
+
+_RECIPE_PRE = None
+if __name__ == "__main__":
+    try:
+        _RECIPE_PRE = apply_recipe_env_from_argv(
+            tool="self_play",
+            reserved={name: f"setzt self_play.py aus dem Flag; im Rezept den Schluessel "
+                            f"{dest!r} verwenden" for name, dest in RECIPE_RESERVED_ENV.items()})
+    except RecipeError as _e:
+        raise SystemExit(f"❌ Rezept abgelehnt: {_e}")
+
 from config import DATA_DIR, MODELS_DIR, BASE_DIR
 from selfplay_manifest import _write_run_manifest, _append_laufzeit
 from corpus_io import dump_records, load_records
@@ -166,7 +208,9 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       spec=None, deviate_prob=0.0,
                       deviate_candidates=6, action_temp=0,
                       excursion_prob=0.0, excursion_profile=None,
-                      start_slot_random_p=0.0, return_order_random_p=0.0):
+                      start_slot_random_p=0.0, return_order_random_p=0.0,
+                      tie_mirror_p=None, label_rng_split=False,
+                      excursion_reshuffle=False, engine_config_only=False):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -227,7 +271,21 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     `import mosaic_rust` in DIESEM Subprozess gesetzt. `0.0` (Default) ist
     fuer Rust identisch zu "ungesetzt" (AUS, keine zusaetzliche Zufallszahl,
     kein zusaetzliches Record-Feld). Wirkt in BEIDEN Modi -- die Streuung
-    braucht kein Netz, sie ersetzt nur den Slot der Handregel."""
+    braucht kein Netz, sie ersetzt nur den Slot der Handregel.
+    `tie_mirror_p` / `label_rng_split` / `excursion_reshuffle` (STATUS
+    Fahrplan 3e; `PREREG_tie_mirror.md`, Code-Review 2026-09-26 #13/#14):
+    dieselbe Bauform (OnceLock in Rust, Variable VOR `import mosaic_rust`),
+    aber ANDERS als die Knoepfe oben nur gesetzt, wenn das Flag gegeben ist
+    (`None`/`False` = Variable unberuehrt). Grund: vor diesen Flags wurden die
+    drei Knoepfe nur ueber die Umgebung gesetzt; ein Aufruf ohne Flag muss sich
+    darum genau wie bisher verhalten und eine geerbte Variable durchlassen.
+    Die Doppelquelle (Flag UND abweichende geerbte Variable) faengt
+    `generate_data` vor dem Start ab.
+    `engine_config_only` (Rezept-Waechter, `check_engine_config`): nach dem
+    Setzen der Umgebung und dem Import NUR `engine_config_json()` melden und
+    ohne Partie enden -- so sieht der Waechter genau die Konfiguration, die ein
+    Chunk-Prozess liest, nicht die des Elternprozesses (dem fehlen die hier
+    gesetzten Variablen)."""
     os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
     os.environ["MOSAIC_DEVIATE_PROB"] = str(deviate_prob)
     os.environ["MOSAIC_DEVIATE_CANDIDATES"] = str(deviate_candidates)
@@ -240,8 +298,18 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     os.environ["MOSAIC_RETURN_ORDER_RANDOM_P"] = str(return_order_random_p)
     if excursion_profile:
         os.environ["MOSAIC_EXCURSION_PROFILE"] = excursion_profile
+    # Fahrplan 3e: nur bei gegebenem Flag, siehe Docstring.
+    if tie_mirror_p is not None:
+        os.environ["MOSAIC_TIE_MIRROR_P"] = str(tie_mirror_p)
+    if label_rng_split:
+        os.environ["MOSAIC_LABEL_RNG_SPLIT"] = "1"
+    if excursion_reshuffle:
+        os.environ["MOSAIC_EXCURSION_RESHUFFLE"] = "1"
     try:
         import mosaic_rust as mr
+        if engine_config_only:
+            queue.put(("engine_config", mr.engine_config_json()))
+            return
         if mode == "network":
             raw = mr.net_self_play_games(
                 model_path=model, n_games=n, base_sims=simulations, c_puct=c_puct,
@@ -281,6 +349,19 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
         queue.put(("ok", raw))
     except Exception as e:  # pragma: no cover
         queue.put(("error", repr(e)))
+    except BaseException as e:  # pragma: no cover
+        # Code-Review 2026-09-26 #23: eine Rust-Panic AUSSERHALB der
+        # Partie-Kapsel (Setup, Netz laden) kommt als pyo3 `PanicException`
+        # an, und die erbt von BaseException, nicht von Exception -- sie lief
+        # an der Zeile darueber vorbei, der Prozess starb stumm, und der
+        # Supervisor meldete sie 180 s spaeter als "Herzschlag ausgeblieben".
+        # Jetzt wird sie als das gemeldet, was sie ist. KeyboardInterrupt/
+        # SystemExit bleiben unberuehrt. Panics INNERHALB einer Partie faengt
+        # der Rust-Watchdog (self_play.rs run_with_watchdog); die sieht Python
+        # nicht.
+        if type(e).__name__ != "PanicException":
+            raise
+        queue.put(("panic", repr(e)))
 
 
 def _recover_partial_progress(progress_path) -> list[list[dict]]:
@@ -332,7 +413,9 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           excursion_prob=0.0,
                           excursion_profile=None,
                           start_slot_random_p=0.0,
-                          return_order_random_p=0.0) -> str | None:
+                          return_order_random_p=0.0,
+                          tie_mirror_p=None, label_rng_split=False,
+                          excursion_reshuffle=False) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -351,11 +434,28 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               seed_positions, seed_positions_offset, heuristik_variante, spec,
               deviate_prob, deviate_candidates, action_temp,
               excursion_prob, excursion_profile, start_slot_random_p,
-              return_order_random_p),
+              return_order_random_p, tie_mirror_p, label_rng_split,
+              excursion_reshuffle),
     )
     proc.start()
     t_start = time.time()
     last_heartbeat_seen = t_start  # Prozessstart zaehlt als initialer Herzschlag
+
+    def _result(status, payload):
+        """Ergebnis aus der Queue auswerten -- EIN Pfad fuer den regulaeren
+        Poll und fuer die Nachlese nach einem Prozessende."""
+        proc.join()
+        if status == "error":
+            raise RuntimeError(f"Rust-Self-Play-Fehler im Subprozess: {payload}")
+        if status == "panic":
+            # Code-Review #23: ehrlich als Panic melden, dann derselbe Weg wie
+            # bisher (Rettung der geflushten Partien, neuer Seed) -- nur ohne
+            # die 180 s Wartezeit bis zum Herzschlag-Timeout.
+            print(f"  ⚠️  Rust-PANIC im Subprozess (Seed {seed}) ausserhalb der Partie-Kapsel: "
+                  f"{payload} -- kein Haenger. Versuche mit neuem Seed erneut.")
+            return None
+        return payload
+
     while True:
         # WICHTIG: das Ergebnis MUSS aus der Queue gelesen werden, während wir
         # warten, nicht erst nach proc.join() -- der Payload (JSON mehrerer
@@ -368,12 +468,26 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
         # zwischendurch den Herzschlag prüfen können.
         try:
             status, payload = queue.get(timeout=HEARTBEAT_POLL_INTERVAL_SECS)
-            proc.join()
-            if status == "error":
-                raise RuntimeError(f"Rust-Self-Play-Fehler im Subprozess: {payload}")
-            return payload
         except _queue_mod.Empty:
             pass
+        else:
+            return _result(status, payload)
+
+        # Code-Review #23: Prozess tot, aber nichts in der Queue -- kein Haenger,
+        # sondern ein Absturz, den Python nicht als Ausnahme sieht (z.B. Rust
+        # `abort`, Zugriffsfehler). Bisher lief dieser Fall ins
+        # Herzschlag-Timeout und hiess dann "Herzschlag ausgeblieben". Vor dem
+        # Urteil EINE Nachlese: das Kind kann sein Ergebnis zwischen dem Poll
+        # oben und dieser Pruefung noch geschrieben haben.
+        if not proc.is_alive():
+            try:
+                status, payload = queue.get(timeout=HEARTBEAT_POLL_INTERVAL_SECS)
+            except _queue_mod.Empty:
+                proc.join()
+                print(f"  ⚠️  Subprozess (Seed {seed}) beendet OHNE Ergebnis, Exit-Code "
+                      f"{proc.exitcode} -- Absturz, kein Haenger. Versuche mit neuem Seed erneut.")
+                return None
+            return _result(status, payload)
 
         try:
             hb_mtime = heartbeat_path.stat().st_mtime
@@ -398,6 +512,55 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
             proc.kill()
             proc.join()
         return None
+
+
+ENGINE_CONFIG_PROBE_TIMEOUT_SECS = 300
+
+
+def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
+    """Rezept-Waechter: `engine_config_json()` so, wie ein CHUNK-Prozess sie
+    sieht. Startet `_worker_run_chunk` mit denselben Knopf-Argumenten wie ein
+    echter Chunk (`knobs` = die Schluesselwort-Argumente von
+    `_run_chunk_supervised` ab `pcr_full_prob`), aber mit
+    `engine_config_only=True`: Umgebung setzen, `mosaic_rust` importieren,
+    Konfiguration melden, ohne Partie enden.
+
+    Warum ein eigener Prozess statt `mosaic_rust.engine_config_json()` hier:
+    der Elternprozess kennt die Variablen nicht, die erst der Worker setzt
+    (`MOSAIC_RETURN_ORDER_RANDOM_P` u.a.), und haette seine OnceLocks unter
+    Umstaenden schon gelesen. Gemessen werden soll, was spielt."""
+    queue: mp.Queue = mp.Queue()
+    proc = mp.Process(
+        target=_worker_run_chunk,
+        args=(mode, model, 0, 0, 0.0, 0, 0, "engine_config_probe", False, False, False,
+              knobs.get("pcr_full_prob"), knobs.get("pcr_cheap_sims", 150),
+              knobs.get("tau_argmax_from_move", 0), queue, None, None),
+        kwargs={
+            "deviate_prob": knobs.get("deviate_prob", 0.0),
+            "deviate_candidates": knobs.get("deviate_candidates", 6),
+            "action_temp": knobs.get("action_temp", 0),
+            "excursion_prob": knobs.get("excursion_prob", 0.0),
+            "excursion_profile": knobs.get("excursion_profile"),
+            "start_slot_random_p": knobs.get("start_slot_random_p", 0.0),
+            "return_order_random_p": knobs.get("return_order_random_p", 0.0),
+            "tie_mirror_p": knobs.get("tie_mirror_p"),
+            "label_rng_split": knobs.get("label_rng_split", False),
+            "excursion_reshuffle": knobs.get("excursion_reshuffle", False),
+            "engine_config_only": True,
+        },
+    )
+    proc.start()
+    try:
+        status, payload = queue.get(timeout=ENGINE_CONFIG_PROBE_TIMEOUT_SECS)
+    except _queue_mod.Empty:
+        proc.terminate()
+        proc.join(10)
+        raise SystemExit(f"❌ Rezept-Waechter: der Probe-Prozess meldete binnen "
+                         f"{ENGINE_CONFIG_PROBE_TIMEOUT_SECS}s keine engine_config -- Abbruch.")
+    proc.join()
+    if status != "engine_config":
+        raise SystemExit(f"❌ Rezept-Waechter: Probe-Prozess meldete {status!r}: {payload}")
+    return json.loads(payload)
 
 
 def _group_by_game(steps: list[dict]) -> list[list[dict]]:
@@ -458,7 +621,14 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   excursion_prob: float = 0.0,
                   excursion_profile: str | None = None,
                   start_slot_random_p: float = 0.0,
-                  return_order_random_p: float = 0.0):
+                  return_order_random_p: float = 0.0,
+                  tie_mirror_p: float | None = None,
+                  label_rng_split: bool = False,
+                  excursion_reshuffle: bool = False,
+                  recipe_info: dict | None = None):
+    # `recipe_info` (Rezeptdatei, docs/working_rules.md): None ohne Rezept,
+    # sonst {"recipe": Recipe, "class": str|None, "overrides": dict} aus
+    # `apply_to_parser`. Wirkt nur auf Manifest und Waechter, nie auf Partien.
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -534,6 +704,33 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     if not (0.0 <= return_order_random_p <= 1.0):
         raise SystemExit(
             f"❌ --return-order-random-p muss in [0,1] liegen (0 = AUS), ist {return_order_random_p}.")
+    # Spiegelknopf (PREREG_tie_mirror.md): Rust setzt ihn NUR in
+    # run_net_self_play (knob_registry.rs, MOSAIC_TIE_MIRROR_P) -- Warnung statt
+    # SystemExit bei falschem Modus, wie bei tau/deviate. Ausserhalb [0,1] hart
+    # ab: Rust wuerde still auf 0.0 zurueckfallen (tie_mirror.rs tie_mirror_p).
+    if tie_mirror_p is not None and not (0.0 <= tie_mirror_p <= 1.0):
+        raise SystemExit(f"❌ --tie-mirror-p muss in [0,1] liegen (0 = AUS), ist {tie_mirror_p}.")
+    if tie_mirror_p and mode != "network":
+        print(f"  ⚠️  --tie-mirror-p={tie_mirror_p} wirkt nur bei --mode network "
+              f"(run_net_self_play) -- bei --mode {mode!r} ist es ein No-Op.")
+    if excursion_reshuffle and not excursion_prob:
+        print("  ℹ️  --excursion-reshuffle ohne --excursion-prob: es entsteht kein Ausflug, "
+              "der Knopf hat nichts zu mischen (Record-Bytes unveraendert).")
+    # Doppelquelle: die drei Knoepfe gab es vor ihren Flags nur als Variable.
+    # Wer das Flag setzt UND eine abweichende Variable aus Kette/Shell erbt,
+    # haette zwei Quellen; das Manifest (`mosaic_env`) zeigte die geerbte, der
+    # Worker faehrt das Flag. Darum Abbruch statt stiller Ueberschreibung.
+    # Ohne Flag bleibt alles wie bisher (die geerbte Variable wirkt).
+    for _flag, _env, _want in (
+            ("--tie-mirror-p", "MOSAIC_TIE_MIRROR_P",
+             None if tie_mirror_p is None else str(tie_mirror_p)),
+            ("--label-rng-split", "MOSAIC_LABEL_RNG_SPLIT", "1" if label_rng_split else None),
+            ("--excursion-reshuffle", "MOSAIC_EXCURSION_RESHUFFLE",
+             "1" if excursion_reshuffle else None)):
+        _have = os.environ.get(_env)
+        if _want is not None and _have is not None and _have != _want:
+            raise SystemExit(f"❌ {_flag} will {_env}={_want!r}, die Umgebung traegt schon "
+                             f"{_have!r} (Doppelquelle: Variable aus Kette/Shell entfernen).")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -569,6 +766,47 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     base_seed = seed if seed is not None else _random.randint(0, 2**31 - 1)
     chunk = max(1, chunk)
     per_file = max(1, per_file)
+
+    # Rezept: Manifest-Block und Waechter (docs/working_rules.md). Ohne Rezept
+    # ist `_recipe_block` None und hier passiert nichts.
+    _recipe_block = None
+    if recipe_info is not None:
+        _recipe = recipe_info["recipe"]
+        _recipe_block = manifest_block(_recipe, _recipe.path, recipe_info.get("class"),
+                                       recipe_info.get("overrides"))
+        _expected = _recipe.get("expect_engine_config") or {}
+    # Die engine_config des MANIFESTS kommt IMMER aus einem Chunk-Prozess (2026-09-27): der
+    # Elternprozess sieht die Knoepfe nicht, die erst der Worker aus Flags setzt
+    # (tie_mirror_p, label_rng_split, ...), und haette sonst z.B. tie_mirror_p 0,0 gemeldet,
+    # waehrend die Partien mit 0,5 liefen (Probelauf 2026-09-27).
+    _worker_cfg = None
+    if mode == "network":
+        _worker_cfg = _probe_worker_engine_config(mode, model, {
+                "pcr_full_prob": pcr_full_prob, "pcr_cheap_sims": pcr_cheap_sims,
+                "tau_argmax_from_move": tau_argmax_from_move,
+                "deviate_prob": deviate_prob, "deviate_candidates": deviate_candidates,
+                "action_temp": action_temp, "excursion_prob": excursion_prob,
+                "excursion_profile": excursion_profile,
+                "start_slot_random_p": start_slot_random_p,
+                "return_order_random_p": return_order_random_p,
+                "tie_mirror_p": tie_mirror_p, "label_rng_split": label_rng_split,
+                "excursion_reshuffle": excursion_reshuffle,
+            })
+    if recipe_info is not None:
+        if _expected:
+            # VOR dem ersten Spiel und vor dem Manifest: ein abweichender Lauf
+            # soll keine Spur in data/ hinterlassen.
+            _deviations = check_engine_config(_worker_cfg or {}, _expected)
+            if _deviations:
+                raise SystemExit("❌ Rezept-Waechter: engine_config des Chunk-Prozesses weicht vom "
+                                 "Rezept (expect_engine_config) ab -- Abbruch vor dem ersten Spiel:\n  - "
+                                 + "\n  - ".join(_deviations))
+            print(f"🛡️  Rezept-Waechter gruen: {len(_expected)} Knoepfe wie erwartet "
+                  f"({', '.join(sorted(_expected))}).")
+            _recipe_block["engine_config_check"] = {
+                "expected": _expected, "deviations": [],
+                "source": "Chunk-Prozess (_probe_worker_engine_config)",
+            }
 
     _write_run_manifest(version_name, run_timestamp, {
         "mode": mode, "games": num_games, "sims": simulations, "version": version_name,
@@ -612,7 +850,13 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # waere ein gestreuter Korpus im Nachhinein nicht von einem ungestreuten zu
         # unterscheiden.
         "return_order_random_p": return_order_random_p,
-    })
+        # Fahrplan 3e: Erzeugungs-Knoepfe wie die Zeile darueber. `None`/False
+        # heisst "Flag nicht gesetzt" -- dann gilt, was die Umgebung traegt
+        # (steht im Manifest unter `mosaic_env`).
+        "tie_mirror_p": tie_mirror_p,
+        "label_rng_split": label_rng_split,
+        "excursion_reshuffle": excursion_reshuffle,
+    }, recipe=_recipe_block, engine_config=_worker_cfg)
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
     # Pickle teilen sich beide Pfade. MCTS = Heuristik-Suche; network = Netz-PUCT
@@ -725,6 +969,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             excursion_profile=excursion_profile,
             start_slot_random_p=start_slot_random_p,
             return_order_random_p=return_order_random_p,
+            tie_mirror_p=tie_mirror_p, label_rng_split=label_rng_split,
+            excursion_reshuffle=excursion_reshuffle,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1070,7 +1316,48 @@ if __name__ == "__main__":
                              "Von PREREG_implicit_minimax_backup.md par.3a fuer den "
                              "Self-Play-Arm verlangt: der Knopf gehoert an den Lauf, nicht in "
                              "die Prozess-Umgebung. Nur --mode network.")
-    args = parser.parse_args()
+    parser.add_argument("--tie-mirror-p", dest="tie_mirror_p", type=float, default=None,
+                        help="PREREG_tie_mirror.md (Spiegelknopf, Nutzer 2026-09-26: '50:50 "
+                             "Aufteilung im self play'): Wahrscheinlichkeit JE PARTIE, dass die "
+                             "deterministischen Gleichstandsregeln (Huellenwahl, Tiling-Zelle) "
+                             "nach RECHTS kippen; die Muenze kommt aus dem Partie-Seed "
+                             "(tie_mirror.rs), der Partie-RNG bleibt unberuehrt. Setzt NUR "
+                             "MOSAIC_TIE_MIRROR_P fuer den Rust-Aufruf. Default None = Variable "
+                             "UNBERUEHRT (Bestand: aus, ausser Kette/Shell setzt sie). Nur "
+                             "--mode network (run_net_self_play).")
+    parser.add_argument("--label-rng-split", dest="label_rng_split", action="store_true",
+                        help="Code-Review 2026-09-26 #13: rtv- und Bootstrap-Labels ziehen aus "
+                             "einem eigenen, aus dem Partie-Seed abgeleiteten Strom statt aus dem "
+                             "Partie-RNG (self_play.rs label_rng). AENDERT Self-Play-Bytes. Setzt "
+                             "MOSAIC_LABEL_RNG_SPLIT=1; ohne Flag bleibt die Variable unberuehrt.")
+    parser.add_argument("--excursion-reshuffle", dest="excursion_reshuffle", action="store_true",
+                        help="Code-Review 2026-09-26 #14: am Abzweig eines Ausflugs (Weg B, "
+                             "--excursion-prob) mit dem Ausflug-RNG neu mischen, was KEINER der "
+                             "beiden Spieler kennt (self_play.rs reshuffle_hidden_world_for_"
+                             "excursion). Setzt MOSAIC_EXCURSION_RESHUFFLE=1; ohne Flag bleibt "
+                             "die Variable unberuehrt.")
+    # Rezeptdatei: EIN zusaetzlicher Schritt statt `parser.parse_args()`. Ohne
+    # --recipe ist `apply_to_parser` ein normaler parse_args (plus die zwei
+    # Flags --recipe/--class), `_recipe_overrides` bleibt leer.
+    try:
+        args, _recipe_overrides = apply_to_parser(
+            parser, None,
+            _RECIPE_PRE["recipe"] if _RECIPE_PRE else None,
+            _RECIPE_PRE["class"] if _RECIPE_PRE else None,
+            tool="self_play")
+    except RecipeError as e:
+        parser.error(str(e))
+    # `apply_to_parser` hebt `required` fuer Rezept-dests auf; ein Rezept mit
+    # null (Platzhalter) darf daraus keinen Lauf ohne Pflichtwert machen.
+    for _dest, _flag in (("mode", "--mode"), ("version", "--version")):
+        if getattr(args, _dest) is None:
+            parser.error(f"{_flag} fehlt (im Rezept null oder nicht gesetzt)")
+    # Ein Rezeptlauf ohne Seed waere nicht reproduzierbar -- und im Entwurf
+    # steht der Seed absichtlich als Platzhalter null. Ohne Rezept bleibt der
+    # zufaellige Seed der Bestand.
+    if _RECIPE_PRE and args.seed is None:
+        parser.error("--seed fehlt: im Rezept ist der Seed null (Platzhalter) -- eintragen "
+                     "oder --seed angeben (erscheint dann als Abweichung im Manifest)")
 
     if args.spec and args.mode != "network":
         raise SystemExit("❌ --spec: nur --mode network (die anderen Einstiege nehmen kein Spec).")
@@ -1123,4 +1410,10 @@ if __name__ == "__main__":
         excursion_profile=args.excursion_profile,
         start_slot_random_p=args.start_slot_random_p,
         return_order_random_p=args.return_order_random_p,
+        tie_mirror_p=args.tie_mirror_p,
+        label_rng_split=args.label_rng_split,
+        excursion_reshuffle=args.excursion_reshuffle,
+        recipe_info=(None if _RECIPE_PRE is None else
+                     {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
+                      "overrides": _recipe_overrides}),
     )

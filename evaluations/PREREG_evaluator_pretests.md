@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: Stufe 1 gefahren 2026-09-26 (par.8): E1 gleich gut (Brier-Differenz -0,00012, CI um 0), Arm kommt wegen der Kosten; E2 BESTEHT (+0,00213); E3 TOT (global besser in allen Runden). Stufe 2 (E1-Arm, E4) nach Kette und b02 (par.5). -->
+<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: Stufe 1 gefahren 2026-09-26 (par.8): E1 gleich gut (Brier-Differenz -0,00012, CI um 0), Arm kommt wegen der Kosten; E2 BESTEHT (+0,00213); E3 TOT (global besser in allen Runden); E4-Vortest BESTEHT (18/18, par.8c). Stufe 2 (E1-Arm, E4) nach Kette und b02 (par.5). -->
 
 # Vorregistrierung: Vortests fuer den Bewerter (E1-E4)
 
@@ -167,6 +167,19 @@ traegt: R2 < 0,9 bzw. Brier deutlich ueber dem Zufalls-Trunk-Abstand; die genaue
 VOR dem Lauf in diesem Absatz nachgetragen, sobald die Grundraten der Groessen bekannt sind (die
 Grundrate bestimmt, was bei Brier "deutlich" heisst).
 
+**SCHWELLE, nachgetragen 2026-09-27 VOR dem Lauf:** fuer stetige UND binaere Groessen dasselbe Mass,
+der erklaerte Varianzanteil `EV = 1 - MSE / Var` auf den ausgehaltenen Faltungen (bei binaeren
+Groessen ist MSE der Brier und Var = p(1-p), EV also Brier-Skill gegen die Grundrate). Je Groesse
+und Musterreihe:
+* **Trunk traegt es schon:** EV(Champion) >= 0,9 -- dann lohnt der Encoder-Abschnitt fuer diese
+  Groesse nicht.
+* **Luecke belegt:** obere Block-CI-Grenze von EV(Champion) < 0,9 UND EV(Champion) > EV(Zufalls-Trunk)
+  mit CI > 0 (sonst ist die Groesse linear ueberhaupt nicht lesbar, und der Vortest sagt nichts).
+**E4 BESTEHT, wenn fuer mindestens die Haelfte der (Groesse, Reihe)-Paare mit Grundrate zwischen 5
+und 95 Prozent (binaer) bzw. Var > 0 (stetig) die Luecke belegt ist.** Grundmenge: Drafting-Records
+MIT mindestens einem Steinzug in `valid_actions` (der JSON-Rueckweg rekonstruiert offene Wahlen
+nicht), Substrat wie par.2.
+
 ## par.6 Stufe 3
 
 Was besteht (E2, E3, E4), wird ein Arm im v34-Rezept: einfaktoriell gegen den Referenzarm auf
@@ -182,6 +195,28 @@ hier.
 5. v34-Generationswechsel mit den Ergebnissen.
 
 ## par.8 Ergebnisse
+
+### par.8c E4-Vortest, gefahren 2026-09-27 (345,2 s, exklusiv)
+
+`tools/probes/e4_supply_demand_pretest.py`, Artefakt `evaluations/artifacts/e4_supply_demand_pretest_v32-b01.json`.
+Substrat wie par.2 (60 Val-Dateien von v32, Champion `v32-b01`), Grundmenge **47.433** Drafting-Records
+mit mindestens einem Steinzug (38.757 ohne Steinzug ausgelassen: offene Wahlen, par.5c). Groessen aus
+dem Engine-Export `stone_move_outcomes_from_json` (jeder legale Steinzug auf einem Klon ausgefuehrt).
+
+| Groesse (Reihe 0 bis 5) | EV Champion-Trunk | EV Zufalls-Trunk |
+| --- | --- | --- |
+| groesste Steinzahl ohne Ueberlauf | 0,674 / 0,743 / 0,725 / 0,664 / 0,631 / 0,592 | 0,36-0,56 |
+| ein Zug fuellt die Reihe genau | 0,674 / 0,607 / 0,172 / 0,091 / 0,109 / 0,093 | 0,02-0,56 |
+| kleinster Ueberlauf beim Fuellen | 0,377 / 0,442 / 0,411 / 0,062 / 0,120 / 0,044 | -0,16-0,04 |
+
+(Reihe 0: die ersten beiden Groessen fallen bei Kapazitaet 1 zusammen, daher identisch.)
+**Alle 18 zulaessigen Paare: Luecke belegt** (obere CI-Grenze < 0,9 und ueber dem Zufalls-Trunk).
+**VERDIKT nach par.5c: BESTEHT** -- der Trunk des Champions traegt die Angebots-Bedarfs-Relation nur
+teilweise, am schwaechsten fuer die langen Reihen (3-5) und fuer "genau fuellen". Folge nach par.6:
+E4 wird ein Arm im v34-Rezept (Encoder-Abschnitt, Bau 1-2 Tage laut Recherche-Bericht E4; aendert
+`INPUT_SIZE`, also additiv nach `project_2d_encoder_must_be_additive`). Zuschnitt in der v34-Prereg.
+Einschraenkung: ein LINEARER Leser; ein nichtlinearer Kopf koennte mehr herausholen (vgl. par.8a:
+dort schlug der Kopf den linearen Leser um 0,008-0,016 Brier).
 
 ### par.8a Stufe 1, gefahren 2026-09-26 (exklusiv, 495,2 s)
 

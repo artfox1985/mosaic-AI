@@ -1668,6 +1668,30 @@ class MosaicDataset(Dataset):
                         # Datensatz byte-identisch.
                         if step.get("return_order_randomized") is True:
                             pol_w = 0.0
+                        # Code-Review 2026-09-26 #16: faellt die Netz-Suche auf
+                        # einen ZUFALLSZUG zurueck, schreibt self_play.rs die
+                        # Record-Flagge `fallback_random_action: true`
+                        # (self_play.rs fallback_random_action_field, NUR wenn
+                        # der Rueckfall feuerte). Das Policy-Ziel eines solchen
+                        # Records waere ein One-hot auf Zufall. Eigene Bedingung
+                        # OHNE `_IGNORE_PTV`-Ausnahme, aus demselben Grund wie die
+                        # Zeile darueber: die Ketten fahren
+                        # MOSAIC_IGNORE_POLICY_TARGET_VALID=1.
+                        #
+                        # KEINE Cache-Schluessel-Komponente, Begruendung wie bei
+                        # der Rueckgabe-Maske (window_cache_key, Kommentar
+                        # 2026-09-19): die Maske ist kein Knopf, sondern gilt
+                        # immer, sobald das Feld im Record steht; ein
+                        # unbedingter Suffix entwertete jeden vorhandenen Cache.
+                        # Kollision ausgeschlossen, weil das Feld erst mit dem
+                        # Wheel aus f27f8ff6 (2026-09-27) existiert und noch kein
+                        # Korpus damit erzeugt wurde: das juengste Lauf-Manifest
+                        # (manifest_v32-b01-value-wegc_20260926_200223, Commit
+                        # 1e4504c2) traegt keinen Schluessel `tie_mirror_p`, lief
+                        # also auf dem Wheel davor (geprueft 2026-09-27). Ohne
+                        # Feld liefert `.get` None -> Datensatz byte-identisch.
+                        if step.get("fallback_random_action") is True:
+                            pol_w = 0.0
                         polw_l.append(np.float32(pol_w))
                         # Schema 19 (RANKING_CACHE_FIELDS): finale Maske erst
                         # HIER moeglich -- `pol_w` (inkl. aller obigen

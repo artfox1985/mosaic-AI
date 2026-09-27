@@ -30,8 +30,9 @@ Form::
 ohne `classes` gilt nur `common`. `description` und `expect_engine_config`
 sind optional.
 
-Ablauf im Werkzeug (Stand 2026-09-26: gebaut, aber in KEIN Werkzeug
-eingehaengt; erste Anwendung soll die v34-Erzeugung sein):
+Ablauf im Werkzeug (Stand 2026-09-27: eingehaengt in `self_play.py`,
+`train.py` und `tools/paired_gating.py`, Tests tools/tests/test_*_recipe.py;
+erster Entwurf `models/v34.recipe.json`; noch nicht mit echtem Lauf gefahren):
 
 1. GANZ OBEN, vor jedem Import, der `MOSAIC_*` liest (Engine, `config.py`,
    `neural_net.py`): `apply_recipe_env_from_argv(...)`.

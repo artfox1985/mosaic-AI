@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 
 from config import BASE_DIR, DATA_DIR
+from tools.recipe_config import mosaic_env_snapshot
 
 def _git_commit_hash() -> str | None:
     """Best-effort HEAD-Commit-Hash. None, wenn nicht ermittelbar."""
@@ -98,17 +99,33 @@ def _spec_block(spec_path) -> dict | None:
         return {"path": str(spec_path), "_error": repr(e)}
 
 
-def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict) -> None:
+def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict,
+                        recipe: dict | None = None, engine_config: dict | None = None) -> None:
     """Schreibt `data/manifest_<version>_<timestamp>.json` neben die
-    generierten .pkl-Dateien."""
+    generierten .pkl-Dateien.
+
+    Rezeptdatei (docs/working_rules.md "Rezeptdatei statt langer Flag-Listen"),
+    beide Felder ADDITIV hinter den bisherigen:
+    * `recipe`: der Block aus `tools/recipe_config.manifest_block` (Pfad,
+      sha256, Klasse, voller Inhalt, Kommandozeilen-Abweichungen), None ohne
+      Rezept -- wie `spec_file` ohne Spec.
+    * `mosaic_env`: IMMER, alle `MOSAIC_*` des Elternprozesses zum
+      Schreibzeitpunkt (Rezept, Kette, Shell). NICHT darin: was erst der Worker
+      aus Flags setzt (`_worker_run_chunk`); das steht in `cli_args`."""
     manifest = {
         "version": version_name,
         "run_timestamp": run_timestamp,
         "cli_args": cli_args,
         "git_commit": _git_commit_hash(),
         "git_dirty": _git_is_dirty(),
-        "engine_config": _engine_config(),
+        # `engine_config` = Sicht eines CHUNK-Prozesses (dort wird gespielt), wenn der Aufrufer sie
+        # mitgibt; `engine_config_parent` = Sicht des Elternprozesses (fehlen dort Knoepfe, die erst
+        # der Worker aus Flags setzt). Ohne Chunk-Sicht (Heuristik-Modus) bleibt es beim Bestand.
+        "engine_config": engine_config if engine_config is not None else _engine_config(),
+        "engine_config_parent": _engine_config() if engine_config is not None else None,
         "spec_file": _spec_block(cli_args.get("spec")),
+        "recipe": recipe,
+        "mosaic_env": mosaic_env_snapshot(),
     }
     path = DATA_DIR / f"manifest_{version_name}_{run_timestamp}.json"
     try:

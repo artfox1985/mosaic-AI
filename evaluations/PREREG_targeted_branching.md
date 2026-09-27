@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: angelegt 2026-09-26, nichts gebaut, nichts gefahren. Stufe 1 ist ein Offline-Vortest (par.3), Stufe 2 der Bau nur, wenn er besteht (par.4). -->
+<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a): roh TOT (misst die Huelle), Policy-KL A +0,029. Stufe 2 NEU registriert (par.7, Nutzer): der Ausflug zweigt nach Rundenprofil x Policy-Diskrepanz ab (Aktionszahl faellt weg), Knopf MOSAIC_EXCURSION_KL_WEIGHT, faehrt in v34 im Paket. -->
 
 # Vorregistrierung: gezielt abzweigen statt zufaellig
 
@@ -70,6 +70,25 @@ Abzweigen erzeugt nur andere, nicht lehrreichere Stellungen.
 
 **Kosten:** Extraktion wie bei den Bewerter-Vortests (495 s fuer 86.190 Zustaende), keine Suche.
 
+**PRAEZISIERUNG 2026-09-27, VOR dem Lauf (am Code gelesen):**
+* `root_q` ist `nodes[0].value / nodes[0].visits` der Wurzel (`net_mcts.rs`, `net_root_child_stats_and_policy`),
+  also ein SUCHwert -- er enthaelt die suchseitigen Additive (Huelle, `envelope_search_c` 1 im
+  Generator-Spec). Der Kopfwert `v_kopf` ist roh. Die rohe Diskrepanz misst darum auch die Huelle.
+  **Primaer bleibt die rohe Diskrepanz** (registriert); **zusaetzlich berichtet** wird eine
+  bereinigte Diskrepanz: Residuum von `root_q` nach linearer Anpassung auf `v_kopf` je Runde
+  (Anpassung auf den Trainingsfaltungen, Auswertung auf der ausgehaltenen, 5-fach ueber Dateien
+  wie `PREREG_evaluator_pretests.md` par.4). Bestehen A und B nur auf einer der beiden Fassungen,
+  wird das ausdruecklich so berichtet; entschieden wird auf der rohen.
+* **Sichtpruefung vor jeder Zahl:** aus wessen Sicht `root_q` steht, prueft das Werkzeug am Ausgang
+  (Brier von `root_q` gegen den Sieg des Ziehers gegen Brier von `1 - root_q`); die bessere Lesart
+  gilt, beide werden berichtet.
+* **Runde 5 ausgenommen:** dort kommt `root_q` aus dem R5-Loeser (`round5::choose_action_with_analysis`),
+  nicht aus der Netzsuche, und das Abzweig-Profil gibt Runde 5 ohnehin Gewicht 0. Grundmenge also
+  Runde 1-4.
+* **Policy-Diskrepanz:** `KL(Ziel || Prior)` ueber die Aktions-IDs der Policy-Eintraege des Records
+  (Ziel = completed-Q-Politik des Records, nach ID zusammengefasst; Prior = Softmax der Netz-Logits
+  auf denselben IDs).
+
 ## par.4 STUFE 2 (nur wenn Stufe 1 besteht)
 
 **Festgelegt 2026-09-26 (Nutzer): gezielt abzweigen wird der AUSFLUG (Weg B)**, *"wir wollen die
@@ -90,4 +109,61 @@ Ergebnis entscheidet, ob die v34-Erzeugung schon gezielt abzweigt.
 
 ## par.6 ERGEBNISSE
 
-(noch leer)
+### par.6a Stufe 1, gefahren 2026-09-27 (122,5 s, exklusiv)
+
+`tools/probes/targeted_branching_pretest.py`, Artefakt
+`evaluations/artifacts/targeted_branching_stage1_v32-b01.json`. **67.302 Drafting-Zustaende Runde 1-4**
+aus 60 Val-Dateien von v33 (je 20 policy / value-excursion / value-tempc-nohull), Generator und
+Modell `v32-b01`; Block = Datei. Sichtpruefung: `root_q` steht aus Sicht des Ziehers (Brier 0,2010
+wie gespeichert gegen 0,4123 gespiegelt). Gesamt-Brier Kopf 0,2064, `root_q` 0,2010.
+
+| Diskrepanz | A: Brier Kopf oberstes Dezil - untere Haelfte | B: Brier(root_q) - Brier(Kopf) im Dezil |
+| --- | --- | --- |
+| **roh** `|root_q - v_kopf|` (primaer) | **+0,0001** [-0,0134; +0,0154] -- nicht | -0,0276 [-0,0441; -0,0098] -- besteht |
+| bereinigt (Residuum je Runde, 5-fach) | **+0,0168** [+0,0066; +0,0276] -- besteht | -0,0286 [-0,0430; -0,0132] -- besteht |
+| Policy `KL(Ziel || Prior)` | **+0,0292** [+0,0221; +0,0364] -- besteht | -0,0097 [-0,0131; -0,0063] -- besteht |
+
+C: Spearman Value- gegen Policy-Diskrepanz **+0,095**; in beiden obersten Dezilen zugleich 1,2 Prozent
+(1,0 bei Unabhaengigkeit) -- zwei weitgehend unabhaengige Zeiger. Anteil im obersten Dezil (roh) je
+Runde 8,4 / 11,9 / 9,2 / 10,3 Prozent; je Klasse **policy 12,9 / excursion 14,3 / tempc-nohull 3,6**.
+
+**VERDIKT nach der registrierten Regel (roh entscheidet): TOT.**
+
+**Lesart, ausdruecklich als Nebenbefund:** die rohe Diskrepanz misst ueberwiegend die HUELLE (`root_q`
+ist ein Suchwert mit Huellenterm, der Kopf roh): in der huellenfreien Klasse `tempc-nohull` liegen nur
+3,6 Prozent der Zustaende im obersten Dezil, in den beiden Klassen mit Knopf 13-14 Prozent. Nach
+Herausrechnen (bereinigt) zeigt die Value-Diskrepanz auf Kopf-Fehler (A +0,0168), und die
+**Policy-Diskrepanz zeigt am staerksten darauf** (A +0,0292): wo Prior und Suche auseinanderliegen,
+liegt auch der VALUE-Kopf deutlich schlechter. Beide Zeiger bestehen A und B. Ob Stufe 2 auf einem
+dieser Zeiger gebaut wird, ist eine NEUE Entscheidung (Nutzer), keine Umdeutung dieses Verdikts:
+dafuer braeuchte es eine neue Registrierung mit dem gewaehlten Zeiger, VOR dem Bau.
+
+## par.7 STUFE 2, NEU REGISTRIERT 2026-09-27: der Ausflug zweigt nach der POLICY-Diskrepanz ab
+
+**Nutzer 2026-09-27:** *"Mach die policy Diskrepanz."* -- nach par.6a (rohe Value-Diskrepanz nach
+Regel TOT, weil sie die Huelle misst; Policy-Diskrepanz A +0,0292 [+0,0221; +0,0364], B besteht).
+Das ist eine NEUE Registrierung auf einem anderen Zeiger, keine Umdeutung des Verdikts in par.6a.
+
+**Bau (vor der v34-Erzeugung, eine Wheel-Runde):**
+* Heute zieht der Ausflug seine Abzweigstelle per gewichtetem Reservoir-Sampling mit Gewicht
+  Rundenprofil x Aktionszahl (`PREREG_start_position_seeding.md` par.9g). **Neu: Gewicht = Rundenprofil x
+  Policy-Diskrepanz** `KL(completed-Q-Ziel || Prior)` an der Wurzel (beides liegt in der Suche ohnehin
+  vor, keine Zusatzkosten). **Die Aktionszahl FAELLT WEG** (Nutzer 2026-09-27 auf die Frage, ob das
+  Profil wegfaellt: *"Ja aendere das"*): sie war eine Setzung als Stellvertreter fuer "hier gibt es
+  etwas zu lernen", das misst KL jetzt direkt; beides zu multiplizieren bevorzugte Stellen mit vielen
+  Zuegen doppelt. Ob KL mit der Aktionszahl korreliert, ist UNGEMESSEN. Das Rundenprofil bleibt
+  (gemessene Verlaesslichkeit des Value-Kopfs je Runde, Runde 5 Gewicht 0).
+* Knopf `MOSAIC_EXCURSION_KL_WEIGHT` (Default 0 = heutiges Gewicht Profil x Aktionszahl,
+  byte-identisch; 1 = Profil x KL),
+  im Rezept der Erzeugung (`docs/working_rules.md`, Rezeptdatei). Weg C bleibt ZUFAELLIG (Vergleichsbasis).
+* Record-Feld `branch_kl` am Abzweig-Record des Ausflugs, VOR der Erzeugung (Record-Feld-Regel).
+
+**Abnahme (Diagnose, kein eigenes Tor):**
+* Verteilung von `branch_kl` im v34-Ausflug gegen die KL-Verteilung aller Drafting-Stellen derselben
+  Erzeugung: der Median am Abzweig muss ueber dem 75-Prozent-Quantil aller Stellen liegen, sonst hat
+  der Knopf nicht gegriffen (dann Bau pruefen, nicht deuten).
+* Brier des Kopfs an den Abzweigstellen des v34-Ausflugs gegen Zufallsstellen aus Weg C: berichtet.
+* **Staerke:** kein isolierter Arm. Der Knopf faehrt in der v34-Erzeugung zusammen mit anderen
+  Paket-Aenderungen; ein Tor-1-Gewinn von v34 ist dem Paket, nicht diesem Knopf zuzuschreiben. Das
+  ist bewusst so (Nutzer: v34 noch fahren, danach alternative Ansaetze pruefen).
+

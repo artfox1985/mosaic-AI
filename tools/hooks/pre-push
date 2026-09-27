@@ -22,6 +22,30 @@ ZERO_SHA="0000000000000000000000000000000000000000"
 ENGINE_SRC_CHANGED=""
 FULL_TEST=""
 PRIVACY_HITS=""
+# Logtext-Herabstufung (Nutzer-Wunsch 2026-08-11, siehe Schleife unten).
+# Code-Review 2026-09-26 #19: das Urteil wurde je Ref UEBERSCHRIEBEN (die
+# letzte Ref mit engine/src-Aenderung gewann). Jetzt zwei Sammler ueber ALLE
+# Refs, das Urteil faellt erst nach der Schleife: herabgestuft wird nur, wenn
+# mindestens eine Ref Logtext-Aenderungen hat und KEINE Ref etwas anderes.
+# Ausdruecklich leer initialisiert -- eine geerbte Umgebungsvariable gleichen
+# Namens darf das Urteil nicht vorwegnehmen. Namen englisch seit 2026-09-27
+# (vorher NUR_LOGTEXT / NICHT_LOG; so zitiert sie das Review).
+LOGTEXT_ONLY=""
+LOGTEXT_REFS=""
+NON_LOGTEXT_REFS=""
+
+# Was als Logtext-/Kommentarzeile gilt (Muster fuer `grep -vE`, ausgelagert,
+# damit tools/tests/test_pre_push_logtext.py sie gegen Beispielzeilen pruefen
+# kann):
+# 1. Kommentar oder eine Zeile mit `log_event`.
+LOGTEXT_LINE_PAT='^[+-][[:space:]]*(//|log_event|.*log_event\()'
+# 2. Code-Review #19: eine Zeile, die NUR aus EINEM Zeichenketten-Literal
+#    besteht (optional gefolgt von `,` `)` `;`) -- die Fortsetzungszeile eines
+#    mehrzeiligen log_event-Aufrufs. Bis dahin genuegte ein fuehrendes `"`,
+#    und damit galten auch Match-Arme (`"x" => ...`) und `json!`-Schluessel
+#    (`"key": wert,`) als Logtext, beides Verhalten. RESTRISIKO (bewusst): ein
+#    reines Zeichenketten-Element einer Liste sieht genauso aus.
+LOGTEXT_STRING_PAT='^[+-][[:space:]]*"([^"\\]|\\.)*"[[:space:]]*[,)]*;?[[:space:]]*$'
 
 # Rechnerstruktur-Waechter (CLAUDE.md, Abschnitt "Oeffentliches Repo: keine
 # Rechnerstruktur", Nutzer-Entscheid 2026-08-17). Dort steht der Pruefbefehl
@@ -145,20 +169,30 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         # keine Warnung).
         #
         # KONSERVATIV: nur wenn JEDE geaenderte Zeile in engine/src/ eine
-        # `log_event`-Zeile oder ein Kommentar ist. Bei jedem Zweifel bleibt es
-        # beim vollen Test -- die Erkennung darf nie zu wenig pruefen.
-        NICHT_LOG=$(git diff -U0 "$RANGE" -- engine/src/ 2>/dev/null             | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)'             | grep -vE '^[+-][[:space:]]*(//|log_event|.*log_event\()'             | grep -vE '^[+-][[:space:]]*"' | head -1)
-        if [ -z "$NICHT_LOG" ]; then
-            NUR_LOGTEXT="yes"
+        # `log_event`-Zeile, ein Kommentar oder eine reine Zeichenketten-Zeile
+        # ist (Muster oben). Bei jedem Zweifel bleibt es beim vollen Test --
+        # die Erkennung darf nie zu wenig pruefen.
+        NON_LOG_LINE=$(git diff -U0 "$RANGE" -- engine/src/ 2>/dev/null < /dev/null \
+            | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' \
+            | grep -vE "$LOGTEXT_LINE_PAT" \
+            | grep -vE "$LOGTEXT_STRING_PAT" | head -1)
+        if [ -z "$NON_LOG_LINE" ]; then
+            LOGTEXT_REFS="$LOGTEXT_REFS $local_ref"
         else
-            NUR_LOGTEXT=""
+            NON_LOGTEXT_REFS="$NON_LOGTEXT_REFS $local_ref"
         fi
     fi
 done
 
+# Code-Review #19: Urteil ueber ALLE Refs (siehe Kopf). Eine einzige Ref mit
+# Nicht-Logtext-Aenderung erzwingt den vollen Test.
+if [ -n "$LOGTEXT_REFS" ] && [ -z "$NON_LOGTEXT_REFS" ]; then
+    LOGTEXT_ONLY="yes"
+fi
+
 # Eine volle Pruefung (Basis unbekannt) darf nie auf Kompilieren herabgestuft
 # werden -- auch nicht durch eine zweite Ref im selben Push.
-[ -n "$FULL_TEST" ] && NUR_LOGTEXT=""
+[ -n "$FULL_TEST" ] && LOGTEXT_ONLY=""
 
 # Rechnerstruktur-Waechter zuerst auswerten: er gilt fuer JEDEN Push, nicht
 # nur fuer engine/src/-Aenderungen.
@@ -218,7 +252,7 @@ else
     echo "          Bei STATUS_DLL_NOT_FOUND: MOSAIC_PYTHON_DIR setzen." >&2
 fi
 
-if [ -n "$NUR_LOGTEXT" ]; then
+if [ -n "$LOGTEXT_ONLY" ]; then
     echo "pre-push: engine/src/ nur in LOGTEXT/Kommentaren geaendert -- nur" >&2
     echo "          cargo build statt cargo test (Nutzer-Entscheid 2026-08-11)." >&2
     echo "          ACHTUNG: Logtexte sind hier NICHT harmlos -- die Regexes von" >&2

@@ -1,0 +1,55 @@
+{
+  "recipe_version": 1,
+  "tool": "self_play",
+  "description": "ENTWURF 2026-09-27 (STATUS Fahrplan 3e, docs/working_rules.md 'Rezeptdatei statt langer Flag-Listen'), noch nicht gefahren. Aufruf: python -X utf8 -u self_play.py --recipe models/v34.recipe.json --class <policy|value-wegc|value-excursion>. Die Flag-Werte bilden die v33-Erzeugung EXAKT ab: policy und value-excursion aus tools/night_v33_generate.sh (Schritte 1 und 3), value-wegc aus tools/night_v33_b03_b04.sh (Phase 2); env MOSAIC_STACK_DRAW_RESEARCH=1 wie dort exportiert. PLATZHALTER null, vor dem Start eintragen: model (Generator-ONNX, v33 fuhr models/alphazero_v32-b01_brierbest.onnx), je Klasse version (v33-Muster '<Generator>-<Klasse>', z.B. 'v32-b01-policy') und seed (v33: policy 20260942, value-excursion 20260944, value-wegc 20260945; Vierer-Schritt laut docs/generation_loop.md). self_play.py bricht bei null in version oder seed ab. spec: v33 fuhr models/v32_generation.spec.json; die Namenskonvention benennt die Spec nach dem Generator (byte-gleicher Inhalt), der Pfad ist beim Eintragen des Generators nachzuziehen. NEU gegenueber v33 und nur VORSCHLAG (Nutzer-Entscheid): tie_mirror_p 0.5 (PREREG_tie_mirror.md), label_rng_split (Code-Review #13), excursion_reshuffle (Code-Review #14), sowie die Sollwerte in expect_engine_config. single_pass_other_val und r5_net_solver sind Spec-Felder je Seite mit Env-Default: engine_config meldet den ENV-Default; der Waechter ist fuer sie nur aussagekraeftig, solange die Spec das Feld NICHT setzt (v32_generation.spec.json setzt keines von beiden, geprueft 2026-09-27). Beide werden hier nicht per env gesetzt (wie in v33), der Waechter prueft also die Defaults (aus / an).",
+  "common": {
+    "mode": "network",
+    "model": null,
+    "spec": "models/v32_generation.spec.json",
+    "games": 4000,
+    "sims": 100,
+    "threads": 11,
+    "chunk": 10,
+    "per_file": 10,
+    "return_order_random_p": 0.81,
+    "tau_argmax_from_move": 1,
+    "start_slot_random_p": 0.15,
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true
+  },
+  "env": {
+    "MOSAIC_STACK_DRAW_RESEARCH": "1"
+  },
+  "classes": {
+    "policy": {
+      "description": "Sockel (Traeger), policy-aktiv. v33: night_v33_generate.sh Schritt 1 (--deviate-prob 1.0, Seed 20260942, Version v32-b01-policy).",
+      "version": null,
+      "seed": null,
+      "deviate_prob": 1.0
+    },
+    "value-wegc": {
+      "description": "Schwarm, value-only, Weg C. v33: night_v33_b03_b04.sh Phase 2 (--value-only --deviate-prob 1.0, Seed 20260945, Version v32-b01-value-wegc). threads 10 statt 11 wie in v33: dort lief parallel das b04-Training (Nebenlast); ob der Wert fuer v34 bleibt, entscheidet der Nutzer.",
+      "version": null,
+      "seed": null,
+      "value_only": true,
+      "deviate_prob": 1.0,
+      "threads": 10
+    },
+    "value-excursion": {
+      "description": "Schwarm, value-only, Ausflug (Weg B). v33: night_v33_generate.sh Schritt 3 (--value-only --excursion-prob 1.0 --no-root-noise, Seed 20260944, Version v32-b01-value-excursion). excursion_reshuffle (common) wirkt nur hier; in den anderen Klassen entsteht kein Ausflug.",
+      "version": null,
+      "seed": null,
+      "value_only": true,
+      "excursion_prob": 1.0,
+      "no_root_noise": true
+    }
+  },
+  "expect_engine_config": {
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true,
+    "single_pass_other_val": false,
+    "r5_net_solver": true
+  }
+}

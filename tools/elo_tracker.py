@@ -495,6 +495,50 @@ def bootstrap_ci(rows, n_boot=2000, seed=0, alpha=0.05):
 
 # --------------------------------------------------------------- Reporting --
 
+# Code-Review 2026-09-26 #20: Breite unter dieser Grenze gilt als "Breite 0".
+# Bootstrap-Werte sind Floats aus demselben Fit; eine echte Streuung liegt
+# Groessenordnungen darueber.
+CI_ZERO_WIDTH_ELO = 1e-6
+# Breite, ab der ein Intervall ein Stichproben-Artefakt ist (Bestand, siehe report()).
+CI_DEGENERATE_WIDTH_ELO = 600
+
+
+def unbeaten_label(total_wins: int, total_games: int) -> str | None:
+    """Code-Review #20: ein Knoten mit NUR Siegen oder NUR Niederlagen hat im
+    Bradley-Terry-Modell keine endliche Schaetzung -- die MLE existiert nicht,
+    `_mm_fit` laesst gamma je Iteration weiterlaufen (bei 10:0 gegen den Anker
+    +1 je Iteration, nach 500 Iterationen gamma 501, also rund 2080 Elo; die
+    Zahl misst die Iterationszahl, nicht die Staerke). Rueckgabe: Text fuer die
+    Tabelle statt einer Elo-Zahl, oder None, wenn der Knoten beides hat.
+
+    Geprueft wird der Knoten fuer sich (alle seine Partien). Nicht erfasst: eine
+    GRUPPE von Knoten, die gegen den Rest nur gewinnt oder nur verliert -- auch
+    dort existiert die MLE nicht; heute ist keine solche Gruppe bekannt."""
+    if total_games <= 0:
+        return None
+    if total_wins >= total_games:
+        return f"alle {total_games} gewonnen"
+    if total_wins <= 0:
+        return f"alle {total_games} verloren"
+    return None
+
+
+def ci_label(lo, hi, is_anchor: bool = False) -> str:
+    """Text der 95%-CI-Spalte. `degeneriert` bei Breite 0 (Code-Review #20:
+    bei p = 1 zieht der Binomial-Bootstrap immer dasselbe Ergebnis, das
+    Intervall schrumpft auf einen Punkt und saehe wie hoechste Sicherheit aus)
+    und, wie bisher, bei Breite ueber `CI_DEGENERATE_WIDTH_ELO`. Der Anker ist
+    per Definition fix; seine Breite 0 ist keine Aussage ueber Stichproben."""
+    if lo is None or hi is None:
+        return "n/a"
+    if is_anchor:
+        return f"[{lo:.0f}, {hi:.0f}]"
+    width = hi - lo
+    if width < CI_ZERO_WIDTH_ELO or width > CI_DEGENERATE_WIDTH_ELO:
+        return "degeneriert"
+    return f"[{lo:.0f}, {hi:.0f}]"
+
+
 def report(n_boot=1000):
     rows = load_rows()
     fitted, nodes, wins, games = fit_all(rows)
@@ -527,13 +571,20 @@ def report(n_boot=1000):
         lo, hi = ci.get(node, (None, None))
         # Ein Knoten mit wenigen Bloecken kann in Bootstrap-Ziehungen ohne einen einzigen
         # Sieg landen (gamma auf dem Boden, Elo -> -2600): dann ist das Intervall keine
-        # Aussage, sondern ein Artefakt der Stichprobe. Ausweisen statt drucken.
-        if lo is not None and hi - lo > 600:
-            ci_str = "degeneriert"
-        else:
-            ci_str = f"[{lo:.0f}, {hi:.0f}]" if lo is not None else "n/a"
+        # Aussage, sondern ein Artefakt der Stichprobe. Ausweisen statt drucken. Seit
+        # Code-Review #20 ebenso Breite 0 (ci_label).
+        ci_str = ci_label(lo, hi, is_anchor=(node == ANCHOR_KEY))
         status = "Anker (fix)" if node == ANCHOR_KEY else ("" if connected else "NICHT mit Anker verbunden!")
         early = f"{edges_early[node]}/{edges_total[node]}"
+        # Code-Review #20: ungeschlagen/sieglos -> keine Elo-Zahl (Scheinwert der
+        # Iterationszahl), sondern der Grund. Der Anker bleibt fix bei ANCHOR_ELO.
+        unbeaten = None if node == ANCHOR_KEY else unbeaten_label(total_wins, total_games)
+        if unbeaten is not None:
+            status = (f"KEINE Elo: {unbeaten} (MLE existiert nicht)"
+                      + ("" if connected else "; NICHT mit Anker verbunden!"))
+            print(f"{node:<20} {'unbeschr.':>9} {'--':>16} {total_games:>7} "
+                  f"{f'{total_wins}-{total_losses}':>9} {early:>6}  {status}")
+            continue
         print(f"{node:<20} {elo:>7.0f} {ci_str:>18} {total_games:>7} "
               f"{f'{total_wins}-{total_losses}':>9} {early:>6}  {status}")
 

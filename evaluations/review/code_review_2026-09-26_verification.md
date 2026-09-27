@@ -191,3 +191,9 @@ Randbedingung: kein Build und kein Commit, solange die Kette laeuft (`evaluation
 8. **Python/Werkzeug, ohne Wheel:** #18 (Export), #19 (pre-push), #20 (Elo-Fit), je ein Commit.
 9. **Server:** #21 und #22 zusammen (debug, CORS, Modellliste, `sims`-Deckel, `_ai_lock`).
 10. **Betrieb:** #23 (atomare Writes, Ueberschreib-Waechter, Inhalt im Cache-Schluessel, Panic im Watchdog ehrlich melden) in kleinen Einzelcommits; #11, #12, #15 niedrig, gern mit 2.
+
+## Nachtrag 2026-09-27: Befund #5 geschlossen
+
+Nicht umgesetzt (Nutzer: *"Dann weg mit dem schalter"*). Kein legaler Pfad erzeugt die Teil-Mond-Entnahmen;
+der Log-Replayer braucht sie fuer alte Menschenpartien (`tools/analyze_game_log.py:1026-1043`).
+Training und Messungen sind unberuehrt.

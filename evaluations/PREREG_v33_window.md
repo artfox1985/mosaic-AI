@@ -374,6 +374,22 @@ Volumen-Folgerung aus task36/corpus_dose (v20-Aera) fuer die heutige Aera und st
 Saettigungs-These des Nutzers ("mit unserer aktuellen Architektur in der Saettigung"). Bericht an
 den Verbraucher: `PREREG_targeted_branching.md`, STATUS Abschnitt 6 Punkt 14.
 
+## par.6e TOR 1 FUER `v33-b02` gegen den Champion (registriert 2026-09-27, VOR dem Lauf)
+
+**Nutzer 2026-09-27:** *"Takte b02 gegen den champ ein"* (nach dem Entscheid "derzeit keine
+Promotion"). par.6a hielt fest: b02 braucht fuer eine Promotion ein eigenes Tor 1.
+
+**Wie Tor 1 von b01 (par.2, par.10), mit denselben Partie-Seeds:** `v33-b02` gegen `v32-b01`, Spec
+`models/v33_gating.spec.json` beidseits, Seeds **20261600 und 20261601** a 200 Paare, Blockgroesse 5,
+`--log-games`, Block-z ueber `tools/gating_block_z.py`, Stufenregel par.2a (dritter Seed 20261602
+nur, wenn genau einer einzeln z >= +1,96). SPRT wie bei b01 (alpha = beta = 0,001, Deckel 200), damit
+beide Tore gleich gebaut sind. **Kriterium par.2:** z >= +1,96 oder gepoolt >= 52,5 % ohne
+Gegenbefund. **Zusaetzlich berichtet:** b01 und b02 gegen den Champion auf IDENTISCHEN Seeds,
+Blockdifferenz je Block (gepaart ueber die Seeds). Eine Promotion bleibt Nutzer-Entscheid.
+
+**Kosten:** wie Tor 1 von b01, rund 3,4 h (2 x 40 Bloecke a rund 150 s). Laeuft in der Nachtkette
+vor E1 und R5.
+
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`)
 
 Erzeugung: v31 **14,66 h** ohne Nebenlast, v32 **13 h 57** mit Nebenlast (keine saubere
@@ -431,3 +447,7 @@ Beide Exit 0.
 **Promotion:** Nutzer-Entscheid. Vorschlag des Koordinators: erst nach dem b02-A/B (par.6a),
 das heute Abend fertig ist -- traegt b02 gegen b01, ist b02 der Kandidat, und die Promotion kostet
 nur einmal rund 2,3 h.
+
+**NUTZER-ENTSCHEID 2026-09-27: derzeit KEINE Promotion** (*"Nein derzeit keine Promotion"*), nach
+b02/b03/b04 (par.6a, par.6d), die alle nicht besser als b01 sind. Champion bleibt `v32-b01`; die
+Arme des v33-Pakets (E1, R5) laufen auf ihm.

@@ -149,6 +149,23 @@ except Exception:
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Rezeptdatei (docs/working_rules.md "Rezeptdatei statt langer Flag-Listen";
+# Klasse = Lauf, z.B. ein Seed). Das `env` muss VOR `set_champion` stehen, das
+# `config` importiert (MOSAIC_DATA_DIR beim Import, config.py:28), und vor
+# `import mosaic_rust` in `run_paired_gating`. Nur als Skript: andere Werkzeuge
+# importieren dieses Modul (hybrid_paired_arena.py) und bringen ihre eigene
+# Umgebung mit.
+from recipe_config import (RecipeError, apply_recipe_env_from_argv,  # noqa: E402
+                           apply_to_parser, check_engine_config, manifest_block,
+                           mosaic_env_snapshot)
+
+_RECIPE_PRE = None
+if __name__ == "__main__":
+    try:
+        _RECIPE_PRE = apply_recipe_env_from_argv(tool="paired_gating")
+    except RecipeError as _e:
+        raise SystemExit(f"Rezept abgelehnt: {_e}")
+
 from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 from set_champion import set_champion as _set_champion  # noqa: E402  (Nutzer-Anstoss 2026-07-27)
 from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
@@ -286,7 +303,9 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        sprt_alpha: float = SPRT_ALPHA, sprt_beta: float = SPRT_BETA,
                        base_seed: int | None = None, threads: int = DEFAULT_THREADS,
                        promote_winner: bool = False, spec_a: str | None = None,
-                       spec_b: str | None = None, log_games: bool = False) -> dict:
+                       spec_b: str | None = None, log_games: bool = False,
+                       expected_engine_config: dict | None = None,
+                       recipe_block: dict | None = None) -> dict:
     """Orchestriert das volle gepaarte Gating (siehe Modul-Docstring). Die
     STOPP-Entscheidung ist ein Wald-SPRT auf den informativen Paaren (b/c);
     bricht NACH einem VOLLSTAENDIGEN Block ab, sobald die LLR eine der beiden
@@ -312,8 +331,27 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     `game_seed`, `first_player`, `names`) plus die Zuordnungsfelder
     `pair_index`, `orientation`, `block_seed`, `board0_name`, `side_names`.
     Default AUS: dann fehlt das Feld ganz und das Artefakt ist Feld fuer Feld
-    das bisherige."""
+    das bisherige.
+
+    Rezeptdatei (docs/working_rules.md): `recipe_block` (aus
+    `recipe_config.manifest_block`, None ohne Rezept) landet als Feld `recipe`
+    im Ergebnis, dazu IMMER `mosaic_env` (alle `MOSAIC_*` des Prozesses) --
+    beide additiv. `expected_engine_config` (Abschnitt des Rezepts): vor dem
+    ersten Block gegen `mosaic_rust.engine_config_json()` geprueft; hier ist
+    der Elternprozess der spielende Prozess, die Pruefung sieht also genau,
+    was spielt. Abweichung -> Abbruch mit Liste."""
     import mosaic_rust as mr
+
+    engine_config_check = None
+    if expected_engine_config:
+        deviations = check_engine_config(json.loads(mr.engine_config_json()),
+                                         expected_engine_config)
+        if deviations:
+            raise SystemExit("Rezept-Waechter: engine_config weicht vom Rezept "
+                             "(expect_engine_config) ab -- Abbruch vor dem ersten Block:\n  - "
+                             + "\n  - ".join(deviations))
+        engine_config_check = {"expected": expected_engine_config, "deviations": [],
+                               "source": "paired_gating-Prozess"}
 
     # CLAUDE.md "Laufzeiten messen, nicht schaetzen": Startmarken fuer den
     # `laufzeit`-Block im Ergebnis-JSON (Codepflege-Audit 2026-08-27 -- das
@@ -491,6 +529,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         # summiert ueber alle Threads des Prozesses.
         "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
                                    n_games=n_games_total),
+        # Rezeptdatei (additiv): None ohne Rezept; `mosaic_env` immer.
+        "recipe": (None if recipe_block is None else
+                   {**recipe_block, **({"engine_config_check": engine_config_check}
+                                       if engine_config_check is not None else {})}),
+        "mosaic_env": mosaic_env_snapshot(),
     }
     # 2026-09-09: `games` NUR anhaengen, wenn der Schalter an war -- sonst
     # bleibt das Artefakt schluesselgleich zum Bestand (Tor-2b-Sonde meldet
@@ -545,7 +588,10 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     return result
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Der CLI-Parser, herausgezogen aus `main()` (2026-09-27), damit die
+    Rezept-Tests ihn gegen ein Rezept pruefen koennen, ohne das Gating zu
+    starten. Inhalt unveraendert."""
     p = argparse.ArgumentParser(description="Gepaartes Netz-vs-Netz-Gating (Task #76)")
     p.add_argument("--model-a", required=True)
     p.add_argument("--model-b", required=True)
@@ -585,7 +631,36 @@ def main() -> None:
                     help="Deaktiviert die automatische Champion-Uebernahme (z.B. fuer reine "
                          "Ablations-/Experiment-Vergleiche, deren Sieger nicht der neue "
                          "Server-Default werden soll).")
-    args = p.parse_args()
+    return p
+
+
+def main(argv=None, recipe_pre=None) -> None:
+    """`argv`/`recipe_pre` nur fuer Tests; als Skript gelten `sys.argv` und
+    der Vorab-Parse am Modulkopf (`_RECIPE_PRE`)."""
+    if recipe_pre is None:
+        recipe_pre = _RECIPE_PRE
+    p = build_parser()
+    # Rezeptdatei: EIN zusaetzlicher Schritt statt `p.parse_args()`; ohne
+    # --recipe ein normaler parse_args (plus --recipe/--class).
+    try:
+        args, recipe_overrides = apply_to_parser(
+            p, argv,
+            recipe_pre["recipe"] if recipe_pre else None,
+            recipe_pre["class"] if recipe_pre else None,
+            tool="paired_gating")
+    except RecipeError as e:
+        p.error(str(e))
+    # `apply_to_parser` hebt `required` fuer Rezept-dests auf; null im Rezept
+    # (Platzhalter) darf daraus kein Gating ohne Modell machen.
+    for dest, flag in (("model_a", "--model-a"), ("model_b", "--model-b")):
+        if getattr(args, dest) is None:
+            p.error(f"{flag} fehlt (im Rezept null oder nicht gesetzt)")
+    recipe_block = None
+    expected_engine_config = None
+    if recipe_pre:
+        recipe_block = manifest_block(recipe_pre["recipe"], recipe_pre["recipe"].path,
+                                      recipe_pre["class"], recipe_overrides)
+        expected_engine_config = recipe_pre["recipe"].get("expect_engine_config") or None
 
     sims_a = args.sims if args.sims is not None else args.sims_a
     sims_b = args.sims if args.sims is not None else args.sims_b
@@ -599,6 +674,7 @@ def main() -> None:
         sprt_alpha=args.sprt_alpha, sprt_beta=args.sprt_beta,
         base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
         spec_a=args.spec_a, spec_b=args.spec_b, log_games=args.log_games,
+        expected_engine_config=expected_engine_config, recipe_block=recipe_block,
     )
 
     out_path = Path(args.out) if args.out else (
