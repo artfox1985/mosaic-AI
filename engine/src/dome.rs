@@ -164,8 +164,12 @@ impl DomeTile {
         Ok(idx.iter().map(|&i| self.spaces[i].clone()).collect())
     }
 
-    /// Dreht die Platte dauerhaft (nur vor dem Platzieren erlaubt).
-    pub fn apply_rotation(&mut self, degrees: u32) -> Result<(), String> {
+    /// Prueft, ob [`DomeTile::apply_rotation`] mit `degrees` gelingen wuerde,
+    /// OHNE die Platte zu veraendern. Dieselben Pruefungen in derselben
+    /// Reihenfolge (Code-Review 2026-09-26 Befund 1): Aufrufer, die vor dem
+    /// Drehen Zustand umbauen (Platte aus Ablage/Stapel entnehmen), pruefen
+    /// damit ZUERST und mutieren erst danach.
+    pub fn check_rotation(&self, degrees: u32) -> Result<(), String> {
         if rotation_indices(degrees).is_none() {
             return Err(format!(
                 "Ungültige Rotation: {degrees}. Erlaubt: 0, 90, 180, 270."
@@ -176,6 +180,15 @@ impl DomeTile {
         }
         if self.spaces.iter().any(|s| s.is_filled()) {
             return Err("Eine bereits befüllte Kuppel kann nicht rotiert werden.".into());
+        }
+        Ok(())
+    }
+
+    /// Dreht die Platte dauerhaft (nur vor dem Platzieren erlaubt).
+    pub fn apply_rotation(&mut self, degrees: u32) -> Result<(), String> {
+        self.check_rotation(degrees)?;
+        if degrees == 0 {
+            return Ok(());
         }
         self.spaces = self.rotated_spaces(degrees)?;
         Ok(())

@@ -47,16 +47,56 @@ pub fn validate_dome_move(state: &GameState, m: &PlaceDomeTileMove) -> Option<St
     if player.has_unplaced_start_tile() {
         return Some("Die Startkuppel muss als erstes (in der Startphase) gelegt werden.".into());
     }
-    if !state.dome_display.iter().any(|t| t.tile_id == m.dome_tile_id) {
-        return Some(format!("Kuppel {} liegt nicht in der offenen Ablage.", m.dome_tile_id));
-    }
+    let tile = match state.dome_display.iter().find(|t| t.tile_id == m.dome_tile_id) {
+        Some(t) => t,
+        None => return Some(format!("Kuppel {} liegt nicht in der offenen Ablage.", m.dome_tile_id)),
+    };
     if m.slot_row > 2 || m.slot_col > 2 {
         return Some(format!("Ungültiger Slot ({},{}).", m.slot_row, m.slot_col));
     }
     if state.players[state.current_player].dome_grid.dome_slots[m.slot_row][m.slot_col].is_some() {
         return Some(format!("Slot ({},{}) ist bereits belegt.", m.slot_row, m.slot_col));
     }
+    // Code-Review 2026-09-26 Befund 1: die Rotation wurde hier nie geprueft,
+    // `execute_dome_move` scheiterte an ihr erst NACH der Entnahme aus der
+    // Ablage (Platte weg, Wahl haengend). Erzeugte Kandidaten tragen nur
+    // 0/90/180/270 (`dome_slot_rotation_candidates`) und bleiben unberuehrt;
+    // abgewiesen wird nur, was ueber die API von aussen kommt.
+    if let Err(e) = tile.check_rotation(m.rotation) {
+        return Some(e);
+    }
     None
+}
+
+/// Befund 1 (Code-Review 2026-09-26): alles, woran das Legen einer Kuppelplatte
+/// NACH ihrer Entnahme (Ablage bzw. gezogene Platten) noch scheitern kann, wird
+/// VORHER geprueft -- dieselben Bedingungen wie `DomeTile::apply_rotation`,
+/// `DomeGrid::place_dome_tile`, `register_dome_placement` und
+/// `use_player_token`, die danach ohne Fehler durchlaufen. Fuer jeden Zug, den
+/// die Validatoren durchlassen, ist das ein No-Op; es schuetzt nur Aufrufer,
+/// die `execute_*` ohne vorherige Validierung rufen.
+fn check_dome_commit(
+    state: &GameState,
+    tile: &crate::dome::DomeTile,
+    rotation: u32,
+    slot_row: usize,
+    slot_col: usize,
+) -> Result<(), String> {
+    tile.check_rotation(rotation)?;
+    if slot_row > 2 || slot_col > 2 {
+        return Err(format!("Ungültiger Slot ({slot_row},{slot_col})."));
+    }
+    let player = &state.players[state.current_player];
+    if player.dome_grid.dome_slots[slot_row][slot_col].is_some() {
+        return Err(format!("Slot ({slot_row},{slot_col}) ist bereits belegt."));
+    }
+    // `can_place_dome_tile` deckt Runde 5, das 2-Platten-Limit
+    // (`register_dome_placement`) und das volle Raster ab,
+    // `has_used_all_tokens` die Bedingungen von `use_player_token`.
+    if !player.can_place_dome_tile(state.round_number) || player.has_used_all_tokens(state.round_number) {
+        return Err(format!("{} kann in dieser Runde keine Kuppelplatte mehr legen.", player.name));
+    }
+    Ok(())
 }
 
 pub fn execute_dome_move(state: &mut GameState, m: &PlaceDomeTileMove) -> Result<(), String> {
@@ -65,6 +105,8 @@ pub fn execute_dome_move(state: &mut GameState, m: &PlaceDomeTileMove) -> Result
         .iter()
         .position(|t| t.tile_id == m.dome_tile_id)
         .ok_or("Kuppel nicht im Display")?;
+    // Befund 1: erst pruefen, dann entnehmen.
+    check_dome_commit(&*state, &state.dome_display[idx], m.rotation, m.slot_row, m.slot_col)?;
     let mut tile = state.dome_display.remove(idx);
     tile.apply_rotation(m.rotation)?;
     let pi = state.current_player;
@@ -85,11 +127,11 @@ pub fn execute_dome_move(state: &mut GameState, m: &PlaceDomeTileMove) -> Result
 }
 
 /// Rotationen, die für diese (Kachel, Slot)-Kombination tatsächlich legal
-/// sind (`validate_dome_move` selbst prüft `rotation` nicht -- die einzige
-/// Fehlerquelle wäre `DomeTile::apply_rotation` auf einer bereits befüllten
-/// Kachel, was für eine frisch gezogene, unplatzierte Kachel nie zutrifft --
+/// sind. Seit Befund 1 (Code-Review 2026-09-26) prüft `validate_dome_move`
+/// die Rotation mit (`DomeTile::check_rotation`); für die vier Standardwinkel
+/// auf einer frisch gezogenen, unbefüllten Kachel ist das nie ein Fehler --
 /// daher aktuell immer alle 4, aber als echter Filter geschrieben statt
-/// hartkodiert, falls künftige Regeln Rotation doch einschränken).
+/// hartkodiert, falls künftige Regeln Rotation doch einschränken.
 fn dome_slot_rotation_candidates(
     state: &GameState,
     dome_tile_id: usize,
@@ -257,11 +299,27 @@ pub fn validate_draw_from_stack(state: &GameState, m: &DrawFromStackMove) -> Opt
     if got != expected {
         return Some("return_order stimmt nicht mit den übrigen gezogenen Platten überein.".into());
     }
+    // Code-Review 2026-09-26 Befund 1: Rotation vor der Ausfuehrung pruefen --
+    // `execute_draw_from_stack` hatte zu diesem Zeitpunkt den Ziehstapel schon
+    // geleert und die Restplatten zurueckgelegt. Die gewaehlte Platte existiert
+    // (oben geprueft).
+    if let Some(tile) = state.pending_stack_draw.iter().find(|t| t.tile_id == m.chosen_id) {
+        if let Err(e) = tile.check_rotation(m.rotation) {
+            return Some(e);
+        }
+    }
     None
 }
 
 pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> Result<(), String> {
     let pi = state.current_player;
+    // Befund 1 (Code-Review 2026-09-26): alles, woran der Zug nach dem Leeren
+    // von `pending_stack_draw` noch scheitern kann, VORHER pruefen -- sonst
+    // gingen gewaehlte Platte und Ziehstapel bei einem Fehler verloren.
+    match state.pending_stack_draw.iter().find(|t| t.tile_id == m.chosen_id) {
+        Some(tile) => check_dome_commit(&*state, tile, m.rotation, m.slot_row, m.slot_col)?,
+        None => return Err("gewählte Kachel nicht gezogen".into()),
+    }
     let drawn = std::mem::take(&mut state.pending_stack_draw);
     let mut chosen = None;
     let mut rest: std::collections::HashMap<usize, crate::dome::DomeTile> = std::collections::HashMap::new();
@@ -600,6 +658,12 @@ pub fn apply_start_placement(
         .iter()
         .position(|t| t.tile_id == tile_id)
         .ok_or_else(|| format!("Kachel {tile_id} nicht im Display."))?;
+    // Code-Review 2026-09-26 Befund 1: Rotation pruefen, BEVOR die Platte das
+    // Display verlaesst und die Luecke vom Stapel nachgezogen wird -- vorher
+    // scheiterte `apply_rotation` erst danach (Platte weg, Stapel verkuerzt).
+    // Slot-Bereich und -Belegung sind oben geprueft, `place_dome_tile` kann
+    // danach nicht mehr scheitern.
+    state.dome_display[idx].check_rotation(rot)?;
     let mut tile = state.dome_display.remove(idx);
     if !state.dome_tile_pool.is_empty() {
         // Nachziehen an dieselbe Display-Position, damit übrige Karten ihren Platz behalten.
@@ -849,7 +913,23 @@ impl Game {
         Game { state }
     }
 
+    /// Ist die Partie zu Ende (Runde 5 samt Tiling abgeschlossen)?
+    ///
+    /// Code-Review 2026-09-26 Befund 6: frueher `round_number >= NUM_ROUNDS`,
+    /// also schon ab BEGINN von Runde 5 wahr -- die `"done"`-Felder der
+    /// KI-Schritte (py.rs) meldeten ganz Runde 5 als beendet. Jetzt die Phase:
+    /// `End` (nach dem letzten Tiling) oder `Final` (nach der Endwertung).
+    /// Self-Play, Arena und Referee pruefen ohnehin `Phase::End` und rufen
+    /// diese Funktion nicht.
     pub fn is_over(&self) -> bool {
+        matches!(self.state.phase, Phase::End | Phase::Final)
+    }
+
+    /// Ist die laufende Runde die letzte (Runde 5)? Das ist die alte
+    /// `is_over`-Bedingung, und sie ist genau dort richtig, wo sie am
+    /// RUNDENENDE gefragt wird (`execute_end_tiling`: nach Runde 5 folgt
+    /// `Phase::End`, sonst `next_round`).
+    fn is_final_round(&self) -> bool {
         self.state.round_number >= NUM_ROUNDS
     }
 
@@ -1090,6 +1170,20 @@ impl Game {
                 self.state.switch_player();
             }
             Action::Pass => {
+                // Code-Review 2026-09-26 Befund 7: Pass nur, wenn er die EINZIGE
+                // legale Aktion ist -- genau dann bietet `drafting_actions` ihn
+                // an (auch als Sackgassen-Rueckfall der Pending-Zweige). Vorher
+                // wurde er bedingungslos angenommen; Server und Referee prueften
+                // selbst, direkte Aufrufer (py.rs `apply_pass`) nicht. Fuer jeden
+                // Pass aus `drafting_actions` (Suche, Self-Play, Arena) aendert
+                // sich nichts; die Neuberechnung laeuft nur im Pass-Zweig.
+                let legal = drafting_actions(&self.state);
+                if !(legal.len() == 1 && legal[0] == Action::Pass) {
+                    return Err(format!(
+                        "Passen ist nur erlaubt, wenn keine andere Aktion moeglich ist ({} legale Aktionen).",
+                        legal.len()
+                    ));
+                }
                 // Nutzer 2026-09-07 ("fuege in den logs das passen als eigenen schritt
                 // ein"): der Pass steht als eigene Zeile im Log wie jede andere
                 // Aktion. Der Replayer (tools/analyze_game_log.py, Kategorie PASS)
@@ -1255,7 +1349,7 @@ impl Game {
             }
         }
 
-        if self.is_over() {
+        if self.is_final_round() {
             self.state.phase = Phase::End;
             self.state.log_event("Das Spiel ist beendet!");
         } else {
@@ -1682,14 +1776,15 @@ mod tests {
 
     /// Nutzer 2026-09-07: ein Pass schreibt GENAU eine eigene Log-Zeile mit dem
     /// Namen des Passenden, danach ist der andere Spieler dran.
+    ///
+    /// Angepasst mit Befund 7 (Code-Review 2026-09-26): frueher passte der Test
+    /// in der Eroeffnung von Runde 1, wo Steinzuege legal sind -- das ging nur,
+    /// weil Pass bedingungslos angenommen wurde. Jetzt baut er eine Stellung, in
+    /// der Pass die einzige legale Aktion ist ([`pass_only_game`]).
     #[test]
     fn pass_writes_its_own_log_line() {
-        let mut rng = StdRng::seed_from_u64(9);
-        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
-        for p in game.state.players.iter_mut() {
-            p.start_tile_pending = false;
-        }
-        game.state.current_player = 0;
+        let mut game = pass_only_game(9);
+        assert_eq!(drafting_actions(&game.state), vec![Action::Pass], "Testvoraussetzung");
         let before = game.state.log.len();
         let who = game.state.players[0].name.clone();
         game.apply_drafting(&Action::Pass).expect("Pass ohne offene Teilzuege ist anwendbar");
@@ -1697,6 +1792,165 @@ mod tests {
         assert_eq!(new.len(), 1, "genau eine Zeile: {new:?}");
         assert_eq!(new[0], &format!("[R{}] ⏭️ {who}: passt", game.state.round_number));
         assert_eq!(game.state.current_player, 1);
+    }
+
+    // ── Code-Review 2026-09-26: illegale Eingaben aendern den Zustand nicht ──
+
+    /// Vollstaendiger Zustandsabdruck fuer Vorher/Nachher-Vergleiche: das
+    /// exakte JSON traegt auch Beutel-, Turm- und Stapelreihenfolge, die
+    /// anhaengige Kuppelwahl und das ungefensterte Log.
+    fn snapshot(state: &GameState) -> serde_json::Value {
+        crate::serialize::state_to_json_exact(state, false)
+    }
+
+    /// Stellung, in der Spieler 0 am Zug ist und NUR passen kann: alle Quellen
+    /// leer, beide Kuppelplaettchen verbraucht, kein Bonuschip aufgedeckt. Die
+    /// Bonuschips liegen noch verdeckt auf den (leeren) Fabriken, darum endet
+    /// das Drafting durch den Pass nicht (`check_drafting_complete`).
+    fn pass_only_game(seed: u64) -> Game {
+        let mut game = started_game(seed);
+        game.state.current_player = 0;
+        for f in game.state.factories.iter_mut() {
+            f.sun_tiles.clear();
+            f.moon_stacks.clear();
+        }
+        game.state.large_factory.sun_tiles.clear();
+        game.state.large_factory.moon_pool.clear();
+        let p = &mut game.state.players[0];
+        p.dome_tiles_placed_this_round = 2;
+        p.player_tokens_used = 2;
+        game
+    }
+
+    /// Befund 7: Pass wird abgewiesen, solange eine andere Aktion legal ist,
+    /// und der Zustand bleibt dabei unveraendert (kein Spielerwechsel, keine
+    /// Logzeile).
+    #[test]
+    fn pass_is_rejected_while_other_actions_are_legal() {
+        let mut game = started_game(9);
+        let legal = drafting_actions(&game.state);
+        assert!(legal.len() > 1 && !legal.contains(&Action::Pass), "Testvoraussetzung: Eroeffnung");
+        let before = snapshot(&game.state);
+        assert!(game.apply_drafting(&Action::Pass).is_err(), "Pass neben legalen Zuegen muss Err sein");
+        assert_eq!(snapshot(&game.state), before, "abgewiesener Pass darf nichts veraendern");
+    }
+
+    /// Befund 1, Ablage-Pfad: eine unzulaessige Rotation wird in Stufe 2
+    /// abgewiesen, BEVOR die Platte die Ablage verlaesst; die offene Wahl
+    /// bleibt stehen und ist mit einer gueltigen Rotation weiter abschliessbar.
+    #[test]
+    fn dome_rotation_invalid_is_rejected_before_the_tile_leaves_the_display() {
+        let mut game = started_game(5);
+        let tid = game.state.dome_display[0].tile_id;
+        game.apply_drafting(&Action::ChooseDomeSlot(PlaceDomeTileMove {
+            dome_tile_id: tid,
+            slot_row: 0,
+            slot_col: 0,
+            rotation: 0,
+        }))
+        .expect("Kachel+Slot-Wahl sollte gelingen");
+        let before = snapshot(&game.state);
+        for bad in [45u32, 1, 360, u32::MAX] {
+            assert!(
+                validate_dome_move(
+                    &game.state,
+                    &PlaceDomeTileMove { dome_tile_id: tid, slot_row: 0, slot_col: 0, rotation: bad }
+                )
+                .is_some(),
+                "Validator muss Rotation {bad} ablehnen"
+            );
+            assert!(game.apply_drafting(&Action::ChooseDomeRotation(bad)).is_err(), "Rotation {bad}");
+            assert_eq!(snapshot(&game.state), before, "Rotation {bad} darf nichts veraendern");
+            // Auch der direkte Ausfuehrer entnimmt nichts mehr.
+            let direct = PlaceDomeTileMove { dome_tile_id: tid, slot_row: 0, slot_col: 0, rotation: bad };
+            assert!(execute_dome_move(&mut game.state, &direct).is_err());
+            assert_eq!(snapshot(&game.state), before, "execute_dome_move({bad}) darf nichts veraendern");
+        }
+        // Gegenprobe: die Wahl ist weiter legal abschliessbar.
+        game.apply_drafting(&Action::ChooseDomeRotation(90)).expect("gueltige Rotation");
+        assert!(game.state.pending_dome_choice.is_none());
+        assert!(game.state.players[0].dome_grid.dome_slots[0][0].is_some());
+    }
+
+    /// Befund 1, Stapel-Pfad: vorher leerte `execute_draw_from_stack` den
+    /// Ziehstapel und legte den Rest zurueck, bevor die Rotation scheiterte.
+    #[test]
+    fn draw_stack_rotation_invalid_keeps_the_drawn_tiles() {
+        let mut game = started_game(12);
+        peek_n(&mut game, 3);
+        let m = generate_draw_stack_moves(&game.state).into_iter().next().expect("Kandidat");
+        game.apply_drafting(&Action::ChooseDrawStackSlot(m.clone())).expect("Wahl sollte gelingen");
+        assert!(game.state.pending_dome_choice.is_some(), "Testvoraussetzung: Rotation steht aus");
+        let before = snapshot(&game.state);
+        for bad in [45u32, 91, u32::MAX] {
+            let mv = DrawFromStackMove { rotation: bad, ..m.clone() };
+            assert!(validate_draw_from_stack(&game.state, &mv).is_some(), "Validator: Rotation {bad}");
+            assert!(game.apply_drafting(&Action::ChooseDomeRotation(bad)).is_err(), "Rotation {bad}");
+            assert_eq!(snapshot(&game.state), before, "Rotation {bad} darf nichts veraendern");
+            assert!(execute_draw_from_stack(&mut game.state, &mv).is_err());
+            assert_eq!(snapshot(&game.state), before, "execute_draw_from_stack({bad}) darf nichts veraendern");
+        }
+        assert_eq!(game.state.pending_stack_draw.len(), 3, "gezogene Platten bleiben liegen");
+        // Gegenprobe: legaler Abschluss.
+        game.apply_drafting(&Action::ChooseDomeRotation(180)).expect("gueltige Rotation");
+        assert!(game.state.pending_stack_draw.is_empty());
+        assert!(game.state.pending_dome_choice.is_none());
+    }
+
+    /// Befund 1, Startsetzung: die Luecke im Display wurde vom Stapel
+    /// nachgezogen, bevor die Rotation scheiterte.
+    #[test]
+    fn start_placement_invalid_rotation_leaves_display_and_stack_untouched() {
+        let mut rng = StdRng::seed_from_u64(51);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        let tid = game.state.dome_display[0].tile_id;
+        let before = snapshot(&game.state);
+        for bad in [45u32, 1, u32::MAX] {
+            assert!(apply_start_placement(&mut game.state, 1, tid, 0, 0, bad).is_err(), "Rotation {bad}");
+            assert_eq!(snapshot(&game.state), before, "Rotation {bad} darf nichts veraendern");
+        }
+        apply_start_placement(&mut game.state, 1, tid, 0, 0, 270).expect("gueltige Startplatzierung");
+    }
+
+    /// Befund 6: `is_over` ist erst nach dem letzten Tiling wahr, nicht schon
+    /// ab Beginn von Runde 5.
+    #[test]
+    fn is_over_follows_the_phase_not_the_round_number() {
+        let mut game = started_game(3);
+        assert!(!game.is_over());
+        game.state.round_number = NUM_ROUNDS;
+        for phase in [Phase::Drafting, Phase::Tiling] {
+            game.state.phase = phase;
+            assert!(!game.is_over(), "Runde 5 in Phase {phase:?} ist nicht vorbei");
+        }
+        for phase in [Phase::End, Phase::Final] {
+            game.state.phase = phase;
+            assert!(game.is_over(), "Phase {phase:?} ist das Spielende");
+        }
+    }
+
+    /// Befund 6, Gegenstueck: der Rundenabschluss (`execute_end_tiling`) haengt
+    /// weiter an der Rundenzahl -- nach Runde 4 folgt Runde 5, nach Runde 5
+    /// `Phase::End`.
+    #[test]
+    fn end_tiling_still_ends_the_game_only_after_round_five() {
+        for (round, want_phase, want_round) in
+            [(NUM_ROUNDS - 1, Phase::Drafting, NUM_ROUNDS), (NUM_ROUNDS, Phase::End, NUM_ROUNDS)]
+        {
+            let mut rng = StdRng::seed_from_u64(77);
+            let mut game = started_game(77);
+            game.state.round_number = round;
+            game.state.phase = Phase::Tiling;
+            game.state.tiling_done = [false, false];
+            for pi in 0..NUM_PLAYERS {
+                assert!(game.valid_tiling_actions(pi).is_empty(), "Testvoraussetzung: nichts zu legen");
+            }
+            game.apply_tiling(&TilingMove::EndTiling { player: 0 }, &mut rng).expect("Spieler 0 beendet");
+            game.apply_tiling(&TilingMove::EndTiling { player: 1 }, &mut rng).expect("Spieler 1 beendet");
+            assert_eq!(game.state.phase, want_phase, "nach Runde {round}");
+            assert_eq!(game.state.round_number, want_round, "nach Runde {round}");
+            assert_eq!(game.is_over(), want_phase == Phase::End);
+        }
     }
 
     #[test]

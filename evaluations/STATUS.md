@@ -46,6 +46,11 @@ Wiederholung von Seed 20261651, Block 1-17 (das ganze Lastfenster) auf Blockeben
 abgebrochen; der Seed gilt. Statt des Rests laeuft auf Nutzer-Hinweis ein **Entscheidungsseed
 20261652** (fester Umfang, `PREREG_v33_window.md` par.6a Nachtrag), danach b03.
 
+**NEBENLAST 2026-09-26 abends (Agent, selbst gemeldet):** waehrend der b03-Erzeugung
+(`value-wegc`) lief ein leerer `python`-Prozess rund 120 s wartend auf Eingabe, dann beendet --
+Last praktisch null, Self-Play ist seed-getrieben ohne Zeitbudget. Die Laufzeit der Erzeugung
+ist ohnehin als *unter Nebenlast* markiert (parallel zum b04-Training).
+
 **LAEUFT: b02-Arm** (`tools/night_v33_b02.sh`, im selben Hintergrundauftrag wie die Kette):
 Training, dann A/B gegen b01 (2 Seeds a 200 Paare). Nichts anderes starten, kein Build, kein Commit.
 Danach **b03** (`PREREG_v33_window.md` par.6b, Nutzer 2026-09-26): 4.000 Schwarm-Partien MEHR vom
@@ -92,6 +97,41 @@ Rolle, Zwischenstaende v31/v32, drei Ketten-Skripte. `data/` 6,2 -> 3,2 GB,
     (`PREREG_r5_net_vs_solver.md`, NEU: A/B desselben Champions, braucht den Schalter
     `r5_net_solver` je Seite aus der Wheel-Runde), Spiegelknopf in der v34-Erzeugung
     (`PREREG_tie_mirror.md`).
+3e. **Nachzug nach der Kette (Python, damals gesperrt), vor dem Build-Commit:** `spec_env.py`
+    `SPEC_TO_ENV` um `single_pass_other_val` und `r5_net_solver`; `lib.rs:877` Manifest-Schluessel
+    `mirror_other_val` -> `single_pass_other_val` plus `r5_net_solver` (danach Alias
+    `MIRROR_OTHER_VAL` weg); `py.rs::search_config_json` beide Felder; `self_play.py` Flag
+    `--tie-mirror-p`; `tools/generate_knob_docs.py`; `PREREG_r5_net_vs_solver.md` par.2
+    Pfadliste (fuenf Lesestellen, Agentenbericht 2026-09-26); Review #16 Maske in
+    `corpus_dataset.py` (`if step.get("fallback_random_action") is True: pol_w = 0.0` hinter der
+    `return_order_randomized`-Zeile, Cache-Schluessel-Frage klaeren), #18, #19, #20, #23;
+    `self_play.py` Flags `--label-rng-split` / `--excursion-reshuffle` (setzen die Env vor dem
+    Rust-Aufruf, ins Manifest); **Smoke-Lauf mit gesetzten Knoepfen** vor jeder Erzeugung (die
+    Knoepfe sind prozessweit, nur Bausteine sind getestet); E4-Vortest verwirft Records ohne
+    Steinzug in `valid_actions` (`json_to_state` rekonstruiert pending-Wahlen nicht).
+    Heuristik-Pfad: `drafting_policy` liefert jetzt einen dritten Rueckgabewert (#16) -- die
+    Anker-Invarianz muss das als bitgleich bestaetigen.
+    **Review #5 NICHT umgesetzt:** `tools/analyze_game_log.py:1026-1043` erzeugt Teil-Mond-Entnahmen
+    absichtlich als Rettungskandidaten fuers Nachspielen alter Menschenpartien (auch
+    `/api/debug/replay_log`); ein Fix braucht einen Schalter nur fuer den Replayer -- Nutzer-Entscheid.
+    **Review #17 aendert legale Eingaben gewollt:** `json_to_state` liest `first_player_next_round`,
+    betrifft Diagnose-/Seeding-Pfade (Merkmal P.15), nicht die Trainingsmerkmale aus Records.
+    **Folgen fuer Tools** (beim Nachzug pruefen): `gui_node_gate_smoke.py` spielt jetzt ganz Runde 5,
+    `analyze_game_log.py` implizite Paesse und spaetes `select_scoring`, `claude_play.py` pass/floor.
+    `server.py`-Syntax ungeprueft (kein python waehrend der Kette).
+    **REZEPTDATEI JE GENERATION** (Nutzer 2026-09-26: *"Ja nimm es auf ... Vielleicht machst sowas
+    wie eine config Datei in der das alles festgeschrieben steht"*): `models/v34.recipe.json` mit
+    `common` und `classes` (Seeds, Klassen-Flags, Partie-Knoepfe wie `tie_mirror_p`,
+    `label_rng_split`, `excursion_reshuffle`; Such-Knoepfe je Seite bleiben in der Spec, auf die das
+    Rezept verweist). `self_play.py --recipe <datei> --class <name>` setzt Flags UND Env selbst,
+    lehnt unbekannte Schluessel ab; Manifest traegt Rezept (Pfad, sha256, Inhalt) plus
+    `mosaic_env` (alle `MOSAIC_*`); Waechter vergleicht `engine_config` VOR dem ersten Spiel mit dem
+    Rezept; Manifest-Diff auf Rezept-Ebene. Erste Anwendung: die v34-Erzeugung.
+    **Stand 2026-09-27 02:55:** gemeinsamer Helfer `tools/recipe_config.py` plus
+    `tools/tests/test_recipe_config.py` GESCHRIEBEN, nicht ausgefuehrt (Regel allgemein:
+    `docs/working_rules.md` Arbeitskonventionen). Offen: Tests laufen lassen, Einhaengen in
+    `self_play.py` / `train.py` / `paired_gating.py` (Einhaengeplan selbst erstellen, der Agent
+    brach am Nutzungslimit vor dem Bericht ab), Entwurf `models/v34.recipe.json` aus den v33-Flags.
 3c. **Code-Review vom 2026-09-26 umsetzen** (Nutzer: *"Mach das"*; Review als Claude-Docs-Dokument
     "Code-Review mosaic-AI", 23 Befunde; Nachpruefung lesend nach
     `evaluations/review/code_review_2026-09-26_verification.md`). IN DERSELBEN Wheel-Runde wie 3b,
@@ -326,6 +366,12 @@ Beim Generationswechsel am 2026-09-25 auf ENTSCHIEDEN gezogen bzw. ergaenzt: `v3
     Offen fuer v34: ob ueberhaupt, und welche Klasse -- der Ausflug liefert unverzerrte Ziele,
     der temperierte Schwarm Breite; die Vielfaltssonde an `value-tempc-nohull` (v33 par.9)
     liefert dazu die erste Zahl.
+    **BEANTWORTET 2026-09-27: NEIN.** b03 (+4.000 frische Schwarm-Partien) gegen b01: 411:389,
+    z +0,75; b02 (ohne alten Schwarm) 574:516, z +1,76; b04 (nur frische Wertziele) gegen b02
+    399:401, z -0,07; Val-Brier aller vier Arme innerhalb 0,001 (`PREREG_v33_window.md` par.6a,
+    par.6d). Volumen und Alter des Value-Materials sind in dieser Aera KEIN Hebel mehr; die
+    Volumenbelege stammen aus der v20-Aera. Naechster Kandidat: gezieltes Abzweigen. Fuer v34
+    offen: das billigere Fenster (b02 oder b04) waehlen -- Nutzer-Entscheid.
 15. **ENTSCHIEDEN 2026-09-26: Stufenregel gilt fuer v33** (Nutzer: *"Setz es um wie vorgeschlagen"*). Frueher offen: **Stufenregel fuer Tor 1 behalten?** (`PREREG_v33_window.md` par.2a, in der v33-Kette
     eingebaut): ein dritter Seed kostet rund 2 h, nur wenn die ersten zwei sich widersprechen.
     Er aendert ein Verdikt nur in knappen Faellen, weil das Kriterium auch "gepoolt >= 52,5

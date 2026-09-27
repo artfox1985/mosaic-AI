@@ -192,12 +192,95 @@ fn apply_step(state: &GameState, pi: usize, step: &TilingStep) -> Option<(GameSt
     }
 }
 
+// ── Spiegelknopf: Kandidaten-Reihenfolge des echten Zugs ────────────────────
+//
+// `PREREG_tie_mirror.md` par.2 (Nutzer 2026-09-26). `generate_tiling_actions`
+// zaehlt die Zellen je Musterreihe mit Slot-Spalte aufsteigend, und jeder
+// Waehler dieses Moduls uebernimmt nur bei STRIKT besserem Wert (`>`), bzw.
+// nimmt beim Gleichstand den ersten Kandidaten -- die linke Zelle gewinnt.
+// In einer gespiegelten Partie (`tie_mirror::game_tie_mirror`) werden die
+// Platzierungen JE MUSTERREIHE in gespiegelter Rasterspalte betrachtet
+// (`2 * slot_col + space_index % 2` absteigend); Reihenfolge der Musterreihen
+// und Lage der Chip-Schritte bleiben, wie sie sind. Damit kippen ALLE
+// Gleichstandsbrueche, die an der Kandidaten-Reihenfolge haengen (Punkte,
+// Huellen-Score, Netz-Stichentscheid bei gleichem Wert, Runde-5-`max_by_key`)
+// in das Spiegelbild, ohne dass ein Waehler selbst angefasst wird.
+//
+// Gelesen wird der Schalter NUR auf dem Entscheidungspfad
+// (`best_first_step_inner`, `top_k_tilings`), nicht im Blatt-Hot-Path
+// (`solve_max_tiling_points*`, `project_rec`, `solve_rec_endaware`): deren
+// Rueckgabe ist ein reiner Wert und haengt von der Reihenfolge nur ab, wenn
+// das Knotenbudget reisst; `project_rec` speist ausserdem die Netz-Eingabe
+// (features.rs, Variante C), die im Training ohne Schalter aus dem Record neu
+// gerechnet wird -- ein gespiegelter Wert dort waere ein Eingabe-Versatz.
+
+/// Rasterspalte (0..6) der Zielzelle einer Platzierung
+/// (`DomeGrid::cell_to_dome_space` rueckwaerts: `col6 = 2 * sc + si % 2`).
+#[inline]
+fn target_grid_col(ta: &TilingAction) -> usize {
+    ta.slot_col * 2 + ta.space_index % 2
+}
+
+/// Spiegelt die Reihenfolge der Platzierungen JE zusammenhaengendem Block
+/// gleicher Musterreihe: Rasterspalte absteigend (stabile Sortierung). Chip-
+/// Schritte und die Reihenfolge der Musterreihen bleiben stehen.
+fn mirror_place_order(steps: &mut [TilingStep]) {
+    let mut i = 0;
+    while i < steps.len() {
+        let row = match &steps[i] {
+            TilingStep::Place(ta) => ta.pattern_row,
+            _ => {
+                i += 1;
+                continue;
+            }
+        };
+        let mut j = i + 1;
+        while j < steps.len() && matches!(&steps[j], TilingStep::Place(tb) if tb.pattern_row == row) {
+            j += 1;
+        }
+        steps[i..j].sort_by_key(|s| match s {
+            TilingStep::Place(ta) => std::cmp::Reverse(target_grid_col(ta)),
+            // Im Block stehen nur Platzierungen (Schleife oben); der Arm ist
+            // fuer die Vollstaendigkeit des `match` da.
+            _ => std::cmp::Reverse(0),
+        });
+        i = j;
+    }
+}
+
+/// [`legal_steps`] in der Reihenfolge, die der ENTSCHEIDUNGSPFAD betrachtet:
+/// Bestand, oder bei `mirror` gespiegelt ([`mirror_place_order`]). `mirror`
+/// kommt als Parameter herein (einmal je Entscheid gelesen), nicht aus der
+/// Rekursion heraus neu.
+fn decision_steps(state: &GameState, pi: usize, exact: bool, mirror: bool) -> Vec<TilingStep> {
+    let mut steps = legal_steps(state, pi, exact);
+    if mirror {
+        mirror_place_order(&mut steps);
+    }
+    steps
+}
+
 fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool, budget: &mut u32) -> i32 {
+    solve_rec_ordered(state, pi, depth, exact, false, budget)
+}
+
+/// Rumpf von [`solve_rec`] mit der Kandidaten-Reihenfolge als Parameter. Der
+/// Hot-Path ruft ihn ueber `solve_rec` mit `mirror = false` (unveraendert);
+/// nur [`best_first_step_inner`] reicht den Spiegel-Schalter durch, damit der
+/// echte Zug auch bei reissendem Knotenbudget das exakte Spiegelbild ist.
+fn solve_rec_ordered(
+    state: &GameState,
+    pi: usize,
+    depth: u32,
+    exact: bool,
+    mirror: bool,
+    budget: &mut u32,
+) -> i32 {
     if depth >= MAX_DEPTH || *budget == 0 {
         return 0;
     }
     *budget -= 1;
-    let steps = legal_steps(state, pi, exact);
+    let steps = decision_steps(state, pi, exact, mirror);
     if steps.is_empty() {
         return 0;
     }
@@ -209,7 +292,7 @@ fn solve_rec(state: &GameState, pi: usize, depth: u32, exact: bool, budget: &mut
             break; // Budget erschöpft: bisher bestes Ergebnis liefern statt hängen.
         }
         if let Some((next, pts)) = apply_step(state, pi, step) {
-            let total = pts + solve_rec(&next, pi, depth + 1, exact, budget);
+            let total = pts + solve_rec_ordered(&next, pi, depth + 1, exact, mirror, budget);
             if total > best {
                 best = total;
             }
@@ -772,7 +855,10 @@ pub fn solve_round_final_score_endaware(state: &GameState, pi: usize) -> i32 {
 /// platzierbar/komplettierbar ist. `exact` → exakte Chip-Allokationssuche
 /// (nur für den echten Zug verwenden, NICHT pro MCTS-Blatt).
 fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingStep {
-    let steps = legal_steps(state, pi, exact);
+    // Spiegelknopf (PREREG_tie_mirror.md par.2): EINMAL je Entscheid gelesen und
+    // durch die Rekursion gereicht. Ungespiegelt exakt der Bestand.
+    let mirror = crate::tie_mirror::game_tie_mirror();
+    let steps = decision_steps(state, pi, exact, mirror);
     if steps.is_empty() {
         return TilingStep::End;
     }
@@ -791,7 +877,7 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
             break; // Budget erschöpft: bisher besten Schritt liefern statt hängen.
         }
         if let Some((next, pts)) = apply_step(state, pi, &step) {
-            let mut val = f64::from(pts + solve_rec(&next, pi, 1, exact, &mut budget));
+            let mut val = f64::from(pts + solve_rec_ordered(&next, pi, 1, exact, mirror, &mut budget));
             if TILING_SHAPING_ENABLED {
                 let delta = crate::scoring::scoring_progress(
                     &next.players[pi],
@@ -879,19 +965,25 @@ pub struct TilingOutcome {
     pub final_state: GameState,
 }
 
+/// `mirror`: Kandidaten-Reihenfolge des Spiegelknopfs ([`decision_steps`]),
+/// einmal in [`top_k_tilings`] gelesen und durch die Rekursion gereicht --
+/// die DFS-Reihenfolge und damit Budget-/Blatt-Deckel, stabile Punkte-
+/// Sortierung und Dedup-Vertreter werden so zum Spiegelbild des Bestands.
+#[allow(clippy::too_many_arguments)]
 fn collect_tilings(
     state: &GameState,
     pi: usize,
     acc: i32,
     first: Option<&TilingStep>,
     depth: u32,
+    mirror: bool,
     budget: &mut u32,
     out: &mut Vec<TilingOutcome>,
 ) {
     if *budget == 0 || out.len() >= MAX_TILING_LEAVES || depth >= MAX_DEPTH {
         return;
     }
-    let steps = legal_steps(state, pi, true);
+    let steps = decision_steps(state, pi, true, mirror);
     if steps.is_empty() {
         if let Some(f) = first {
             out.push(TilingOutcome {
@@ -909,7 +1001,7 @@ fn collect_tilings(
         *budget -= 1;
         if let Some((next, pts)) = apply_step(state, pi, &step) {
             let f = first.unwrap_or(&step).clone();
-            collect_tilings(&next, pi, acc + pts, Some(&f), depth + 1, budget, out);
+            collect_tilings(&next, pi, acc + pts, Some(&f), depth + 1, mirror, budget, out);
         }
     }
 }
@@ -969,7 +1061,9 @@ impl TilingBudgetStats {
 pub fn top_k_tilings(state: &GameState, pi: usize, k: usize) -> Vec<TilingOutcome> {
     let mut out: Vec<TilingOutcome> = Vec::new();
     let mut budget = NODE_BUDGET;
-    collect_tilings(state, pi, 0, None, 0, &mut budget, &mut out);
+    // Spiegelknopf (PREREG_tie_mirror.md par.2): ungespiegelt exakt der Bestand.
+    let mirror = crate::tie_mirror::game_tie_mirror();
+    collect_tilings(state, pi, 0, None, 0, mirror, &mut budget, &mut out);
     {
         use std::sync::atomic::Ordering::Relaxed;
         TILING_BUDGET_STATS.calls.fetch_add(1, Relaxed);
@@ -3637,5 +3731,115 @@ mod tests {
         clear_tiling_caches_for_test();
         assert!(a.newly_filled.iter().any(|x| *x), "Fall A muesste eine Zelle fuellen");
         assert!(!b.newly_filled.iter().any(|x| *x), "Fall B bekam As Eintrag (Kollision)");
+    }
+
+    // ── Spiegelknopf (PREREG_tie_mirror.md par.2) ──────────────────────────
+
+    /// Zwei gleich gute Zellen fuer dieselbe volle Musterreihe 0 (Rot): Platte
+    /// `pool[2]` (si1 = Rot) in Slot (0,0) -> Rasterspalte 1, und dieselbe
+    /// Platte in Slot (0,2) -> Rasterspalte 5. Beide Steine stehen allein,
+    /// je 1 Punkt.
+    fn mirror_tie_state() -> GameState {
+        let mut s = tiling_state(7);
+        let pool = build_dome_tile_pool();
+        s.players[0].dome_grid.place_dome_tile(pool[2].clone(), 0, 0).unwrap();
+        s.players[0].dome_grid.place_dome_tile(pool[2].clone(), 0, 2).unwrap();
+        s.players[0].pattern_lines[0].add_tiles(&[Rot]);
+        s
+    }
+
+    fn placed_col(step: &TilingStep) -> Option<usize> {
+        match step {
+            TilingStep::Place(ta) => Some(target_grid_col(ta)),
+            _ => None,
+        }
+    }
+
+    /// Alle Waehler des echten Zugs auf dem Gleichstands-Brett, als
+    /// Rasterspalte der gewaehlten Zelle: (exakter Loeser, Greedy-Loeser,
+    /// Netz-Stichentscheid Top-12, Huellen-Zweig K3 (d), voller Einstieg in
+    /// Runde 2 mit Stichentscheid).
+    fn chosen_cols_on_tie_board() -> [Option<usize>; 5] {
+        let s = mirror_tie_state();
+        let neutral = |_: &GameState| 0.5;
+        let mut s2 = s.clone();
+        s2.round_number = 2;
+        let cols = [
+            placed_col(&best_first_step_exact(&s, 0)),
+            placed_col(&best_first_step(&s, 0)),
+            best_first_step_valued(&s, 0, &neutral).as_ref().and_then(placed_col),
+            best_first_step_envelope_valued(
+                &s, 0, 0.0, 0.0, 1.0, None, None, NET_TILING_TIEBREAK_DEFAULT,
+            )
+            .as_ref()
+            .and_then(placed_col),
+            placed_col(&best_first_step_exact_or_valued_envelope(
+                &s2, 0, Some(&neutral), None, &crate::envelope::EnvelopeTilingParams::OFF, None,
+                NET_TILING_TIEBREAK_DEFAULT,
+            )),
+        ];
+        cols
+    }
+
+    /// Knopf AUS: die Wahl ist die des Bestands (linke Zelle), und die
+    /// Kandidatenfolge ist unveraendert links vor rechts.
+    #[test]
+    fn tie_mirror_off_keeps_left_choice_on_tie() {
+        let _g = crate::tie_mirror::TieMirrorGuard::set(false);
+        let s = mirror_tie_state();
+        let cols: Vec<usize> = legal_steps(&s, 0, true).iter().filter_map(placed_col).collect();
+        assert_eq!(cols, vec![1, 5], "Vorbedingung: genau die zwei Zellen, links zuerst");
+        let cands = top_k_tilings(&s, 0, NET_TILING_TOPK);
+        let cand_cols: Vec<usize> = cands.iter().filter_map(|c| placed_col(&c.first_step)).collect();
+        assert_eq!(cand_cols, vec![1, 5], "Bestand: Top-k links vor rechts");
+        assert_eq!(cands[0].points, cands[1].points, "Vorbedingung: Punktegleichstand");
+        assert_eq!(chosen_cols_on_tie_board(), [Some(1); 5], "Bestand waehlt links");
+    }
+
+    /// Knopf AN und Partie gespiegelt: bei zwei gleich guten Zellen wird an
+    /// JEDEM Waehler rechts gewaehlt; der Wert selbst aendert sich nicht.
+    #[test]
+    fn tie_mirror_on_picks_right_cell_on_tie() {
+        let s = mirror_tie_state();
+        let exact_off = {
+            let _g = crate::tie_mirror::TieMirrorGuard::set(false);
+            solve_max_tiling_points_exact(&s, 0)
+        };
+        let _g = crate::tie_mirror::TieMirrorGuard::set(true);
+        let cands = top_k_tilings(&s, 0, NET_TILING_TOPK);
+        let cand_cols: Vec<usize> = cands.iter().filter_map(|c| placed_col(&c.first_step)).collect();
+        assert_eq!(cand_cols, vec![5, 1], "gespiegelt: Top-k rechts vor links");
+        assert_eq!(chosen_cols_on_tie_board(), [Some(5); 5], "gespiegelt waehlt rechts");
+        assert_eq!(solve_max_tiling_points_exact(&s, 0), exact_off, "der Wert bleibt gleich");
+    }
+
+    /// Reine Umordnung: je Block gleicher Musterreihe Rasterspalte absteigend;
+    /// Reihenfolge der Musterreihen und Lage der Chip-Schritte bleiben.
+    #[test]
+    fn mirror_place_order_reverses_columns_within_each_pattern_row() {
+        let place = |pattern_row, slot_col, space_index| {
+            TilingStep::Place(TilingAction { pattern_row, slot_row: pattern_row / 2, slot_col, space_index })
+        };
+        let mut steps = vec![
+            place(0, 0, 0), // Spalte 0
+            place(0, 0, 1), // Spalte 1
+            place(0, 2, 1), // Spalte 5
+            place(1, 1, 2), // Spalte 2
+            place(1, 2, 3), // Spalte 5
+            TilingStep::Chips { row: 3, chips: vec![0] },
+        ];
+        mirror_place_order(&mut steps);
+        let got: Vec<(usize, Option<usize>)> = steps
+            .iter()
+            .map(|s| match s {
+                TilingStep::Place(ta) => (ta.pattern_row, Some(target_grid_col(ta))),
+                TilingStep::Chips { row, .. } => (*row, None),
+                TilingStep::End => (usize::MAX, None),
+            })
+            .collect();
+        assert_eq!(
+            got,
+            vec![(0, Some(5)), (0, Some(1)), (0, Some(0)), (1, Some(5)), (1, Some(2)), (3, None)]
+        );
     }
 }

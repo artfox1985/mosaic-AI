@@ -276,3 +276,21 @@ gemessen).
   und `git add -f evaluations/artifacts`.
 - **Der Ahead-Stand wird im CHAT gemeldet, NICHT in STATUS gefuehrt** -- dort
   verrottet er sofort (Nutzer 2026-08-28).
+- **Rezeptdatei statt langer Flag-Listen** (Nutzer 2026-09-26: *"Das kannst generell einfuehren
+  fuer Funktionen mit vielen flags"*). Werkzeuge mit vielen Flags und Umgebungsvariablen
+  (`self_play.py`, `train.py`, `tools/paired_gating.py`, die Cache-/Fensterwerkzeuge) nehmen
+  `--recipe <datei.json>`; die Aufrufe der Ketten nennen nur noch Rezept (und ggf. Klasse/Arm).
+  Bauform, EIN gemeinsamer Helfer fuer alle:
+  * Schluessel des Rezepts sind die argparse-`dest`-Namen; ein Abschnitt `env` setzt
+    `MOSAIC_*`-Variablen VOR dem ersten Import der Engine. **Unbekannte Schluessel brechen ab**
+    (ein Tippfehler darf nicht still zum Default werden).
+  * Explizite Kommandozeilen-Flags ueberschreiben das Rezept nur mit Protokoll im Manifest
+    (Feld `recipe_overrides`), damit ein Abweichen sichtbar bleibt.
+  * Das Lauf-Manifest traegt das Rezept (Pfad, sha256, Inhalt) und alle `MOSAIC_*` der
+    Umgebung (`mosaic_env`), wie heute schon `spec_file`.
+  * Wo die Engine meldet, was sie tatsaechlich gelesen hat (`engine_config_json`), vergleicht ein
+    Waechter das VOR dem Start mit dem Rezept und bricht bei Abweichung ab.
+  * Abgrenzung: die Spec (`models/*.spec.json`) bleibt die Suchkonfiguration JE SEITE, die auch
+    Arena und GUI laden; das Rezept beschreibt den LAUF und verweist auf die Spec.
+  Erste Anwendung: die v34-Erzeugung (STATUS Fahrplan 3e), danach Training und Arena. Rezepte
+  liegen neben ihren Specs unter `models/` und werden mit der Generation versioniert.

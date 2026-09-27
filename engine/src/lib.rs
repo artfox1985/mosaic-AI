@@ -56,6 +56,7 @@ pub mod serialize;
 pub mod column_build;
 pub mod state;
 pub mod supply;
+pub mod tie_mirror;
 pub mod tiling_solver;
 pub mod tile;
 pub mod validation;
@@ -841,6 +842,19 @@ fn engine_config_json() -> String {
         // `stack_draw_research` unten, samt derselben OnceLock-Warnung:
         // Variable setzen, DANN lesen).
         "return_order_random_p": crate::self_play::return_order_random_p(),
+        // PREREG_tie_mirror.md par.2: Wahrscheinlichkeit je Partie, dass die
+        // ERZEUGUNG die Gleichstandsregeln (Huellenwahl, Tiling-Zelle) nach
+        // rechts kippt (0 = Bestand). Aus demselben Grund im Manifest wie
+        // `return_order_random_p` darueber; kein Spec-Feld, Getter aus
+        // `tie_mirror` mit derselben OnceLock-Regel (Variable setzen, DANN lesen).
+        "tie_mirror_p": crate::tie_mirror::tie_mirror_p(),
+        // Code-Review 2026-09-26 #13: eigener Label-Strom (rtv/Bootstrap) statt
+        // Partie-RNG. Aendert Self-Play-Bytes, darum im Manifest; OnceLock-Regel
+        // wie oben (Variable setzen, DANN lesen).
+        "label_rng_split": crate::self_play::label_rng_split_enabled(),
+        // Code-Review 2026-09-26 #14: Neumischung der verdeckten Welt am
+        // Ausflug-Abzweig (Weg B). Gleiche Begruendung und OnceLock-Regel.
+        "excursion_reshuffle": crate::self_play::excursion_reshuffle_enabled(),
         // PREREG_moon_stack_order.md par.4: Fan-out ueber die Reihenfolge der
         // Mondsteine nach einem Sonnenzug (1 = Bestand, 0 = nur die kanonische
         // Reihenfolge). Aus demselben Grund im Manifest wie `return_order_mode`
@@ -867,7 +881,13 @@ fn engine_config_json() -> String {
         // Lauf mit abgeschaltetem Zweig waere sonst nachtraeglich nicht von
         // einem Bestandslauf zu unterscheiden.
         "net_tiling_tiebreak": crate::net_mcts::SearchConfig::from_env().net_tiling_tiebreak,
+        // E1 (PREREG_evaluator_pretests.md par.5): der Env-Default, den Seiten ohne
+        // Spec-Feld und die Label-Pfade lesen; der alte Schluessel bleibt fuer Diffs
+        // gegen Alt-Manifeste stehen.
         "mirror_other_val": MIRROR_OTHER_VAL,
+        "single_pass_other_val": crate::net_mcts::single_pass_other_val_env(),
+        // R5-Schalter (PREREG_r5_net_vs_solver.md par.2): Env-Default der Seiten ohne Spec-Feld.
+        "r5_net_solver": crate::round5::net_solver_enabled(),
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
         // Arm v29-b02). Gehoert ins Lauf-Manifest, weil er den EINGANG des Netzes
@@ -1505,6 +1525,151 @@ fn end_scoring_from_state_json(
     let result = crate::serialize::end_scoring_from_state(&parsed, &tile_ids, &mut rng)
         .map_err(PyValueError::new_err)?;
     Ok(result.to_string())
+}
+
+/// E4-Export (`evaluations/PREREG_evaluator_pretests.md` par.5a/par.5c): je
+/// legalem Steinzug des Spielers am Zug die Folge auf der Zielmusterreihe --
+/// reine LESEFUNKTION, aendert nichts an Suche, Self-Play oder Wertung.
+///
+/// Warum in Rust: die Regel "wie viele Steine nimmt ein Zug" (Sonne nimmt alle
+/// einer Farbe, Aktion C nimmt die obersten einer Farbe ueber ALLE Mondbereiche,
+/// Startspielerstein, Strafleiste mit Turm-Ueberlauf) wird NICHT nachgebaut
+/// (CLAUDE.md Regel 0, Ausloeser 3). Jeder Zug laeuft auf einem KLON durch
+/// `execution::execute_move`, genau die Ausfuehrung, die auch
+/// `Game::apply_drafting` fuer einen Steinzug benutzt (game.rs, Zweig
+/// `Action::Stone` ohne Mondknoten). NICHT ueber `apply_drafting` selbst: das
+/// schliesst nach dem letzten Zug der Phase `check_phase_transition` an und
+/// schiebt unplatzierbare Reihen auf die Strafleiste
+/// (`process_unplaceable_rows`) -- das waere eine FOLGE des Phasenwechsels,
+/// nicht des Zugs, und verfaelschte `tiles_into_row`/`overflow_to_floor`.
+/// Mondknoten (Weg A) sind im rekonstruierten Zustand ohnehin aus
+/// (`json_to_state` setzt `extended_action_nodes = false`).
+///
+/// Legale Zuege: `game::drafting_actions` (dieselbe Quelle wie Suche und
+/// Self-Play), gefiltert auf `Action::Stone`. Sonnenzuege aus kleinen Fabriken
+/// kommen dort je Mondreihenfolge mehrfach vor; die Reihenfolge aendert nur den
+/// Mondstapel, nicht die Musterreihe -- es bleibt je (Quelle, Fabrik, Farbe,
+/// Reihe) der ERSTE Eintrag.
+///
+/// Ausgabe: JSON-Array, je Zug
+/// `{player, source, factory_id, color, row, action, tiles_taken,
+///   tiles_into_row, overflow_to_floor, floor_slots_filled, to_tower,
+///   row_fill_before, row_capacity, row_full_after, took_first_player_marker}`.
+/// * `source`: Schreibweise wie `py.rs::parse_source` (`SMALL_FACTORY_SUN`, ...);
+///   `factory_id` `null` bei grosser Fabrik und Aktion C.
+/// * `row`: 0..5 Musterreihe, `-1` = direkt auf die Strafleiste. Dann sind
+///   `row_fill_before`, `row_capacity`, `row_full_after` `null` und
+///   `tiles_into_row = 0`.
+/// * `overflow_to_floor`: Steine DIESES Zugs, die nicht in der Reihe landen
+///   (Strafleiste plus, falls sie voll ist, Turm) =
+///   `floor_slots_filled + to_tower`. Beim direkten Strafleisten-Zug alle.
+/// * `tiles_taken = tiles_into_row + overflow_to_floor` (Erhaltung; gemessen
+///   als Summe der drei Zuwaechse, nicht nachgerechnet).
+/// * `action`: `self_play::action_to_env_dict` des Zugs, damit Python gegen
+///   `valid_actions`/`policy` eines Records joinen kann.
+/// * Nicht-Drafting-Phase oder ausstehende Startkuppel: leeres Array.
+///
+/// Rueckweg JSON -> Zustand: `serialize::json_to_state`. Fuer die Steinzahl
+/// verliert er nichts: Fabriken (Sonne, Mondstapel in Reihenfolge), grosse
+/// Fabrik samt Marker, Musterreihen samt `phantom_count`, Strafleiste und
+/// Turm-Farbzaehler stehen woertlich im Record; neu gemischt werden nur
+/// Beutel, Kuppelstapel und verdeckte Chips, die ein Steinzug nicht liest.
+/// ABER: `pending_dome_choice`, `pending_moon_order` und
+/// `pending_return_order` serialisiert `state_to_json` nicht (serialize.rs,
+/// Kategorie 3). Ein Record mitten in einer solchen Wahl wird als "Drafting
+/// frei" rekonstruiert und liefert hier Steinzuege, die im echten Zustand
+/// NICHT legal waren. Solche Records erkennt der Aufrufer an ihrem
+/// `valid_actions`-Feld (aus dem echten Zustand): enthaelt es keinen
+/// Steinzug, ist das Ergebnis hier zu verwerfen.
+#[pyfunction]
+fn stone_move_outcomes_from_json(state_json: String) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    // Fester Seed: der RNG mischt nur verdeckte Sammlungen, die kein Steinzug
+    // liest -- das Ergebnis haengt nicht von ihm ab.
+    let mut rng = StdRng::seed_from_u64(0);
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    Ok(serde_json::Value::Array(stone_move_outcomes(&state)).to_string())
+}
+
+/// Schreibweise der Quelle wie `py.rs::parse_source`.
+fn take_source_name(source: crate::moves::TakeSource) -> &'static str {
+    use crate::moves::TakeSource;
+    match source {
+        TakeSource::SmallFactorySun => "SMALL_FACTORY_SUN",
+        TakeSource::SmallFactoryMoon => "SMALL_FACTORY_MOON",
+        TakeSource::LargeFactorySun => "LARGE_FACTORY_SUN",
+        TakeSource::LargeFactoryMoon => "LARGE_FACTORY_MOON",
+    }
+}
+
+/// Rumpf von [`stone_move_outcomes_from_json`] auf einem fertigen Zustand
+/// (testbar ohne Python). Beschreibung der Felder dort.
+pub(crate) fn stone_move_outcomes(state: &crate::state::GameState) -> Vec<serde_json::Value> {
+    use crate::moves::{Action, TakeSource};
+    use crate::tile::TileColor;
+
+    if state.phase != crate::state::Phase::Drafting
+        || state.players.iter().any(|p| p.start_tile_pending)
+    {
+        return Vec::new();
+    }
+    let pi = state.current_player;
+    let mut seen: Vec<(TakeSource, Option<usize>, TileColor, i32)> = Vec::new();
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    for action in crate::game::drafting_actions(state) {
+        let Action::Stone(m) = &action else { continue };
+        let key = (m.take.source, m.take.factory_id, m.take.color, m.place.row_index);
+        if seen.contains(&key) {
+            continue;
+        }
+        seen.push(key);
+
+        let row = m.place.row_index;
+        let row_idx = usize::try_from(row).ok();
+        let mut probe = state.clone();
+        let row_fill_before = row_idx.map(|r| probe.players[pi].pattern_lines[r].tiles.len());
+        let row_capacity = row_idx.map(|r| probe.players[pi].pattern_lines[r].capacity());
+        let floor_before = probe.players[pi].broken_tiles.len();
+        let tower_before = probe.tower.tiles.len();
+        let marker_before = probe.players[pi].holds_first_player_marker;
+
+        crate::execution::execute_move(&mut probe, m);
+
+        let row_fill_after = row_idx.map(|r| probe.players[pi].pattern_lines[r].tiles.len());
+        let tiles_into_row = match (row_fill_before, row_fill_after) {
+            (Some(b), Some(a)) => a.saturating_sub(b),
+            _ => 0,
+        };
+        let floor_slots_filled = probe.players[pi].broken_tiles.len().saturating_sub(floor_before);
+        let to_tower = probe.tower.tiles.len().saturating_sub(tower_before);
+        let overflow_to_floor = floor_slots_filled + to_tower;
+        let row_full_after = row_idx.map(|r| probe.players[pi].pattern_lines[r].is_complete());
+        let took_marker = !marker_before && probe.players[pi].holds_first_player_marker;
+
+        out.push(json!({
+            "player": pi,
+            "source": take_source_name(m.take.source),
+            "factory_id": m.take.factory_id,
+            "color": m.take.color.value(),
+            "row": row,
+            "action": crate::self_play::action_to_env_dict(state, &action),
+            "tiles_taken": tiles_into_row + overflow_to_floor,
+            "tiles_into_row": tiles_into_row,
+            "overflow_to_floor": overflow_to_floor,
+            "floor_slots_filled": floor_slots_filled,
+            "to_tower": to_tower,
+            "row_fill_before": row_fill_before,
+            "row_capacity": row_capacity,
+            "row_full_after": row_full_after,
+            "took_first_player_marker": took_marker,
+        }));
+    }
+    out
 }
 
 /// Vollendbarkeit der Plattengeometrien fuer einen extern gespeicherten Zustand
@@ -2332,6 +2497,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(bootstrap_horizon_stage0_probe_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(stone_move_outcomes_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(plate_completability_json, m)?)?;
     m.add_function(wrap_pyfunction!(state_json_to_exact_json, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_shaping_e_json, m)?)?;
@@ -2527,5 +2693,105 @@ mod contract_stamp_tests {
             parsed["num_planes_channels"].as_u64(),
             Some(crate::features::NUM_PLANES_CHANNELS as u64)
         );
+    }
+}
+
+/// E4-Export (`stone_move_outcomes_from_json`): ein kleines Brett mit bekannter
+/// Folge, einmal ueber den Rumpf und einmal ueber den JSON-Rueckweg.
+#[cfg(test)]
+mod stone_move_outcomes_tests {
+    use super::*;
+    use crate::board::PatternLine;
+    use crate::tile::TileColor;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    /// Spieler 0 am Zug; Fabrik 0 traegt Blau x3 + Rot x1; alle Musterreihen
+    /// leer bis auf Reihe 2 (Kapazitaet 3) mit einem Blau; Strafleiste leer.
+    fn known_board() -> (crate::state::GameState, usize) {
+        let mut rng = StdRng::seed_from_u64(17);
+        let mut s = crate::state::setup_new_game(["P0".into(), "P1".into()], 0, &mut rng);
+        for p in s.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        s.phase = crate::state::Phase::Drafting;
+        s.current_player = 0;
+        s.factories[0].sun_tiles = vec![TileColor::Blau, TileColor::Blau, TileColor::Blau, TileColor::Rot];
+        let fid = s.factories[0].factory_id;
+        let p = &mut s.players[0];
+        p.pattern_lines = (0..6).map(PatternLine::new).collect();
+        p.pattern_lines[2].tiles = vec![TileColor::Blau];
+        p.pattern_lines[2].color = Some(TileColor::Blau);
+        p.broken_tiles.clear();
+        (s, fid)
+    }
+
+    fn find<'a>(out: &'a [serde_json::Value], fid: usize, color: &str, row: i64) -> Vec<&'a serde_json::Value> {
+        out.iter()
+            .filter(|e| {
+                e["source"] == "SMALL_FACTORY_SUN"
+                    && e["factory_id"].as_u64() == Some(fid as u64)
+                    && e["color"] == color
+                    && e["row"].as_i64() == Some(row)
+            })
+            .collect()
+    }
+
+    fn check_known_board(out: &[serde_json::Value], fid: usize) {
+        // (Reihe, in die Reihe, Ueberlauf, Reihe voll, Fuellstand vorher)
+        let expected: [(i64, u64, u64, Option<bool>, Option<u64>); 5] = [
+            (0, 1, 2, Some(true), Some(0)),
+            (1, 2, 1, Some(true), Some(0)),
+            (2, 2, 1, Some(true), Some(1)),
+            (3, 3, 0, Some(false), Some(0)),
+            (-1, 0, 3, None, None),
+        ];
+        for (row, into, overflow, full, fill_before) in expected {
+            let hits = find(out, fid, "blau", row);
+            assert_eq!(hits.len(), 1, "Blau aus F{fid} in Reihe {row}: genau EIN Eintrag erwartet, {}", hits.len());
+            let e = hits[0];
+            assert_eq!(e["player"].as_u64(), Some(0));
+            assert_eq!(e["tiles_taken"].as_u64(), Some(3), "Reihe {row}: Sonne nimmt alle drei Blau");
+            assert_eq!(e["tiles_into_row"].as_u64(), Some(into), "Reihe {row}: tiles_into_row");
+            assert_eq!(e["overflow_to_floor"].as_u64(), Some(overflow), "Reihe {row}: overflow_to_floor");
+            assert_eq!(e["row_full_after"].as_bool(), full, "Reihe {row}: row_full_after");
+            assert_eq!(e["row_fill_before"].as_u64(), fill_before, "Reihe {row}: row_fill_before");
+            assert_eq!(e["took_first_player_marker"].as_bool(), Some(false));
+            assert_eq!(e["action"]["type"], "stone");
+        }
+        // Rot passt nicht in die Blau-Reihe 2 -- kein Eintrag.
+        assert!(find(out, fid, "rot", 2).is_empty(), "Rot in die Blau-Reihe waere illegal");
+        // Rot in die leere Reihe 0: ein Stein, kein Ueberlauf.
+        let rot0 = find(out, fid, "rot", 0);
+        assert_eq!(rot0.len(), 1);
+        assert_eq!(rot0[0]["tiles_into_row"].as_u64(), Some(1));
+        assert_eq!(rot0[0]["overflow_to_floor"].as_u64(), Some(0));
+    }
+
+    #[test]
+    fn known_board_on_state() {
+        let (s, fid) = known_board();
+        let before = s.clone();
+        let out = stone_move_outcomes(&s);
+        check_known_board(&out, fid);
+        // Der Eingabezustand bleibt unberuehrt (Zuege laufen auf Klonen).
+        assert_eq!(crate::serialize::state_to_json(&s, true), crate::serialize::state_to_json(&before, true));
+    }
+
+    #[test]
+    fn known_board_through_record_json() {
+        let (s, fid) = known_board();
+        let record_state = crate::serialize::state_to_json(&s, true).to_string();
+        let raw = stone_move_outcomes_from_json(record_state).expect("Export");
+        let parsed: serde_json::Value = serde_json::from_str(&raw).expect("JSON");
+        let out = parsed.as_array().expect("Array").clone();
+        check_known_board(&out, fid);
+    }
+
+    #[test]
+    fn non_drafting_state_yields_empty_list() {
+        let leaf = crate::round_transition::drive_to_first_round_end(51);
+        assert_ne!(leaf.phase, crate::state::Phase::Drafting);
+        assert!(stone_move_outcomes(&leaf).is_empty());
     }
 }

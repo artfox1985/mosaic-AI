@@ -100,7 +100,9 @@ pub const MAX_DEPTH: u32 = 60;
 
 /// True, wenn `state` in den Zuständigkeitsbereich dieses Moduls fällt
 /// (Runde 5, Drafting-Phase) -- einzige Gate-Bedingung, von allen
-/// Aufrufstellen (mcts.rs, net_mcts.rs) geprüft.
+/// Aufrufstellen (mcts.rs, net_mcts.rs) geprüft. Im Netzpfad kommt seit
+/// 2026-09-26 das Seiten-Feld `SearchConfig::r5_net_solver` dazu
+/// (`net_mcts::r5_solver_takes_over`).
 pub fn applies(state: &GameState) -> bool {
     state.round_number >= 5 && state.phase == Phase::Drafting
 }
@@ -177,14 +179,30 @@ fn chance_nodes_enabled() -> bool {
 /// Knoten, 84,8 % bei 4000 -- Tiefe kauft fast nichts, die BLATTBEWERTUNG
 /// traegt). Offen ist damit nur noch, ob der exakte Blattwert den GELERNTEN
 /// schlaegt. Dieser Knopf macht die Gegenprobe ueberhaupt moeglich.
+///
+/// SEIT 2026-09-26 (`PREREG_r5_net_vs_solver.md` par.2) ist das nur noch der
+/// ENV-DEFAULT des Seiten-Felds `SearchConfig::r5_net_solver`: ein prozessweiter
+/// OnceLock wirkt in einer Arena auf BEIDE Seiten, ein A/B "Loeser gegen
+/// Netzsuche in Runde 5" mit demselben Champion ist so nicht fahrbar. Die
+/// Netz-Sucheinstiege in `net_mcts.rs` lesen deshalb das Feld ihrer Seite;
+/// diese Funktion liest nur noch `SearchConfig::from_env` (und
+/// `from_spec_file`, wenn die Spec das Feld nicht traegt). Bei ungesetzter
+/// Variable und ohne Spec-Feld bleibt alles wie vorher: [`NET_SOLVER_DEFAULT`].
+/// Der eingefrorene `round5_anchor.rs` und die Heuristik-Bahn (`mcts.rs`) lesen
+/// weder Funktion noch Feld.
 pub(crate) fn net_solver_enabled() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         std::env::var("MOSAIC_R5_NET_SOLVER")
             .map(|v| v.is_empty() || v != "0")
-            .unwrap_or(true)
+            .unwrap_or(NET_SOLVER_DEFAULT)
     })
 }
+
+/// Bestand des Seiten-Felds `SearchConfig::r5_net_solver`: der Netzpfad nutzt
+/// in Runde 5 den Loeser (an). Umgekehrte Polung wie `net_tiling_tiebreak`:
+/// `false` ist die Verhaltensaenderung, nicht `true`.
+pub const NET_SOLVER_DEFAULT: bool = true;
 
 /// Knotenbudget je Entscheidung, Default [`NODE_BUDGET`].
 ///

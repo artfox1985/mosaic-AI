@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen (par.9). Tor 1 GENAU AUF DER KANTE: 420:380 = 52,50 %, Block-z +1,41, formal getragen (par.10). b02 ohne alten Schwarm: 574:516, z +1,76, kein messbarer Beitrag (par.6a). b03 (+4.000 frisch) und b04 (nur frische Wertziele) laufen (par.6b/6c). Zweiter Arm b02: nur der Schwarm des Generators, A/B gegen b01 im Anschluss (par.6a). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen (par.9). Tor 1 GENAU AUF DER KANTE: 420:380 = 52,50 %, Block-z +1,41, formal getragen (par.10). Fenster-Arme b02/b03/b04 alle ohne messbaren Unterschied (par.6a, par.6d): weder Menge noch Alter des Value-Materials ist ein Hebel. -->
 
 # Vorregistrierung: das v33-Fenster
 
@@ -339,6 +339,40 @@ Parallelphasen.
 16.577 s je 4.000 Partien), Bloecke, Monolith und Training rund 1,5 h, A/B rund 3,4 h: **rund 9,5 h**. Laeuft mit
 dem heutigen Wheel, also VOR der Wheel-Runde (E1, E4, Review-Fixes, Spiegelknopf); die verschiebt
 sich entsprechend.
+
+## par.6d ERGEBNISSE b03 und b04 (Kette `tools/night_v33_b03_b04.sh b02 b01`, 2026-09-26 19:59 bis 2026-09-27 08:09)
+
+Ablauf ohne Stopp; Manifest-Diffs beider Trainings: 0 unerwartete Abweichungen; Val-Menge beider
+Arme identisch mit b01 (147 Dateien). Laufzeiten der Parallelphasen UNTER NEBENLAST: b03-Erzeugung
+`value-wegc` 20:02-00:44 (400 Dateien, 10 Threads, parallel zum b04-Training 4.507 s),
+b03-Training 4.307 s parallel zum b04-A/B. Tor 0 `value-wegc`: 0,974 volle Spalten je Seite.
+
+| Arm | Gegner | Seed | Ergebnis | Block-z | volle Spalten A / B |
+| --- | --- | --- | --- | --- | --- |
+| b04 | b02 | 20261680 | 197:203 | -0,29 | 1,003 / 1,028 |
+| b04 | b02 | 20261681 | 202:198 | +0,21 | 1,078 / 1,055 |
+| **b04 gepoolt** | | | **399:401** | **-0,07** | |
+| b03 | b01 | 20261660 | 190:210 | -0,88 | 1,043 / 1,008 |
+| b03 | b01 | 20261661 | 221:179 | +2,38 | 0,958 / 0,945 |
+| **b03 gepoolt** | | | **411:389** | **+0,75** | |
+
+Val-Brier (dieselbe Val-Menge): b01 0,1837, b02 0,1835, b03 0,1834 (Epoche 9), b04 0,1843
+(Endmodell = bestes). Elo-Register: vier Zeilen 2026-09-27.
+
+**Verdikte nach den Leseregeln:**
+* **b04 (par.6c): DAZWISCHEN -- altes Value-Material hat keinen messbaren Beitrag.** v34 kann die
+  620 policy-maskierten alten Sockel-Dateien weglassen (billiger), Nutzer-Entscheid.
+* **b03 (par.6b, Gegner b01): DAZWISCHEN -- mehr frisches Volumen ist in dieser Aera kein Hebel.**
+  Nach der Leseregel ist der naechste Kandidat das gezielte Abzweigen
+  (`PREREG_targeted_branching.md`).
+
+**Gesamtbild der vier Arme:** b01 (2.947 Dateien), b02 (ohne alten Schwarm, 2.001), b03 (b02 plus
+4.000 frische Partien) und b04 (nur frische Wertziele, 1.381) sind in der Arena ununterscheidbar,
+und ihr Val-Brier liegt innerhalb von 0,001. Die Fensterzusammensetzung ist in dieser Aufloesung
+KEIN Hebel mehr -- weder Menge noch Alter des Value-Materials. Das widerspricht der
+Volumen-Folgerung aus task36/corpus_dose (v20-Aera) fuer die heutige Aera und stuetzt die
+Saettigungs-These des Nutzers ("mit unserer aktuellen Architektur in der Saettigung"). Bericht an
+den Verbraucher: `PREREG_targeted_branching.md`, STATUS Abschnitt 6 Punkt 14.
 
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`)
 

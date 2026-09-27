@@ -614,6 +614,44 @@ pub(crate) fn read_net_tiling_tiebreak_env() -> u32 {
     }
 }
 
+/// Bestand des E1-Knopfs `single_pass_other_val` (`PREREG_evaluator_pretests.md`
+/// par.5a): AUS, also zwei Vorwaertspaesse je Netz-Blatt (Mover plus geflippter
+/// `current_player`). War bis 2026-09-26 die Kompilierzeit-Konstante
+/// [`MIRROR_OTHER_VAL`] mit demselben Wert.
+pub const SINGLE_PASS_OTHER_VAL_DEFAULT: bool = false;
+
+/// `MOSAIC_SINGLE_PASS_OTHER_VAL` (E1, `PREREG_evaluator_pretests.md` par.5a):
+/// `1` = EIN Vorwaertspass je Netz-Blatt, `other_val = 1 - mover_val`; `0` oder
+/// ungesetzt = Bestand ([`SINGLE_PASS_OTHER_VAL_DEFAULT`]). Ungueltig -> Default
+/// plus einmalige Warnung, gleiche Disziplin wie die Nachbarn.
+///
+/// OnceLock statt frischem Lesen: der Wert ist zugleich der Default der
+/// SearchConfig-FREIEN Blattbewertung [`net_leaf_eval`] (TD-Bootstrap- und
+/// Rueckgabe-Label-Pfade in `round_transition_deep.rs`/`self_play.rs`), und die
+/// laeuft je Blatt -- dort darf die Umgebung nicht je Aufruf geparst werden.
+/// Folge wie bei allen OnceLock-Knoepfen: Variable setzen, DANN lesen.
+pub(crate) fn single_pass_other_val_env() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let Ok(raw) = std::env::var("MOSAIC_SINGLE_PASS_OTHER_VAL") else {
+            return SINGLE_PASS_OTHER_VAL_DEFAULT;
+        };
+        match raw.trim() {
+            "" => SINGLE_PASS_OTHER_VAL_DEFAULT,
+            "0" => false,
+            "1" => true,
+            _ => {
+                eprintln!(
+                    "⚠️  MOSAIC_SINGLE_PASS_OTHER_VAL={raw:?} ungueltig (0 oder 1) -- \
+                     {} gilt.",
+                    u8::from(SINGLE_PASS_OTHER_VAL_DEFAULT)
+                );
+                SINGLE_PASS_OTHER_VAL_DEFAULT
+            }
+        }
+    })
+}
+
 pub(crate) fn read_moon_order_search_sims_env() -> u32 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SIMS") else {
@@ -1093,6 +1131,38 @@ pub struct SearchConfig {
     /// waere das A/B "Champion mit gegen Champion ohne" im selben Prozess nicht
     /// fahrbar.
     pub net_tiling_tiebreak: u32,
+    /// E1 (`PREREG_evaluator_pretests.md` par.5a/5b): Einpass-Konsum des
+    /// Netz-Blattwerts DIESER SEITE. `false` = Bestand (bitidentisch): je
+    /// Blatt zwei Vorwaertspaesse, der zweite auf geflipptem `current_player`,
+    /// `other_val` aus ihm. `true` = EIN Vorwaertspass, `other_val = 1 -
+    /// mover_val`, kein Batch-2-Aufruf und keine Perspektiven-Divergenz-
+    /// Zaehlung (sie waere per Konstruktion 0).
+    ///
+    /// Wirkt an allen Blattstellen der Netzsuche (`make_node`,
+    /// `batched_expand_root_candidates`, Variante-B-Blatt ueber
+    /// [`net_leaf_eval_with`]). Die SearchConfig-freien Label-Pfade
+    /// ([`net_leaf_eval`]) folgen dem Env-Knopf, nicht diesem Feld.
+    ///
+    /// Spec-Feld je Seite (`single_pass_other_val`, OPTIONAL, 0 oder 1; fehlt
+    /// es, gilt der Env-Default), Env-Default `MOSAIC_SINGLE_PASS_OTHER_VAL`.
+    /// Ersetzt die Kompilierzeit-Konstante [`MIRROR_OTHER_VAL`].
+    pub single_pass_other_val: bool,
+    /// Runde-5-Schalter DIESER SEITE (`PREREG_r5_net_vs_solver.md` par.2):
+    /// `true` = Bestand, der Netzpfad uebergibt die Drafting-Entscheidung in
+    /// Runde 5 an den Expectiminimax-Loeser (`round5::choose_action`); `false`
+    /// = das Netz sucht in Runde 5 wie in Runde 1-4 (Gumbel, Netz-Blattwert).
+    ///
+    /// Gelesen an den fuenf Netz-Sucheinstiegen ueber
+    /// [`r5_solver_takes_over`]. NICHT betroffen: die Heuristik-Bahn
+    /// (`mcts.rs`, Elo-Anker), der eingefrorene `round5_anchor.rs`, das
+    /// Tiling in Runde 5 und die TD-Bootstrap-Labels 4->5
+    /// (`round5::exact_round5_outcome`).
+    ///
+    /// Spec-Feld je Seite (`r5_net_solver`, OPTIONAL, 0 oder 1; fehlt es, gilt
+    /// der Env-Default), Env-Default `MOSAIC_R5_NET_SOLVER`
+    /// ([`crate::round5::net_solver_enabled`]). Umgekehrte Polung: `false` ist
+    /// die Verhaltensaenderung.
+    pub r5_net_solver: bool,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1207,6 +1277,8 @@ impl SearchConfig {
             // der Wurzel einer Suche (`with_round_transition_leaf_context`).
             round_transition_leaf_ctx: None,
             net_tiling_tiebreak: read_net_tiling_tiebreak_env(),
+            single_pass_other_val: single_pass_other_val_env(),
+            r5_net_solver: crate::round5::net_solver_enabled(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1267,6 +1339,8 @@ impl SearchConfig {
             "moon_order_search_scale",
             "round_transition_leaf",
             "net_tiling_tiebreak",
+            "single_pass_other_val",
+            "r5_net_solver",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1594,6 +1668,37 @@ impl SearchConfig {
                 x as u32
             }
         };
+        // E1 (`PREREG_evaluator_pretests.md` par.5a) und der Runde-5-Schalter
+        // (`PREREG_r5_net_vs_solver.md` par.2): OPTIONAL, 0 oder 1 als ZAHL wie
+        // die Nachbarn (`start_by_search`, `net_tiling_tiebreak`). Fehlt das
+        // Feld, gilt der ENV-DEFAULT (Muster der Stilmittel unten), nicht eine
+        // feste Konstante: der Runde-5-Knopf wirkte bis heute prozessweit auch
+        // auf Seiten MIT Spec, und genau das bleibt fuer jede Spec ohne das Feld
+        // so -- bitidentisch unter jeder Umgebung. Bei ungesetzter Variable ist
+        // der Env-Default der Bestand.
+        //
+        // Bewusst KEIN JSON-Bool: `spec_env.py` uebersetzt Spec-Felder mit
+        // `str(value)` in Env-Text, aus `false` wuerde "False" -- und der
+        // Runde-5-Leser behandelt jeden Text ausser "0" als AN.
+        let spec_flag = |name: &str, env_default: bool| -> Result<bool, String> {
+            match obj.get(name) {
+                None => Ok(env_default),
+                Some(v) => {
+                    let x = v.as_f64().ok_or_else(|| {
+                        format!("Spec-Datei {path}: '{name}' ist keine Zahl (0 oder 1)")
+                    })?;
+                    if x == 0.0 {
+                        Ok(false)
+                    } else if x == 1.0 {
+                        Ok(true)
+                    } else {
+                        Err(format!("Spec-Datei {path}: '{name}' muss 0 oder 1 sein, ist {x}"))
+                    }
+                }
+            }
+        };
+        let single_pass_other_val = spec_flag("single_pass_other_val", single_pass_other_val_env())?;
+        let r5_net_solver = spec_flag("r5_net_solver", crate::round5::net_solver_enabled())?;
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -1736,6 +1841,8 @@ impl SearchConfig {
             round_transition_leaf,
             round_transition_leaf_ctx: None,
             net_tiling_tiebreak,
+            single_pass_other_val,
+            r5_net_solver,
             heuristic_variant,
             sims,
             root_noise,
@@ -1955,7 +2062,15 @@ fn apply_value_shrink(value: [f64; 2], round_number: u32) -> [f64; 2] {
 /// Die Perspektiven-/OOD-Hypothese ist damit als ALLEINIGE Erklärung
 /// widerlegt (der zweite Forward-Pass ist zumindest nicht der dominante
 /// Schadensfaktor) -- auf `false` zurückgesetzt (Original-Verhalten).
-pub const MIRROR_OTHER_VAL: bool = false;
+///
+/// ABGELOEST 2026-09-26 (`PREREG_evaluator_pretests.md` par.5a, E1): die Suche
+/// liest diese Konstante NICHT mehr. An ihre Stelle tritt das Seiten-Feld
+/// [`SearchConfig::single_pass_other_val`] (Env-Default
+/// `MOSAIC_SINGLE_PASS_OTHER_VAL`). Der Name bleibt nur als Alias des Defaults
+/// stehen, weil `lib.rs::engine_config_json` ihn noch als Manifest-Feld
+/// `mirror_other_val` exportiert; sobald dort
+/// `SearchConfig::from_env().single_pass_other_val` steht, faellt er weg.
+pub const MIRROR_OTHER_VAL: bool = SINGLE_PASS_OTHER_VAL_DEFAULT;
 
 /// Kuppelstapel-Determinisierung im Suchbaum (Fund 6, externer Hinweis,
 /// 2026-07-20) -- mischt `dome_tile_pool` bei jedem simulierten
@@ -3109,7 +3224,9 @@ fn round_transition_leaf_value(
         let (l, p, a) = c.get();
         c.set((l, p, a + 1));
     });
-    Some(net_leaf_eval(net_value.unwrap_or(net_policy), &next))
+    // E1: der Einpass-Knopf DIESER Seite, nicht der Env-Default -- dieses
+    // Blatt gehoert zur Suche und muss konsumieren wie jedes andere.
+    Some(net_leaf_eval_with(net_value.unwrap_or(net_policy), &next, search_config.single_pass_other_val))
 }
 
 /// Snapshot `(blaetter, marge_geklammert, einheit_geklammert)` der K1-Zaehler
@@ -3202,11 +3319,43 @@ fn try_batched_pair_ex(
 /// unverändert), zusätzlich von `round_transition`-Aufrufstellen (Sampling
 /// über Runden-Neubefüllungen, siehe `round_transition.rs`) wiederverwendet,
 /// da beide denselben Netz-Blattwert brauchen.
+///
+/// E1 (`PREREG_evaluator_pretests.md` par.5a): diese SearchConfig-freie Form
+/// nimmt den Einpass-Knopf aus der Umgebung ([`single_pass_other_val_env`]).
+/// Sie bedient die Label-Pfade (TD-Bootstrap, Rueckgabe-Bewertung); die Suche
+/// selbst ruft [`net_leaf_eval_with`] mit dem Feld ihrer Seite.
 pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
+    net_leaf_eval_with(net, state, single_pass_other_val_env())
+}
+
+// Testzaehler fuer den geflippten zweiten Vorwaertspass (E1). Nur im
+// Test-Bau vorhanden; im Produktionsbau ist `note_other_pass` leer und der
+// Pfad unveraendert. Thread-lokal wie `MOON_ORDER_DIAG`, damit parallel
+// laufende Tests sich nicht gegenseitig zaehlen.
+#[cfg(test)]
+thread_local! {
+    static OTHER_PASS_CALLS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+#[inline(always)]
+fn note_other_pass() {
+    #[cfg(test)]
+    OTHER_PASS_CALLS.with(|c| c.set(c.get() + 1));
+}
+
+#[cfg(test)]
+fn take_other_pass_calls() -> u64 {
+    OTHER_PASS_CALLS.with(|c| c.replace(0))
+}
+
+/// [`net_leaf_eval`] mit AUSDRUECKLICHEM E1-Knopf `single_pass`
+/// (`SearchConfig::single_pass_other_val` der suchenden Seite). `false` ist
+/// der Bestand, Zeile fuer Zeile.
+pub(crate) fn net_leaf_eval_with(net: &Net, state: &GameState, single_pass: bool) -> [f64; 2] {
     let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
         crate::features::features_for_net(net, state)
     });
-    // Paket 1 (Inferenz-Batching, 2026-07-22): bei `MIRROR_OTHER_VAL=false`
+    // Paket 1 (Inferenz-Batching, 2026-07-22): bei `single_pass=false`
     // braucht dieser Aufruf ohnehin ZWEI Forward-Pässe (Mover-/geflippte
     // Perspektive) -- `Net::eval_pair` fasst sie zu einem Batch=2-Aufruf
     // zusammen statt zwei sequenzieller Batch=1-Aufrufe zu bezahlen (Parität
@@ -3216,7 +3365,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
     // deckt BEIDE Spieler ab (`[0:36]` ich, `[36:72]` Gegner, ego-
     // perspektivisch -- `neural_net.py:1825-1840`), der geflippte Pass wird
     // dafuer also nicht gebraucht.
-    let (mover_val, other_val, own_map) = if MIRROR_OTHER_VAL {
+    let (mover_val, other_val, own_map) = if single_pass {
         // Task #81: Batch=1 (ein einzelner Forward-Pass) -- fuer die Amdahl-
         // Aufteilung des geplanten GPU-Batchers (Task #82).
         // Task #28: `eval_ex` statt `eval` -- liest zusaetzlich den optionalen
@@ -3234,6 +3383,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         (mv, 1.0 - mv, ownership)
     } else {
         crate::profiling::note_gamestate_clone();
+        note_other_pass();
         let mut flipped = state.clone();
         flipped.current_player = 1 - state.current_player;
         let other_feats = crate::features::features_for_net(net, &flipped);
@@ -3264,7 +3414,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
             ownership,
         )
     };
-    if !MIRROR_OTHER_VAL {
+    if !single_pass {
         record_perspective_divergence(state.round_number, mover_val, other_val);
     }
     let raw = if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
@@ -3371,7 +3521,8 @@ fn make_node<R: Rng + ?Sized>(
     // ein (KataGo-Stil Score-Utility, siehe `POINTS_UTILITY_WEIGHT`-Kommentar).
     //
     // Paket 1 (Inferenz-Batching, 2026-07-22): bei ACTIVE_LEAF=Net UND
-    // MIRROR_OTHER_VAL=false braucht dieser Knoten ohnehin einen zweiten
+    // `search_config.single_pass_other_val=false` (E1-Knopf aus, Bestand)
+    // braucht dieser Knoten ohnehin einen zweiten
     // Forward-Pass für `other_val` (geflippte Perspektive, siehe weiter unten)
     // -- `Net::eval_pair` fasst Mover- und Gegner-Pass zu EINEM Batch=2-
     // ONNX-Aufruf zusammen statt zwei sequenzieller Batch=1-Aufrufe (Parität
@@ -3385,7 +3536,10 @@ fn make_node<R: Rng + ?Sized>(
     // und `net_value` unterschiedliche Layouts haben (z.B. ein 2D- und ein
     // flaches Modell im selben Vergleich), ein einzelner geteilter
     // Feature-Puffer wäre für mindestens eines der beiden Netze falsch.
-    let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
+    // E1 (`PREREG_evaluator_pretests.md` par.5a): der Knopf DIESER Seite
+    // entscheidet, ob der geflippte Pass ueberhaupt laeuft. Bei `true` faellt
+    // der Batch-2-Aufruf weg -- das ist der Kostengewinn des Knopfs.
+    let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !search_config.single_pass_other_val;
     let same_net = net_value.is_none_or(|v| std::ptr::eq(v, net_policy));
     // Task #28: `_ex`-Varianten statt `eval`/`eval_pair` -- lesen zusaetzlich
     // den optionalen `opp_points`-Kopf (leer bei jedem Netz ohne den Kopf),
@@ -3400,6 +3554,7 @@ fn make_node<R: Rng + ?Sized>(
         });
         if need_other_pass {
             crate::profiling::note_gamestate_clone();
+            note_other_pass();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let other_feats = crate::features::features_for_net(net, &flipped);
@@ -3409,7 +3564,7 @@ fn make_node<R: Rng + ?Sized>(
             // Default) faellt byte-identisch auf den bisherigen synchronen
             // `eval_pair_ex`-Aufruf zurueck. Dies ist der DOMINANTE
             // Netz-Aufrufpfad (`same_net=true`, `need_other_pass=true` bei
-            // `USE_GUMBEL_SEARCH=true`/`MIRROR_OTHER_VAL=false`, dem heutigen
+            // `USE_GUMBEL_SEARCH=true`/`single_pass_other_val=false`, dem heutigen
             // Produktions-Stand) -- die eigentliche Ziel-Stelle der
             // Verschraenkung.
             let (
@@ -3459,6 +3614,7 @@ fn make_node<R: Rng + ?Sized>(
         });
         if need_other_pass {
             crate::profiling::note_gamestate_clone();
+            note_other_pass();
             let mut flipped = state.clone();
             flipped.current_player = 1 - state.current_player;
             let feats_value = crate::features::features_for_net(net_value, &state);
@@ -3572,7 +3728,10 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     let leaf_value = match ACTIVE_LEAF {
         LeafEval::Net => {
             let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
-            let other_val = if MIRROR_OTHER_VAL {
+            // E1: `other_pass` ist genau dann `None`, wenn der Aufrufer mit
+            // demselben `search_config` den geflippten Pass ausgelassen hat
+            // (`make_node`, `batched_expand_root_candidates`).
+            let other_val = if search_config.single_pass_other_val {
                 1.0 - mover_val
             } else {
                 // `other_pass` wurde oben bereits per `eval_pair` MIT dem
@@ -3584,9 +3743,9 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             };
             // Perspektiven-/OOD-Audit (siehe Modul-Kommentar oben) -- nur
             // aussagekräftig, wenn `other_val` ein ECHTER zweiter Forward-Pass
-            // ist (bei `MIRROR_OTHER_VAL=true` wäre die Divergenz trivial 0,
+            // ist (bei `single_pass_other_val=true` wäre die Divergenz trivial 0,
             // per Konstruktion, keine echte Information).
-            if !MIRROR_OTHER_VAL {
+            if !search_config.single_pass_other_val {
                 record_perspective_divergence(state.round_number, mover_val, other_val);
             }
             let mut today_value =
@@ -3786,7 +3945,13 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                         // Dead Code bei `ROUND_TRANSITION_SAMPLING=false` (Standard) --
                         // faellt fuer eine spaetere Aktivierung konsistent auf den
                         // Value-Net (falls Hybrid) statt Policy-Net zurueck.
-                        |s, _rng| net_leaf_eval(net_value.unwrap_or(net_policy), s),
+                        |s, _rng| {
+                            net_leaf_eval_with(
+                                net_value.unwrap_or(net_policy),
+                                s,
+                                search_config.single_pass_other_val,
+                            )
+                        },
                         rng,
                         std::time::Instant::now() + crate::round_transition::TIME_BUDGET,
                     ),
@@ -4818,9 +4983,13 @@ fn select_final_root_child(nodes: &[Node]) -> Option<usize> {
 // gebrauchten Farbe wegnimmt als der Suchsieger, ohne die eigene Strafleiste
 // staerker zu fuellen. Der Zaehler laeuft, der Zug bleibt der Zug.
 //
-// Runde 5 erreicht diese Stelle nie (`round5::applies` kurzschliesst schon in
-// `net_search_drafting_action`/`net_root_child_stats_and_policy`, dort kein
-// Gumbel-Baum) -- PREREG §9.6 Punkt 2, hier bewusst nicht noch einmal gegatet.
+// Runde 5 erreicht diese Stelle im Bestand nie (`r5_solver_takes_over`
+// kurzschliesst schon in `net_search_drafting_action`/
+// `net_root_child_stats_and_policy`, dort kein Gumbel-Baum) -- PREREG §9.6
+// Punkt 2, hier bewusst nicht noch einmal gegatet. AUSNAHME seit 2026-09-26:
+// eine Seite mit `r5_net_solver = false` (`PREREG_r5_net_vs_solver.md`) sucht
+// auch in Runde 5 mit dem Gumbel-Baum und zaehlt dann hier mit; der
+// Zaehlmodus ist Default AUS.
 
 static COLOR_DENIAL_PROBE_TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 static COLOR_DENIAL_PROBE_FENSTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -5273,7 +5442,9 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     search_config: &SearchConfig,
 ) {
     let mover = root_state.current_player;
-    let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
+    // E1: dieselbe Bedingung wie in `make_node` -- `node_from_net_outputs`
+    // erwartet `other_pass` genau dann, wenn der Knopf aus ist.
+    let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !search_config.single_pass_other_val;
 
     struct Pending {
         ci: usize,
@@ -5325,6 +5496,7 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     );
 
     let other_outputs: Vec<Option<(Vec<f32>, Vec<f32>, Vec<f32>)>> = if need_other_pass {
+        note_other_pass();
         let other_feats: Vec<Vec<f32>> = pending
             .iter()
             .map(|p| {
@@ -5441,7 +5613,12 @@ fn descend_and_backprop<R: Rng + ?Sized>(
     backprop_path(nodes, nid);
 }
 
-fn build_gumbel_tree<R: Rng + ?Sized>(
+/// Gumbel-Baum mit optionalem BETRACHTER der Wurzel-Determinisierung (siehe
+/// [`determinize_root_for`]). `None` ist der Bestand. Hiess bis 2026-09-26
+/// `build_gumbel_tree` (ohne Betrachter); einziger Aufrufer ist
+/// [`build_net_tree_for`].
+#[allow(clippy::too_many_arguments)]
+fn build_gumbel_tree_for<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
     state: &GameState,
@@ -5450,26 +5627,70 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     rng: &mut R,
     trace: Option<&mut GumbelTrace>,
     search_config: &SearchConfig,
+    viewer: Option<usize>,
 ) -> Vec<Node> {
-    build_gumbel_tree_inner(
-        net_policy, net_value, state, sims, add_root_noise, rng, trace, BATCH_ROOT_EXPANSION, search_config,
+    build_gumbel_tree_inner_for(
+        net_policy, net_value, state, sims, add_root_noise, rng, trace, BATCH_ROOT_EXPANSION, search_config, viewer,
     )
 }
 
-/// Eigentliche Implementierung von [`build_gumbel_tree`], mit
+/// Wurzel-Determinisierung mit optionalem, AUSDRUECKLICHEM Betrachter.
+///
+/// `None` = Bestand: Betrachter ist `state.current_player`
+/// ([`determinize_hidden_information`]), bitidentisch. `Some(pi)` braucht eine
+/// Suche, deren Wurzel NICHT beim Suchenden liegt -- die Mondstapel-Nachsuche
+/// ([`moon_order_post_search`]) bewertet den Folgezustand, in dem der GEGNER am
+/// Zug ist, gesucht wird aber fuer den Spieler, der den Mondzug macht (Review-
+/// Befund #8, `PREREG_moon_stack_order.md` par.13). Gleiche Bauform wie
+/// [`search_start_placement`].
+fn determinize_root_for<R: Rng + ?Sized>(state: &mut GameState, viewer: Option<usize>, rng: &mut R) {
+    match viewer {
+        None => determinize_hidden_information(state, rng),
+        Some(pi) => determinize_hidden_information_for(state, pi, rng),
+    }
+}
+
+/// Eigentliche Implementierung von [`build_gumbel_tree_for`], mit
 /// `batch_root_expansion` als LAUFZEIT-Parameter statt der globalen
 /// `BATCH_ROOT_EXPANSION`-Konstante (Perf-Auftrag, 2026-08-02) -- einziger
 /// Zweck: der Paritaetstest
 /// `batched_root_expansion_matches_sequential_within_tolerance` kann so
 /// BEIDE Pfade (batched/unbatcht) mit IDENTISCHEM Seed direkt gegeneinander
 /// vergleichen, ohne die Konstante zur Testlaufzeit umschalten zu muessen
-/// (waere bei einem `const` ohnehin nicht moeglich). `build_gumbel_tree`
+/// (waere bei einem `const` ohnehin nicht moeglich). `build_gumbel_tree_for`
 /// selbst bleibt die STABILE Aufrufstellen-Signatur -- reicht nur
 /// `BATCH_ROOT_EXPANSION`s aktuellen (Default `false`) Wert durch.
 /// `search_config` (PREREG_agent_encapsulation.md par.4 Punkt 4, Pilot-
 /// Migration): einzige Konsument-Stelle ist `gumbel_select_child` ueber
 /// `descend_and_backprop`, siehe dort.
+///
+/// Seit 2026-09-26 (Betrachter-Parameter, Review-Befund #8) nur noch die
+/// betrachterlose Form fuer die Tests; der Produktionspfad geht ueber
+/// [`build_gumbel_tree_inner_for`].
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
 fn build_gumbel_tree_inner<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    state: &GameState,
+    sims: u32,
+    add_root_noise: bool,
+    rng: &mut R,
+    trace: Option<&mut GumbelTrace>,
+    batch_root_expansion: bool,
+    search_config: &SearchConfig,
+) -> Vec<Node> {
+    build_gumbel_tree_inner_for(
+        net_policy, net_value, state, sims, add_root_noise, rng, trace, batch_root_expansion, search_config, None,
+    )
+}
+
+/// Rumpf von [`build_gumbel_tree_inner`] mit optionalem Betrachter der
+/// Wurzel-Determinisierung ([`determinize_root_for`]). Der Betrachter gilt
+/// auch fuer den Kuppelstapel am Rundenende-Blatt der Variante B -- beide
+/// modellieren dieselbe Informationsmenge, die des Suchenden.
+#[allow(clippy::too_many_arguments)]
+fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
     state: &GameState,
@@ -5479,16 +5700,17 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
     mut trace: Option<&mut GumbelTrace>,
     batch_root_expansion: bool,
     search_config: &SearchConfig,
+    viewer: Option<usize>,
 ) -> Vec<Node> {
     let mut root_state = state.clone();
     root_state.log.clear();
     if DETERMINIZE_ROOT_HIDDEN_INFO {
-        determinize_hidden_information(&mut root_state, rng);
+        determinize_root_for(&mut root_state, viewer, rng);
     }
     let root_player = root_state.current_player;
     // Variante B: Pro-Suche-Kontext (Betrachter + Salz) VOR dem ersten Knoten --
     // bei ausgeschaltetem Knopf eine Identitaet ohne RNG-Verbrauch.
-    let leaf_config = with_round_transition_leaf_context(search_config, root_player, rng);
+    let leaf_config = with_round_transition_leaf_context(search_config, viewer.unwrap_or(root_player), rng);
     let search_config = &leaf_config;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
@@ -5818,7 +6040,27 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// (PREREG_agent_encapsulation.md par.4 Punkt 4): nur im Gumbel-Pfad
 /// wirksam (`gumbel_select_child`) -- der PUCT-Legacy-Pfad unten liest ihn
 /// gar nicht, `best_puct` kennt keine Implicit-Minimax-Beimischung.
+#[allow(clippy::too_many_arguments)]
 fn build_net_tree<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+    log: Option<&mut Vec<String>>,
+    trace: Option<&mut GumbelTrace>,
+    search_config: &SearchConfig,
+) -> Vec<Node> {
+    build_net_tree_for(net_policy, net_value, state, sims, c_puct, add_root_noise, rng, log, trace, search_config, None)
+}
+
+/// [`build_net_tree`] mit optionalem BETRACHTER der Wurzel-Determinisierung
+/// ([`determinize_root_for`]). `None` ist der Bestand und wird von allen
+/// Aufrufern ausser [`moon_order_post_search`] benutzt.
+#[allow(clippy::too_many_arguments)]
+fn build_net_tree_for<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
     state: &GameState,
@@ -5829,22 +6071,25 @@ fn build_net_tree<R: Rng + ?Sized>(
     mut log: Option<&mut Vec<String>>,
     trace: Option<&mut GumbelTrace>,
     search_config: &SearchConfig,
+    viewer: Option<usize>,
 ) -> Vec<Node> {
     if USE_GUMBEL_SEARCH {
         if let Some(l) = log.as_deref_mut() {
             l.push("  GUMBEL-SUCHE (kein granularer Text-Sim-Trace -- strukturierter Trace siehe `gumbel_trace`-Feld, falls angefordert)".to_string());
         }
-        return build_gumbel_tree(net_policy, net_value, state, sims, add_root_noise, rng, trace, search_config);
+        return build_gumbel_tree_for(
+            net_policy, net_value, state, sims, add_root_noise, rng, trace, search_config, viewer,
+        );
     }
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
     root_state.log.clear();
     if DETERMINIZE_ROOT_HIDDEN_INFO {
-        determinize_hidden_information(&mut root_state, rng);
+        determinize_root_for(&mut root_state, viewer, rng);
     }
     let root_player = root_state.current_player;
-    // Variante B: siehe `build_gumbel_tree_inner` (Identitaet bei Knopf 0).
-    let leaf_config = with_round_transition_leaf_context(search_config, root_player, rng);
+    // Variante B: siehe `build_gumbel_tree_inner_for` (Identitaet bei Knopf 0).
+    let leaf_config = with_round_transition_leaf_context(search_config, viewer.unwrap_or(root_player), rng);
     let search_config = &leaf_config;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
@@ -6267,14 +6512,23 @@ pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
     // Netzaufruf und genau eine Zahl aus dem Suchstrom.
     let moon_scores = net_moon_scores(net_policy, state);
     let base: u64 = rng.random();
+    // Review-Befund #8 (`PREREG_moon_stack_order.md` par.13): `next` hat den
+    // GEGNER am Zug, gesucht wird aber fuer den Spieler, der den Mondzug macht.
+    // Bis 2026-09-26 determinisierte `build_net_tree` mit `viewer =
+    // next.current_player` -- die Nachsuche kannte die Rueckgabe-Bloecke des
+    // Gegners in echter Reihenfolge (Orakel) und mischte den eigenen. Jetzt
+    // ist der Betrachter ausdruecklich der Ziehende, wie bei
+    // `search_start_placement`. Der Pfad laeuft nur bei `moon_order_variants
+    // == 2`; der Bestand (1) erreicht diese Zeile nie.
+    let mover = state.current_player;
     let chosen = choose_moon_order_with(state, &m, &moon_scores, |next, rank| {
         use rand::SeedableRng as _;
         let mut sub = rand::rngs::StdRng::seed_from_u64(derive_search_seed(
             base ^ MOON_ORDER_SEARCH_SEED_DISTINGUISHER,
             rank as u64,
         ));
-        let nodes = build_net_tree(
-            net_policy, net_value, next, sims, c_puct, false, &mut sub, None, None, search_config,
+        let nodes = build_net_tree_for(
+            net_policy, net_value, next, sims, c_puct, false, &mut sub, None, None, search_config, Some(mover),
         );
         Some(v_mix(&nodes, 0))
     });
@@ -6294,6 +6548,19 @@ pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
         }
         None => action,
     }
+}
+
+/// Das Runde-5-Tor der Netz-Sucheinstiege (`PREREG_r5_net_vs_solver.md`
+/// par.2): `true` = der Expectiminimax-Loeser (`round5.rs`) entscheidet diesen
+/// Drafting-Zug, `false` = die Netzsuche laeuft wie in Runde 1-4.
+///
+/// Bis 2026-09-26 stand hier an fuenf Stellen `round5::applies(state) &&
+/// round5::net_solver_enabled()` -- ein prozessweiter OnceLock, der in einer
+/// Arena auf beide Seiten wirkte. Jetzt liest jede Seite ihr eigenes Feld
+/// [`SearchConfig::r5_net_solver`]; dessen Env-Default ist derselbe OnceLock,
+/// eine Seite ohne Spec-Feld verhaelt sich also wie vorher.
+pub(crate) fn r5_solver_takes_over(state: &GameState, search_config: &SearchConfig) -> bool {
+    search_config.r5_net_solver && crate::round5::applies(state)
 }
 
 /// Beste Drafting-Aktion per Netz-PUCT (meistbesuchtes Wurzelkind). None außerhalb
@@ -6316,9 +6583,9 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // Runde 5: exakte Alpha-Beta-Wahl statt Netz-PUCT -- die BLATTBEWERTUNG
     // dort ist exakt (optimales Tiling + Endwertung des erreichten Bretts),
     // was das Netz nur schaetzen kann. Dass das die bessere Wahl IST, war nie
-    // gegatet: siehe `round5::net_solver_enabled` fuer den Knopf und
-    // `PREREG_chance_nodes.md` Teil E fuer die offene Gegenprobe.
-    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
+    // gegatet: siehe `SearchConfig::r5_net_solver` fuer den Knopf je Seite und
+    // `PREREG_r5_net_vs_solver.md` fuer die Gegenprobe.
+    if r5_solver_takes_over(state, search_config) {
         return crate::round5::choose_action(state);
     }
     // PREREG_ismcts_determinizations.md: Getter statt Konstante (siehe
@@ -6370,7 +6637,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return None;
     }
-    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
+    if r5_solver_takes_over(state, search_config) {
         return crate::round5::choose_action(state);
     }
     let k = num_determinizations();
@@ -6428,7 +6695,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     // Gewicht 1.0 (statt leer) macht `net_drafting_policy`s Zufalls-
     // Fallback (bei leerer Stats-Liste) nicht faelschlich fuer die
     // Aktionswahl zustaendig.
-    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
+    if r5_solver_takes_over(state, search_config) {
         return crate::round5::choose_action(state)
             .into_iter()
             .map(|a| (a, 1, 1.0))
@@ -6494,7 +6761,7 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return (Vec::new(), Vec::new(), None, Vec::new());
     }
-    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
+    if r5_solver_takes_over(state, search_config) {
         let stats: Vec<(Action, u32, f64)> =
             crate::round5::choose_action(state).into_iter().map(|a| (a, 1, 1.0)).collect();
         let n = stats.len().max(1);
@@ -6720,7 +6987,7 @@ fn net_search_with_tree_inner<R: Rng + ?Sized>(
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
     }
-    if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
+    if r5_solver_takes_over(state, &search_config) {
         return crate::round5::choose_action_with_analysis(state);
     }
     // Debug-UI-/Mensch-vs-Netz-Einstieg (py.rs, kein Arena-/Self-Play-Pfad).
@@ -8819,6 +9086,12 @@ mod tests {
             // `NET_TILING_TIEBREAK_ENABLED = true`). `0` waere hier eine
             // Verhaltensaenderung, kein Nullpunkt.
             net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+            // E1 aus = zwei Vorwaertspaesse, Bestand.
+            single_pass_other_val: SINGLE_PASS_OTHER_VAL_DEFAULT,
+            // DRITTE AUSNAHME von "nichts ist an": der Bestand des
+            // Runde-5-Schalters ist der Loeser (an), `false` waere hier eine
+            // Verhaltensaenderung.
+            r5_net_solver: crate::round5::NET_SOLVER_DEFAULT,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -9047,6 +9320,250 @@ mod tests {
                 "Fehlermeldung nennt das Feld ({tag}): {msg}"
             );
         }
+    }
+
+    // ── E1 Einpass-Konsum (PREREG_evaluator_pretests.md par.5a) und
+    // Runde-5-Schalter je Seite (PREREG_r5_net_vs_solver.md par.2) ──────────
+
+    /// Die Bestandswerte beider Knoepfe: E1 aus (zwei Paesse, wie die
+    /// abgeloeste Konstante), Runde-5-Loeser an. `search_config_off` traegt
+    /// genau diese Werte -- sonst waeren alle Paritaetstests, die ihn benutzen,
+    /// still auf einen anderen Pfad gewandert.
+    #[test]
+    fn single_pass_and_r5_defaults_are_the_stock_behaviour() {
+        assert!(!SINGLE_PASS_OTHER_VAL_DEFAULT);
+        assert_eq!(MIRROR_OTHER_VAL, SINGLE_PASS_OTHER_VAL_DEFAULT, "Alias darf nicht driften");
+        assert!(crate::round5::NET_SOLVER_DEFAULT);
+        let off = search_config_off();
+        assert!(!off.single_pass_other_val);
+        assert!(off.r5_net_solver);
+    }
+
+    /// Beide Spec-Felder sind OPTIONAL. Fehlen sie, gilt der Env-Default (hier:
+    /// die Getter, die auch `from_env` liest); 0 und 1 kommen an; 2, Text und
+    /// JSON-Bool sind harte Fehler (JSON-Bool, weil `spec_env.py` daraus
+    /// "True"/"False" machen wuerde, siehe Kommentar in `from_spec_file`).
+    #[test]
+    fn search_config_spec_single_pass_and_r5_fields_are_optional_and_validated() {
+        let dir = std::env::temp_dir();
+        let write = |tag: &str, extra: &str| {
+            let path = dir.join(format!("mosaic_test_spec_e1r5_{tag}_{}.json", std::process::id()));
+            std::fs::write(&path, format!("{{{SPEC_MIN_FIELDS}{extra}}}")).unwrap();
+            path
+        };
+        let p_missing = write("missing", "");
+        let cfg = SearchConfig::from_spec_file(p_missing.to_str().unwrap())
+            .expect("eine Spec ohne die Felder muss weiter laden");
+        std::fs::remove_file(&p_missing).ok();
+        assert_eq!(cfg.single_pass_other_val, single_pass_other_val_env());
+        assert_eq!(cfg.r5_net_solver, crate::round5::net_solver_enabled());
+
+        let p_set = write("set", r#", "single_pass_other_val": 1, "r5_net_solver": 0"#);
+        let cfg_set = SearchConfig::from_spec_file(p_set.to_str().unwrap()).expect("1 und 0 sind gueltig");
+        std::fs::remove_file(&p_set).ok();
+        assert!(cfg_set.single_pass_other_val);
+        assert!(!cfg_set.r5_net_solver);
+
+        let p_rev = write("rev", r#", "single_pass_other_val": 0, "r5_net_solver": 1"#);
+        let cfg_rev = SearchConfig::from_spec_file(p_rev.to_str().unwrap()).expect("0 und 1 sind gueltig");
+        std::fs::remove_file(&p_rev).ok();
+        assert!(!cfg_rev.single_pass_other_val);
+        assert!(cfg_rev.r5_net_solver);
+
+        for field in ["single_pass_other_val", "r5_net_solver"] {
+            for (tag, value) in [("zwei", "2"), ("text", r#""x""#), ("bool", "true")] {
+                let p_bad = write(&format!("{field}_{tag}"), &format!(r#", "{field}": {value}"#));
+                let msg = SearchConfig::from_spec_file(p_bad.to_str().unwrap())
+                    .expect_err("ungueltiger Wert muss hart abgewiesen werden");
+                std::fs::remove_file(&p_bad).ok();
+                assert!(msg.contains(field), "Fehlermeldung nennt das Feld ({field}/{tag}): {msg}");
+            }
+        }
+    }
+
+    /// E1: bei `single_pass_other_val = true` laeuft an KEINER Blattstelle ein
+    /// geflippter zweiter Pass (`net_leaf_eval_with`, `make_node`, gebuendelte
+    /// Wurzel-Expansion), und der Blattwert ist per Konstruktion eine
+    /// Nullsumme `v0 + v1 == 1`. Bei `false` (Bestand) laeuft er je Blatt.
+    /// Der Mover-Wert ist in beiden Modi derselbe Pass (Toleranz wie
+    /// `eval_pair` gegen zwei Einzelaufrufe, 1e-5).
+    #[test]
+    fn single_pass_leaf_skips_the_flipped_pass_and_is_zero_sum() {
+        let net = load_test_net();
+        let mut rng = StdRng::seed_from_u64(20260926);
+        let off = search_config_off();
+        let on = SearchConfig { single_pass_other_val: true, ..search_config_off() };
+        let mut checked = 0usize;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 12, &mut rng) else { continue };
+            let cp = state.current_player;
+
+            take_other_pass_calls();
+            let v_on = net_leaf_eval_with(&net, &state, true);
+            assert_eq!(take_other_pass_calls(), 0, "Spiel {gi}: Einpass darf keinen zweiten Pass rechnen");
+            assert!((v_on[0] + v_on[1] - 1.0).abs() < 1e-12, "Spiel {gi}: v0 + v1 != 1: {v_on:?}");
+
+            let v_off = net_leaf_eval_with(&net, &state, false);
+            assert_eq!(take_other_pass_calls(), 1, "Spiel {gi}: Bestand rechnet genau einen geflippten Pass");
+            assert!(
+                (v_on[cp] - v_off[cp]).abs() < 1e-5,
+                "Spiel {gi}: Mover-Wert muss in beiden Modi derselbe sein: {v_on:?} gegen {v_off:?}"
+            );
+
+            let mut r_on = StdRng::seed_from_u64(gi);
+            let _ = make_node(&net, None, state.clone(), None, None, None, 0.0, cp, &mut r_on, &on);
+            assert_eq!(take_other_pass_calls(), 0, "Spiel {gi}: make_node mit Knopf an ohne zweiten Pass");
+            let mut r_off = StdRng::seed_from_u64(gi);
+            let _ = make_node(&net, None, state.clone(), None, None, None, 0.0, cp, &mut r_off, &off);
+            assert_eq!(take_other_pass_calls(), 1, "Spiel {gi}: make_node im Bestand mit genau einem");
+
+            // Ganzer Baum inkl. gebuendelter Wurzel-Expansion.
+            let mut t_on = StdRng::seed_from_u64(100 + gi);
+            let nodes = build_gumbel_tree_inner(&net, None, &state, 32, false, &mut t_on, None, true, &on);
+            assert!(nodes.len() > 1, "Spiel {gi}: Testaufbau, der Baum muss expandieren");
+            assert_eq!(take_other_pass_calls(), 0, "Spiel {gi}: Suche mit Knopf an ohne zweiten Pass");
+            let mut t_off = StdRng::seed_from_u64(100 + gi);
+            let _ = build_gumbel_tree_inner(&net, None, &state, 32, false, &mut t_off, None, true, &off);
+            assert!(take_other_pass_calls() > 0, "Spiel {gi}: Suche im Bestand rechnet zweite Paesse");
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige auswertbare Stichproben ({checked}) -- Testaufbau pruefen");
+    }
+
+    /// Review-Befund #8 (`PREREG_moon_stack_order.md` par.13): die
+    /// Mondstapel-Nachsuche sucht auf einem Zustand, in dem der GEGNER am Zug
+    /// ist, aber FUER den Ziehenden. Mit ausdruecklichem Betrachter bleibt
+    /// dessen eigener Rueckgabe-Block in echter Reihenfolge, der fremde wird in
+    /// sich gemischt; der Alt-Pfad (`None` = `current_player`) tat genau das
+    /// Umgekehrte. Beide Rollen (Ziehender 0 und 1), also auch der gespiegelte
+    /// Zustand.
+    #[test]
+    fn moon_post_search_determinizes_for_the_mover_not_for_the_player_to_move() {
+        for mover in 0..2usize {
+            let mut rng = StdRng::seed_from_u64(11 + mover as u64);
+            let mut base = setup_new_game(names(), 0, &mut rng);
+            base.note_dome_pool_return(3, mover);
+            base.note_dome_pool_return(3, 1 - mover);
+            assert!(crate::state::dome_pool_knowledge_is_consistent(&base));
+            // `next` in `moon_order_post_search`: der Gegner ist am Zug.
+            base.current_player = 1 - mover;
+            let n = base.dome_tile_pool.len();
+            let own = n - 6..n - 3;
+            let foreign = n - 3..n;
+            let ids = |s: &GameState| s.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>();
+            let own_before = ids(&base)[own.clone()].to_vec();
+            let foreign_before = ids(&base)[foreign.clone()].to_vec();
+
+            let (mut foreign_mixed_new, mut own_mixed_old) = (0usize, 0usize);
+            for seed in 0u64..200 {
+                let mut s = base.clone();
+                let mut r = StdRng::seed_from_u64(seed);
+                determinize_root_for(&mut s, Some(mover), &mut r);
+                let after = ids(&s);
+                assert_eq!(
+                    &after[own.clone()],
+                    &own_before[..],
+                    "Ziehender {mover}, seed {seed}: eigener Block muss in echter Reihenfolge bleiben"
+                );
+                if after[foreign.clone()] != foreign_before[..] {
+                    foreign_mixed_new += 1;
+                }
+
+                let mut t = base.clone();
+                let mut r = StdRng::seed_from_u64(seed);
+                determinize_root_for(&mut t, None, &mut r);
+                let after_old = ids(&t);
+                assert_eq!(
+                    &after_old[foreign.clone()],
+                    &foreign_before[..],
+                    "Ziehender {mover}, seed {seed}: der Alt-Pfad sieht den Gegnerblock als Orakel"
+                );
+                if after_old[own.clone()] != own_before[..] {
+                    own_mixed_old += 1;
+                }
+            }
+            assert!(foreign_mixed_new > 0, "Ziehender {mover}: der fremde Block muss gemischt werden");
+            assert!(own_mixed_old > 0, "Ziehender {mover}: Kontrolle, der Alt-Pfad mischte den eigenen");
+        }
+    }
+
+    /// Bitidentitaet des Bestands: `determinize_root_for(None)` ist Zug fuer
+    /// Zug `determinize_hidden_information` -- gleicher Zustand UND gleicher
+    /// RNG-Verbrauch. Daran haengt, dass jede Suche ausser der
+    /// Mondstapel-Nachsuche unveraendert bleibt.
+    #[test]
+    fn determinize_root_for_none_is_the_stock_determinization() {
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut base = setup_new_game(names(), 0, &mut rng);
+        base.note_dome_pool_return(2, 0);
+        base.note_dome_pool_return(3, 1);
+        for cp in 0..2usize {
+            base.current_player = cp;
+            for seed in 0u64..20 {
+                let mut a = base.clone();
+                let mut ra = StdRng::seed_from_u64(seed);
+                determinize_hidden_information(&mut a, &mut ra);
+                let next_a: u64 = ra.random();
+                let mut b = base.clone();
+                let mut rb = StdRng::seed_from_u64(seed);
+                determinize_root_for(&mut b, None, &mut rb);
+                let next_b: u64 = rb.random();
+                assert_eq!(format!("{a:?}"), format!("{b:?}"), "cp {cp}, seed {seed}: Zustand");
+                assert_eq!(next_a, next_b, "cp {cp}, seed {seed}: RNG-Verbrauch");
+                // `Some(current_player)` ist derselbe Betrachter.
+                let mut c = base.clone();
+                let mut rc = StdRng::seed_from_u64(seed);
+                determinize_root_for(&mut c, Some(cp), &mut rc);
+                assert_eq!(format!("{a:?}"), format!("{c:?}"), "cp {cp}, seed {seed}: Some(cp) == None");
+            }
+        }
+    }
+
+    /// `PREREG_r5_net_vs_solver.md` par.2: das Runde-5-Tor haengt am Feld der
+    /// Seite. Feld an (Bestand) -> der Loeser uebernimmt in Runde 5; Feld aus
+    /// -> das Tor ist zu, `round5::applies` allein reicht nicht mehr. In
+    /// Runde 1-4 ist das Tor in beiden Stellungen zu.
+    #[test]
+    fn r5_switch_gates_the_solver_per_side() {
+        use crate::round_transition::drive_to_round_start;
+        let r5 = drive_to_round_start(101, 5);
+        assert!(crate::round5::applies(&r5), "Testaufbau: Runde-5-Drafting");
+        let on = search_config_off();
+        let off = SearchConfig { r5_net_solver: false, ..search_config_off() };
+        assert!(r5_solver_takes_over(&r5, &on));
+        assert!(!r5_solver_takes_over(&r5, &off));
+        let r4 = drive_to_round_start(101, 4);
+        assert!(!crate::round5::applies(&r4));
+        assert!(!r5_solver_takes_over(&r4, &on));
+        assert!(!r5_solver_takes_over(&r4, &off));
+    }
+
+    /// Dasselbe am echten Einstieg: mit Feld aus liefert
+    /// `net_root_child_stats_and_policy` in Runde 5 eine Netzsuche (Politik
+    /// ueber alle Wurzelkandidaten, Wurzel-Q aus dem Baum), mit Feld an den
+    /// Loeser-Eintrag (genau eine Aktion).
+    #[test]
+    fn r5_switch_off_searches_round5_with_the_net() {
+        use crate::round_transition::drive_to_round_start;
+        let net = load_test_net();
+        let state = drive_to_round_start(202, 5);
+        assert!(crate::round5::applies(&state), "Testaufbau: Runde-5-Drafting");
+        assert!(drafting_actions(&state).len() >= 2, "Testaufbau: mindestens zwei legale Zuege");
+
+        let off = SearchConfig { r5_net_solver: false, ..search_config_off() };
+        let mut r_off = StdRng::seed_from_u64(7);
+        let (stats_off, policy_off, root_q_off, _) =
+            net_root_child_stats_and_policy(&net, &state, 32, 1.5, false, &mut r_off, &off);
+        assert!(policy_off.len() >= 2, "Feld aus: Politik ueber die Wurzelkandidaten, nicht One-Hot");
+        assert!(!stats_off.is_empty());
+        assert!(root_q_off.is_some());
+
+        let on = search_config_off();
+        let mut r_on = StdRng::seed_from_u64(7);
+        let (stats_on, policy_on, _, _) =
+            net_root_child_stats_and_policy(&net, &state, 32, 1.5, false, &mut r_on, &on);
+        assert!(stats_on.len() <= 1, "Feld an: Loeser-Eintrag");
+        assert_eq!(stats_on.len(), policy_on.len());
     }
 
     /// Tor (a) des Bauauftrags: **Knopf 0 laesst alles bitidentisch.** Drei

@@ -953,6 +953,11 @@ OPTIONAL_ARRAY_FIELD_RE = re.compile(r'obj\.get\(\s*"([^"]+)"\s*\)\s*\{\s*None\s
 # verdeckt die naechste echte).
 OPTIONAL_HELPER_FIELD_RE = re.compile(r'spec_u32\(\s*"([^"]+)"')
 
+# Vierte Bauform (2026-09-27, E1 und R5-Schalter je Seite): der Bool-Helfer
+# `spec_flag("<name>", <env_default>)` -- fehlt das Feld, gilt der Env-Default,
+# es ist also ebenfalls kein Abweisungsgrund.
+OPTIONAL_FLAG_FIELD_RE = re.compile(r'spec_flag\(\s*"([^"]+)"')
+
 
 def _spec_known_fields() -> set[str] | None:
     """Feldnamen aus `SearchConfig::from_spec_file`, oder None wenn nicht parsebar."""
@@ -969,7 +974,7 @@ def _spec_optional_fields() -> set[str]:
     ein FEHLEN ist dort kein Abweisungsgrund, nur ein UNBEKANNTES Feld bleibt einer.
     Seit 2026-09-11 (`dead_cell_w`, `out_wild_w`, PREREG_geometric_envelope.md par.12c):
     die eingefrorenen Artefakt-Specs tragen sie nicht und muessen weiter laden.
-    DREI Bauformen, alle zaehlen: der Zahl-Leser `get_optional_non_negative`,
+    VIER Bauformen, alle zaehlen (vierte: `spec_flag`, seit 2026-09-27): der Zahl-Leser `get_optional_non_negative`,
     der Feld-Leser `match obj.get("<name>") { None => <DEFAULT>, ... }`
     (`round_est_b_profile`, K4, seit 2026-09-12) und der gemeinsame Helfer
     `spec_u32("<name>", lo, hi)` (Stilfelder der Stufen, seit 2026-09-13)."""
@@ -977,7 +982,7 @@ def _spec_optional_fields() -> set[str]:
         return set()
     text = NET_MCTS_PATH.read_text(encoding="utf-8", errors="replace")
     return set(OPTIONAL_FIELD_RE.findall(text)) | set(OPTIONAL_ARRAY_FIELD_RE.findall(text)
-        + OPTIONAL_HELPER_FIELD_RE.findall(text))
+        + OPTIONAL_HELPER_FIELD_RE.findall(text) + OPTIONAL_FLAG_FIELD_RE.findall(text))
 
 
 def warn_live_specs_match_known_fields(staged_only: bool, staged_files: set[str]) -> None:

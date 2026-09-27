@@ -343,7 +343,9 @@ pub(crate) fn action_to_id_direct(state: &GameState, a: &Action) -> usize {
 
 /// Gewichtete Policy aus der Wurzelkind-Statistik:
 /// `visits^(1/temp) * max(q,1e-6)^2`, normalisiert. Liefert die gewählte Aktion
-/// (per Gewichten gesampelt) und die Policy-Einträge (agent_env-Schema).
+/// (per Gewichten gesampelt), die Policy-Einträge (agent_env-Schema) und ob
+/// der Zufalls-Rueckfall gegriffen hat (#16, dritter Wert; einziger Aufrufer
+/// ist `HeuristicSelfPlayAgent::decide`).
 fn drafting_policy<R: Rng + ?Sized>(
     state: &GameState,
     actions: &[Action],
@@ -352,16 +354,18 @@ fn drafting_policy<R: Rng + ?Sized>(
     play_temp: f64,
     rng: &mut R,
     variant: crate::mcts::HeuristicVariant,
-) -> (Action, Vec<Value>) {
+) -> (Action, Vec<Value>, bool) {
     let sims = dynamic_sims(base_sims, actions.len());
     // `Hv1` laeuft ueber dieselbe Suche wie zuvor (`root_child_stats`
     // delegiert mit `Hv1`) -- der Anker bleibt unberuehrt.
     let stats = root_child_stats_with_variant(state, sims, c, rng, variant); // Vec<(Action, visits, q)>
 
     if stats.is_empty() {
+        // #16: Rueckfall -- das Policy-Ziel ist eine Eins auf einem
+        // ZUFAELLIGEN Zug, kein Suchergebnis. Gemeldet ueber den dritten Wert.
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
         let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-        return (a, vec![entry]);
+        return (a, vec![entry], true);
     }
 
     // Gewichte für eine Temperatur: visits^(1/temp)·q², mit reinem-Visits-Fallback.
@@ -395,7 +399,7 @@ fn drafting_policy<R: Rng + ?Sized>(
     // PLAY: moderate Temperatur → gespielte Aktion sampeln (Zustandsvielfalt).
     let (pw, ps) = weights_for(play_temp);
     let idx = if ps > 0.0 { weighted_index(&pw, ps, rng) } else { 0 };
-    (stats[idx].0.clone(), policy)
+    (stats[idx].0.clone(), policy, false)
 }
 
 /// Sampelt einen Index proportional zu `weights` (Summe = `total`).
@@ -3229,6 +3233,117 @@ fn excursion_gate(game_seed: u64) -> bool {
     rng.random::<f64>() < prob
 }
 
+// ── #14: der Ausflug erbt die verdeckte Welt nicht mehr ──────────────────────
+//
+// ANLASS (`evaluations/review/code_review_2026-09-26_verification.md` #14,
+// Nutzer-Entscheid "Takte es ein"): der Ausflug startet als roher Klon der
+// Abzweigstellung (`unified_game_loop`, `cell.set(Some(game.state.clone()))`).
+// Beutelreihenfolge, unbekannter Teil des Kuppelstapels und verdeckte
+// Bonuschips sind damit dieselben wie in der Hauptpartie: `Bag::draw` nimmt
+// ohne RNG vom Anfang (supply.rs), erst eine Turm-Nachfuellung mischt. Haupt-
+// und Ausflugspartie teilen so die verdeckte ZUKUNFT, nicht nur den Vorlauf --
+// ihre Wertziele sind staerker gekoppelt, als der gemeinsame Vorlauf erklaert.
+//
+// FIX (Knopf `MOSAIC_EXCURSION_RESHUFFLE`, Default aus): am Abzweig wird mit
+// dem Ausflug-RNG (`ex_rng`) neu gemischt, was KEINER der beiden Spieler kennt.
+// Welche Sicht: "niemand weiss es", NICHT die eines Spielers. Darum ist
+// `state::determinize_dome_pool` nicht der passende Baustein -- er kennt nur
+// "Sicht von Spieler v" (fremde Bloecke werden in sich permutiert) oder
+// `None` (auch der eigene Block wird permutiert). Beides wuerde Reihenfolgen
+// vernichten, die ein Spieler rechtmaessig kennt. Die Chip-Mischung in
+// `net_mcts::determinize_hidden_information_for` ist betrachterunabhaengig
+// und passt inhaltlich; sie ist aber privat (und an die Stapel-Sicht eines
+// Betrachters gekoppelt), darum hier als kleiner eigener Baustein
+// nachgebildet (gleiche Logik, gelesen, nicht geaendert).
+//
+// Was gemischt wird:
+//   * `bag.tiles` komplett (die Reihenfolge kennt niemand; die Farbzaehler
+//     sind oeffentlich und bleiben, weil nur permutiert wird);
+//   * das unbekannte Praefix des Kuppelstapels (`dome_pool_unknown_prefix_len`);
+//     der TYP der obersten Platte ist oeffentlich (P.10,
+//     `dome_stack_top_type`) und wird ohne RNG-Verbrauch wiederhergestellt
+//     (dieselbe Tauschregel wie `state::restore_top_plate_type`, die privat
+//     ist);
+//   * die verdeckten Bonuschips: Pool plus alle unaufgedeckten Fabrik-Chips,
+//     gemeinsam gemischt und auf dieselben Plaetze verteilt.
+// Was bleibt:
+//   * JEDER bekannte Rueckgabeblock (`dome_pool_known_blocks`) samt
+//     Reihenfolge: sein Rueckleger hat sie gewaehlt und kennt sie, die Menge
+//     und Lage kennen beide. Auch bei `MOSAIC_DOME_POOL_KNOWLEDGE=0` -- jener
+//     Knopf steuert, was die SUCHE beachtet; physisch gewusst ist der Block
+//     trotzdem;
+//   * aufgedeckte Fabrik-Chips, Turm, Auslage, Fabriken, Bretter, offene
+//     Wahlen (`pending_*`, z. B. bereits gezogene Stapelplatten) -- alles
+//     oeffentlich oder schon in der Hand eines Spielers.
+//
+// DEFAULT AUS = BYTE-IDENTISCH: ohne Knopf wird die Funktion nicht
+// aufgerufen, `ex_rng` bleibt unberuehrt.
+
+/// `MOSAIC_EXCURSION_RESHUFFLE`: jeder nicht-leere Wert ausser `"0"` schaltet
+/// die Neumischung am Abzweig ein. Default aus. Prozessweit gecacht
+/// (OnceLock), Variable VOR dem ersten Lesen setzen.
+pub(crate) fn excursion_reshuffle_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_EXCURSION_RESHUFFLE") {
+        Err(_) => false,
+        Ok(raw) => {
+            let v = raw.trim();
+            !v.is_empty() && v != "0"
+        }
+    })
+}
+
+/// Mischt am Ausflug-Abzweig alles neu, was KEIN Spieler kennt (siehe
+/// Abschnittskopf #14). Reihenfolge der Ziehungen: Beutel, Stapel-Praefix,
+/// Chips -- fest, damit der Ausflug je `excursion_seed` reproduzierbar bleibt.
+fn reshuffle_hidden_world_for_excursion<R: Rng + ?Sized>(state: &mut GameState, rng: &mut R) {
+    // (1) Beutel.
+    state.bag.tiles.shuffle(rng);
+
+    // (2) Unbekanntes Praefix des Kuppelstapels; die bekannten Bloecke dahinter
+    // bleiben woertlich stehen.
+    let prefix_len = state.dome_pool_unknown_prefix_len().min(state.dome_tile_pool.len());
+    if prefix_len > 1 {
+        let top_special_before = state.dome_tile_pool.first().map(|t| t.is_special_type());
+        state.dome_tile_pool[..prefix_len].shuffle(rng);
+        if let Some(want_special) = top_special_before {
+            if state.dome_tile_pool[0].is_special_type() != want_special {
+                // Tauschpartner nur aus dem Praefix: die Blockgrenzen bleiben
+                // unberuehrt, und weil das Praefix nur permutiert wurde, gibt
+                // es dort immer eine typgleiche Platte.
+                if let Some(idx) = state.dome_tile_pool[..prefix_len]
+                    .iter()
+                    .position(|t| t.is_special_type() == want_special)
+                {
+                    state.dome_tile_pool.swap(0, idx);
+                }
+            }
+        }
+    }
+
+    // (3) Verdeckte Bonuschips: Pool und unaufgedeckte Fabrik-Chips gemeinsam.
+    let orig_pool_len = state.bonus_chip_pool.len();
+    let mut hidden_chips: Vec<crate::dome::BonusChip> = state.bonus_chip_pool.drain(..).collect();
+    let unrevealed_idxs: Vec<usize> = state
+        .factories
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.bonus_chip.is_some() && !f.bonus_chip_revealed)
+        .map(|(i, _)| i)
+        .collect();
+    for &idx in &unrevealed_idxs {
+        if let Some(chip) = state.factories[idx].bonus_chip.take() {
+            hidden_chips.push(chip);
+        }
+    }
+    hidden_chips.shuffle(rng);
+    let for_factories = hidden_chips.split_off(orig_pool_len.min(hidden_chips.len()));
+    state.bonus_chip_pool = hidden_chips;
+    for (idx, chip) in unrevealed_idxs.into_iter().zip(for_factories) {
+        state.factories[idx].bonus_chip = Some(chip);
+    }
+}
+
 /// EIN Schritt des gewichteten Reservoir-Samplings (Reservoir-Groesse 1,
 /// sequenzielles Verfahren): gegeben die bisherige Gewichtsumme
 /// `weight_sum_before` und das Gewicht `w` des aktuellen Kandidaten, zieht
@@ -3279,6 +3394,14 @@ struct DraftingDecision {
     /// Vorzugs-Kandidat der Bauer-Kette, falls einer existierte -- fuer den
     /// Spaltenbau-Trace des Arena-Pfads (`column_build_trace`).
     vorzug: Option<Action>,
+    /// #16 (Code-Review 2026-09-26): `true` GENAU DANN, wenn die Suche keine
+    /// brauchbare Besuchsverteilung lieferte und der Zug eine rein zufaellige
+    /// legale Aktion ist (Rueckfall in [`drafting_policy`] bzw.
+    /// [`net_drafting_policy_with_fallback_flag`]). Das Policy-Ziel ist dann
+    /// eine Eins auf diesem Zufallszug. Wird als Record-Feld
+    /// `fallback_random_action: true` geschrieben -- NUR in diesem Fall, sonst
+    /// fehlt das Feld (byte-identisch zum Bestand).
+    fallback_random_action: bool,
 }
 
 impl DraftingDecision {
@@ -3291,8 +3414,16 @@ impl DraftingDecision {
             root_child_q: Vec::new(),
             policy_target_valid: None,
             vorzug: None,
+            fallback_random_action: false,
         }
     }
+}
+
+/// #16: Record-Feld des Such-Rueckfalls. `Some(true)` nur bei ausgeloestem
+/// Rueckfall, sonst `None` = kein Feld (Muster
+/// `return_order_randomized_field`).
+fn fallback_random_action_field(fired: bool) -> Option<Value> {
+    fired.then(|| json!(true))
 }
 
 /// Zugquelle EINES Spielers fuer die Drafting-Phase der vereinheitlichten
@@ -3366,14 +3497,24 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
         // nachweislich dieselbe Staffel fahren. Werte unveraendert:
         // n > 50 -> 0,7; n > 15 -> 0,4; sonst 0,15.
         let temp = action_temp_for(n);
-        let (chosen, policy) = if n == 1 {
+        let (chosen, policy, fallback) = if n == 1 {
             let a = actions[0].clone();
             let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![entry])
+            (a, vec![entry], false)
         } else {
             drafting_policy(state, actions, self.base_sims, self.c, temp, search_rng, self.variant)
         };
-        DraftingDecision { policy: Some(policy), ..DraftingDecision::plain(chosen) }
+        DraftingDecision {
+            policy: Some(policy),
+            // #16: beim Rueckfall ist das Ziel eine Eins auf dem Zufallszug --
+            // als policy-ungueltig markieren (Muster Startkuppel-Streuung:
+            // `policy_target_valid=false` PLUS eigene Flagge, weil die Kette
+            // mit `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` faehrt). Ohne Rueckfall
+            // `None` wie bisher.
+            policy_target_valid: fallback.then_some(false),
+            fallback_random_action: fallback,
+            ..DraftingDecision::plain(chosen)
+        }
     }
 }
 
@@ -3562,20 +3703,20 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             _ => self.base_sims,
         };
         let vorzug_kandidat = if self.vorzug { builder_drafting_preference(state) } else { None };
-        let (chosen, policy, root_q, root_child_q) = if actions.len() == 1 {
+        let (chosen, policy, root_q, root_child_q, fallback) = if actions.len() == 1 {
             let a = actions[0].clone();
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new())
+            (a, vec![e], None, Vec::new(), false)
         } else if let Some(a) = vorzug_kandidat.clone() {
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new())
+            (a, vec![e], None, Vec::new(), false)
         } else {
             // Task #80/#81: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
             // tatsaechlich gespielten Zuege; `timed()` ist ohne
             // `clone_profiling`-Feature ein No-Op (siehe profiling.rs).
             crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
                 crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
-                    net_drafting_policy(
+                    net_drafting_policy_with_fallback_flag(
                         self.net, state, actions, effective_sims, self.c_puct, search_rng,
                         self.add_root_noise, self.deterministic, move_number,
                         self.tau_argmax_override, &self.search_config,
@@ -3588,8 +3729,12 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             policy: Some(policy),
             root_q,
             root_child_q,
-            policy_target_valid: pcr_is_full,
+            // #16: beim Such-Rueckfall ist das Ziel ungueltig, unabhaengig vom
+            // PCR-Wurf (Muster Startkuppel-Streuung). Ohne Rueckfall exakt der
+            // Bestandswert `pcr_is_full`.
+            policy_target_valid: if fallback { Some(false) } else { pcr_is_full },
             vorzug: vorzug_kandidat,
+            fallback_random_action: fallback,
         }
     }
 }
@@ -3602,6 +3747,123 @@ struct LabelSamplingConfig<'n> {
     net: &'n Net,
     record_rtv: bool,
     profiled: bool,
+}
+
+// ── #13: eigener Zufallsstrom fuer das Label-Sampling ────────────────────────
+//
+// ANLASS (`evaluations/review/code_review_2026-09-26_verification.md` #13):
+// rtv- und Bootstrap-Labels zogen aus dem PARTIE-`rng`. Ihre Schleifen haben
+// Wanduhr-Deckel (`round_transition.rs::sample_round_transition_value`,
+// `round_transition_deep.rs`), und die "ehrlichen Deckel" machen zwar den
+// WERT bei Feuern deterministisch, nicht aber die ANZAHL der gezogenen
+// Zufallszahlen. Danach treibt derselbe `rng` den `EndTiling`-Refill der
+// naechsten Runde: feuert ein Deckel (Nebenlast, Drosselung), wird die Partie
+// ab Runde 2 eine andere. Mechanismus am Code belegt (Review #13), die
+// Wirkung ist Herleitung.
+//
+// FIX: hinter `MOSAIC_LABEL_RNG_SPLIT` zieht das Label-Sampling aus einem
+// EIGENEN, aus dem Partie-Seed abgeleiteten Strom (Muster
+// `PREREG_search_rng_split.md`: `derive_search_seed(game_seed ^ DISTINGUISHER,
+// counter)`). Je Runde und je Label-Art ein frischer Strom -- auch ein
+// feuernder rtv-Deckel verschiebt so die Bootstrap-Ziehung derselben Runde
+// nicht. Der Partie-`rng` sieht bei aktivem Knopf KEINE Label-Ziehung mehr;
+// sein Verbrauch haengt damit nicht mehr an der Wanduhr.
+//
+// DEFAULT AUS = BYTE-IDENTISCH: ohne Knopf laufen exakt dieselben Aufrufe mit
+// demselben `rng` wie vorher (die Helfer unten sind reine Auszuege). Mit Knopf
+// aendern sich die Self-Play-Bytes (andere Label-Stichproben UND ein anderer
+// Refill-Strom ab Runde 2), darum Knopf statt stiller Umstellung.
+
+/// Stromindex des Label-Samplings. EIGENER Wert, gegen alle Distinguisher im
+/// Baum gegrept (Stand 2026-09-26: `RETURN_ORDER_SEED_DISTINGUISHER`,
+/// `RETURN_ORDER_NODE_SEED_DISTINGUISHER`, `DEVIATE_SEED_DISTINGUISHER`,
+/// `EXCURSION_SEED_DISTINGUISHER`, die lokale Konstante in
+/// `asym_preference_side`, `net_mcts::MOON_ORDER_SEARCH_SEED_DISTINGUISHER`,
+/// `round_transition::ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER`,
+/// `tie_mirror::TIE_MIRROR_SEED_DISTINGUISHER` sowie die kurzen XOR-Werte
+/// `0x5EED`/`0xBEEF` in `round_transition.rs` und `0xDEB0_6DEB_06DE_B06D` in
+/// `py.rs`). Bewacht von `label_seed_distinguisher_is_unique`.
+const LABEL_SEED_DISTINGUISHER: u64 = 0x1ABE_15A3_5EED_C0DE;
+
+/// Label-Art im Zaehler-Argument: rtv und Bootstrap bekommen je Runde
+/// getrennte Stroeme (`counter = runde * LABEL_STREAMS_PER_ROUND + art`).
+const LABEL_STREAM_RTV: u64 = 0;
+const LABEL_STREAM_BOOTSTRAP: u64 = 1;
+const LABEL_STREAMS_PER_ROUND: u64 = 2;
+
+/// `MOSAIC_LABEL_RNG_SPLIT`: jeder nicht-leere Wert ausser `"0"` schaltet den
+/// eigenen Label-Strom ein. Default aus (= Bestand, byte-identisch).
+/// Prozessweit gecacht (OnceLock): die Variable MUSS vor dem ersten Lesen
+/// gesetzt sein, gleiche Regel wie `return_order_random_p`.
+pub(crate) fn label_rng_split_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_LABEL_RNG_SPLIT") {
+        Err(_) => false,
+        Ok(raw) => {
+            let v = raw.trim();
+            !v.is_empty() && v != "0"
+        }
+    })
+}
+
+/// Der abgeleitete Label-Strom EINER Label-Ziehung (Runde `round`, Art
+/// `stream`). Reine Funktion von `(game_seed, round, stream)`.
+fn label_rng(game_seed: u64, round: u32, stream: u64) -> StdRng {
+    StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+        game_seed ^ LABEL_SEED_DISTINGUISHER,
+        (round as u64) * LABEL_STREAMS_PER_ROUND + stream,
+    ))
+}
+
+/// `Some(strom)` bei aktivem Split, sonst `None` (dann nimmt der Aufrufer den
+/// Partie-`rng`, Bestand). Bei `split = false` wird nichts abgeleitet.
+fn split_label_rng(split: bool, game_seed: u64, round: u32, stream: u64) -> Option<StdRng> {
+    split.then(|| label_rng(game_seed, round, stream))
+}
+
+/// rtv-Label einer Runde -- reiner Auszug aus `unified_game_loop` (dieselben
+/// Aufrufe, dieselbe Profiling-Klammer), damit er mit Partie- ODER Label-Strom
+/// laufen kann.
+fn sample_rtv_label<R: Rng + ?Sized>(
+    lbl: &LabelSamplingConfig<'_>,
+    round_before: u32,
+    pre: &crate::round_transition::PreChanceState,
+    rng: &mut R,
+) -> [f64; 2] {
+    if lbl.profiled {
+        crate::profiling::with_category(crate::profiling::Category::Rtv, || {
+            crate::profiling::timed(crate::profiling::note_rtv_ns, || {
+                sample_round_transition_for_round(round_before, pre, lbl.net, rng)
+            })
+        })
+    } else {
+        sample_round_transition_for_round(round_before, pre, lbl.net, rng)
+    }
+}
+
+/// Bootstrap-Label einer Runde -- reiner Auszug wie [`sample_rtv_label`].
+fn sample_bootstrap_label<R: Rng + ?Sized>(
+    lbl: &LabelSamplingConfig<'_>,
+    pre: &crate::round_transition::PreChanceState,
+    rng: &mut R,
+) -> [f64; 2] {
+    if lbl.profiled {
+        crate::profiling::with_category(crate::profiling::Category::Bootstrap, || {
+            crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
+                crate::round_transition_deep::bootstrap_value_after_rounds(
+                    pre, lbl.net,
+                    crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+                    rng,
+                )
+            })
+        })
+    } else {
+        crate::round_transition_deep::bootstrap_value_after_rounds(
+            pre, lbl.net,
+            crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+            rng,
+        )
+    }
 }
 
 /// Ausgabe-Modus der Schleife.
@@ -4287,34 +4549,25 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                 // rtv-Sampling (~81% der Self-Play-Kosten,
                                 // Task #80/#81); `bootstrap_value` laeuft
                                 // unabhaengig davon immer mit.
+                                //
+                                // #13 (`MOSAIC_LABEL_RNG_SPLIT`): bei aktivem
+                                // Knopf zieht jede Label-Art aus ihrem eigenen,
+                                // aus `cfg.game_seed` abgeleiteten Strom, der
+                                // Partie-`rng` bleibt unberuehrt. Ohne Knopf
+                                // (`None`) exakt der Bestandsaufruf mit `rng`.
+                                let split = label_rng_split_enabled();
                                 if lbl.record_rtv {
-                                    let v = if lbl.profiled {
-                                        crate::profiling::with_category(crate::profiling::Category::Rtv, || {
-                                            crate::profiling::timed(crate::profiling::note_rtv_ns, || {
-                                                sample_round_transition_for_round(round_before, &pre, lbl.net, rng)
-                                            })
-                                        })
-                                    } else {
-                                        sample_round_transition_for_round(round_before, &pre, lbl.net, rng)
+                                    let v = match split_label_rng(split, cfg.game_seed, round_before, LABEL_STREAM_RTV) {
+                                        Some(mut label_stream) => {
+                                            sample_rtv_label(lbl, round_before, &pre, &mut label_stream)
+                                        }
+                                        None => sample_rtv_label(lbl, round_before, &pre, rng),
                                     };
                                     round_transition_values.insert(round_before, v);
                                 }
-                                let bv = if lbl.profiled {
-                                    crate::profiling::with_category(crate::profiling::Category::Bootstrap, || {
-                                        crate::profiling::timed(crate::profiling::note_bootstrap_ns, || {
-                                            crate::round_transition_deep::bootstrap_value_after_rounds(
-                                                &pre, lbl.net,
-                                                crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-                                                rng,
-                                            )
-                                        })
-                                    })
-                                } else {
-                                    crate::round_transition_deep::bootstrap_value_after_rounds(
-                                        &pre, lbl.net,
-                                        crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-                                        rng,
-                                    )
+                                let bv = match split_label_rng(split, cfg.game_seed, round_before, LABEL_STREAM_BOOTSTRAP) {
+                                    Some(mut label_stream) => sample_bootstrap_label(lbl, &pre, &mut label_stream),
+                                    None => sample_bootstrap_label(lbl, &pre, rng),
                                 };
                                 bootstrap_values.insert(round_before, bv);
                             }
@@ -4356,6 +4609,14 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         if let Some(v) = return_order_randomized_field(return_order_randomized.get())
                         {
                             m.insert("return_order_randomized".into(), v);
+                        }
+                        // #16: additiv, NUR wenn der Such-Rueckfall gegriffen
+                        // hat (Zufallszug als Eins-Ziel). Eigene Flagge statt
+                        // nur `policy_target_valid`, weil die Kette mit
+                        // `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` faehrt und
+                        // jenes Feld dann nicht maskiert.
+                        if let Some(v) = fallback_random_action_field(d.fallback_random_action) {
+                            m.insert("fallback_random_action".into(), v);
                         }
                         records.push(m);
                     }
@@ -5763,7 +6024,38 @@ pub fn run_net_vs_net_arena_hybrid(
 /// Aufrufer (`mean_rollout_diff`, `deterministic=true`) wird `0` als
 /// bedeutungsloser Platzhalter uebergeben -- der `deterministic`-Zweig hat
 /// dort ohnehin Vorrang, der τ-Zweig ist unerreichbar.
+///
+/// Duenner Wrapper um [`net_drafting_policy_with_fallback_flag`] (#16), der
+/// die Rueckfall-Meldung verwirft -- fuer die Aufrufer, die kein Record
+/// schreiben (`lib.rs::net_drafting_policy_states_json_batch`, die
+/// Stufe-1-Fortsetzung). Gleiche Aufrufe, gleicher RNG-Verbrauch.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    base_sims: u32,
+    c_puct: f64,
+    rng: &mut R,
+    add_root_noise: bool,
+    deterministic: bool,
+    move_number: u64,
+    tau_argmax_override: Option<usize>,
+    search_config: &crate::net_mcts::SearchConfig,
+) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
+    let (chosen, policy, root_q, child_q, _fallback) = net_drafting_policy_with_fallback_flag(
+        net, state, actions, base_sims, c_puct, rng, add_root_noise, deterministic, move_number,
+        tau_argmax_override, search_config,
+    );
+    (chosen, policy, root_q, child_q)
+}
+
+/// Rumpf von [`net_drafting_policy`] mit FUENFTEM Rueckgabewert (#16): `true`
+/// genau dann, wenn der Zufalls-Rueckfall gegriffen hat (leere/nutzlose
+/// Suchstatistik, Zug = zufaellige legale Aktion, Policy-Ziel = Eins darauf).
+/// Einziger Aufrufer mit Record ist `NetSelfPlayAgent::decide`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
     actions: &[Action],
@@ -5781,7 +6073,7 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
     // dieselbe globale Env-Var-Abfrage wie vor diesem Parameter.
     tau_argmax_override: Option<usize>,
     search_config: &crate::net_mcts::SearchConfig,
-) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
+) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool) {
     let sims = net_effective_sims(base_sims, actions.len());
     let (stats, completed_q_policy, root_q, root_child_q) = crate::net_mcts::net_root_child_stats_and_policy(
         net, state, sims, c_puct, add_root_noise, rng, search_config,
@@ -5819,12 +6111,17 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
         // -- Korrektheits-Fixes bleiben auch bei flachem/keinem gemessenen
         // Effekt), aber die urspruenglich gemeldete ~20%-Zahl war ein
         // Messfehler in der eigenen Diagnose, kein reales Engine-Verhalten.
+        //
+        // #16 (Code-Review 2026-09-26): das Policy-Ziel hier ist eine Eins auf
+        // einem ZUFALLSZUG. Gemeldet ueber den fuenften Wert; der Aufrufer
+        // schreibt daraus die Record-Flagge `fallback_random_action`.
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
         return (
             a.clone(),
             vec![json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 })],
             root_q,
             Vec::new(),
+            true,
         );
     }
     // Task #35: `root_child_q` MUSS exakt dieselbe Reihenfolge/Länge wie
@@ -5930,7 +6227,7 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
         search_config,
     )
     .unwrap_or_else(|| stats[idx].0.clone());
-    (chosen, policy, root_q, child_q)
+    (chosen, policy, root_q, child_q, false)
 }
 
 /// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive
@@ -6500,7 +6797,17 @@ pub fn run_net_self_play(
         let net_ex = std::sync::Arc::clone(&net);
         let gid_thread = gid.clone();
         let move_counter_thread = Arc::clone(&move_counter);
+        // Spiegelknopf (PREREG_tie_mirror.md par.2): EINE Muenze je Partie, aus
+        // `partie_seed` abgeleitet (eigener Distinguisher, der Partie-`rng`
+        // bleibt unberuehrt). Hier in der aeusseren Closure geworfen, damit
+        // der Ausflug unten DENSELBEN Wert uebernimmt (dieselbe Welt, derselbe
+        // Stil). `p = 0` (Default): kein Wurf, `false`, kein Record-Feld.
+        let tie_p = crate::tie_mirror::tie_mirror_p();
+        let tie_mirrored = crate::tie_mirror::tie_mirror_coin(tie_p, partie_seed);
         let result = run_with_watchdog(watchdog_deadline, move || {
+            // Thread-lokal wie `GAME_WEIGHT`/`PARTIE_SEED` darunter: MUSS im
+            // gespawnten Partie-Thread gesetzt werden.
+            crate::tie_mirror::set_game_tie_mirror(tie_mirrored);
             // Plattengewicht JE PARTIE streuen (Nutzer-Auftrag: *"dann ziehen
             // die spiele mal mehr und mal weniger richtung wertungsplatten"*).
             // Aus dem Partie-Seed abgeleitet, also reproduzierbar. MUSS hier
@@ -6562,6 +6869,10 @@ pub fn run_net_self_play(
                 (Vec::new(), None)
             }
         };
+        // Spiegelknopf: additives Record-Feld `tie_mirrored` auf JEDEM Record
+        // der Partie, nur bei `p > 0` (sonst byte-gleich zum Bestand). VOR dem
+        // Fortschritts-Log, damit Datei und Rueckgabe dieselben Records tragen.
+        crate::tie_mirror::stamp_tie_mirrored(&mut steps, tie_p, tie_mirrored);
         // Nur GENUTZTE Spiele (nicht der leere Watchdog-Abbruch-Fall) zaehlen
         // fuers Fortschritts-Tracking -- ein leeres Ergebnis traegt nichts
         // zur Ziel-Spielezahl bei (`_group_by_game` in self_play.py ueberspringt
@@ -6583,7 +6894,7 @@ pub fn run_net_self_play(
         // Fenster-Manifest zaehlt -- deshalb hier bewusst NICHT in
         // `games_counter` gezaehlt (der die Ziel-Partiezahl `n_games`
         // trackt), nur additiv in den flachen Record-Strom gefaltet.
-        if let Some(branch_state) = excursion_branch {
+        if let Some(mut branch_state) = excursion_branch {
             // Eigener, aus `partie_seed` abgeleiteter Ausflug-Seed
             // (Determinismus-Vorgabe) -- unabhaengig vom Hauptpartie-Strom,
             // reservierter Zaehler (siehe `EXCURSION_GAME_SEED_COUNTER`-Doku).
@@ -6592,6 +6903,13 @@ pub fn run_net_self_play(
                 EXCURSION_GAME_SEED_COUNTER,
             );
             let mut ex_rng = StdRng::seed_from_u64(excursion_seed);
+            // #14 (`MOSAIC_EXCURSION_RESHUFFLE`): was keiner der beiden Spieler
+            // kennt, wird am Abzweig mit `ex_rng` neu gemischt (Begruendung am
+            // Abschnittskopf von `reshuffle_hidden_world_for_excursion`). Aus
+            // (Default): kein Aufruf, `ex_rng` unberuehrt, byte-identisch.
+            if excursion_reshuffle_enabled() {
+                reshuffle_hidden_world_for_excursion(&mut branch_state, &mut ex_rng);
+            }
             let ex_ids = branch_state.scoring_tile_ids.clone();
             let ex_first = branch_state.current_player;
             let ex_names = ["Netz".to_string(), "Netz".to_string()];
@@ -6603,6 +6921,9 @@ pub fn run_net_self_play(
                 // an der Hauptpartie oben, gleicher Grund: `run_with_watchdog`
                 // spawnt einen NEUEN Thread) -- eigener Ausflug-Seed statt
                 // `partie_seed`.
+                // Spiegelknopf: der Ausflug uebernimmt den Wert der Hauptpartie
+                // (keine eigene Muenze aus `excursion_seed`).
+                crate::tie_mirror::set_game_tie_mirror(tie_mirrored);
                 let streuung_max = crate::net_mcts::scoring_scatter_max();
                 crate::net_mcts::set_game_shaping_weight(if streuung_max > 0.0 {
                     Some(crate::net_mcts::game_weight_from_seed(excursion_seed, streuung_max))
@@ -6639,6 +6960,9 @@ pub fn run_net_self_play(
                         "[excursion] game_id={ex_gid} seed={excursion_seed} records={}",
                         ex_steps.len()
                     );
+                    // Spiegelknopf: dasselbe Record-Feld wie die Hauptpartie.
+                    let mut ex_steps = ex_steps;
+                    crate::tie_mirror::stamp_tie_mirrored(&mut ex_steps, tie_p, tie_mirrored);
                     append_game_progress(&progress_file, &ex_steps);
                     steps.extend(ex_steps);
                 }
@@ -12391,5 +12715,285 @@ mod start_slot_tests {
                 "leere Auswahl darf keinen Zufall ziehen (Zug {i})"
             );
         }
+    }
+}
+
+/// Tests zu den Self-Play-Fixes aus der Code-Review-Nachpruefung 2026-09-26
+/// (`evaluations/review/code_review_2026-09-26_verification.md` #13, #14, #16).
+/// Alle netzfrei: die Knoepfe selbst sind OnceLock-gecacht und darum in einem
+/// Testprozess nicht umschaltbar; geprueft werden die Bausteine, die der Knopf
+/// zuschaltet, und dass ohne Knopf nichts gezogen bzw. geschrieben wird.
+#[cfg(test)]
+mod review_2026_09_26_tests {
+    use super::*;
+    use crate::state::{setup_new_game, KnownPoolBlock};
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    /// Frischer Drafting-Zustand ohne ausstehende Startkuppel (Muster
+    /// `mcts.rs::tests::drafting_state`).
+    fn drafting_state(seed: u64) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut s = setup_new_game(["P0".into(), "P1".into()], 0, &mut rng);
+        for p in s.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        s
+    }
+
+    // ── #13 ─────────────────────────────────────────────────────────────────
+
+    /// Der Label-Distinguisher kollidiert mit keinem anderen Strom im Baum.
+    #[test]
+    fn label_seed_distinguisher_is_unique() {
+        let others: [(&str, u64); 11] = [
+            ("RETURN_ORDER_SEED_DISTINGUISHER", RETURN_ORDER_SEED_DISTINGUISHER),
+            ("RETURN_ORDER_NODE_SEED_DISTINGUISHER", RETURN_ORDER_NODE_SEED_DISTINGUISHER),
+            ("DEVIATE_SEED_DISTINGUISHER", DEVIATE_SEED_DISTINGUISHER),
+            ("EXCURSION_SEED_DISTINGUISHER", EXCURSION_SEED_DISTINGUISHER),
+            ("asym_preference_side", 0xA5A5_A5A5_A5A5_A5A5),
+            ("MOON_ORDER_SEARCH_SEED_DISTINGUISHER", crate::net_mcts::MOON_ORDER_SEARCH_SEED_DISTINGUISHER),
+            (
+                "ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER",
+                crate::round_transition::ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER,
+            ),
+            ("TIE_MIRROR_SEED_DISTINGUISHER", crate::tie_mirror::TIE_MIRROR_SEED_DISTINGUISHER),
+            ("round_transition 0x5EED", 0x5EED),
+            ("round_transition 0xBEEF", 0xBEEF),
+            ("py.rs debug", 0xDEB0_6DEB_06DE_B06D),
+        ];
+        for (name, v) in others {
+            assert_ne!(LABEL_SEED_DISTINGUISHER, v, "Label-Distinguisher kollidiert mit {name}");
+        }
+    }
+
+    /// Ohne Split wird nichts abgeleitet; mit Split sind die Stroeme je Runde
+    /// und je Label-Art verschieden und reproduzierbar.
+    #[test]
+    fn label_streams_are_separate_and_reproducible() {
+        assert!(split_label_rng(false, 7, 1, LABEL_STREAM_RTV).is_none());
+        let first = |round: u32, stream: u64| -> u64 {
+            split_label_rng(true, 7, round, stream).expect("Split an").random::<u64>()
+        };
+        assert_eq!(first(1, LABEL_STREAM_RTV), first(1, LABEL_STREAM_RTV));
+        assert_ne!(first(1, LABEL_STREAM_RTV), first(1, LABEL_STREAM_BOOTSTRAP));
+        assert_ne!(first(1, LABEL_STREAM_BOOTSTRAP), first(2, LABEL_STREAM_RTV));
+        assert_ne!(first(1, LABEL_STREAM_RTV), first(2, LABEL_STREAM_RTV));
+        // Der Label-Strom ist nicht der Partie-Strom desselben Seeds.
+        assert_ne!(first(1, LABEL_STREAM_RTV), StdRng::seed_from_u64(7).random::<u64>());
+    }
+
+    /// Bewerter, der je Aufruf eine Zufallszahl zieht -- steht fuer das
+    /// Netz-Blatt, dessen Rollouts ebenfalls ziehen.
+    fn consuming_evaluator(_s: &GameState, r: &mut StdRng) -> [f64; 2] {
+        let _ = r.random::<u64>();
+        [0.5, 0.5]
+    }
+
+    /// DER #13-Test: zwei Deadlines (sofort abgelaufen / eine Stunde), sonst
+    /// dieselbe Partie. MIT Split zieht das Label-Sampling aus seinem eigenen
+    /// Strom, und die naechste Ziehung des Partie-RNG (= der Refill der
+    /// naechsten Runde) ist in beiden Faellen dieselbe. Gegenprobe OHNE Split
+    /// (Bestand): dieselbe Ziehung haengt an der Deadline -- genau der Defekt.
+    #[test]
+    fn label_split_makes_game_rng_independent_of_label_deadline() {
+        use std::time::{Duration, Instant};
+        let leaf = crate::round_transition::drive_to_first_round_end(51);
+        let pre = crate::round_transition::resolve_to_pre_chance(&leaf).expect("aufloesbar");
+        let game_seed = 4242u64;
+        let expired = Instant::now;
+        let generous = || Instant::now() + Duration::from_secs(3600);
+
+        let next_game_draw_with_split = |deadline: Instant| -> u64 {
+            let mut game_rng = StdRng::seed_from_u64(game_seed);
+            let _ = game_rng.random::<u64>(); // Vorlauf der Partie
+            let mut label_stream =
+                split_label_rng(true, game_seed, 1, LABEL_STREAM_BOOTSTRAP).expect("Split an");
+            let _ = crate::round_transition::sample_round_transition_value(
+                &pre, 8, consuming_evaluator, &mut label_stream, deadline,
+            );
+            game_rng.random::<u64>()
+        };
+        assert_eq!(
+            next_game_draw_with_split(expired()),
+            next_game_draw_with_split(generous()),
+            "mit Split darf die Label-Deadline den Partie-RNG nicht verschieben"
+        );
+
+        let next_game_draw_legacy = |deadline: Instant| -> u64 {
+            let mut game_rng = StdRng::seed_from_u64(game_seed);
+            let _ = game_rng.random::<u64>();
+            let _ = crate::round_transition::sample_round_transition_value(
+                &pre, 8, consuming_evaluator, &mut game_rng, deadline,
+            );
+            game_rng.random::<u64>()
+        };
+        assert_ne!(
+            next_game_draw_legacy(expired()),
+            next_game_draw_legacy(generous()),
+            "Gegenprobe: im Bestand verschiebt die Deadline den Partie-RNG (sonst prueft der Test nichts)"
+        );
+    }
+
+    // ── #14 ─────────────────────────────────────────────────────────────────
+
+    fn color_multiset(tiles: &[crate::tile::TileColor]) -> Vec<&'static str> {
+        let mut v: Vec<&'static str> = tiles.iter().map(|t| t.value()).collect();
+        v.sort_unstable();
+        v
+    }
+
+    fn hidden_chip_ids(s: &GameState) -> Vec<usize> {
+        let mut ids: Vec<usize> = s.bonus_chip_pool.iter().map(|c| c.chip_id).collect();
+        for f in &s.factories {
+            if !f.bonus_chip_revealed {
+                if let Some(c) = &f.bonus_chip {
+                    ids.push(c.chip_id);
+                }
+            }
+        }
+        ids.sort_unstable();
+        ids
+    }
+
+    /// DER #14-Test: die Neumischung am Abzweig aendert die Beutelreihenfolge,
+    /// laesst aber alles Oeffentliche und jeden Rueckgabeblock stehen.
+    #[test]
+    fn excursion_reshuffle_keeps_public_and_own_knowledge() {
+        let mut s = drafting_state(2026);
+        // Zwei bekannte Rueckgabebloecke am unteren Stapelende (einer je Spieler).
+        assert!(s.dome_tile_pool.len() >= 8, "Stapel zu klein fuer den Test: {}", s.dome_tile_pool.len());
+        s.dome_pool_known_blocks =
+            vec![KnownPoolBlock { len: 3, returner: 0 }, KnownPoolBlock { len: 2, returner: 1 }];
+        // Einen Fabrik-Chip aufdecken (oeffentlich), der Rest bleibt verdeckt.
+        let revealed_idx = s.factories.iter().position(|f| f.bonus_chip.is_some()).expect("Fabrik mit Chip");
+        s.factories[revealed_idx].bonus_chip_revealed = true;
+
+        let before = s.clone();
+        let mut after = s.clone();
+        let mut ex_rng = StdRng::seed_from_u64(99);
+        reshuffle_hidden_world_for_excursion(&mut after, &mut ex_rng);
+
+        // Beutel: andere Reihenfolge, gleiche Multimenge.
+        assert_ne!(after.bag.tiles, before.bag.tiles, "Beutelreihenfolge wurde nicht neu gemischt");
+        assert_eq!(color_multiset(&after.bag.tiles), color_multiset(&before.bag.tiles));
+
+        // Kuppelstapel: bekannte Bloecke woertlich, Praefix als Menge, Typ oben.
+        let prefix = before.dome_pool_unknown_prefix_len();
+        let ids = |p: &[crate::dome::DomeTile]| p.iter().map(|t| t.tile_id).collect::<Vec<_>>();
+        assert_eq!(after.dome_tile_pool.len(), before.dome_tile_pool.len());
+        assert_eq!(
+            ids(&after.dome_tile_pool[prefix..]),
+            ids(&before.dome_tile_pool[prefix..]),
+            "eigene/fremde Rueckgabebloecke muessen samt Reihenfolge stehen bleiben"
+        );
+        let mut pre_a = ids(&after.dome_tile_pool[..prefix]);
+        let mut pre_b = ids(&before.dome_tile_pool[..prefix]);
+        pre_a.sort_unstable();
+        pre_b.sort_unstable();
+        assert_eq!(pre_a, pre_b);
+        assert_eq!(
+            after.dome_tile_pool.first().map(|t| t.is_special_type()),
+            before.dome_tile_pool.first().map(|t| t.is_special_type()),
+            "Typ der obersten Platte ist oeffentlich (P.10)"
+        );
+        assert_eq!(after.dome_pool_known_blocks, before.dome_pool_known_blocks);
+
+        // Chips: aufgedeckter bleibt, verdeckte als Menge, Plaetze gleich.
+        assert_eq!(after.factories[revealed_idx].bonus_chip, before.factories[revealed_idx].bonus_chip);
+        assert_eq!(after.bonus_chip_pool.len(), before.bonus_chip_pool.len());
+        assert_eq!(hidden_chip_ids(&after), hidden_chip_ids(&before));
+        for (fa, fb) in after.factories.iter().zip(before.factories.iter()) {
+            assert_eq!(fa.bonus_chip.is_some(), fb.bonus_chip.is_some());
+            assert_eq!(fa.bonus_chip_revealed, fb.bonus_chip_revealed);
+            // Fabrik-Steine und -Mondstapel unveraendert.
+            assert_eq!(fa.sun_tiles, fb.sun_tiles);
+            assert_eq!(fa.moon_stacks, fb.moon_stacks);
+        }
+
+        // Oeffentliche Sicht (Zaehler, Maske, Auslage, grosse Fabrik, Bretter).
+        let ja = state_to_json(&after, true);
+        let jb = state_to_json(&before, true);
+        for key in [
+            "bag_colors", "tower_colors", "dome_pool_mask", "dome_stack_top_type", "dome_display",
+            "large_factory", "players", "round", "current_player",
+        ] {
+            assert_eq!(ja.get(key), jb.get(key), "oeffentliches Feld {key} hat sich veraendert");
+        }
+    }
+
+    /// Reproduzierbar je Ausflug-Seed: gleicher RNG-Seed, gleiche Welt.
+    #[test]
+    fn excursion_reshuffle_is_deterministic_per_seed() {
+        let s = drafting_state(7);
+        let run = |seed: u64| {
+            let mut st = s.clone();
+            reshuffle_hidden_world_for_excursion(&mut st, &mut StdRng::seed_from_u64(seed));
+            (
+                st.bag.tiles.clone(),
+                st.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+                hidden_chip_ids(&st),
+            )
+        };
+        assert_eq!(run(5), run(5));
+    }
+
+    // ── #16 ─────────────────────────────────────────────────────────────────
+
+    /// Das Record-Feld existiert NUR beim Rueckfall.
+    #[test]
+    fn fallback_field_only_when_fired() {
+        assert_eq!(fallback_random_action_field(false), None);
+        assert_eq!(fallback_random_action_field(true), Some(json!(true)));
+        assert!(!DraftingDecision::plain(Action::Pass).fallback_random_action);
+    }
+
+    /// Heuristik-Self-Play: Rueckfall (Suche liefert keine Statistik, hier
+    /// erzwungen ueber einen Zustand ausserhalb der Drafting-Phase, in dem
+    /// `mcts::build_tree` `None` gibt) setzt Flagge UND policy_target_valid=false;
+    /// eine normale Suche setzt keins von beiden.
+    #[test]
+    fn heuristic_decision_flags_only_the_fallback() {
+        let agent = HeuristicSelfPlayAgent {
+            base_sims: 8,
+            c: SELF_PLAY_C,
+            variant: crate::mcts::HeuristicVariant::Hv1,
+        };
+
+        let leaf = crate::round_transition::drive_to_first_round_end(51);
+        assert_ne!(leaf.phase, Phase::Drafting, "Rueckfall-Zustand muss ausserhalb des Drafting liegen");
+        let two = vec![Action::Pass, Action::DrawStackPeek];
+        let mut rng = StdRng::seed_from_u64(3);
+        let (_a, policy, fired) =
+            drafting_policy(&leaf, &two, 8, SELF_PLAY_C, 0.5, &mut rng, crate::mcts::HeuristicVariant::Hv1);
+        assert!(fired, "leere Suchstatistik muss als Rueckfall gemeldet werden");
+        assert_eq!(policy.len(), 1);
+        let d = agent.decide(&leaf, &two, &mut StdRng::seed_from_u64(4), 1);
+        assert!(d.fallback_random_action);
+        assert_eq!(d.policy_target_valid, Some(false));
+
+        let s = drafting_state(11);
+        let actions = drafting_actions(&s);
+        assert!(actions.len() > 1, "Drafting-Zustand mit echter Wahl erwartet");
+        let d = agent.decide(&s, &actions, &mut StdRng::seed_from_u64(4), 1);
+        assert!(!d.fallback_random_action, "normale Suche darf die Flagge nicht setzen");
+        assert_eq!(d.policy_target_valid, None, "ohne Rueckfall bleibt das Feld weg (Bestand)");
+    }
+
+    /// Ganze Heuristik-Partie ohne Rueckfall: kein Record traegt das Feld
+    /// (Default-Records byte-identisch zum Bestand).
+    #[test]
+    fn default_records_carry_no_fallback_field() {
+        let mut rng = StdRng::seed_from_u64(123);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let recs = play_one_game(
+            8, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 0, "fallback_g1",
+            &mut rng, None, false, None, crate::mcts::HeuristicVariant::Hv1, 123,
+        );
+        assert!(!recs.is_empty());
+        assert!(
+            recs.iter().all(|r| r.get("fallback_random_action").is_none()),
+            "ohne Rueckfall darf kein Record das Feld tragen"
+        );
     }
 }

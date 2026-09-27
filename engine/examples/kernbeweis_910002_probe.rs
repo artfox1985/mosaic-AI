@@ -130,6 +130,11 @@ fn main() {
         // gleiche Lage wie bei `moon_order_variants` darueber, und diese
         // Sonde ist ein Byte-Identitaets-Nachweis.
         net_tiling_tiebreak: mosaic_rust::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+        // E1 (PREREG_evaluator_pretests.md par.5a): Einpass-Konsum AUS und
+        // Runde-5-Loeser AN (PREREG_r5_net_vs_solver.md par.2) -- beides der
+        // Bestand, aus demselben Grund wie die Knoepfe darueber.
+        single_pass_other_val: mosaic_rust::net_mcts::SINGLE_PASS_OTHER_VAL_DEFAULT,
+        r5_net_solver: mosaic_rust::round5::NET_SOLVER_DEFAULT,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

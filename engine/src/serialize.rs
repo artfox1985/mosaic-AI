@@ -787,16 +787,9 @@ fn serialize_chippable_tiling_rows(state: &GameState) -> Value {
     Value::Array(result)
 }
 
-/// Serialisiert die obersten n Stapel-Kacheln (für /api/stack/peek).
-pub fn serialize_stack_peek(state: &GameState, n: usize) -> Value {
-    let n = n.min(state.dome_tile_pool.len());
-    Value::Array(
-        state.dome_tile_pool[..n]
-            .iter()
-            .map(|t| serialize_dome_tile(Some(t)))
-            .collect(),
-    )
-}
+// `serialize_stack_peek` (fuer /api/stack/peek) entfernt, Code-Review
+// 2026-09-26 Befund 10: die Route gab die obersten verdeckten Kuppelplatten
+// MIT Vorderseite aus, ohne Schalter; kein Aufrufer in `static/` oder `tools/`.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Task #89: json_to_state — Umkehrung von state_to_json
@@ -836,7 +829,11 @@ pub fn serialize_stack_peek(state: &GameState, n: usize) -> Value {
 // 2) Aus dem JSON VOLLSTÄNDIG ableitbare, aber nicht wörtlich vorhandene
 //    Felder: `first_player_next_round` (= der Spieler mit `marker=true`, falls
 //    einer; sonst noch offen und daher irrelevant -- wird beim tatsächlichen
-//    Nehmen im Suchbaum frisch gesetzt, siehe execution.rs:253),
+//    Nehmen im Suchbaum frisch gesetzt, siehe execution.rs:253). SEIT
+//    Code-Review 2026-09-26 Befund 17 nur noch RUECKFALL fuer Alt-JSONs ohne
+//    das Feld: die Ableitung war vor der Markennahme falsch ("irrelevant"
+//    stimmte nicht, Merkmal P.15 liest es), das Feld wird jetzt woertlich
+//    gelesen, siehe `json_to_state`,
 //    `monochrome_fallback` der großen Fabrik (jede ECHTE monochrome
 //    Notbefüllung setzt dieses Flag, UND `take_from_sun` leert `sun_tiles`
 //    beim ersten Zug immer GANZ -- kein Teil-Zustand möglich, siehe
@@ -1240,9 +1237,31 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
 
     let players: Vec<PlayerBoard> = players_json.iter().map(player_from_json).collect::<Result<_, _>>()?;
 
-    // first_player_next_round (Kategorie 2, vollständig ableitbar): s.o.
-    let first_player_next_round =
-        players.iter().position(|p| p.holds_first_player_marker).unwrap_or(current_player);
+    // first_player_next_round: Code-Review 2026-09-26 Befund 17. `state_to_json`
+    // schreibt das Feld woertlich (Schluessel "first_player_next_round"); es
+    // wird jetzt GELESEN, wenn es da ist. Die Ableitung aus der Marke (s.o.,
+    // Kategorie 2) stimmte nur, solange jemand die Marke haelt -- vor der
+    // Markennahme lieferte der Rueckfall `current_player` statt des
+    // Vorrunden-Halters, und das Direktmerkmal P.15 (`features.rs`
+    // `current_is_first_next`) las damit einen anderen Wert als der JSON-Pfad
+    // des Encoders, der das Feld woertlich nimmt. Haelt jemand die Marke,
+    // stimmen Feld und Ableitung ueberein (`execution.rs` setzt beide beim
+    // Nehmen). Alt-JSONs OHNE das Feld laufen unveraendert ueber die
+    // Ableitung; ein vorhandener Wert ausserhalb 0..NUM_PLAYERS ist ein Fehler
+    // (spaeter indiziert `setup_new_round` damit `players`).
+    let first_player_next_round = match v.get("first_player_next_round").filter(|x| !x.is_null()) {
+        Some(x) => {
+            let fp = x
+                .as_u64()
+                .ok_or_else(|| "json_to_state: first_player_next_round: keine Zahl".to_string())?
+                as usize;
+            if fp >= crate::state::NUM_PLAYERS {
+                return Err(format!("json_to_state: first_player_next_round {fp} ausserhalb 0..{}", crate::state::NUM_PLAYERS));
+            }
+            fp
+        }
+        None => players.iter().position(|p| p.holds_first_player_marker).unwrap_or(current_player),
+    };
 
     let log: Vec<String> = get_arr(v, "log")?
         .iter()
@@ -1440,7 +1459,9 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
     // gewechselt hat. Redundanter, aber klarster Fix: den bereits im JSON
     // vorhandenen Wert unter einem eigenen exact-Schluessel spiegeln, damit
     // der exact-Pfad ihn woertlich lesen kann, ohne `json_to_state` selbst
-    // anzutasten (Basislinien-Schutz).
+    // anzutasten (Basislinien-Schutz). NACHTRAG Code-Review 2026-09-26 Befund
+    // 17: `json_to_state` liest den Schluessel inzwischen selbst; der
+    // exact-Schluessel bleibt fuer bestehende exact-JSONs und den Referee.
     obj.insert("first_player_next_round_exact".to_string(), json!(state.first_player_next_round));
     // Vier weitere PlayerBoard-Felder, ebenfalls per erschoepfendem
     // Strukturvergleich empirisch gefunden (Schritt 29 des Random-Walk-Tests,
@@ -2882,6 +2903,43 @@ mod json_to_state_tests {
             }
         }
         panic!("keiner der Test-Seeds erreichte Runde 5 in Phase::Drafting -- Testaufbau prüfen");
+    }
+
+    /// Code-Review 2026-09-26 Befund 17: `json_to_state` liest
+    /// `first_player_next_round`, wenn das Feld da ist -- auch in der Lage, in
+    /// der die alte Ableitung falsch war (niemand haelt die Marke, der
+    /// Vorrunden-Halter ist NICHT `current_player`). Alt-JSONs ohne das Feld
+    /// laufen weiter ueber die Ableitung; ein Wert ausserhalb 0/1 ist ein
+    /// Fehler statt eines spaeteren Index-Panics.
+    #[test]
+    fn json_to_state_reads_first_player_next_round_when_present() {
+        let mut rng = StdRng::seed_from_u64(31);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+            p.holds_first_player_marker = false;
+        }
+        state.current_player = 0;
+        state.first_player_next_round = 1;
+        let json = state_to_json(&state, true);
+        assert_eq!(json["first_player_next_round"], serde_json::json!(1), "Testvoraussetzung");
+
+        let rebuilt = json_to_state(&json, &mut StdRng::seed_from_u64(1)).expect("Rekonstruktion");
+        assert_eq!(rebuilt.first_player_next_round, 1, "Feld woertlich, nicht current_player");
+
+        // Alt-JSON ohne das Feld: Bestandsableitung (niemand haelt die Marke
+        // -> current_player).
+        let mut old = json.clone();
+        old.as_object_mut().unwrap().remove("first_player_next_round");
+        let rebuilt_old = json_to_state(&old, &mut StdRng::seed_from_u64(1)).expect("Alt-JSON");
+        assert_eq!(rebuilt_old.first_player_next_round, 0);
+
+        // Ungueltige Werte: Fehler, kein Panic.
+        for bad in [serde_json::json!(2), serde_json::json!(-1), serde_json::json!("eins")] {
+            let mut j = json.clone();
+            j["first_player_next_round"] = bad.clone();
+            assert!(json_to_state(&j, &mut StdRng::seed_from_u64(1)).is_err(), "{bad} muss abgewiesen werden");
+        }
     }
 }
 

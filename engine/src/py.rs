@@ -19,8 +19,8 @@ use crate::net_mcts::{self, net_search_with_tree};
 use crate::round_end::{apply_bonus_chips_to_row, apply_bonus_chips_with, find_unplaceable_rows, TilingAction};
 #[cfg(test)]
 use crate::round_end::generate_tiling_actions;
-use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
-use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
+use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids, ALL_SCORING_TILES};
+use crate::serialize::{state_to_json, tiling_action_to_dict};
 use crate::tiling_solver::{
     best_first_step_exact_or_valued, best_first_step_exact_or_valued_envelope, solve_round_final_score,
     TilingStep,
@@ -50,6 +50,56 @@ fn parse_source(s: &str) -> PyResult<TakeSource> {
 
 fn map_err<T>(r: Result<T, String>) -> PyResult<T> {
     r.map_err(PyValueError::new_err)
+}
+
+/// Code-Review 2026-09-26 Befund 3: eine Wertungsplatten-Auswahl ist genau
+/// drei VERSCHIEDENE Katalog-IDs (`scoring.rs` `ALL_SCORING_TILES`, IDs
+/// 0..=7) ohne Ausschluss-Paar (`engine_manual.md` Abschnitt 6: "Exactly 3
+/// of the 8 possible plates", "at most one plate per pair"). Vorher wurden
+/// nur Laenge und Ausschluss geprueft: `[1,1,1]` wertete dreifach
+/// (`calculate_end_scoring` iteriert ungefiltert), unbekannte IDs wurden still
+/// uebersprungen.
+fn check_scoring_ids(ids: &[usize]) -> Result<(), String> {
+    if ids.len() != 3 {
+        return Err("Genau 3 Wertungsplatten wählen.".into());
+    }
+    if let Some(bad) = ids.iter().find(|&&id| id >= ALL_SCORING_TILES.len()) {
+        return Err(format!(
+            "Unbekannte Wertungsplatte {bad} (gueltig: 0..{}).",
+            ALL_SCORING_TILES.len() - 1
+        ));
+    }
+    if ids[0] == ids[1] || ids[0] == ids[2] || ids[1] == ids[2] {
+        return Err("Wertungsplatten muessen paarweise verschieden sein.".into());
+    }
+    if has_exclusion_conflict(ids) {
+        return Err("Zwei sich ausschließende Wertungsplatten gewählt.".into());
+    }
+    Ok(())
+}
+
+/// Code-Review 2026-09-26 Befund 4: `first_player` indiziert in
+/// `state::setup_new_game` direkt `players[first_player]`; ein Wert >= 2 war
+/// ein Panic im Konstruktor, den `except Exception` in server.py nicht faengt.
+fn check_first_player(first_player: usize) -> Result<(), String> {
+    if first_player >= crate::state::NUM_PLAYERS {
+        return Err(format!(
+            "Ungueltiger Startspieler {first_player} (gueltig: 0..{}).",
+            crate::state::NUM_PLAYERS - 1
+        ));
+    }
+    Ok(())
+}
+
+/// Befund 1 an der Bindung: `apply_dome`/`apply_dome_stack_choose` sind nach
+/// aussen EIN Zug, intern zwei `apply_drafting`-Schritte (Slot, dann
+/// Rotation). Eine unzulaessige Rotation muss VOR dem ersten Schritt
+/// scheitern, sonst bliebe die Slot-Wahl (`pending_dome_choice`) haengen.
+fn check_rotation_value(rotation: u32) -> Result<(), String> {
+    if crate::dome::rotation_indices(rotation).is_none() {
+        return Err(format!("Ungültige Rotation: {rotation}. Erlaubt: 0, 90, 180, 270."));
+    }
+    Ok(())
 }
 
 #[pyclass]
@@ -103,17 +153,24 @@ impl PyGame {
         first_player: usize,
         seed: Option<u64>,
         scoring_ids: Option<Vec<usize>>,
-    ) -> Self {
+    ) -> PyResult<Self> {
+        // Befund 4 (Code-Review 2026-09-26): Eingaben pruefen, BEVOR Seed/RNG
+        // angefasst werden -- fuer gueltige Eingaben laeuft danach exakt der
+        // Bestandspfad (gleicher RNG-Verbrauch).
+        map_err(check_first_player(first_player))?;
+        if let Some(ids) = &scoring_ids {
+            map_err(check_scoring_ids(ids))?;
+        }
         let seed = seed.unwrap_or_else(rand::random);
         let mut rng = StdRng::seed_from_u64(seed);
         let ids = scoring_ids.unwrap_or_else(|| sample_valid_scoring_ids(3, &mut rng));
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
-        PyGame {
+        Ok(PyGame {
             game, rng, seed, scoring_confirmed: false,
             net: None, net_path: None, move_seq: 0,
             // s. Feld-Kommentar: from_env ist genau das Bestandsverhalten.
             search_config: net_mcts::SearchConfig::from_env(),
-        }
+        })
     }
 
     /// Lädt ein ONNX-Netz für den Netz-KI-Modus (einmalig pro Modellpfad — wird
@@ -246,8 +303,15 @@ impl PyGame {
         self.game.state.players.iter().all(|p| !p.start_tile_pending)
     }
     /// Anzahl noch platzierbarer Tiling-Aktionen für einen Spieler (Guard für end_tiling).
-    fn pending_tiling_count(&self, player: usize) -> usize {
-        self.game.valid_tiling_actions(player).len()
+    ///
+    /// Nachtrag Code-Review 2026-09-26 (Panic-Suche): ein Spielerindex >= 2
+    /// indizierte `players` in `generate_tiling_actions` (Panic); jetzt ein
+    /// `ValueError`. Fuer gueltige Indizes unveraendert eine ganze Zahl.
+    fn pending_tiling_count(&self, player: usize) -> PyResult<usize> {
+        if player >= self.game.state.players.len() {
+            return Err(PyValueError::new_err(format!("Ungueltiger Spielerindex {player}.")));
+        }
+        Ok(self.game.valid_tiling_actions(player).len())
     }
     /// Neue Log-Einträge ab Index `from` (für die Logdatei).
     fn log_since(&self, from: usize) -> Vec<String> {
@@ -301,6 +365,7 @@ impl PyGame {
     /// den kleineren Verzweigungsfaktor braucht.
     #[pyo3(signature = (tile_id, slot_row, slot_col, rotation=0))]
     fn apply_dome(&mut self, tile_id: usize, slot_row: usize, slot_col: usize, rotation: u32) -> PyResult<()> {
+        map_err(check_rotation_value(rotation))?;
         let m = PlaceDomeTileMove { dome_tile_id: tile_id, slot_row, slot_col, rotation: 0 };
         // EINE `#a`-Zeile fuer den nach aussen atomaren Zug (Slot + Rotation).
         // `id` deckt die Slot-Stufe ab, `id_rotation` die zweite -- die ID
@@ -354,6 +419,7 @@ impl PyGame {
         rotation: u32,
         return_order: Option<Vec<usize>>,
     ) -> PyResult<()> {
+        map_err(check_rotation_value(rotation))?;
         let return_order = match return_order {
             Some(o) => o,
             None => {
@@ -525,25 +591,78 @@ impl PyGame {
     }
 
     /// Unplatzierbare Fliesen einer Reihe auf die Strafleiste schieben.
+    ///
+    /// Code-Review 2026-09-26 Befund 2: vorher ohne jede Pruefung -- Spieler-
+    /// und Reihenindex waren Index-Panics, jede nicht leere Reihe (auch eine
+    /// platzierbare) liess sich in jeder Phase abraeumen, und Phantom-Fliesen
+    /// aus einer Chip-Vollendung landeten als echte Fliesen auf der
+    /// Strafleiste. Das Handbuch kennt keine freie "Reihe auf die
+    /// Strafleiste"-Aktion: platzierbare Reihen MUESSEN gelegt werden,
+    /// unplatzierbare fallen (`engine_manual.md` Phase 2, "Rows that cannot be
+    /// placed"). Erlaubt ist darum nur, in der Tiling-Phase eine Reihe des
+    /// noch nicht fertigen Spielers vorzuziehen, die `find_unplaceable_rows`
+    /// ohnehin am Rundenende abraeumen wuerde.
+    ///
+    /// "Am Zug" heisst im Tiling: `tiling_done[player]` ist noch falsch. Beide
+    /// Seiten tilen unabhaengig voneinander, und `apply_tiling` prueft
+    /// `current_player` ebenfalls nicht (die GUI laesst den Menschen tilen,
+    /// waehrend `current_player` die KI sein kann, server.py `end_tiling`).
+    ///
+    /// Die Abraeumung selbst spiegelt `round_end::process_unplaceable_rows`
+    /// (round_end.rs:88-111) fuer EINE Reihe: nur echte Fliesen gehen auf
+    /// Strafleiste/Turm, der Phantom-Zaehler wird zurueckgesetzt, der
+    /// Beobachtungszaehler fuer lange Reihen mitgezaehlt.
     fn move_row_to_floor(&mut self, player: usize, pattern_row: usize) -> PyResult<()> {
-        let p = &mut self.game.state.players[player];
-        let tiles: Vec<_> = std::mem::take(&mut p.pattern_lines[pattern_row].tiles);
-        if tiles.is_empty() {
+        self.check_player_row(player, pattern_row)?;
+        if self.game.state.phase != Phase::Tiling {
+            return Err(PyValueError::new_err("Nicht in der Tiling-Phase."));
+        }
+        if self.game.state.tiling_done[player] {
+            return Err(PyValueError::new_err(format!(
+                "Spieler {player} hat das Tiling bereits beendet."
+            )));
+        }
+        if self.game.state.players[player].pattern_lines[pattern_row].tiles.is_empty() {
             return Err(PyValueError::new_err("Reihe ist leer"));
         }
-        p.pattern_lines[pattern_row].color = None;
-        let overflow = p.add_broken(&tiles);
+        if !find_unplaceable_rows(&self.game.state.players[player]).contains(&pattern_row) {
+            return Err(PyValueError::new_err(format!(
+                "Reihe {} ist nicht unplatzierbar und muss gelegt werden bzw. bleibt liegen.",
+                pattern_row + 1
+            )));
+        }
+        let p = &mut self.game.state.players[player];
+        let line = &mut p.pattern_lines[pattern_row];
+        // `find_unplaceable_rows` liefert nur Reihen mit Farbe und Fliesen.
+        let color = match line.color {
+            Some(c) => c,
+            None => return Err(PyValueError::new_err("Reihe hat keine Farbe.")),
+        };
+        let tiles: Vec<_> = std::mem::take(&mut line.tiles);
+        let phantom = line.phantom_count;
+        line.color = None;
+        line.phantom_count = 0;
+        let real_n = tiles.len().saturating_sub(phantom);
+        let overflow = p.add_broken(&vec![color; real_n]);
+        if crate::board::LONG_ROW_INDICES.contains(&pattern_row) {
+            p.long_rows_cleared_unplaceable_total += 1;
+        }
         self.game.state.tower.add(&overflow);
         let name = self.game.state.players[player].name.clone();
-        let n = tiles.len();
         self.game
             .state
-            .log_event(format!("{name}: {n} unplatzierbare Fliesen → Strafleiste"));
+            .log_event(format!("{name}: {real_n} unplatzierbare Fliesen → Strafleiste"));
         Ok(())
     }
 
     /// Beendet das Tiling für einen Spieler (löst ggf. Runden-/Spielende aus).
     fn end_tiling(&mut self, player: usize) -> PyResult<()> {
+        // Nachtrag Code-Review 2026-09-26 (Panic-Suche): `Game::end_tiling`
+        // indiziert `tiling_done[player]` und rechnet `1 - player` -- ein
+        // Index >= 2 war ein Panic statt eines Fehlers.
+        if player >= self.game.state.players.len() {
+            return Err(PyValueError::new_err(format!("Ungueltiger Spielerindex {player}.")));
+        }
         let mv = TilingMove::EndTiling { player };
         map_err(self.game.apply_tiling(&mv, &mut self.rng))
     }
@@ -567,12 +686,20 @@ impl PyGame {
 
     // ── Wertungsplatten / Endwertung ──────────────────────────────────────────
 
+    /// Befund 3 (Code-Review 2026-09-26): IDs pruefen ([`check_scoring_ids`])
+    /// und nur VOR Spielbeginn zulassen. Die Wertungsplatten sind Teil des
+    /// Spielaufbaus (`engine_manual.md` Abschnitt 6); "vor Spielbeginn" heisst
+    /// hier: Runde 1 und mindestens eine Startkuppel noch offen -- vorher
+    /// laesst `apply_drafting` keinen Zug zu. Das ist genau das Fenster, in
+    /// dem die GUI die Auswahl anbietet (`static/js/app.js` `canEditScoring`:
+    /// nicht bestaetigt und nicht alle `start_placed`).
     fn select_scoring(&mut self, ids: Vec<usize>) -> PyResult<()> {
-        if ids.len() != 3 {
-            return Err(PyValueError::new_err("Genau 3 Wertungsplatten wählen."));
-        }
-        if has_exclusion_conflict(&ids) {
-            return Err(PyValueError::new_err("Zwei sich ausschließende Wertungsplatten gewählt."));
+        map_err(check_scoring_ids(&ids))?;
+        let s = &self.game.state;
+        if s.round_number != 1 || s.phase != Phase::Drafting || !s.players.iter().any(|p| p.start_tile_pending) {
+            return Err(PyValueError::new_err(
+                "Wertungsplatten koennen nur vor Spielbeginn (vor den Startkuppeln) gewaehlt werden.",
+            ));
         }
         self.game.state.scoring_tile_ids = ids.clone();
         self.scoring_confirmed = true;
@@ -599,11 +726,6 @@ impl PyGame {
             per_player.insert(pi.to_string(), Value::Object(entry));
         }
         Ok(json!({ "end_scoring": Value::Object(per_player) }).to_string())
-    }
-
-    /// Oberste n Stapel-Kacheln (für /api/stack/peek).
-    fn peek_stack_json(&self, n: usize) -> String {
-        serialize_stack_peek(&self.game.state, n).to_string()
     }
 
     // ── KI (MCTS) ─────────────────────────────────────────────────────────────
@@ -709,6 +831,12 @@ impl PyGame {
     /// kein Netz angefasst und keine Zufallszahl gezogen.
     #[pyo3(signature = (player, simulations=300))]
     fn ai_start_tile_json(&mut self, player: usize, simulations: u32) -> PyResult<String> {
+        // Nachtrag Code-Review 2026-09-26 (Panic-Suche): `player` kommt im
+        // Server aus `_ai_player`, beim Log-Replay ungeprueft aus dem Log-Kopf;
+        // die Startplatzierungs-Wahl indiziert damit `players`.
+        if player >= self.game.state.players.len() {
+            return Err(PyValueError::new_err(format!("Ungueltiger Spielerindex {player}.")));
+        }
         let cfg = net_mcts::SearchConfig::from_env();
         let searched = match (cfg.start_by_search, self.net.as_ref()) {
             (1, Some(net)) => {
@@ -1240,6 +1368,220 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
+    /// `PyGame::new` gibt seit Befund 4 ein `PyResult` zurueck. Kein `unwrap`/
+    /// `expect` auf dem `PyErr` (dessen Debug-Ausgabe braucht den Interpreter,
+    /// s. `explicit_chip_allocation_survives_where_greedy_starves`).
+    fn test_game(a: &str, b: &str, seed: u64) -> PyGame {
+        match PyGame::new((a.into(), b.into()), 0, Some(seed), None) {
+            Ok(g) => g,
+            Err(_) => panic!("PyGame::new mit gueltigen Eingaben muss gelingen"),
+        }
+    }
+
+    /// Vollstaendiger Zustandsabdruck (exaktes JSON) plus die Bindungsfelder.
+    fn snapshot(pg: &PyGame) -> (String, bool) {
+        (
+            crate::serialize::state_to_json_exact(&pg.game.state, pg.scoring_confirmed).to_string(),
+            pg.scoring_confirmed,
+        )
+    }
+
+    /// Partie direkt nach beiden Startkuppeln (Drafting, Runde 1).
+    fn game_after_start_tiles(seed: u64) -> PyGame {
+        let mut pg = test_game("P1", "P2", seed);
+        for p in [1usize, 0] {
+            assert!(pg.ai_start_tile_json(p, 300).is_ok(), "Startkuppel {p}");
+        }
+        assert!(pg.game.state.players.iter().all(|p| !p.start_tile_pending));
+        pg
+    }
+
+    // ── Code-Review 2026-09-26: Bindungen weisen illegale Eingaben ab ────────
+
+    /// Befund 4: Startspieler ausserhalb 0/1 ist ein Fehler, kein Panic; 0 und
+    /// 1 gehen weiter.
+    #[test]
+    fn new_rejects_first_player_out_of_range() {
+        for fp in [2usize, 3, 99, usize::MAX] {
+            assert!(PyGame::new(("A".into(), "B".into()), fp, Some(1), None).is_err(), "first_player={fp}");
+        }
+        for fp in [0usize, 1] {
+            let pg = PyGame::new(("A".into(), "B".into()), fp, Some(1), None);
+            assert!(pg.is_ok(), "first_player={fp} muss gehen");
+            if let Ok(pg) = pg {
+                assert_eq!(pg.game.state.current_player, fp);
+            }
+        }
+    }
+
+    /// Befund 3: Duplikate, IDs ausserhalb des Katalogs, Ausschluss-Paare und
+    /// falsche Anzahl werden abgewiesen -- ohne Zustandsaenderung.
+    #[test]
+    fn select_scoring_rejects_bad_ids_and_leaves_state_untouched() {
+        let mut pg = test_game("P1", "P2", 7);
+        let before = snapshot(&pg);
+        for ids in [
+            vec![1usize, 1, 1],
+            vec![1, 2, 1],
+            vec![8, 9, 10],
+            vec![0, 1, 8],
+            vec![0, 7, 1], // Ausschluss-Paar (0, 7)
+            vec![0, 1],
+            vec![0, 1, 2, 3],
+        ] {
+            assert!(pg.select_scoring(ids.clone()).is_err(), "{ids:?} muss abgewiesen werden");
+            assert_eq!(snapshot(&pg), before, "{ids:?} darf nichts veraendern");
+        }
+        // Gegenprobe: gueltige Auswahl vor Spielbeginn.
+        assert!(pg.select_scoring(vec![0, 1, 2]).is_ok());
+        assert_eq!(pg.game.state.scoring_tile_ids, vec![0, 1, 2]);
+        assert!(pg.scoring_confirmed);
+    }
+
+    /// Befund 3, Zeitpunkt: nach beiden Startkuppeln ist die Auswahl gesperrt
+    /// (wie in der GUI, `canEditScoring`).
+    #[test]
+    fn select_scoring_is_rejected_after_the_game_has_started() {
+        let mut pg = game_after_start_tiles(7);
+        let before = snapshot(&pg);
+        assert!(pg.select_scoring(vec![0, 1, 2]).is_err());
+        assert_eq!(snapshot(&pg), before);
+    }
+
+    /// Befund 1 an der Bindung: `apply_dome` mit unzulaessiger Rotation laesst
+    /// weder eine haengende Slot-Wahl noch eine `#a`-Zeile zurueck.
+    #[test]
+    fn apply_dome_invalid_rotation_leaves_state_untouched() {
+        let mut pg = game_after_start_tiles(11);
+        let pi = pg.game.state.current_player;
+        let tid = pg.game.state.dome_display[0].tile_id;
+        let (sr, sc) = pg.game.state.players[pi].dome_grid.empty_slots()[0];
+        let before = snapshot(&pg);
+        for bad in [45u32, 1, u32::MAX] {
+            assert!(pg.apply_dome(tid, sr, sc, bad).is_err(), "Rotation {bad}");
+            assert_eq!(snapshot(&pg), before, "Rotation {bad} darf nichts veraendern");
+        }
+        assert!(pg.apply_dome(tid, sr, sc, 90).is_ok(), "gueltige Rotation geht weiter");
+    }
+
+    /// Befund 1, Stapel-Variante der Bindung.
+    #[test]
+    fn apply_dome_stack_choose_invalid_rotation_leaves_state_untouched() {
+        let mut pg = game_after_start_tiles(11);
+        let pi = pg.game.state.current_player;
+        pg.game.state.players[pi].score = 0; // Ziehen gratis, s. game.rs-Tests
+        assert!(pg.apply_dome_stack_peek().is_ok());
+        assert!(pg.apply_dome_stack_peek().is_ok());
+        let drawn: Vec<usize> = pg.game.state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+        let (sr, sc) = pg.game.state.players[pi].dome_grid.empty_slots()[0];
+        let before = snapshot(&pg);
+        for bad in [45u32, 271] {
+            assert!(
+                pg.apply_dome_stack_choose(drawn[0], sr, sc, bad, Some(vec![drawn[1]])).is_err(),
+                "Rotation {bad}"
+            );
+            assert_eq!(snapshot(&pg), before, "Rotation {bad} darf nichts veraendern");
+        }
+        assert!(pg.apply_dome_stack_choose(drawn[0], sr, sc, 0, Some(vec![drawn[1]])).is_ok());
+        assert!(pg.game.state.pending_stack_draw.is_empty());
+    }
+
+    /// Befund 2: Index ausserhalb, falsche Phase, platzierbare/leere Reihe und
+    /// ein Spieler, der sein Tiling beendet hat, werden abgewiesen -- ohne
+    /// Zustandsaenderung.
+    #[test]
+    fn move_row_to_floor_rejects_illegal_calls_and_leaves_state_untouched() {
+        let mut pg = test_game("P1", "P2", 7);
+        for p in pg.game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        pg.game.state.players[0].pattern_lines[1].add_tiles(&[Rot]);
+        // Drafting-Phase: nicht erlaubt.
+        let before = snapshot(&pg);
+        assert!(pg.move_row_to_floor(0, 1).is_err(), "Drafting");
+        assert_eq!(snapshot(&pg), before);
+
+        pg.game.state.phase = Phase::Tiling;
+        let before = snapshot(&pg);
+        for (player, row) in [(2usize, 0usize), (99, 0), (0, 6), (0, 99)] {
+            assert!(pg.move_row_to_floor(player, row).is_err(), "Index ({player},{row})");
+            assert_eq!(snapshot(&pg), before, "Index ({player},{row}) darf nichts veraendern");
+        }
+        // Leere Reihe.
+        assert!(pg.move_row_to_floor(0, 0).is_err(), "leere Reihe");
+        assert_eq!(snapshot(&pg), before);
+        // Reihe 2 hat Fliesen, aber die Kuppel-Reihe hat noch freie Slots:
+        // nicht unplatzierbar, bleibt liegen.
+        assert!(find_unplaceable_rows(&pg.game.state.players[0]).is_empty(), "Testvoraussetzung");
+        assert!(pg.move_row_to_floor(0, 1).is_err(), "platzierbare Reihe");
+        assert_eq!(snapshot(&pg), before);
+    }
+
+    /// Befund 2, legaler Fall: eine unplatzierbare Reihe mit Phantom-Fliesen
+    /// (Chip-Vollendung) schiebt nur die ECHTEN Fliesen auf die Strafleiste --
+    /// wie `round_end::process_unplaceable_rows`.
+    #[test]
+    fn move_row_to_floor_moves_only_real_tiles_of_an_unplaceable_row() {
+        use crate::dome::build_dome_tile_pool;
+
+        let mut pg = test_game("P1", "P2", 9);
+        pg.game.state.phase = Phase::Tiling;
+        // Fixtur nach game.rs `unplaceable_row_logs_row_and_color_at_tiling_start`
+        // (pool[11] = [Tuerkis, Schwarz, Rot, Wild]), um 180 Grad gedreht: die
+        // UNTERE Haelfte (Spaces 2/3, Musterreihe 2) traegt dann Schwarz und
+        // Tuerkis, also keinen offenen Rot-/Wild-Space. Die Vorbedingung wird
+        // unten per `find_unplaceable_rows` geprueft, nicht angenommen.
+        let pool = build_dome_tile_pool();
+        {
+            let p = &mut pg.game.state.players[0];
+            p.start_tile_pending = false;
+            for sc in 0..3 {
+                let mut t = pool[11].clone();
+                t.tile_id = 200 + sc;
+                t.apply_rotation(180).unwrap();
+                p.dome_grid.place_dome_tile(t, 0, sc).unwrap();
+            }
+            // Reihe 2 (idx 1, cap 2): eine echte, eine Phantom-Fliese.
+            p.pattern_lines[1].add_tiles(&[Rot, Rot]);
+            p.pattern_lines[1].phantom_count = 1;
+            p.broken_tiles.clear();
+        }
+        pg.game.state.players[1].start_tile_pending = false;
+        assert_eq!(find_unplaceable_rows(&pg.game.state.players[0]), vec![1], "Testvoraussetzung");
+        let tower_before = pg.game.state.tower.count();
+
+        // Wer sein Tiling beendet hat, raeumt nichts mehr ab.
+        pg.game.state.tiling_done[0] = true;
+        let before = snapshot(&pg);
+        assert!(pg.move_row_to_floor(0, 1).is_err(), "Tiling bereits beendet");
+        assert_eq!(snapshot(&pg), before);
+        pg.game.state.tiling_done[0] = false;
+
+        assert!(pg.move_row_to_floor(0, 1).is_ok());
+        let p = &pg.game.state.players[0];
+        assert!(p.pattern_lines[1].tiles.is_empty());
+        assert_eq!(p.pattern_lines[1].color, None);
+        assert_eq!(p.pattern_lines[1].phantom_count, 0, "Phantom-Zaehler zurueckgesetzt");
+        assert_eq!(p.broken_tiles, vec![Rot], "nur die EINE echte Fliese auf der Strafleiste");
+        assert_eq!(pg.game.state.tower.count(), tower_before, "kein Ueberlauf");
+
+        // Ein zweiter Aufruf trifft eine leere Reihe.
+        assert!(pg.move_row_to_floor(0, 1).is_err());
+    }
+
+    /// Befund 6 an der Bindung: `is_over` (und damit die `"done"`-Felder) ist
+    /// in Runde 5 falsch und erst nach dem letzten Tiling wahr.
+    #[test]
+    fn is_over_binding_is_false_during_round_five() {
+        let mut pg = test_game("P1", "P2", 5);
+        pg.game.state.round_number = crate::state::NUM_ROUNDS;
+        assert!(!pg.is_over(), "Runde 5 Drafting");
+        pg.game.state.phase = Phase::Tiling;
+        assert!(!pg.is_over(), "Runde 5 Tiling");
+        pg.game.state.phase = Phase::End;
+        assert!(pg.is_over(), "Spielende");
+    }
+
     /// Während des Tilings werden keine neuen Kuppelplatten gelegt (Regel): eine
     /// volle Pattern-Reihe ohne bereits belegten passenden Slot bleibt liegen --
     /// weder der Solver noch `generate_tiling_actions` bieten dafür eine Aktion
@@ -1268,7 +1610,7 @@ mod tests {
     /// dem Spiel-Log reproduzierbar (Replay-Validierung, analyze_game_log.py).
     #[test]
     fn debug_endpoints_leave_game_rng_untouched() {
-        let mk = || PyGame::new(("A".into(), "B".into()), 0, Some(465392), None);
+        let mk = || test_game("A", "B", 465392);
         let mut plain = mk();
         let mut probed = mk();
 
@@ -1284,7 +1626,11 @@ mod tests {
 
         let mut refill_seen = false;
         let mut prev_tower = probed.game.state.tower.count();
-        for _ in 0..600 {
+        // Befund 6 (Code-Review 2026-09-26): `is_over` ist erst nach dem
+        // letzten Tiling wahr -- die Schleife spielt jetzt auch Runde 5, darum
+        // mehr Schritte als die frueheren 600 (die bis zum Beginn von Runde 5
+        // reichten). Der Deckel ist eine Sicherung, kein Messwert.
+        for _ in 0..1500 {
             if plain.game.is_over() {
                 break;
             }
@@ -1325,7 +1671,7 @@ mod tests {
         use crate::dome::{build_dome_tile_pool, BonusChip};
         use crate::tile::TileColor::{Blau, Rot};
 
-        let mut pg = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        let mut pg = test_game("P1", "P2", 7);
         pg.game.state.phase = Phase::Tiling;
         for p in pg.game.state.players.iter_mut() {
             p.start_tile_pending = false;
@@ -1389,7 +1735,7 @@ mod tests {
         //    beliebige -- und nimmt die ersten drei (0,1,2), darunter einen
         //    gelb-Traeger. Danach bleiben 3+4, nur noch EIN gelb-Traeger:
         //    Reihe 3 braucht drei beliebige, es sind aber nur zwei da.
-        let mut greedy = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        let mut greedy = test_game("P1", "P2", 7);
         setup(&mut greedy);
         // Kein `expect` auf einem `PyErr`: dessen Debug-Ausgabe braucht den
         // Interpreter, den der Rust-Test nicht haelt -- ein Fehlschlag wuerde
@@ -1407,7 +1753,7 @@ mod tests {
 
         // B) Explizite Auswahl: Reihe 2 mit 1,2,3 bezahlen (die gelb-Traeger
         //    schonen), dann traegt Reihe 3 ihre zwei farbgleichen 0,4.
-        let mut exact = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        let mut exact = test_game("P1", "P2", 7);
         setup(&mut exact);
         let cands: Vec<Vec<usize>> =
             serde_json::from_str(&exact.chip_allocations_json(0, 1)).expect("Kandidaten-JSON");
@@ -1446,7 +1792,7 @@ mod tests {
         use crate::dome::BonusChip;
         use crate::tile::TileColor::{Blau, Rot};
 
-        let mut pg = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        let mut pg = test_game("P1", "P2", 7);
         pg.game.state.phase = Phase::Tiling;
         {
             let p = &mut pg.game.state.players[0];

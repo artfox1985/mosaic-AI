@@ -67,7 +67,18 @@ STATIC_DIR = APP_DIR / 'static'
 app = Flask(__name__, static_folder=str(STATIC_DIR))
 try:
     from flask_cors import CORS
-    CORS(app)
+    # Code-Review 2026-09-26 Befund 21: `CORS(app)` ohne Argumente liess JEDE
+    # Webseite im Browser des Nutzers die lokale API aufrufen (Zuege setzen,
+    # Partien starten). Die GUI selbst braucht CORS gar nicht -- sie kommt vom
+    # selben Ursprung (Flask liefert static/ aus). Zugelassen bleiben nur
+    # lokale Urspruenge, falls ein Werkzeug auf einem anderen Port die API
+    # anspricht. Regex-Eintraege nach flask_cors-Konvention [UNGEPRUEFT an der
+    # flask_cors-Quelle].
+    CORS(app, origins=[
+        r"^https?://localhost(:\d+)?$",
+        r"^https?://127\.0\.0\.1(:\d+)?$",
+        r"^https?://\[::1\](:\d+)?$",
+    ])
 except ImportError:
     pass
 
@@ -280,20 +291,66 @@ def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) ->
     return DIFFICULTY_PRESETS["_default"]
 
 
+def _inside_models_dir(p: Path) -> bool:
+    """Code-Review 2026-09-26 Befund 22: liegt `p` innerhalb von `models/`?
+
+    Bewusst LEXIKALISCH normalisiert (`os.path.abspath` loest `..` auf), nicht
+    per `resolve()`: Verzeichnis-Verknuepfungen UNTER `models/` (Junctions,
+    siehe Worktree-Vorfall 2026-07-24) sind Einrichtung des Nutzers und sollen
+    weiter laden; abgewehrt wird der Weg aus `models/` heraus."""
+    try:
+        base = os.path.normcase(os.path.abspath(str(MODELS_DIR)))
+        target = os.path.normcase(os.path.abspath(str(p)))
+        return os.path.commonpath([base, target]) == base
+    except (OSError, ValueError):
+        return False
+
+
 def _resolve_model_path(model: str | None) -> Path | None:
     """`model` ("v8", "heuristic", None, ...) -> ONNX-Pfad oder None (= Heuristik).
     Akzeptiert auch einen bereits vollständigen Pfad/Dateinamen.
 
     Versionsnamen loest `_champion_onnx_path` auf (Bestandsplatz zuerst,
-    dann das gefrorene Artefakt)."""
+    dann das gefrorene Artefakt).
+
+    Befund 22 (Code-Review 2026-09-26): nur Dateien UNTERHALB von `models/`.
+    Vorher lud der Server jede vorhandene `.onnx`-Datei, deren Pfad im
+    Anfrage-Rumpf stand (auch per `..` aus dem Versionsnamen heraus). Ein
+    Pfad ausserhalb gilt als "nicht gefunden" -- der Aufrufer faellt dann wie
+    bisher mit Warnung auf die Heuristik zurueck."""
     if not model or model.strip().lower() in ("", "heuristic", "heuristik"):
         return None
     m = model.strip()
     # Direkte Pfad-/Dateinamen-Angabe hat Vorrang (Bestandsverhalten).
     for c in (Path(m), MODELS_DIR / m):
-        if c.suffix == ".onnx" and c.exists():
+        if c.suffix == ".onnx" and c.exists() and _inside_models_dir(c):
             return c
-    return _champion_onnx_path(m)
+    found = _champion_onnx_path(m)
+    if found is not None and not _inside_models_dir(found):
+        return None
+    return found
+
+
+# Befund 22 (Code-Review 2026-09-26): Obergrenze fuer Such-Simulationen aus
+# dem Anfrage-Rumpf. 5000 ist die Grenze, die das Formular der GUI selbst
+# setzt (`static/index.html` `ng-sims` und `ng-teacher-sims`: min 1 bzw. 20,
+# max 5000) -- keine GUI-Anfrage wird dadurch abgewiesen. Darueber hinaus
+# haelt eine einzige Suche den Prozess beliebig lange fest (py.rs gibt die GIL
+# waehrend der Suche nicht frei, laut Pruefbericht [HERLEITUNG]).
+MAX_REQUEST_SIMS = 5000
+
+
+def _capped_sims(value, name: str) -> int:
+    """`value` als ganze Zahl, gedeckelt auf 1..MAX_REQUEST_SIMS. Gedeckelt
+    statt abgewiesen: die GUI schickt die Lehrer-Sims bei JEDEM Spielstart mit,
+    auch wenn der Lehrer aus ist -- ein Tippfehler dort soll keine Partie
+    verhindern. Nur eine Nicht-Zahl ist ein Fehler (ValueError; vorher ein
+    unbehandelter 500er aus `int()`)."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} muss eine ganze Zahl sein.")
+    return max(1, min(n, MAX_REQUEST_SIMS))
 
 
 # ── Rust-Helfer ──────────────────────────────────────────────────────────────
@@ -617,13 +674,34 @@ def new_game():
     global _rust, _rust_logged, _ai_sims, _ai_player, _ai_model, _ai_debug_history, _game_log_path
     global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_history, _teacher_cache
     global _profile_p0, _profile_p1, _game_rated, _hints_used_this_game
-    _ai_debug_history = []
     data = request.get_json(silent=True) or {}
     names      = data.get('names', ['Spieler 1', 'Spieler 2'])
     seed       = data.get('seed', None)
     ai_enabled = data.get('ai_enabled', False)
     difficulty = data.get('difficulty', 'medium')
     ai_side    = data.get('ai_side', 1)   # 0 = KI ist P1, 1 = KI ist P2
+
+    # Code-Review 2026-09-26 Befunde 4 und 22: alle Zahlen aus dem Rumpf
+    # pruefen, BEVOR irgendein globaler Zustand angefasst wird -- ein Fehler
+    # laesst die laufende Partie unveraendert. `first_player` ging vorher
+    # ungeprueft in `PyGame` (Panic im Konstruktor bei >= 2), `ai_side`
+    # ungeprueft in `_ai_player`, die Sims ungedeckelt in die Suche.
+    try:
+        fp_raw = data.get('first_player', None)
+        first_player_req = None if fp_raw is None else int(fp_raw)
+        ai_player_req = int(ai_side) if ai_enabled else None
+        teacher_sims       = _capped_sims(data.get('teacher_sims', 800) or 800, "teacher_sims")
+        teacher_coach_sims = _capped_sims(data.get('teacher_coach_sims', 400) or 400, "teacher_coach_sims")
+        preset = _resolve_difficulty(difficulty, data.get('model'), data.get('sims')) if ai_enabled else None
+        ai_sims_req = _capped_sims(preset.get('sims') or 100, "sims") if ai_enabled else None
+    except (TypeError, ValueError) as e:
+        return jsonify(err(f"Ungültige Eingabe: {e}"))
+    if first_player_req is not None and first_player_req not in (0, 1):
+        return jsonify(err(f"first_player muss 0 oder 1 sein (war {first_player_req})."))
+    if ai_player_req is not None and ai_player_req not in (0, 1):
+        return jsonify(err(f"ai_side muss 0 oder 1 sein (war {ai_player_req})."))
+
+    _ai_debug_history = []
 
     # Spielerprofile (Nutzer-Feature 2026-08-02): ungueltige/leere IDs werden
     # stillschweigend als Gast (None, ungewertet) behandelt -- kein Hard-Error,
@@ -646,8 +724,9 @@ def new_game():
     if teacher_level not in (0, 1, 2, 3):
         teacher_level = 0
     _teacher_level      = teacher_level
-    _teacher_sims       = int(data.get('teacher_sims', 800) or 800)
-    _teacher_coach_sims = int(data.get('teacher_coach_sims', 400) or 400)
+    # Befund 22: gedeckelt oben (MAX_REQUEST_SIMS, Begruendung dort).
+    _teacher_sims       = teacher_sims
+    _teacher_coach_sims = teacher_coach_sims
     _teacher_history    = []
     _teacher_cache      = {"key": None, "analysis": None}
 
@@ -669,8 +748,7 @@ def new_game():
         _hints_used_this_game = True
 
     import random as _random
-    fp_raw = data.get('first_player', None)
-    first_player = _random.randint(0, 1) if fp_raw is None else int(fp_raw)
+    first_player = _random.randint(0, 1) if first_player_req is None else first_player_req
     if seed is None:
         seed = _random.randint(0, 999999)
 
@@ -684,9 +762,9 @@ def new_game():
 
     model_warning = None
     if ai_enabled:
-        preset = _resolve_difficulty(difficulty, data.get('model'), data.get('sims'))
-        _ai_player = int(ai_side)
-        _ai_sims   = int(preset.get('sims') or 100)
+        # `preset`, `ai_player_req` und `ai_sims_req` sind oben geprueft.
+        _ai_player = ai_player_req
+        _ai_sims   = ai_sims_req
         requested_model = preset.get('model')
         model_path = _resolve_model_path(requested_model)
         if model_path is not None:
@@ -818,7 +896,11 @@ def debug_replay_log():
     _rust = rep.g
     _ai_debug_history = []
     _ai_player = header.get('ai_player')
-    _ai_sims = int(header.get('ai_sims') or 100)
+    # Befund 22: auch aus dem Log-Kopf nur gedeckelt (MAX_REQUEST_SIMS).
+    try:
+        _ai_sims = _capped_sims(header.get('ai_sims') or 100, "ai_sims")
+    except ValueError:
+        _ai_sims = 100
     _ai_model = header.get('ai_model') if header.get('ai_model') != "heuristic" else None
     if _ai_model:
         model_path = _resolve_model_path(_ai_model)
@@ -1476,19 +1558,11 @@ def end_game_log():
     return jsonify(ok())
 
 
-@app.route('/api/stack/peek', methods=['POST'])
-def stack_peek():
-    if (e := _require_game()) is not None:
-        return e
-    d = request.get_json()
-    try:
-        n = int(d.get('num', 1))
-        tiles = _json.loads(_rust.peek_stack_json(n))
-        if not tiles:
-            return jsonify(err("Keine Karten auf dem Stapel"))
-        return jsonify({"ok": True, "tiles": tiles})
-    except Exception as e:
-        return jsonify(err(str(e)))
+# `/api/stack/peek` entfernt (Code-Review 2026-09-26 Befund 10): die Route gab
+# die obersten n VERDECKTEN Kuppelplatten mit Vorderseite aus, ohne Schalter
+# und ohne Aufrufer in `static/` oder `tools/`. Die Rust-Bindung
+# `peek_stack_json` ist mit entfernt. Das verdeckte Ziehen der GUI laeuft
+# ueber `/api/move/dome_stack_peek` (zeigt nur den Typ der Rueckseite).
 
 
 # ── KI ───────────────────────────────────────────────────────────────────────
@@ -1564,7 +1638,30 @@ def set_aggression():
     return jsonify({"ok": True, "w": actual_w, "lambda_aggr": actual_lambda_aggr})
 
 
+def _with_ai_lock(fn):
+    """Code-Review 2026-09-26 Befund 22: `_ai_lock` war definiert, aber nie
+    benutzt. Jetzt umschliesst es jeden KI-ZUG (Pruefung "ist die KI dran?"
+    UND Ausfuehrung in einem Stueck), damit zwei ueberlappende Anfragen nicht
+    beide den Zugspieler-Check bestehen und zwei Zuege setzen. Nicht
+    blockierend: eine zweite Anfrage bekommt sofort eine Fehlermeldung statt
+    hinter einer langen Suche zu warten. Die GUI fragt ohnehin seriell
+    (`static/js/app.js` `triggerAIMove`: `AI_THINKING`-Sperre, `await` je
+    Schritt) und trifft das nie."""
+    import functools
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not _ai_lock.acquire(blocking=False):
+            return jsonify(err("Die KI berechnet bereits einen Zug."))
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _ai_lock.release()
+    return wrapper
+
+
 @app.route('/api/ai/move', methods=['GET', 'POST'])
+@_with_ai_lock
 def ai_move():
     """Lässt die KI (Rust-MCTS) einen Zug ausführen."""
     global _last_ai_log
@@ -1605,6 +1702,7 @@ def ai_move():
 
 
 @app.route('/api/ai/start_tile', methods=['GET', 'POST'])
+@_with_ai_lock
 def ai_start_tile():
     """KI legt ihre Startkuppelplatte (Rust-Heuristik)."""
     if (e := _require_game()) is not None:
@@ -1758,6 +1856,14 @@ def teacher_config_set():
     """Setzt Lehrer-Stufe/Sims während des Spiels (analog /api/ai/config)."""
     global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_cache
     d = request.get_json(silent=True) or {}
+    # Befund 22 (Code-Review 2026-09-26): Sims gedeckelt wie in /api/new_game
+    # (eine Nicht-Zahl war vorher ein unbehandelter 500er) -- und alles erst
+    # pruefen, dann setzen, damit ein Fehler nichts halb uebernimmt.
+    try:
+        new_sims = _capped_sims(d['sims'], "sims") if 'sims' in d else None
+        new_coach_sims = _capped_sims(d['coach_sims'], "coach_sims") if 'coach_sims' in d else None
+    except ValueError as e:
+        return jsonify(err(str(e)))
     if 'level' in d:
         try:
             lvl = int(d['level'])
@@ -1766,10 +1872,10 @@ def teacher_config_set():
         if lvl not in (0, 1, 2, 3):
             return jsonify(err("teacher_level muss 0-3 sein."))
         _teacher_level = lvl
-    if 'sims' in d:
-        _teacher_sims = int(d['sims'])
-    if 'coach_sims' in d:
-        _teacher_coach_sims = int(d['coach_sims'])
+    if new_sims is not None:
+        _teacher_sims = new_sims
+    if new_coach_sims is not None:
+        _teacher_coach_sims = new_coach_sims
     _teacher_cache = {"key": None, "analysis": None}  # Stufenwechsel -> alte Analyse verwerfen
     return jsonify({"ok": True, "level": _teacher_level, "sims": _teacher_sims, "coach_sims": _teacher_coach_sims})
 
@@ -1883,6 +1989,12 @@ if __name__ == '__main__':
     # Partien neu (docs/pitfalls.md, Vorfall 23:21). Wer beim Entwickeln
     # Auto-Reload will, setzt MOSAIC_SERVER_RELOAD=1.
     use_reloader = os.environ.get("MOSAIC_SERVER_RELOAD") == "1"
+    # Code-Review 2026-09-26 Befund 21: der Werkzeug-Debugger (`debug=True`)
+    # zeigt bei jedem unbehandelten Fehler eine interaktive Konsole, die
+    # beliebigen Python-Code im Serverprozess ausfuehrt. Nur noch per
+    # Umgebung, Default AUS -- dasselbe Muster wie MOSAIC_SERVER_RELOAD oben.
+    use_debug = os.environ.get("MOSAIC_SERVER_DEBUG") == "1"
     print("Mosaic-AI Server läuft auf http://localhost:5000"
-          + ("" if use_reloader else " (Auto-Reload AUS)"))
-    app.run(debug=True, port=5000, use_reloader=use_reloader)
+          + ("" if use_reloader else " (Auto-Reload AUS)")
+          + (" (Debug-Modus AN)" if use_debug else ""))
+    app.run(debug=use_debug, port=5000, use_reloader=use_reloader)

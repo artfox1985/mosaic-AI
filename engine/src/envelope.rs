@@ -10,7 +10,10 @@
 //! braucht Musterreihe `r`, also `r + 1` Fliesen), Gesamtkost einer Huelle
 //! 56. Die bestpassende Huelle ist die mit der kleineren UNGEWICHTETEN
 //! Abweichung (Zellen der Huelle ohne Stein plus Steine ausserhalb), bei
-//! Gleichstand LINKS -- genau wie `best_hull` der Sonde (`<=`).
+//! Gleichstand LINKS -- genau wie `best_hull` der Sonde (`<=`). Ausnahme seit
+//! 2026-09-26: in einer per Spiegelknopf gespiegelten Self-Play-Partie
+//! (`MOSAIC_TIE_MIRROR_P`, `PREREG_tie_mirror.md`) RECHTS; die Regel steht an
+//! EINER Stelle, [`pick_hull`].
 //!
 //! `H(brett)` (par.8.1) = kosten-gewichteter Fuellanteil INNERHALB der
 //! bestpassenden Huelle (Summe `r + 1` der belegten Huellenzellen / 56) MINUS
@@ -178,19 +181,50 @@ pub fn deviation_in(occ: &[[bool; 6]; 6], hull: Hull, form: HullForm) -> usize {
     d
 }
 
+/// DIE Gleichstandsregel der Orientierungswahl, EINE Stelle fuer alle
+/// Waehler ([`best_hull_in`], [`best_hull_frac_in`], die Modus-1-Wahl in
+/// [`envelope_score_row6_in`]): kleinere Abweichung gewinnt; bei Gleichstand
+/// LINKS (`best_hull` der Sonde, `<=`) -- AUSSER die Partie dieses Threads ist
+/// per Spiegelknopf gespiegelt (`tie_mirror::game_tie_mirror`,
+/// `PREREG_tie_mirror.md` par.2), dann RECHTS.
+///
+/// Warum das der tragende Hebel des Spiegelknopfs ist (Herleitung aus dem
+/// Code, nicht gemessen): fruehe Bretter mit Steinen nur in Rasterzeile 0
+/// liegen in BEIDEN Huellen, die Abweichungen sind gleich. Auf einem exakt
+/// spiegelsymmetrischen Brett ist die Wahl fuer H folgenlos; sie entscheidet
+/// aber auf Brettern mit gleicher Abweichung und ungleich teuren Haelften, und
+/// vor allem ueber K5 ([`apply_row6_special_in`] prueft nur die Zeile-6-Zelle
+/// der GEWAEHLTEN Orientierung), welche Seite der Such-Term (e) belohnt -- und
+/// damit, wohin die Suche die Kuppelplatten legt.
+///
+/// Ungespiegelt ist der Ausdruck exakt der fruehere (`dl <= dr` -> links),
+/// also bitidentisch; bei NaN faellt die Wahl wie bisher auf die jeweils
+/// andere Seite.
+#[inline]
+pub fn pick_hull<T: PartialOrd>(dev_left: T, dev_right: T) -> Hull {
+    if crate::tie_mirror::game_tie_mirror() {
+        if dev_right <= dev_left {
+            Hull::Right
+        } else {
+            Hull::Left
+        }
+    } else if dev_left <= dev_right {
+        Hull::Left
+    } else {
+        Hull::Right
+    }
+}
+
 /// Bestpassende Huelle: kleinere Abweichung, bei Gleichstand LINKS
-/// (`best_hull` der Sonde, `<=`). Dreieck.
+/// (`best_hull` der Sonde, `<=`), in gespiegelten Partien RECHTS
+/// ([`pick_hull`]). Dreieck.
 pub fn best_hull(occ: &[[bool; 6]; 6]) -> Hull {
     best_hull_in(occ, HullForm::Triangle)
 }
 
 /// Wie [`best_hull`], in der gewaehlten Huellenform.
 pub fn best_hull_in(occ: &[[bool; 6]; 6], form: HullForm) -> Hull {
-    if deviation_in(occ, Hull::Left, form) <= deviation_in(occ, Hull::Right, form) {
-        Hull::Left
-    } else {
-        Hull::Right
-    }
+    pick_hull(deviation_in(occ, Hull::Left, form), deviation_in(occ, Hull::Right, form))
 }
 
 /// `(innen, aussen)`: kosten-gewichtete Belegung innerhalb bzw. ausserhalb
@@ -343,15 +377,12 @@ pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
 }
 
 /// Bestpassende Orientierung fuer eine GEBROCHENE Belegung: kleinere
-/// `deviation_frac`, bei Gleichstand LINKS -- genau die Wahl, die
-/// [`envelope_score_frac_in`] intern trifft. Eigene Funktion, seit die
-/// Zell-Knoepfe par.12c wissen muessen, WELCHE Orientierung bewertet wurde.
+/// `deviation_frac`, bei Gleichstand LINKS (in gespiegelten Partien RECHTS,
+/// [`pick_hull`]) -- genau die Wahl, die [`envelope_score_frac_in`] intern
+/// trifft. Eigene Funktion, seit die Zell-Knoepfe par.12c wissen muessen,
+/// WELCHE Orientierung bewertet wurde.
 pub fn best_hull_frac_in(occ: &[[f64; 6]; 6], form: HullForm) -> Hull {
-    if deviation_frac_in(occ, Hull::Left, form) <= deviation_frac_in(occ, Hull::Right, form) {
-        Hull::Left
-    } else {
-        Hull::Right
-    }
+    pick_hull(deviation_frac_in(occ, Hull::Left, form), deviation_frac_in(occ, Hull::Right, form))
 }
 
 /// Wie [`envelope_score_frac`], in der gewaehlten Huellenform (Normierung
@@ -854,13 +885,9 @@ pub fn envelope_score_row6_in(
         return best;
     }
     let mut occ = projected_occupancy(board);
-    let hull = if deviation_frac_in(&occ, Hull::Left, form)
-        <= deviation_frac_in(&occ, Hull::Right, form)
-    {
-        Hull::Left
-    } else {
-        Hull::Right
-    };
+    // Gleichstandsregel ueber [`pick_hull`] (Spiegelknopf, PREREG_tie_mirror.md
+    // par.2) -- ungespiegelt exakt der fruehere Ausdruck `dl <= dr` -> links.
+    let hull = best_hull_frac_in(&occ, form);
     apply_row6_special_in(board, &mut occ, hull, form, w_k5);
     envelope_score_frac_for_in(&occ, hull, form)
 }
@@ -2217,5 +2244,56 @@ mod tests {
             outside_wild_mass_in(&occ_n, &normal_board, Hull::Left, HullForm::Triangle),
             0.0
         );
+    }
+
+    /// Spiegelknopf (`PREREG_tie_mirror.md` par.2): symmetrische Bretter haben
+    /// zu beiden Huellen dieselbe Abweichung. Ungespiegelt gewinnt LINKS
+    /// (Bestand, bitidentisch), gespiegelt RECHTS -- an jedem Waehler, der ueber
+    /// [`pick_hull`] laeuft. Ohne Gleichstand entscheidet in beiden Faellen
+    /// unveraendert die kleinere Abweichung.
+    #[test]
+    fn tie_mirror_flips_hull_tie_to_right() {
+        use crate::tie_mirror::TieMirrorGuard;
+        // Leeres Brett und ein Brett nur mit Rasterzeile 0: Zeile 0 liegt in
+        // BEIDEN Huellen, das ist der fruehe Gleichstand aus par.1.
+        let empty = [[false; 6]; 6];
+        let mut row0 = [[false; 6]; 6];
+        row0[0] = [true; 6];
+        let forms = [HullForm::Triangle, HullForm::Row6Pair];
+        for occ in [empty, row0] {
+            for form in forms {
+                assert_eq!(
+                    deviation_in(&occ, Hull::Left, form),
+                    deviation_in(&occ, Hull::Right, form),
+                    "Testbrett muss ein Gleichstand sein"
+                );
+            }
+        }
+        {
+            let _g = TieMirrorGuard::set(false);
+            for occ in [empty, row0] {
+                assert_eq!(best_hull(&occ), Hull::Left);
+                for form in forms {
+                    assert_eq!(best_hull_in(&occ, form), Hull::Left);
+                    assert_eq!(best_hull_frac_in(&frac_occupancy(&occ), form), Hull::Left);
+                }
+            }
+            assert_eq!(pick_hull(3.0, 3.0), Hull::Left);
+            assert_eq!(pick_hull(2usize, 3usize), Hull::Left);
+            assert_eq!(pick_hull(4usize, 3usize), Hull::Right);
+        }
+        {
+            let _g = TieMirrorGuard::set(true);
+            for occ in [empty, row0] {
+                assert_eq!(best_hull(&occ), Hull::Right);
+                for form in forms {
+                    assert_eq!(best_hull_in(&occ, form), Hull::Right);
+                    assert_eq!(best_hull_frac_in(&frac_occupancy(&occ), form), Hull::Right);
+                }
+            }
+            assert_eq!(pick_hull(3.0, 3.0), Hull::Right);
+            assert_eq!(pick_hull(2usize, 3usize), Hull::Left, "kein Gleichstand: kleinere Abweichung");
+            assert_eq!(pick_hull(4usize, 3usize), Hull::Right, "kein Gleichstand: kleinere Abweichung");
+        }
     }
 }

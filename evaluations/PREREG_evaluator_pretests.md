@@ -151,6 +151,11 @@ MINDESTENS ZWEI der Runden 1-4 um >= 0,0012 mit Block-CI > 0 besser ist.
   (die Erzeugung waere dann gleich stark und billiger oder gleich stark und gleich teuer).
 * **Folge fuer die Labels:** mit Knopf aendern sich `root_q` und die Bootstrap-Werte der naechsten
   Erzeugung; das ist gewollt und gehoert in die v34-Fenster-Prereg.
+* **Bau-Stand 2026-09-26 (Agent, ungebaut):** Spec-Feld `single_pass_other_val` je Seite plus
+  Env-Fallback `MOSAIC_SINGLE_PASS_OTHER_VAL`. Die LABEL-Pfade (`net_leaf_eval` in `self_play.rs`,
+  `round_transition_deep.rs`) lesen nur den Env-Default: fuer eine v34-Erzeugung mit E1 muss die
+  Env-Variable gesetzt sein, das Spec-Feld allein aendert die Bootstrap-Werte nicht. Fuer das
+  Arena-A/B (par.5b) reicht das Spec-Feld.
 
 **par.5c E4-Vortest:** mit dem Export aus par.5a je Zustand und eigener Musterreihe die Groessen
 "groesste Steinzahl, die ein Zug ohne Ueberlauf in die Reihe legt", "ein Zug fuellt die Reihe

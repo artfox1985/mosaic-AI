@@ -87,6 +87,11 @@ SPEC_TO_ENV = {
     # PREREG_round_transition_search_sampling.md par.16.10: OPTIONAL, Default
     # 1 (an = Bestand), also wieder umgekehrte Polung. NACHGETRAGEN 2026-09-21.
     "net_tiling_tiebreak": "MOSAIC_NET_TILING_TIEBREAK",
+    # PREREG_evaluator_pretests.md par.5 (E1) und PREREG_r5_net_vs_solver.md par.2: beide
+    # OPTIONAL, Wert 0 oder 1 (kein JSON-Bool -- str(False) waere "False" und der R5-Leser
+    # nimmt jeden Text ausser "0" als an). `r5_net_solver` hat umgekehrte Polung: Default 1.
+    "single_pass_other_val": "MOSAIC_SINGLE_PASS_OTHER_VAL",
+    "r5_net_solver": "MOSAIC_R5_NET_SOLVER",
 }
 
 # Felder aus `KNOWN_FIELDS`, die BEWUSST keinen Env-Knopf bekommen. Der Test
