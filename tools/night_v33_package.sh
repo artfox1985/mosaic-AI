@@ -70,9 +70,10 @@ python -X utf8 tools/gating_block_z.py "$ART"/gating_v33-b02_vs_v32-b01_s2026160
 # Erzeugungs-Spec traegt das Feld nicht, also gilt der Env-Default.
 echo ""
 echo "== 2) E1-Kostentor: je 100 Partien ohne / mit Einpass-Konsum $(date +%F' '%H:%M:%S)"
+mkdir -p data/probe_e1gate
 for ARMV in off on; do
   if [ "$ARMV" = on ]; then export MOSAIC_SINGLE_PASS_OTHER_VAL=1; else unset MOSAIC_SINGLE_PASS_OTHER_VAL; fi
-  MOSAIC_STACK_DRAW_RESEARCH=1 python -X utf8 -u self_play.py --mode network --model "$CHAMP" \
+  MOSAIC_DATA_DIR=data/probe_e1gate MOSAIC_STACK_DRAW_RESEARCH=1 python -X utf8 -u self_play.py --mode network --model "$CHAMP" \
     --spec "$GEN_SPEC" --games 100 --sims 100 --value-only --version "e1gate-$ARMV" \
     --threads 11 --chunk 10 --per-file 10 --seed 20261699 --return-order-random-p 0.81 \
     --tau-argmax-from-move 1 --deviate-prob 1.0 --start-slot-random-p 0.15
@@ -83,7 +84,7 @@ python -X utf8 - <<'PYEOF'
 import glob, json
 res = {}
 for arm in ("off", "on"):
-    m = sorted(glob.glob(f"data/manifest_e1gate-{arm}_*.json"))[-1]
+    m = sorted(glob.glob(f"data/probe_e1gate/manifest_e1gate-{arm}_*.json"))[-1]
     d = json.load(open(m, encoding="utf-8"))
     res[arm] = (d.get("laufzeit") or {}).get("s_je_partie"), d.get("engine_config", {}).get("single_pass_other_val")
     print(f"   {arm}: {res[arm][0]} s je Partie, engine_config.single_pass_other_val = {res[arm][1]}")
