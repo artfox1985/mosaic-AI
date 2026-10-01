@@ -92,8 +92,11 @@ um zwei neue klassen erweitern ... prinzipiell wuensch ich mir mehr asymetrische
 stellungen zu provozieren die nicht entstehen wenn du gegen dich selber spielst"*). (1) Ausflug mit
 zufaelliger Kuppelplatte: Wuerfel fuer Rotation 0-3, Quelle Auslage/Stapel, ID in der Auslage bzw.
 Stapeltiefe, VOR der Suche gesetzt; den Platz waehlt die Suche, 600 Sims. (2) Asymmetrisch gegen
-einen stoerenden Gegner, dem die eigenen Punkte weniger wichtig sind. Zusammensetzung im Gespraech,
-Prereg folgt nach den Nutzer-Antworten. Vorlaeufer (gemessen): `PREREG_asymmetric_curriculum.md`,
+einen stoerenden Gegner, dem die eigenen Punkte weniger wichtig sind. **Entwurf
+`PREREG_asymmetric_selfplay.md`:** Wuerfel-Klasse W festgelegt (ALLE Platten der Wuerfel-Seite
+gewuerfelt, Stapeltiefe d in 1..max, Platz per Suche @600, erzwungene Zuege ohne Record, alle
+Wertziele bleiben, Start normal); Nutzer-Plan 4.000 W plus 2.000 Sockel, G-1/G-2 fallen weg;
+endgueltige Zusammensetzung nach den Sonden S1-S4 (par.5). Bau in der Wheel-Runde nach der v34-Erzeugung. Vorlaeufer (gemessen): `PREREG_asymmetric_curriculum.md`,
 `PREREG_opponent_disruption.md` (+v2), `PREREG_task28_aggression.md`, `PREREG_denial_tiebreak.md`.
 
 **Parallel bzw. danach (nicht vor der Erzeugung):** R5 Stufe 2a A/B (iterativ @2000 gegen Netz, Seeds

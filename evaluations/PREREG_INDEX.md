@@ -77,15 +77,16 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 131 Dateien = 7 OFFEN + 110 ENTSCHIEDEN + 14 UEBERHOLT.**
+**Stand (automatisch generiert): 132 Dateien = 8 OFFEN + 110 ENTSCHIEDEN + 14 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (7)
+## OFFEN (8)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
+| `PREREG_asymmetric_selfplay.md` | Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | ENTWURF 2026-10-01, nichts gebaut. Wuerfel-Klasse W festgelegt (par.2), Stoerer-Klasse S skizziert (par.3); Zusammensetzung des Fensters nach den Sonden (par.5), Nutzer-Plan 4.000 W plus 2.000 Sockel ohne G-1/G-2 (par.4). Zeitpunkt: nach dem v34-Training. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
 | `PREREG_evaluator_pretests.md` | Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Vortests (par.8a/8c): E2 und E4 bestehen, E3 TOT. E1-Arm (par.8d): gleich stark (415:385, z +1,04) und 39,4 % billiger je Partie -> v34-Erzeugung mit Knopf (Nutzer 2026-10-01). E2/E4 als Arme in v34 (PREREG_v34_window.md par.3). |
 | `PREREG_r5_net_vs_solver.md` | Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2a (par.5a): iterativer Loeser gegen das Netz, gebaut; Sonde (par.6b): beim heutigen Loeser frisst das erste Kind in 86 von 117 Entscheidungen das Budget, iterativ @2000 kostet 129 ms Median je Entscheidung. Offen: A/B Stufe 2. |
