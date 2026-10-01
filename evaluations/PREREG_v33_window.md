@@ -1,4 +1,5 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen (par.9). Tor 1 GENAU AUF DER KANTE: 420:380 = 52,50 %, Block-z +1,41, formal getragen (par.10). Fenster-Arme b02/b03/b04 alle ohne messbaren Unterschied (par.6a, par.6d): weder Menge noch Alter des Value-Materials ist ein Hebel. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen (par.9). Tor 1 GENAU AUF DER KANTE: 420:380 = 52,50 %, Block-z +1,41, formal getragen (par.10). Fenster-Arme b02/b03/b04 alle ohne messbaren Unterschied (par.6a, par.6d): weder Menge noch Alter des Value-Materials ist ein Hebel. Nutzer-Entscheid: v34-Fenster im b04-Zuschnitt (par.6d). -->
+
 
 # Vorregistrierung: das v33-Fenster
 
@@ -374,6 +375,13 @@ Volumen-Folgerung aus task36/corpus_dose (v20-Aera) fuer die heutige Aera und st
 Saettigungs-These des Nutzers ("mit unserer aktuellen Architektur in der Saettigung"). Bericht an
 den Verbraucher: `PREREG_targeted_branching.md`, STATUS Abschnitt 6 Punkt 14.
 
+**Nutzer-Entscheid zum v34-Fenster (2026-09-27, nach dem b02-Tor 1, par.6e):** *"Ok, dann Takte es
+so ein"* auf den Vorschlag, den b04-Zuschnitt zu uebernehmen: die ganze v34-Erzeugung plus aus
+aelteren Generationen nur die Policy-Traeger des Traeger-Manifests. Begruendung: alle vier Arme
+ununterscheidbar, b04 ist das kleinste Fenster (spart Bloecke, Monolith und Trainingszeit; wie viel,
+ist UNGEMESSEN, die b04-Trainingszeit lief unter Nebenlast), und das v34-Paket wird nicht durch
+Altmaterial ohne die neuen Knoepfe verduennt. Der Zuschnitt steht in par.1 der v34-Fenster-Prereg.
+
 ## par.6e TOR 1 FUER `v33-b02` gegen den Champion (registriert 2026-09-27, VOR dem Lauf)
 
 **Nutzer 2026-09-27:** *"Takte b02 gegen den champ ein"* (nach dem Entscheid "derzeit keine
@@ -389,6 +397,26 @@ Blockdifferenz je Block (gepaart ueber die Seeds). Eine Promotion bleibt Nutzer-
 
 **Kosten:** wie Tor 1 von b01, rund 3,4 h (2 x 40 Bloecke a rund 150 s). Laeuft in der Nachtkette
 vor E1 und R5.
+
+### par.6e ERGEBNIS (Nachtkette `tools/night_v33_package.sh`, 2026-09-27 09:09-12:35, exklusiv)
+
+| Seed | v33-b02 : v32-b01 | Block-z | Punkte | Marge (je Brett) | Strafleiste | volle Spalten je Seite |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261600 | 199:201 | -0,11 | 59,13 / 58,74 | +0,39 | 6,95 / 6,98 | 1,040 / 1,108 |
+| 20261601 | 206:194 | +0,60 | 59,47 / 59,02 | +0,46 | 7,05 / 7,23 | 0,983 / 1,083 |
+| **gepoolt** | **405:395 = 50,6 %** | **+0,37** | | | | |
+
+Block-z aus `tools/gating_block_z.py` (am 2026-10-01 nachgerechnet: der Schlussaufruf der Kette
+brach ab, weil das Glob `s2026160*.json` auch die `_plate_points.json` traf; Stufenzaehlung davor
+lief auf den expliziten Dateien). Stufenregel: kein Seed einzeln >= +1,96, kein dritter Seed.
+Plattenpunkte je Kriterium: `evaluations/artifacts/gating_v33-b02_vs_v32-b01_s2026160{0,1}_plate_points.json`
+(gepaart signifikant nur `spezial_bonus` auf Seed 20261600, -0,46 [-0,85; -0,07]).
+
+**Verdikt nach par.2: b02 VERFEHLT Tor 1** (weder z >= +1,96 noch 52,5 %). **Gepaart gegen b01 auf
+denselben Seeds** (gleiche Block-Seeds, Differenz der Blockanteile b02 - b01): Seed 20261600 -0,033,
+Seed 20261601 -0,005, gepoolt -0,019 (n = 80 Bloecke, sd 0,214, z -0,79) -- kein Unterschied. Tor 2b
+(volle Spalten) auf beiden Seeds unter dem Champion. Keine Promotion (Nutzer-Entscheid par.10 bleibt);
+Elo-Register zwei Zeilen 2026-09-27.
 
 ## par.8 KOSTEN (aus `docs/measured_runtimes.md`)
 

@@ -95,6 +95,10 @@ Gedaechtnis:
    (`round5.rs`); was der Value-Kopf dort ausgibt, fuehrt keinen Zug. R5 mass also eine
    Kalibrierung ohne Spielwirkung (878 s je Promotion). R4 und R4b bleiben: das Ende von Runde 4
    bewertet noch der Kopf. Das Werkzeug `tools/r5_value_calibration.py` bleibt im Baum.
+   **WIEDERVORLAGE 2026-10-01:** die Netzsuche schlaegt den Loeser in Runde 5 (495:305,
+   `PREREG_r5_net_vs_solver.md` par.6a). Spielt ein Champion Runde 5 per Netz (`r5_net_solver` 0),
+   fuehrt der Value-Kopf dort wieder Zuege, und die Begruendung oben entfaellt fuer ihn -- dann R5
+   vor dessen Promotion wieder aufnehmen (Nutzer-Entscheid).
 
    **Stand 2026-09-25:** fuer `v32-b01` auf Nutzer-Anweisung gefahren (*"r5 und r4b
    mitfahren"*), alle GEPAART gegen den Vorgaenger. Gepaart heisst: dasselbe Substrat wie beim

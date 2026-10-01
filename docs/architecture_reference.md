@@ -34,7 +34,11 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
 - **Runde 5 ist Expectiminimax** mit Zufallsknoten an den Chip-Aufdeckstellen;
   `NODE_BUDGET = 200` ist eine Bezahlbarkeits-, keine Hinreichenszahl --
   **kein geloestes Endspiel** (~3 Halbzuege, Orakel-Uebereinstimmung 81,4
-  Prozent). Der frueher hier genannte zweite, eingefrorene Loeser
+  Prozent). **Korrektur 2026-10-01:** die Suche ist eine Tiefensuche OHNE iterative Vertiefung mit
+  einem Knotenzaehler ueber alle Wurzelkinder (`round5.rs:590-624`); erschoepft das erste Kind das
+  Budget, entscheidet die Vorsortierung. "~3 Halbzuege" und die 81,4 Prozent (dieselbe Suchform mit
+  20.000 Knoten) tragen damit nicht. Im A/B verliert der Loeser gegen die Netzsuche in Runde 5
+  305:495 (z -10,17, `PREREG_r5_net_vs_solver.md` par.6a); ein iterativer Loeser ist dort par.5a. Der frueher hier genannte zweite, eingefrorene Loeser
   `round5_anchor.rs` ist mit B4b **entfernt** (2026-08-27); der Anker-Schutz
   liegt seither in einem eingefrorenen Heuristik-Artefakt, aktuell
   `models/frozen_heuristics/hv4_anchor` (Neuverankerung 2026-09-12; das

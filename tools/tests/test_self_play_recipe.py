@@ -42,6 +42,7 @@ V33_GENERATE = REPO / "tools" / "night_v33_generate.sh"
 V33_B03_B04 = REPO / "tools" / "night_v33_b03_b04.sh"
 
 # In v34 absichtlich anders als in v33: Platzhalter (null) und die neuen Knoepfe.
+V34_SEEDS = {"policy": 20260946, "value-wegc": 20260947, "value-excursion": 20260948}
 PLACEHOLDER_OR_NEW = {"model", "version", "seed", "tie_mirror_p", "label_rng_split",
                       "excursion_reshuffle", "recipe", "recipe_class"}
 
@@ -96,18 +97,23 @@ class RecipeSetsValues(unittest.TestCase):
                 self.assertEqual(ns.tie_mirror_p, 0.5)
                 self.assertIs(ns.label_rng_split, True)
                 self.assertIs(ns.excursion_reshuffle, True)
-                self.assertIsNone(ns.seed, "Seed ist im Entwurf Platzhalter null")
-                self.assertIsNone(ns.model, "Generator ist im Entwurf Platzhalter null")
+                # Entschieden 2026-09-27/10-01 (PREREG_v34_window.md par.5): Generator v33-b01,
+                # Seeds im Vierer-Schritt nach v33 (42/43/44).
+                self.assertEqual(ns.seed, V34_SEEDS[cls])
+                self.assertEqual(ns.model, "models/alphazero_v33-b01_brierbest.onnx")
+                self.assertEqual(ns.version, f"v33-b01-{cls}")
+                self.assertEqual(ns.spec, "models/v33_generation.spec.json")
         ns, _ = apply_to_parser(fresh_parser(), ["--recipe", str(V34), "--class", "value-wegc"],
                                 str(V34), "value-wegc", tool="self_play")
         self.assertIs(ns.value_only, True)
-        self.assertEqual(ns.threads, 10)
+        # v33-b03 fuhr 10 Threads nur wegen des parallelen b04-Trainings; v34 nimmt die 11 aus common.
+        self.assertEqual(ns.threads, 11)
 
     def test_explicit_flag_is_recorded_as_override(self):
         argv = ["--recipe", str(V34), "--class", "policy", "--seed", "20261000"]
         ns, overrides = apply_to_parser(fresh_parser(), argv, str(V34), "policy", tool="self_play")
         self.assertEqual(ns.seed, 20261000)
-        self.assertEqual(overrides, {"seed": {"recipe": None, "cli": 20261000}})
+        self.assertEqual(overrides, {"seed": {"recipe": V34_SEEDS["policy"], "cli": 20261000}})
 
     def test_v34_draft_mirrors_the_v33_generation_flag_by_flag(self):
         for script in (V33_GENERATE, V33_B03_B04):
@@ -126,11 +132,23 @@ class RecipeSetsValues(unittest.TestCase):
                 new = vars(new)
                 diff = {k: (old.get(k), new.get(k)) for k in sorted(set(old) | set(new))
                         if k not in PLACEHOLDER_OR_NEW and old.get(k) != new.get(k)}
-                self.assertEqual(diff, {}, f"{cls}: v34-Entwurf weicht von v33 ab (v33, v34)")
+                # Gewollte Abweichungen: die Spec heisst nach dem Generator (Inhalt byte-gleich),
+                # und Weg C faehrt 11 statt 10 Threads (PREREG_v34_window.md par.5 Punkt 2).
+                spec_old, spec_new = diff.pop("spec", (None, None))
+                if spec_old is not None:
+                    self.assertEqual((REPO / spec_old).read_bytes(), (REPO / spec_new).read_bytes(),
+                                     f"{cls}: Generator-Spec nicht byte-gleich")
+                if cls == "value-wegc":
+                    self.assertEqual(diff.pop("threads", None), (10, 11))
+                self.assertEqual(diff, {}, f"{cls}: v34-Rezept weicht von v33 ab (v33, v34)")
 
     def test_v34_env_matches_the_v33_chain(self):
         recipe = load_recipe(V34)
-        self.assertEqual(recipe["env"], {"MOSAIC_STACK_DRAW_RESEARCH": "1"})
+        # E1 an und Runde 5 per Netz (Nutzer 2026-10-01), beide ueber env, damit auch die
+        # Label-Pfade sie lesen (PREREG_v34_window.md par.5 Punkt 3).
+        self.assertEqual(recipe["env"], {"MOSAIC_STACK_DRAW_RESEARCH": "1",
+                                         "MOSAIC_SINGLE_PASS_OTHER_VAL": "1",
+                                         "MOSAIC_R5_NET_SOLVER": "0"})
 
 
 class RecipeRejects(unittest.TestCase):

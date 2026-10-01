@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a): roh TOT (misst die Huelle), Policy-KL A +0,029. Stufe 2 NEU registriert (par.7, Nutzer): der Ausflug zweigt nach Rundenprofil x Policy-Diskrepanz ab (Aktionszahl faellt weg), Knopf MOSAIC_EXCURSION_KL_WEIGHT, faehrt in v34 im Paket. -->
+<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a): roh TOT (misst die Huelle), Policy-KL A +0,029. Stufe 2 NEU registriert (par.7, Nutzer): der Ausflug zweigt nach Rundenprofil x Policy-Diskrepanz ab (Aktionszahl faellt weg), Knopf MOSAIC_EXCURSION_KL_WEIGHT, faehrt in v34 im Paket. Wirkung auf den Kopf: Offline-Pruefung nach dem v34-Training registriert (par.7a, Doppel-Differenz gegen den v33-Schritt). -->
 
 # Vorregistrierung: gezielt abzweigen statt zufaellig
 
@@ -158,6 +158,24 @@ Das ist eine NEUE Registrierung auf einem anderen Zeiger, keine Umdeutung des Ve
   im Rezept der Erzeugung (`docs/working_rules.md`, Rezeptdatei). Weg C bleibt ZUFAELLIG (Vergleichsbasis).
 * Record-Feld `branch_kl` am Abzweig-Record des Ausflugs, VOR der Erzeugung (Record-Feld-Regel).
 
+**Bau-Stand 2026-09-27 (Quelltext, noch NICHT kompiliert):** `excursion_branch_weight`
+(`engine/src/self_play.rs:3380`) rechnet bei Knopf 0 woertlich den Bestandsausdruck
+`profile_weight * n_actions`, die KL wird dann gar nicht berechnet (Guard `self_play.rs:6460`);
+bei Knopf 1 Gewicht `profile_weight * kl`, ohne echte Suche (eine Aktion, Rueckfall, R5-Loeser)
+Gewicht 0. KL = `KL(completed-Q-Ziel || Wurzel-Prior)` nach Aktions-ID, Epsilon 1e-12 wie das
+Vortest-Werkzeug. Manifest-Schluessel `engine_config.excursion_kl_weight`. Wheel-Runde, Tests,
+Paritaets-Fixture und Anker-Invarianz stehen aus.
+
+**PRAEZISIERUNG der Abnahme, VOR der Erzeugung (Definitionsabstand):** die Engine liest den Prior
+aus dem Suchbaum, dessen Wurzel determinisiert ist (`DETERMINIZE_ROOT_HIDDEN_INFO`,
+`net_mcts.rs:2161`), in f32; das Vortest-Werkzeug rechnet die Logits auf dem gespeicherten Zustand
+in f64. `branch_kl` und eine offline gerechnete KL sind darum nicht bitgleich definiert. Die
+Quantil-Abnahme unten vergleicht deshalb BEIDE Seiten in der OFFLINE-Definition (Werkzeug-KL am
+ersten Record jedes Ausflugs gegen die Werkzeug-KL aller Drafting-Records der Erzeugung);
+`branch_kl` wird daneben als Engine-Wert berichtet, samt Rangkorrelation zur Werkzeug-KL
+derselben Records. Einschraenkung: das Policy-Ziel des ersten Ausflug-Records stammt aus der
+eigenen Suche des Ausflugs (anderer Seed), nicht aus der Suche der Hauptpartie, die gewichtet hat.
+
 **Abnahme (Diagnose, kein eigenes Tor):**
 * Verteilung von `branch_kl` im v34-Ausflug gegen die KL-Verteilung aller Drafting-Stellen derselben
   Erzeugung: der Median am Abzweig muss ueber dem 75-Prozent-Quantil aller Stellen liegen, sonst hat
@@ -166,4 +184,58 @@ Das ist eine NEUE Registrierung auf einem anderen Zeiger, keine Umdeutung des Ve
 * **Staerke:** kein isolierter Arm. Der Knopf faehrt in der v34-Erzeugung zusammen mit anderen
   Paket-Aenderungen; ein Tor-1-Gewinn von v34 ist dem Paket, nicht diesem Knopf zuzuschreiben. Das
   ist bewusst so (Nutzer: v34 noch fahren, danach alternative Ansaetze pruefen).
+
+### par.7a OFFLINE-PRUEFUNG NACH DEM v34-TRAINING: lernt der Kopf gezielt dort, wo abgezweigt wurde?
+
+**Nutzer 2026-09-27:** *"Registriere die offline Pruefung"* (auf die Frage, ob das Abzweigen nach der
+Policy-Diskrepanz ueberhaupt auf den Value-Kopf wirkt). Registriert VOR der v34-Erzeugung.
+
+**Warum ueberhaupt:** der Knopf hat kein eigenes Tor (par.7), und die Abnahme in par.7 prueft nur,
+ob er GREIFT (Abzweig an Stellen hoher KL), nicht, ob der Kopf daraus lernt. Der Mechanismus (am
+Code gelesen 2026-09-27): die Abzweigstelle waehlt die Policy-Diskrepanz, die Abweichung selbst der
+Value-Kopf (`deviation_best_action`, `engine/src/self_play.rs:3015`: unter zufaelligen Kandidaten
+ohne den Suchzug der mit dem besten Kopfwert der Folgestellung), danach laeuft der Ausflug greedy
+bis zum Ende und liefert nur Wertziele. Gemessen ist bisher nur, dass der Kopf AN solchen Stellen
+schlechter liegt (par.6a, A +0,0292), nicht, dass Wertziele von dort ihn dort verbessern.
+
+**Messung (Doppel-Differenz, Werkzeug-Definitionen wie par.6a):**
+* **Grundmenge:** Drafting-Records Runde 1-4 MIT `root_q`, `completed is not False`, aus der
+  v34-Val-Menge; Auswahl wie par.2 (60 Dateien, je Klasse gleich viele, Seed 20260926). **Einheit**
+  Zustand, **Block** Datei. Weder der Generator noch der v34-Arm hat diese Dateien trainiert.
+* **Zeiger:** `KL(Ziel || Prior)` wie par.3, Prior aus dem GENERATOR der Daten (nicht aus dem
+  neuen Arm), damit beide Koepfe auf denselben Zustaenden verglichen werden. Oberstes Dezil
+  (KL >= q90) und untere Haelfte (KL <= q50) wie in `analyse()` des Vortest-Werkzeugs.
+* **Groesse:** `DiD = [Brier(neu) - Brier(Generator)]_oberstes Dezil - [Brier(neu) - Brier(Generator)]_untere Haelfte`,
+  Brier des rohen Kopfs gegen den Sieg des Ziehers, Block-Bootstrap ueber Dateien (wie par.6a).
+  Negativ heisst: der neue Kopf hat dort, wo abgezweigt wurde, MEHR dazugelernt als im Rest.
+* **v34:** neu = der v34-Arm mit Knopf, Generator = der Generator der v34-Erzeugung.
+* **Kontrolle v33** (derselbe Generationsschritt OHNE KL-Abzweigen, Ausflug nach Profil x
+  Aktionszahl): neu = `v33-b01`, Generator = `v32-b01`, Val-Menge `data/window_v33_val.txt`, dieselbe
+  Auswahl wie par.6a. Noetig, weil ein neuer Kopf ohnehin dort mehr aufholen kann, wo der alte
+  schlecht lag (Regression zur Mitte, Auswahl nach einem fehler-korrelierten Zeiger). Die Kontrolle
+  darf VOR der v34-Erzeugung laufen (alle Teile liegen vor), exklusiv wie jede Sonde.
+* **Primaere Groesse:** `E = DiD(v34) - DiD(v33)`, CI aus unabhaengigen Bootstrap-Ziehungen beider
+  Mengen (gleiche Zahl Ziehungen, paarweise differenziert).
+
+**Leseregel, VORAB:**
+* **E < 0 mit CI-Obergrenze < 0:** der Knopf wirkt auf den Kopf, gezielt an den Abzweigstellen.
+* **CI von E ueberdeckt 0:** kein zuordenbarer Lerneffekt; das Abzweigen nach KL erzeugt andere,
+  aber nicht nachweisbar lehrreichere Stellungen. Die Linie gilt damit fuer diese Architektur als
+  abgeschlossen (kein eigener Arm mehr, Nutzer-Richtung: danach alternative Ansaetze).
+* **E > 0 mit CI-Untergrenze > 0:** der Kopf lernt dort WENIGER als ohne Knopf; berichtet, v35
+  (falls es eine gibt) faehrt ohne Knopf.
+* Berichtet werden zusaetzlich DiD(v34) und DiD(v33) einzeln, n je Gruppe, die Brier-Werte beider
+  Koepfe je Gruppe, und dieselbe Rechnung getrennt fuer die Ausflug-Dateien und fuer die uebrigen
+  Klassen (der Knopf wirkt nur ueber die Ausflug-Klasse; wirkt er, sollte sich E dort zuerst zeigen).
+
+**Grenzen, vorab benannt:** gemessen wird am Zeiger KL, nicht an den tatsaechlichen Abzweigstellen
+des Trainingsmaterials (die liegen in Trainingsdateien, nicht in der Val-Menge). Und der v34-Arm
+unterscheidet sich vom v33-Schritt nicht nur im Knopf (Paket, par.7); E ist darum ein Hinweis auf
+die Wirkrichtung, kein isolierter Knopf-Effekt. Ein Arm ohne Knopf waere die saubere Kontrolle, ist
+aber bewusst nicht vorgesehen (Kosten einer ganzen Erzeugung).
+
+**Werkzeug:** Erweiterung von `tools/probes/targeted_branching_pretest.py` um einen zweiten Kopf
+(`--model-new`; KL und Dezile bleiben beim `--model` = Generator), laufzeit-Block und
+Fortschrittszaehler wie bisher. **Kosten, HERLEITUNG, ungemessen:** der Vortest brauchte 122,5 s fuer
+ein Modell auf 60 Dateien; zwei Mengen mit je zwei Koepfen also rund 4 x 2 min, unter 10 min.
 

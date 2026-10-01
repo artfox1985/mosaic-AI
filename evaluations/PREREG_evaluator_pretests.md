@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: Stufe 1 gefahren 2026-09-26 (par.8): E1 gleich gut (Brier-Differenz -0,00012, CI um 0), Arm kommt wegen der Kosten; E2 BESTEHT (+0,00213); E3 TOT (global besser in allen Runden); E4-Vortest BESTEHT (18/18, par.8c). Stufe 2 (E1-Arm, E4) nach Kette und b02 (par.5). -->
+<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: Vortests (par.8a/8c): E2 und E4 bestehen, E3 TOT. E1-Arm (par.8d): gleich stark (415:385, z +1,04) und 39,4 % billiger je Partie -> v34-Erzeugung mit Knopf (Nutzer 2026-10-01). E2/E4 als Arme in v34 (PREREG_v34_window.md par.3). -->
 
 # Vorregistrierung: Vortests fuer den Bewerter (E1-E4)
 
@@ -195,6 +195,33 @@ hier.
 5. v34-Generationswechsel mit den Ergebnissen.
 
 ## par.8 Ergebnisse
+
+### par.8d E1-Arm (par.5b), Nachtkette `tools/night_v33_package.sh` 2026-09-27, exklusiv
+
+**Kostentor** (Champion `v32-b01`, Sockel-Einstellung, je Arm 100 Partien, Seed 20261699,
+11 Threads, `data/probe_e1gate`): ohne Einpass **4,171 s je Partie** (417,1 s), mit Einpass
+**2,527 s** (252,7 s), Manifest `engine_config.single_pass_other_val` False / True wie erwartet.
+**Ersparnis 39,4 %**, je 4.000er-Klasse rund 2.600 Partien mehr in derselben Zeit (Kettenausgabe).
+
+**Staerke** (Champion mit Knopf = A gegen ohne, `models/v33_gating_e1.spec.json` gegen
+`v33_gating.spec.json`, je 200 Paare, fester Umfang):
+
+| Seed | A : B | Block-z | Punkte | Marge (je Brett) | Strafleiste | volle Spalten je Seite |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261690 | 194:206 | -0,60 | 58,78 / 58,77 | +0,01 | 6,58 / 7,36 | 1,048 / 1,025 |
+| 20261691 | 221:179 | +2,12 | 60,16 / 58,89 | +1,26 | 6,86 / 7,36 | 1,078 / 0,983 |
+| **gepoolt** | **415:385 = 51,9 %** | **+1,04** | | | | |
+
+Laufzeit je Seed 5.128,7 s / 4.900,1 s (12,82 / 12,25 s je Partie, 10 Threads; zum Vergleich Tor 1
+b02 mit beiden Seiten ohne Knopf 15,46 / 15,35 s). Plattenpunkte:
+`evaluations/artifacts/ab_e1_v32-b01_s2026169{0,1}_plate_points.json`.
+
+**Verdikt nach par.5b: DAZWISCHEN** (gepoolt z +1,04, einzeln -0,60 und +2,12) -> **Nutzer-Entscheid
+mit der Kostenzahl**: gleich stark in dieser Aufloesung und 39,4 % billiger je Partie. Vorschlag
+Koordinator: Knopf AN in der v34-Erzeugung (Env `MOSAIC_SINGLE_PASS_OTHER_VAL=1`, damit auch die
+Label-Pfade ihn lesen, par.5b Bau-Stand). Elo-Register zwei Zeilen 2026-09-27 (`v32-b01-e1`).
+**NUTZER-ENTSCHEID 2026-10-01: Knopf AN in der v34-Erzeugung** (*"E1 an"*), Env im Rezept
+(`PREREG_v34_window.md` par.5 Punkt 3).
 
 ### par.8c E4-Vortest, gefahren 2026-09-27 (345,2 s, exklusiv)
 

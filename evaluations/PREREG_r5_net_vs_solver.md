@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein Hybrid aus Loeser-Blatt und Punkte-Kopf? | Beleg: angelegt 2026-09-26, nichts gebaut, nichts gefahren. Stufe 1 ist ein gepaartes A/B desselben Champions, Loeser gegen Netzsuche in Runde 5 (par.3); braucht einen je Seite setzbaren Schalter (par.2). Stufe 2 (Hybrid) nur nach Stufe 1 (par.5). -->
+<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2a (par.5a): iterativer Loeser gegen das Netz, Staerke gegen Zeit, Bau laeuft. -->
 
 # Vorregistrierung: Runde 5 -- Netz gegen Loeser
 
@@ -80,6 +80,114 @@ schaetzt (Arm c aus `PREREG_r5_solver_split.md` par.4). Abgrenzung: der Punkte-K
 war im Vierervergleich signifikant schlechter als der Value-Kopf (22:48, par.3e dort); hier ist er
 Ergaenzung zum exakten Blatt, nicht Ersatz.
 
+## par.5a STUFE 2a, REGISTRIERT 2026-09-27 VOR jedem Bau: Loeser mit iterativer Vertiefung gegen das Netz
+
+**Nutzer 2026-09-27:** *"bau ihn mal, dann sehen wir wieviel wir von der spielstaerke gewinnen im
+austausch fuer die zeit die er braucht. als referenz haben wir nun das netz."* Anlass: Stufe 1
+Seed 20261670 243:157 fuer das Netz (Verdikt folgt in par.6), und ein Bauform-Befund am Loeser.
+
+**Der Befund (am Code gelesen 2026-09-27, `engine/src/round5.rs:590-624`):** `choose_action_deadlined`
+durchsucht die Wurzelkinder der Reihe nach mit Tiefe `MAX_DEPTH - 1` und EINEM Knotenzaehler fuer
+alle; ist das Budget erschoepft, bricht die Schleife ab und gibt das beste bisher bewertete Kind
+zurueck. Ohne iterative Vertiefung kann schon das erste Kind das Budget von 200 Knoten
+verbrauchen; dann ist der Loeser faktisch die Vorsortierung (`ordered_children`, statischer
+Wert "als ende die Runde jetzt"). HERLEITUNG, wie oft das greift ist UNGEMESSEN (Pruefung unten,
+Punkt 1). Die Lesart "~3 Halbzuege" im Modulkopf (`round5.rs:22-28`) und die 81,4 % Orakel-
+Uebereinstimmung (derselbe Suchaufbau mit 20.000 Knoten) sind damit nicht mehr tragfaehig.
+
+**Bau (Rust, per Seite, Default aus = byte-identisch):**
+* Neue Spec-Felder je Seite `r5_solver_iterative` (0/1, Default 0) und `r5_solver_node_budget`
+  (Default = heutiges Budget). Mit `r5_solver_iterative` 1: iterative Vertiefung d = 1, 2, 3 ...
+  mit Alpha-Beta bis Tiefe d, statischer Blattwert an der Tiefengrenze wie heute, Wurzelkinder je
+  Iteration nach den Werten der vorigen sortiert; Rueckgabe = bester Zug der letzten VOLLSTAENDIGEN
+  Iteration (bei Budgetende mitten in einer Iteration). Zufallsknoten wie heute.
+* Not-Deckel pro Entscheidung mit dem Budget skaliert (Muster `TIME_BUDGET`: Worst-Case 4,4 ms je
+  Knoten x 5, `round5.rs:90-96`), bleibt Ausfallschutz; bindend ist das Knotenbudget.
+* Kalibriersonde (`#[ignore]`-Test nach dem Muster `round5_node_calibration_probe`): auf
+  realistischen Runde-5-Stellungen je Entscheidung erreichte volle Tiefe, Knoten, Millisekunden;
+  fuer den heutigen Loeser zusaetzlich, wie oft er `ordered_children[0]` zurueckgibt, weil das
+  Budget im ersten Kind endete (Befund oben).
+
+**Bau-Stand 2026-10-01 (Quelltext, Agent, NICHT kompiliert):** Spec-Felder je Seite
+`r5_solver_iterative` (Env-Default `MOSAIC_R5_SOLVER_ITERATIVE`) und `r5_solver_node_budget` (nur
+Spec-Feld, `spec_env.py` begruendet ausgenommen, weil `MOSAIC_R5_NODE_BUDGET` prozessweit wirkt);
+`round5.rs` `choose_action_iterative` (Tiefe 1 = Vorsortierung, dann d = 2, 3 ...), Default-Pfad ruft
+denselben Kern wie `choose_action`; Kalibriersonde `r5_iterative_deepening_calibration_probe`
+(`#[ignore]`). Build, Tests und Anker-Invarianz in der Wheel-Runde mit dem KL-Knopf.
+
+**Messung, Stufenleiter von oben:**
+1. **Sonde** (Kosten und Tiefe, deterministisch, Minuten): heutiger Loeser @200, iterativ @400,
+   @2000, dazu die Netzsuche @400 und @100 in Millisekunden je Runde-5-Entscheidung, auf denselben
+   Stellungen. Berichtet: Median und p90 der Zeit, Verteilung der erreichten vollen Tiefe, und die
+   Quote "erstes Kind verbraucht das Budget" beim heutigen Loeser.
+2. **A/B oben:** Champion `v32-b01`, Seite A iterativer Loeser **@2000**, Seite B Netz in Runde 5
+   (`r5_net_solver` 0, die Referenz aus Stufe 1), sonst `models/v33_gating.spec.json`; Seeds
+   **20261672 / 20261673** a 200 Paare, Blockgroesse 5, fester Umfang (SPRT 1e-12), `--log-games`,
+   Block-z. Laufzeit-Block im Artefakt.
+3. **A/B unten, nur wenn Stufe 2 z >= +1,96:** dasselbe mit **@400**, Seeds 20261674 / 20261675.
+
+**Leseregel, VORAB (A = iterativer Loeser):**
+* Stufe 2 z <= -1,96: das Netz schlaegt auch den tieferen Loeser -> **Loeser-Linie geschlossen**,
+  das Netz spielt Runde 5; Stufe 3 entfaellt (Annahme: mehr Budget spielt nicht schlechter,
+  ausdruecklich eine ANNAHME).
+* Stufe 2 dazwischen: gleich stark -> das Netz bleibt, falls es je Entscheidung nicht teurer ist
+  (Sonde); sonst Nutzer-Entscheid nach der Zeittabelle.
+* Stufe 2 z >= +1,96: der Loeser traegt -> Stufe 3. Danach **Nutzer-Entscheid Staerke gegen Zeit**
+  auf der Tabelle (Siegquote je Budget, ms je Entscheidung, s je Partie), getrennt fuer Champion/GUI
+  (400 Sims, Zeit zweitrangig) und Erzeugung (100 Sims, Zeit zaehlt).
+* Berichtet wie Stufe 1 (sechs Kennzahlen, Runde 5 getrennt: Strafleiste, Plattenpunkte).
+
+**Zeitplan:** Bau jetzt (Quelltext), Build in der Wheel-Runde vor der v34-Erzeugung (Default aus,
+Anker-Invarianz). Die v34-Erzeugung faehrt Runde 5 nach dem Verdikt von Stufe 1; die A/B hier laufen
+parallel zum v34-Training (GPU und EIN CPU-Auftrag, `docs/working_rules.md`). Die Frage, wer in der
+ERZEUGUNG Runde 5 spielt, bleibt fuer v34 damit beim Ergebnis aus Stufe 1 (Nutzer-Abwaegung
+2026-09-27, Kosten eines halben Tags Verzug gegen sauberere Ausgaenge).
+
+**Kosten (Herleitung):** Knotenkosten 0,3-4,4 ms (`round5.rs:81-83`); @2000 also rund 0,6-9 s je
+Entscheidung. Ein A/B-Seed dauerte in Stufe 1 6.504,5 s (16,26 s je Partie); mit @2000 auf einer
+Seite laenger, UNGEMESSEN, die Sonde liefert die Planungszahl vor dem Start.
+
 ## par.6 ERGEBNISSE
 
-(noch leer)
+### par.6a Stufe 1 (Nachtkette `tools/night_v33_package.sh`, 2026-09-27 15:33-19:23)
+
+Champion `v32-b01`, A = Netzsuche in Runde 5 (`models/v33_gating_r5net.spec.json`, `r5_net_solver`
+0), B = Loeser (`v33_gating.spec.json`), je 200 Paare, fester Umfang, Blockgroesse 5, `--log-games`.
+
+| Seed | A : B | Block-z | Sweeps A / B | Punkte | Marge (je Brett) | Strafleiste | volle Spalten je Seite |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261670 | **243:157** | **+6,49** | 47 / 4 | 60,77 / 56,51 | +4,27 | 6,63 / 7,94 | 1,108 / 0,953 |
+| 20261671 | **252:148** | **+7,89** | 59 / 7 | 61,18 / 56,29 | +4,89 | 6,74 / 8,51 | 1,158 / 0,963 |
+| **gepoolt** | **495:305 = 61,9 %** | **+10,17** | | | | | |
+
+Gepaart je Partie (Seed 1 / Seed 2): Punkte +4,27 [+3,43; +5,10] / +4,89 [+4,06; +5,72].
+Plattenpunkte je Kriterium: `evaluations/artifacts/ab_r5net_v32-b01_s2026167{0,1}_plate_points.json`.
+Die Aufschluesselung nach Runde 5 (Strafleiste, Plattenpunkte, par.3 "berichtet") steht AUS; sie
+kommt aus den `--log-games`-Logs zusammen mit der Loeser-Diagnose aus par.5a Punkt 1.
+
+**Laufzeit:** 6.504,5 s (16,26 s je Partie) und 7.280,9 s (18,20 s je Partie), 10 Threads. **Auf Seed
+20261671 wurden die Bloecke ab Nr. 15 (ab rund 18:00) von rund 155 s auf 195-242 s langsamer**; das
+faellt mit zwei Lese-Agenten des Koordinators zusammen (Sicht-Audit, Loeser-Bau; einer fuehrte
+regelwidrig einmal `python -c "print('skip')"` aus). Seed 20261671 steht damit unter
+Nebenlast-Verdacht, gemeldet an den Nutzer. **Das Verdikt haengt daran nicht:** Seed 20261670 allein
+(Bloecke 147-176 s, gleichmaessig) hat z +6,49.
+
+**Sicht-Audit vor dem Verdikt** (Agent, Kernstelle vom Koordinator am Code nachgelesen,
+`round5.rs:590-624`): kein Informationsleck der Netzseite (Wurzel-Determinisierung mischt verdeckte
+Chips, Encoder liest Chipfarben nur aufgedeckt), Schalter wirkt nur je Seite, Tiling und Vorzug in
+Runde 5 fuer beide Seiten gleich. Aber: der Loeser ist eine Tiefensuche ohne iterative Vertiefung
+mit EINEM Knotenzaehler -- er misst sich hier vermutlich als gieriger Vorsortierer (par.5a).
+
+**Verdikt nach par.3: gepoolt z +10,17 >= +1,96 -> das Netz spielt Runde 5 besser als der heutige
+Loeser.** Folgen, Rezeptfrage an den Nutzer: (a) v34-Erzeugung mit Netzsuche in Runde 5, dann werden
+die R5-Policy-Ziele Besuchsverteilungen statt Loeser-One-Hot (`net_mcts.rs:6796`, gegatet); (b) der
+Champion spielt mit dieser Spec als eigene gemessene Identitaet (`feedback_measured_identity`);
+(c) das Label am Uebergang Runde 4 -> 5 (`exact_round5_outcome`, `self_play.rs:6510-6515`) laeuft
+weiter ueber dieselbe Tiefensuche und ist vom Schalter NICHT erfasst -- offener Punkt fuer par.2.
+Stufe 2a (iterativer Loeser gegen das Netz) misst, ob der Abstand am Blattwert oder an der Suchform
+liegt. Elo-Register zwei Zeilen 2026-09-27 (`v32-b01-r5net`).
+
+**NUTZER-ENTSCHEID 2026-10-01:** *"Runde 5 mit Netz, Seed 2 nicht wiederholen"* -- die v34-Erzeugung
+spielt Runde 5 per Netzsuche (Env im Rezept, `PREREG_v34_window.md` par.5 Punkt 3); Seed 20261671 bleibt
+mit Nebenlast-Vermerk stehen. Champion-Spec und R5-Kalibrierung bleiben offen bis zur naechsten
+Promotion bzw. Stufe 2a.

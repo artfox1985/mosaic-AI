@@ -19,6 +19,23 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
+**STAND 2026-10-01 -- Nachtkette des v33-Pakets FERTIG (2026-09-27 19:23), Ergebnisse registriert;
+nichts laeuft auf der Maschine.** Champion bleibt `v32-b01`.
+* **b02 Tor 1 verfehlt:** 405:395 = 50,6 %, z +0,37; gegen b01 auf denselben Seeds -0,019 je Block
+  (z -0,79) (`PREREG_v33_window.md` par.6e).
+* **E1 dazwischen:** 415:385, z +1,04, und 39,4 % billiger je Partie (`PREREG_evaluator_pretests.md`
+  par.8d) -> **v34-Erzeugung mit E1** (Nutzer 2026-10-01).
+* **R5: das Netz spielt Runde 5 besser als der Loeser**, 495:305 = 61,9 %, z +10,17, Sicht-Audit ohne
+  Leck (`PREREG_r5_net_vs_solver.md` par.6a). Seed 20261671 unter Nebenlast-Verdacht (Bloecke ab
+  Nr. 15 langsamer, Agenten-Aktivitaet), Verdikt traegt auf Seed 1 allein (z +6,49). Der Loeser ist
+  eine Tiefensuche ohne Vertiefung; **Stufe 2a (iterativer Loeser gegen das Netz) im Bau** (Agent,
+  Quelltext, par.5a). **v34-Erzeugung spielt Runde 5 per Netz** (Nutzer 2026-10-01, Seed 2 wird nicht wiederholt); offen: Champion-Spec,
+  R5-Kalibrierung (Wiedervorlage `docs/promotion_checklist.md`), Label 4->5.
+* **Uncommitted im Baum:** KL-Abzweig-Knopf (Rust, ungebaut), v34-Fenster-Prereg
+  (`PREREG_v34_window.md`, Entscheide bis auf E1/R5 gefallen), Rezept `models/v34.recipe.json`
+  (Generator v33-b01), Registrierungen. Naechster Schritt: Python-Nachzuege, Wheel-Runde mit
+  Anker-Invarianz, Generationswechsel, Start der v34-Erzeugung.
+
 **STAND 2026-09-26 -- v33-Erzeugung fertig, Pflichtpruefungen und Vortests stehen an; die Kette wartet auf
 Nutzer-Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich in
 `../archive/history.md`, dazu der Generationsbericht v32.
@@ -75,7 +92,8 @@ wir v34 noch fahren und uns dann ueberlegen welche alternativen Ansaetze es gibt
 Tor 1 v33 nur auf der Kante (52,50 %), Fensterarme b02/b03/b04 ohne Unterschied (Menge und Alter des
 Value-Materials kein Hebel), Suche seit v28 bei 400 Sims gesaettigt. **v34 ist die letzte Generation
 dieser Architektur**; sie nimmt das Paket mit (Spiegelknopf, E1/R5 nach ihren A/B, E2- und E4-Arm,
-gezieltes Abzweigen nach der Policy-Diskrepanz `PREREG_targeted_branching.md` par.7). Danach:
+gezieltes Abzweigen nach der Policy-Diskrepanz `PREREG_targeted_branching.md` par.7, Wirkung auf den
+Kopf per Offline-Pruefung nach dem Training, par.7a; deren v33-Kontrolle darf vorher laufen). Danach:
 alternative Ansaetze pruefen, bevor eine v35 geplant wird.
 
 ### FAHRPLAN (eingetaktet 2026-09-25, Nutzer: *"Registrieren das so vor und takte es ein"*)
@@ -126,7 +144,17 @@ alternative Ansaetze pruefen, bevor eine v35 geplant wird.
     `/api/debug/replay_log`); ein Fix braucht einen Schalter nur fuer den Replayer. **GESCHLOSSEN, wird
     nicht umgesetzt** (Nutzer 2026-09-27: *"Dann weg mit dem schalter"*): kein legaler Pfad
     erzeugt die Teilformen, Training und Messungen sind unberuehrt; einziger Nutzen waere Haertung der
-    lokalen API gegen handgeschickte Zuege. v34-Fenster: Entscheid nach dem b02-Tor 1 (Nutzer).
+    lokalen API gegen handgeschickte Zuege.
+3f. **v34-Fenster ENTSCHIEDEN 2026-09-27 (Nutzer, *"Ok, dann Takte es so ein"*): Zuschnitt wie b04**
+    (`PREREG_v33_window.md` par.6d): die ganze v34-Erzeugung plus aus aelteren Generationen NUR die
+    Policy-Traeger des Traeger-Manifests; das policy-maskierte Altmaterial faellt weg. Grund: vier
+    Fensterarme ununterscheidbar, b04 das kleinste Fenster (1.381 statt 2.947 Dateien), das
+    v34-Paket wird nicht durch Altmaterial ohne die neuen Knoepfe verduennt. Erzeugung mit E1
+    (`single_pass_other_val`), falls das E1-A/B nicht negativ ausgeht (Kostentor: -39,4 % je Partie);
+    die Ersparnis wird als Laufzeit genommen, nicht als mehr Partien. b02-Tor 1 (405:395) ohne
+    Promotion. Vor dem Start: KL-Abzweig-Knopf bauen (`PREREG_targeted_branching.md` par.7),
+    Wheel-Runde samt Anker-Invarianz, v33-Kontrolle der Offline-Pruefung (par.7a),
+    Generationswechsel (`/mosaic-generation-turnover`), v34-Fenster-Prereg mit Rezept.
     **Review #17 aendert legale Eingaben gewollt:** `json_to_state` liest `first_player_next_round`,
     betrifft Diagnose-/Seeding-Pfade (Merkmal P.15), nicht die Trainingsmerkmale aus Records.
     **Folgen fuer Tools** (beim Nachzug pruefen): `gui_node_gate_smoke.py` spielt jetzt ganz Runde 5,
