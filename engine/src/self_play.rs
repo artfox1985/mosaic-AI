@@ -3233,6 +3233,184 @@ fn excursion_gate(game_seed: u64) -> bool {
     rng.random::<f64>() < prob
 }
 
+// ── Weg B: Abzweig nach der Policy-Diskrepanz (PREREG_targeted_branching.md par.7) ──
+//
+// Nutzer 2026-09-27 ("Mach die policy Diskrepanz", "Ja aendere das"): das
+// Reservoir-Gewicht der Abzweigstelle wird bei `MOSAIC_EXCURSION_KL_WEIGHT=1`
+// Rundenprofil x `KL(Ziel || Prior)` statt Rundenprofil x Aktionszahl. Die
+// Aktionszahl FAELLT dann weg (par.7: beides zu multiplizieren bevorzugte
+// Stellen mit vielen Zuegen doppelt). Vortest: par.6a, Policy-Diskrepanz
+// A +0,0292.
+//
+// Definition wie im Vortest-Werkzeug `tools/probes/targeted_branching_pretest.py`
+// (dort `flush_buf`): Ziel = completed-Q-Politik des Records, nach Aktions-ID
+// zusammengefasst und normiert; Prior = Softmax der Netz-Logits auf denselben
+// IDs; `KL = sum_{t>0} t * (ln max(t, 1e-12) - ln max(p, 1e-12))`. Beide
+// Groessen liegen in der Suche ohnehin vor (`net_mcts::
+// net_root_child_stats_policy_and_prior`), keine zweite Netzauswertung.
+//
+// KEINE neue Zufallsstelle: das Gewicht aendert nur, WELCHE Stelle das
+// bestehende Reservoir zieht (derselbe Strom `EXCURSION_SEED_DISTINGUISHER`,
+// Zaehler `move_number`); `docs/architecture_reference.md` bleibt unberuehrt.
+//
+// DEFAULT AUS = BYTE-IDENTISCH: `excursion_branch_weight` rechnet bei Knopf 0
+// exakt den Bestandsausdruck `profile_weight(..) * actions.len() as f64`, die
+// Diskrepanz wird gar nicht berechnet (`net_drafting_policy_with_fallback_flag`),
+// und `branch_kl` bleibt `None` (kein Record-Feld).
+
+/// Ausflug-Abzweigstelle samt der Policy-Diskrepanz an ihr. Inhalt der
+/// Reservoir-Zelle (`GameLoopConfig::excursion_branch`).
+struct ExcursionBranch {
+    /// "Stellung A": der Zustand VOR der Wahl an der Abzweigstelle.
+    state: GameState,
+    /// `KL(Ziel || Prior)` an der Abzweigstelle der HAUPTPARTIE -- genau der
+    /// Wert, mit dem das Reservoir gewichtet hat. `Some` nur bei
+    /// `MOSAIC_EXCURSION_KL_WEIGHT=1`; landet als Record-Feld `branch_kl` am
+    /// ersten Record des Ausflugs ([`stamp_branch_kl`]).
+    branch_kl: Option<f64>,
+}
+
+/// Gueltigkeitspruefung von `MOSAIC_EXCURSION_KL_WEIGHT`: `0` -> aus, `1` ->
+/// an, alles andere ungueltig (`None`). Kein Mischfaktor: par.7 registriert
+/// genau die zwei Gewichte "Profil x Aktionszahl" und "Profil x KL".
+fn sanitize_excursion_kl_weight(raw: f64) -> Option<bool> {
+    if raw == 0.0 {
+        Some(false)
+    } else if raw == 1.0 {
+        Some(true)
+    } else {
+        None
+    }
+}
+
+/// `MOSAIC_EXCURSION_KL_WEIGHT` (PREREG_targeted_branching.md par.7): `1` =
+/// Abzweig-Gewicht Rundenprofil x Policy-Diskrepanz, `0`/ungesetzt = Bestand
+/// (Rundenprofil x Aktionszahl). Ungueltig (nicht parsbar oder weder 0 noch
+/// 1) -> AUS mit EINMALIGER Warnung. Prozessweit gecacht (OnceLock), Variable
+/// VOR dem ersten Lesen setzen.
+pub(crate) fn excursion_kl_weight_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let Ok(raw) = std::env::var("MOSAIC_EXCURSION_KL_WEIGHT") else {
+            return false;
+        };
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return false;
+        }
+        match trimmed.parse::<f64>().ok().and_then(sanitize_excursion_kl_weight) {
+            Some(on) => on,
+            None => {
+                eprintln!(
+                    "⚠️  MOSAIC_EXCURSION_KL_WEIGHT={raw:?} ignoriert -- erwartet 0 oder 1; \
+                     Abzweig-Gewicht bleibt Rundenprofil x Aktionszahl."
+                );
+                false
+            }
+        }
+    })
+}
+
+/// Epsilon gegen `ln(0)` -- derselbe Wert wie `np.clip(.., 1e-12, None)` im
+/// Vortest-Werkzeug.
+const POLICY_KL_EPS: f64 = 1e-12;
+
+/// `KL(Ziel || Prior)` ueber bereits nach Aktions-ID zusammengefasste Paare
+/// `(Ziel-Masse, Prior-Masse)`. Beide Seiten werden hier auf Summe 1
+/// normiert (wie `t = t / t.sum()` und die Softmax im Werkzeug). `None` bei
+/// weniger als zwei IDs (das Werkzeug laesst solche Zustaende aus), bei
+/// nicht positiver Summe einer Seite oder nicht endlichem Ergebnis. Das
+/// Ergebnis ist auf `>= 0` geklemmt (mathematisch ist KL >= 0; nur das
+/// Epsilon-Klemmen und Rundung koennten es minimal darunter druecken).
+fn policy_kl_from_grouped(pairs: &[(f64, f64)]) -> Option<f64> {
+    if pairs.len() < 2 {
+        return None;
+    }
+    let target_sum: f64 = pairs.iter().map(|&(t, _)| t).sum();
+    let prior_sum: f64 = pairs.iter().map(|&(_, p)| p).sum();
+    if !(target_sum > 0.0) || !(prior_sum > 0.0) {
+        return None;
+    }
+    let mut kl = 0.0f64;
+    for &(t_raw, p_raw) in pairs {
+        let t = t_raw / target_sum;
+        if t > 0.0 {
+            let p = p_raw / prior_sum;
+            kl += t * (t.max(POLICY_KL_EPS).ln() - p.max(POLICY_KL_EPS).ln());
+        }
+    }
+    kl.is_finite().then_some(kl.max(0.0))
+}
+
+/// Policy-Diskrepanz an der Wurzel einer Suche: `policy` (completed-Q-Ziel)
+/// und `prior` sind 1:1 per Index gepaart (`net_mcts::
+/// net_root_child_stats_policy_and_prior`, beide ueber `children ∪ untried`).
+/// Fasst beide nach Aktions-ID zusammen ([`action_to_id_direct`], dieselbe ID
+/// wie `features::action_to_id` im Werkzeug -- Mondstein-Varianten teilen
+/// eine ID) und rechnet [`policy_kl_from_grouped`]. `None`, wenn die Paarung
+/// nicht passt (Laenge oder Aktion je Index) -- dann lieber kein Gewicht als
+/// ein falsch gepaartes.
+fn policy_kl_by_id(state: &GameState, policy: &[(Action, f64)], prior: &[(Action, f64)]) -> Option<f64> {
+    if policy.is_empty() || policy.len() != prior.len() {
+        return None;
+    }
+    // BTreeMap: feste Summationsreihenfolge je ID, das Ergebnis ist damit
+    // unabhaengig von der Kandidatenreihenfolge im Baum reproduzierbar.
+    let mut by_id: std::collections::BTreeMap<usize, (f64, f64)> = std::collections::BTreeMap::new();
+    for ((a_t, t), (a_p, p)) in policy.iter().zip(prior.iter()) {
+        if a_t != a_p {
+            return None;
+        }
+        let entry = by_id.entry(action_to_id_direct(state, a_t)).or_insert((0.0, 0.0));
+        entry.0 += *t;
+        entry.1 += *p;
+    }
+    let pairs: Vec<(f64, f64)> = by_id.into_values().collect();
+    policy_kl_from_grouped(&pairs)
+}
+
+/// Reservoir-Gewicht EINES Halbzugs fuer die Ausflug-Abzweigstelle.
+/// `kl_mode == false` (Default): EXAKT der Bestandsausdruck
+/// `profile_weight(profile, round) * n_actions as f64` -- gleiche Operanden,
+/// gleiche Reihenfolge, bitgleiches Ergebnis. `kl_mode == true`:
+/// `profile_weight(profile, round) * kl`; ohne gueltige Diskrepanz (keine
+/// echte Suche: eine legale Aktion, Rueckfall, Runde-5-Loeser) oder bei
+/// `kl <= 0` Gewicht `0.0` -- `reservoir_step` zieht dann keine Zufallszahl,
+/// dieselbe strukturelle Sperre wie Runde 5 im Default-Profil.
+fn excursion_branch_weight(
+    profile: &[f64; 5],
+    round: u32,
+    n_actions: usize,
+    kl_mode: bool,
+    policy_kl: Option<f64>,
+) -> f64 {
+    if !kl_mode {
+        return crate::envelope::profile_weight(profile, round) * n_actions as f64;
+    }
+    match policy_kl {
+        Some(kl) if kl.is_finite() && kl > 0.0 => crate::envelope::profile_weight(profile, round) * kl,
+        _ => 0.0,
+    }
+}
+
+/// Record-Feld `branch_kl` (Muster `fallback_random_action_field`): `Some`
+/// nur bei gesetzter Diskrepanz, sonst `None` = kein Feld.
+fn branch_kl_field(branch_kl: Option<f64>) -> Option<Value> {
+    branch_kl.map(|kl| json!(kl))
+}
+
+/// Setzt `branch_kl` auf den ABZWEIG-Record des Ausflugs: den ersten Record
+/// seiner Partie. Der Ausflug startet in der geklonten Drafting-Stellung
+/// (`start_state`, Startsetzung erledigt), sein erster Record ist also der
+/// Halbzug-1-Record an genau dieser Stellung. Bei `None` (Knopf aus) kein
+/// Zugriff, die Records bleiben byte-identisch.
+fn stamp_branch_kl(steps: &mut [Value], branch_kl: Option<f64>) {
+    let Some(v) = branch_kl_field(branch_kl) else { return };
+    if let Some(Value::Object(m)) = steps.first_mut() {
+        m.insert("branch_kl".into(), v);
+    }
+}
+
 // ── #14: der Ausflug erbt die verdeckte Welt nicht mehr ──────────────────────
 //
 // ANLASS (`evaluations/review/code_review_2026-09-26_verification.md` #14,
@@ -3402,6 +3580,14 @@ struct DraftingDecision {
     /// `fallback_random_action: true` geschrieben -- NUR in diesem Fall, sonst
     /// fehlt das Feld (byte-identisch zum Bestand).
     fallback_random_action: bool,
+    /// PREREG_targeted_branching.md par.7: Policy-Diskrepanz
+    /// `KL(completed-Q-Ziel || Prior)` an der Wurzel der Suche dieses
+    /// Entscheids. `Some` NUR bei `MOSAIC_EXCURSION_KL_WEIGHT=1` UND echter
+    /// Netzsuche (`NetSelfPlayAgent`, mehr als eine legale Aktion, kein
+    /// Vorzug, kein Rueckfall); sonst `None`. Wird NICHT in den Record
+    /// geschrieben -- nur das Abzweig-Gewicht liest es (und der Abzweig-Record
+    /// des Ausflugs traegt es als `branch_kl`).
+    policy_kl: Option<f64>,
 }
 
 impl DraftingDecision {
@@ -3415,6 +3601,7 @@ impl DraftingDecision {
             policy_target_valid: None,
             vorzug: None,
             fallback_random_action: false,
+            policy_kl: None,
         }
     }
 }
@@ -3703,13 +3890,15 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             _ => self.base_sims,
         };
         let vorzug_kandidat = if self.vorzug { builder_drafting_preference(state) } else { None };
-        let (chosen, policy, root_q, root_child_q, fallback) = if actions.len() == 1 {
+        // Sechster Wert (PREREG_targeted_branching.md par.7): Policy-Diskrepanz,
+        // nur aus einer echten Suche und nur bei aktivem Knopf `Some`.
+        let (chosen, policy, root_q, root_child_q, fallback, policy_kl) = if actions.len() == 1 {
             let a = actions[0].clone();
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new(), false)
+            (a, vec![e], None, Vec::new(), false, None)
         } else if let Some(a) = vorzug_kandidat.clone() {
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new(), false)
+            (a, vec![e], None, Vec::new(), false, None)
         } else {
             // Task #80/#81: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
             // tatsaechlich gespielten Zuege; `timed()` ist ohne
@@ -3735,6 +3924,7 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             policy_target_valid: if fallback { Some(false) } else { pcr_is_full },
             vorzug: vorzug_kandidat,
             fallback_random_action: fallback,
+            policy_kl,
         }
     }
 }
@@ -4033,8 +4223,10 @@ struct GameLoopConfig<'a> {
     /// setzen `None` und lesen die `MOSAIC_EXCURSION_*`-Knoepfe damit gar
     /// nicht erst. Auch im Self-Play ist der Default
     /// (`MOSAIC_EXCURSION_PROB=0`) byte-identisch zum Bestand, siehe
-    /// [`excursion_gate`].
-    excursion_branch: Option<&'a std::cell::Cell<Option<GameState>>>,
+    /// [`excursion_gate`]. Seit PREREG_targeted_branching.md par.7 traegt die
+    /// Zelle neben der Stellung die Policy-Diskrepanz der Abzweigstelle
+    /// ([`ExcursionBranch`]).
+    excursion_branch: Option<&'a std::cell::Cell<Option<ExcursionBranch>>>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -4143,6 +4335,9 @@ fn unified_game_loop<R: Rng + ?Sized>(
     // oben.
     let excursion_active: bool = cfg.excursion_branch.is_some() && excursion_gate(cfg.game_seed);
     let excursion_profile: [f64; 5] = excursion_profile_env();
+    // PREREG_targeted_branching.md par.7: Abzweig-Gewicht nach der
+    // Policy-Diskrepanz statt nach der Aktionszahl (Default aus = Bestand).
+    let excursion_kl_mode: bool = excursion_kl_weight_enabled();
     // Laufende Gewichtsumme des gewichteten Reservoir-Samplings (Reservoir-
     // Groesse 1): `S += w_i`, mit Wahrscheinlichkeit `w_i / S` ersetzt der
     // aktuelle Halbzug den bisherigen Kandidaten (siehe Modulkommentar vor
@@ -4426,12 +4621,23 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // eine alternative Fortsetzung ab hier waere kein
                     // sinnvoller Ausflug. Klont "Stellung A" -- den Zustand
                     // VOR dieser Wahl, also VOR dem Apply unten.
+                    //
+                    // PREREG_targeted_branching.md par.7: bei
+                    // `MOSAIC_EXCURSION_KL_WEIGHT=1` ersetzt die Policy-
+                    // Diskrepanz `d.policy_kl` die Aktionszahl
+                    // ([`excursion_branch_weight`]); ohne Diskrepanz (keine
+                    // echte Suche) ist das Gewicht 0 -- dieselbe strukturelle
+                    // Sperre wie Runde 5, keine Zufallszahl. Bei Knopf 0 rechnet
+                    // `excursion_branch_weight` exakt den Bestandsausdruck.
                     if let Some(cell) = cfg.excursion_branch {
                         if excursion_active && d.vorzug.is_none() {
-                            let w = crate::envelope::profile_weight(
+                            let w = excursion_branch_weight(
                                 &excursion_profile,
                                 game.state.round_number,
-                            ) * actions.len() as f64;
+                                actions.len(),
+                                excursion_kl_mode,
+                                d.policy_kl,
+                            );
                             // `w <= 0.0` (z.B. Runde 5 im Default-Profil):
                             // `reservoir_step` selbst waere hier bereits ein
                             // No-Op (struktureller Fruehausstieg, siehe dessen
@@ -4447,7 +4653,14 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                     reservoir_step(reservoir_weight_sum, w, &mut reservoir_rng);
                                 reservoir_weight_sum = new_sum;
                                 if accept {
-                                    cell.set(Some(game.state.clone()));
+                                    // `branch_kl` ist bei Knopf 0 immer `None`
+                                    // (`d.policy_kl` wird dann gar nicht
+                                    // berechnet), der Abzweig-Record bleibt
+                                    // byte-identisch.
+                                    cell.set(Some(ExcursionBranch {
+                                        state: game.state.clone(),
+                                        branch_kl: if excursion_kl_mode { d.policy_kl } else { None },
+                                    }));
                                 }
                             }
                         }
@@ -6043,7 +6256,7 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
     tau_argmax_override: Option<usize>,
     search_config: &crate::net_mcts::SearchConfig,
 ) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
-    let (chosen, policy, root_q, child_q, _fallback) = net_drafting_policy_with_fallback_flag(
+    let (chosen, policy, root_q, child_q, _fallback, _policy_kl) = net_drafting_policy_with_fallback_flag(
         net, state, actions, base_sims, c_puct, rng, add_root_noise, deterministic, move_number,
         tau_argmax_override, search_config,
     );
@@ -6054,7 +6267,15 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
 /// genau dann, wenn der Zufalls-Rueckfall gegriffen hat (leere/nutzlose
 /// Suchstatistik, Zug = zufaellige legale Aktion, Policy-Ziel = Eins darauf).
 /// Einziger Aufrufer mit Record ist `NetSelfPlayAgent::decide`.
-#[allow(clippy::too_many_arguments)]
+///
+/// SECHSTER Rueckgabewert (PREREG_targeted_branching.md par.7): die
+/// Policy-Diskrepanz `KL(completed-Q-Ziel || Prior)` an der Wurzel dieser
+/// Suche ([`policy_kl_by_id`]). NUR berechnet, wenn
+/// `MOSAIC_EXCURSION_KL_WEIGHT=1` ([`excursion_kl_weight_enabled`]), sonst
+/// `None` -- reine Arithmetik auf Werten, die die Suche ohnehin liefert (kein
+/// Netzaufruf, kein RNG-Zug), Zugwahl und Policy-Ziel bleiben unberuehrt.
+/// `None` auch im Rueckfall-Zweig (keine brauchbare Suche).
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -6073,11 +6294,15 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     // dieselbe globale Env-Var-Abfrage wie vor diesem Parameter.
     tau_argmax_override: Option<usize>,
     search_config: &crate::net_mcts::SearchConfig,
-) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool) {
+) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool, Option<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
-    let (stats, completed_q_policy, root_q, root_child_q) = crate::net_mcts::net_root_child_stats_and_policy(
-        net, state, sims, c_puct, add_root_noise, rng, search_config,
-    );
+    // PREREG_targeted_branching.md par.7: dieselbe Suche wie ueber
+    // `net_root_child_stats_and_policy` (dessen Rumpf das IST), zusaetzlich die
+    // Wurzel-Priors als fuenfter Wert -- reines Auslesen, kein RNG-Zug.
+    let (stats, completed_q_policy, root_q, root_child_q, root_prior) =
+        crate::net_mcts::net_root_child_stats_policy_and_prior(
+            net, state, sims, c_puct, add_root_noise, rng, search_config,
+        );
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         // BUGFIX (2026-08-02): dieser Fallback (leere/nutzlose `stats` -- der
@@ -6122,6 +6347,8 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
             root_q,
             Vec::new(),
             true,
+            // par.7: keine brauchbare Suche -> keine Diskrepanz (Gewicht 0).
+            None,
         );
     }
     // Task #35: `root_child_q` MUSS exakt dieselbe Reihenfolge/Länge wie
@@ -6227,7 +6454,15 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
         search_config,
     )
     .unwrap_or_else(|| stats[idx].0.clone());
-    (chosen, policy, root_q, child_q, false)
+    // PREREG_targeted_branching.md par.7: Policy-Diskrepanz nur bei aktivem
+    // Knopf. Bei Knopf 0 wird nichts berechnet (der Getter ist ein
+    // OnceLock-Lesezugriff) -- byte-identischer Bestand.
+    let policy_kl = if excursion_kl_weight_enabled() {
+        policy_kl_by_id(state, &completed_q_policy, &root_prior)
+    } else {
+        None
+    };
+    (chosen, policy, root_q, child_q, false, policy_kl)
 }
 
 /// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive
@@ -6455,7 +6690,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // auseinanderlaufen koennen. `false` fuer die Hauptpartie und alle
     // uebrigen Aufrufer = byte-identisches Bestandsverhalten.
     excursion_run: bool,
-) -> (Vec<Value>, Option<GameState>, bool) {
+) -> (Vec<Value>, Option<ExcursionBranch>, bool) {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
     // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
@@ -6546,7 +6781,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // Ausflug, die eigentliche Abschaltung (Default AUS) passiert INNEN
     // (`excursion_gate`s Fruehausstieg bei `MOSAIC_EXCURSION_PROB<=0`), nicht
     // hier ueber einen Bool-Parameter.
-    let excursion_cell: std::cell::Cell<Option<GameState>> = std::cell::Cell::new(None);
+    let excursion_cell: std::cell::Cell<Option<ExcursionBranch>> = std::cell::Cell::new(None);
     // Weg B (Umbau 2026-09-07): nur fuer den Ausflug-Aufruf selbst -- er meldet
     // hierher zurueck, ob seine erzwungene Abweichung wirklich zustande kam.
     let excursion_deviated: std::cell::Cell<bool> = std::cell::Cell::new(false);
@@ -6894,7 +7129,7 @@ pub fn run_net_self_play(
         // Fenster-Manifest zaehlt -- deshalb hier bewusst NICHT in
         // `games_counter` gezaehlt (der die Ziel-Partiezahl `n_games`
         // trackt), nur additiv in den flachen Record-Strom gefaltet.
-        if let Some(mut branch_state) = excursion_branch {
+        if let Some(ExcursionBranch { state: mut branch_state, branch_kl }) = excursion_branch {
             // Eigener, aus `partie_seed` abgeleiteter Ausflug-Seed
             // (Determinismus-Vorgabe) -- unabhaengig vom Hauptpartie-Strom,
             // reservierter Zaehler (siehe `EXCURSION_GAME_SEED_COUNTER`-Doku).
@@ -6962,6 +7197,10 @@ pub fn run_net_self_play(
                     );
                     // Spiegelknopf: dasselbe Record-Feld wie die Hauptpartie.
                     let mut ex_steps = ex_steps;
+                    // PREREG_targeted_branching.md par.7: `branch_kl` am
+                    // Abzweig-Record (erster Record des Ausflugs), NUR bei
+                    // aktivem KL-Knopf (`branch_kl` sonst `None`, kein Feld).
+                    stamp_branch_kl(&mut ex_steps, branch_kl);
                     crate::tie_mirror::stamp_tie_mirrored(&mut ex_steps, tie_p, tie_mirrored);
                     append_game_progress(&progress_file, &ex_steps);
                     steps.extend(ex_steps);
@@ -11021,6 +11260,155 @@ pub(crate) mod tests {
                 "Seed {seed}: ein Gewicht-0-Kandidat darf die Gewichtsumme nicht veraendern"
             );
         }
+    }
+
+    // ── PREREG_targeted_branching.md par.7: Abzweig nach der Policy-Diskrepanz ──
+
+    /// (a) Knopf aus: `excursion_branch_weight` liefert BITGLEICH den
+    /// Bestandsausdruck `profile_weight(..) * actions.len() as f64`, egal was
+    /// als Diskrepanz hereinkommt -- die Default-Byte-Identitaet des Reservoirs
+    /// haengt genau daran. Dazu: ungesetzt ist der Knopf aus, und nur 0/1 sind
+    /// gueltige Werte.
+    #[test]
+    fn excursion_kl_weight_off_reproduces_the_legacy_weight_bit_for_bit() {
+        assert!(
+            !excursion_kl_weight_enabled(),
+            "MOSAIC_EXCURSION_KL_WEIGHT muss ungesetzt AUS sein"
+        );
+        assert_eq!(sanitize_excursion_kl_weight(0.0), Some(false));
+        assert_eq!(sanitize_excursion_kl_weight(1.0), Some(true));
+        assert_eq!(sanitize_excursion_kl_weight(0.5), None);
+        assert_eq!(sanitize_excursion_kl_weight(2.0), None);
+        assert_eq!(sanitize_excursion_kl_weight(f64::NAN), None);
+
+        let profiles = [crate::envelope::ENVELOPE_PROFILE_DEFAULT, [0.3, 1.7, 0.05, 2.5, 0.9]];
+        for profile in &profiles {
+            for round in 1..=5u32 {
+                for n_actions in [1usize, 2, 7, 38, 113] {
+                    let legacy = crate::envelope::profile_weight(profile, round) * n_actions as f64;
+                    for kl in [None, Some(0.0), Some(0.37), Some(f64::NAN)] {
+                        let w = excursion_branch_weight(profile, round, n_actions, false, kl);
+                        assert_eq!(
+                            w.to_bits(),
+                            legacy.to_bits(),
+                            "Knopf aus: Gewicht muss bitgleich zum Bestand sein \
+                             (Runde {round}, n={n_actions}, kl={kl:?})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// (b) KL-Funktion: identische Verteilungen -> 0; Handwert
+    /// `KL([0,5; 0,5] || [0,25; 0,75]) = 0,5*ln 2 + 0,5*ln(2/3) = 0,5*ln(4/3)`;
+    /// unnormierte Eingaben werden normiert; weniger als zwei IDs -> `None`
+    /// (wie das Vortest-Werkzeug); Nullmasse im Ziel traegt nichts bei, Null im
+    /// Prior wird per Epsilon abgefangen (endlich, >= 0).
+    #[test]
+    fn policy_kl_is_zero_for_identical_and_matches_a_hand_value() {
+        let same = [(0.2, 0.2), (0.5, 0.5), (0.3, 0.3)];
+        let kl_same = policy_kl_from_grouped(&same).expect("drei IDs -> Some");
+        assert!(kl_same.abs() < 1e-15, "identische Verteilungen muessen KL 0 haben, ist {kl_same}");
+
+        let hand = 0.5 * (4.0f64 / 3.0).ln();
+        let kl = policy_kl_from_grouped(&[(0.5, 0.25), (0.5, 0.75)]).expect("zwei IDs -> Some");
+        assert!((kl - hand).abs() < 1e-12, "Handwert {hand}, gerechnet {kl}");
+        // Normierung: dieselben Verhaeltnisse unnormiert.
+        let kl_scaled = policy_kl_from_grouped(&[(3.0, 1.0), (3.0, 3.0)]).unwrap();
+        assert!((kl_scaled - hand).abs() < 1e-12, "unnormiert {kl_scaled} statt {hand}");
+
+        assert_eq!(policy_kl_from_grouped(&[(1.0, 1.0)]), None, "eine ID -> None");
+        assert_eq!(policy_kl_from_grouped(&[]), None);
+        assert_eq!(policy_kl_from_grouped(&[(0.0, 0.5), (0.0, 0.5)]), None, "Zielsumme 0 -> None");
+
+        // Ziel-Masse 0 traegt nichts bei: KL([1;0] || [0,5;0,5]) = ln 2.
+        let kl_zero_t = policy_kl_from_grouped(&[(1.0, 0.5), (0.0, 0.5)]).unwrap();
+        assert!((kl_zero_t - 2.0f64.ln()).abs() < 1e-12);
+        // Prior 0 bei positivem Ziel: Epsilon statt ln(0) -> endlich und gross.
+        let kl_zero_p = policy_kl_from_grouped(&[(0.5, 1.0), (0.5, 0.0)]).unwrap();
+        assert!(kl_zero_p.is_finite() && kl_zero_p > 10.0, "Epsilon-Fall: {kl_zero_p}");
+    }
+
+    /// (b, Fortsetzung) Zusammenfassen nach Aktions-ID an einem echten Zustand:
+    /// Ziel und Prior proportional zueinander -> KL 0; Paarung, die nicht
+    /// passt (Laenge oder Aktion je Index), -> `None`.
+    #[test]
+    fn policy_kl_by_id_groups_by_action_id_and_rejects_mismatched_pairs() {
+        let mut rng = StdRng::seed_from_u64(20260927);
+        let mut state = crate::state::setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let actions = drafting_actions(&state);
+        let n_ids: std::collections::BTreeSet<usize> =
+            actions.iter().map(|a| action_to_id_direct(&state, a)).collect();
+        assert!(n_ids.len() >= 2, "Startzustand braucht >= 2 Aktions-IDs fuer diesen Test");
+
+        let policy: Vec<(Action, f64)> = actions.iter().map(|a| (a.clone(), 1.0)).collect();
+        let prior: Vec<(Action, f64)> = actions.iter().map(|a| (a.clone(), 0.25)).collect();
+        let kl = policy_kl_by_id(&state, &policy, &prior).expect("gepaart -> Some");
+        assert!(kl.abs() < 1e-12, "proportionale Verteilungen je ID -> KL 0, ist {kl}");
+
+        assert_eq!(policy_kl_by_id(&state, &policy, &prior[1..]), None, "Laenge weicht ab");
+        let mut swapped = prior.clone();
+        swapped.swap(0, 1);
+        if swapped[0].0 != prior[0].0 {
+            assert_eq!(policy_kl_by_id(&state, &policy, &swapped), None, "Aktion je Index weicht ab");
+        }
+        assert_eq!(policy_kl_by_id(&state, &[], &[]), None);
+    }
+
+    /// (c) Knopf an: Gewicht = Rundenprofil * KL, also proportional zu KL und
+    /// unabhaengig von der Aktionszahl; Runde 5 bleibt im Default-Profil
+    /// Gewicht 0 (und wird damit nie gezogen, siehe
+    /// `round_profile_excludes_round5_from_the_reservoir`); ohne Diskrepanz
+    /// oder bei KL <= 0 / nicht endlich Gewicht 0.
+    #[test]
+    fn excursion_kl_weight_on_is_profile_times_kl() {
+        let profile = crate::envelope::ENVELOPE_PROFILE_DEFAULT;
+        for round in 1..=4u32 {
+            let p = crate::envelope::profile_weight(&profile, round);
+            assert!(p > 0.0, "Default-Profil Runde {round} muss > 0 sein");
+            let w1 = excursion_branch_weight(&profile, round, 10, true, Some(0.2));
+            let w2 = excursion_branch_weight(&profile, round, 10, true, Some(0.4));
+            assert!((w1 - p * 0.2).abs() < 1e-15, "Runde {round}: {w1} statt {}", p * 0.2);
+            assert!((w2 / w1 - 2.0).abs() < 1e-12, "Runde {round}: nicht proportional zu KL");
+            // Aktionszahl faellt weg.
+            let w_many = excursion_branch_weight(&profile, round, 90, true, Some(0.2));
+            assert_eq!(w_many.to_bits(), w1.to_bits(), "Runde {round}: Aktionszahl darf nicht wirken");
+            for bad in [None, Some(0.0), Some(-0.1), Some(f64::NAN), Some(f64::INFINITY)] {
+                assert_eq!(
+                    excursion_branch_weight(&profile, round, 10, true, bad),
+                    0.0,
+                    "Runde {round}: ungueltige Diskrepanz {bad:?} muss Gewicht 0 geben"
+                );
+            }
+        }
+        assert_eq!(
+            excursion_branch_weight(&profile, 5, 10, true, Some(3.0)),
+            0.0,
+            "Runde 5 muss auch mit Knopf 1 Gewicht 0 haben"
+        );
+    }
+
+    /// Record-Feld `branch_kl`: nur bei `Some`, nur am ersten Record; bei
+    /// `None` bleiben die Records byte-gleich.
+    #[test]
+    fn branch_kl_is_stamped_only_on_the_first_record_and_only_when_set() {
+        let before = vec![json!({"a": 1}), json!({"b": 2})];
+        let mut off = before.clone();
+        stamp_branch_kl(&mut off, None);
+        assert_eq!(off, before, "None muss die Records byte-gleich lassen");
+
+        let mut on = before.clone();
+        stamp_branch_kl(&mut on, Some(0.125));
+        assert_eq!(on[0].get("branch_kl"), Some(&json!(0.125)));
+        assert!(on[1].get("branch_kl").is_none(), "nur der Abzweig-Record traegt das Feld");
+
+        let mut empty: Vec<Value> = Vec::new();
+        stamp_branch_kl(&mut empty, Some(1.0));
+        assert!(empty.is_empty());
     }
 
     /// Auftrags-Test (5): der Ausflug weicht an seinem ERSTEN Halbzug ab und

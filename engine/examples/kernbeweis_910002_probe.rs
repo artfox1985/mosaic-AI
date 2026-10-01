@@ -135,6 +135,11 @@ fn main() {
         // Bestand, aus demselben Grund wie die Knoepfe darueber.
         single_pass_other_val: mosaic_rust::net_mcts::SINGLE_PASS_OTHER_VAL_DEFAULT,
         r5_net_solver: mosaic_rust::round5::NET_SOLVER_DEFAULT,
+        // Loeser-Bauform und -Budget (PREREG_r5_net_vs_solver.md par.5a): Bestand.
+        // Das Budget ueber den Env-Getter, weil der Loeser es bis 2026-09-26 dort
+        // las -- so bleibt die Sonde auch mit gesetztem MOSAIC_R5_NODE_BUDGET gleich.
+        r5_solver_iterative: mosaic_rust::round5::SOLVER_ITERATIVE_DEFAULT,
+        r5_solver_node_budget: mosaic_rust::round5::node_budget(),
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

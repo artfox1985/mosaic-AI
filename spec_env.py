@@ -92,6 +92,9 @@ SPEC_TO_ENV = {
     # nimmt jeden Text ausser "0" als an). `r5_net_solver` hat umgekehrte Polung: Default 1.
     "single_pass_other_val": "MOSAIC_SINGLE_PASS_OTHER_VAL",
     "r5_net_solver": "MOSAIC_R5_NET_SOLVER",
+    # PREREG_r5_net_vs_solver.md par.5a: iterativer Loeser je Seite, OPTIONAL, 0 oder 1, Default 0.
+    # Die Env ist nur der Default des Seiten-Felds (round5.rs solver_iterative_env).
+    "r5_solver_iterative": "MOSAIC_R5_SOLVER_ITERATIVE",
 }
 
 # Felder aus `KNOWN_FIELDS`, die BEWUSST keinen Env-Knopf bekommen. Der Test
@@ -109,6 +112,10 @@ UNMAPPED_ON_PURPOSE = {
     "tau_argmax_from_move": "Stilmittel der Erzeugung, CLI-Flag",
     "deviate_prob": "Stilmittel der Erzeugung, CLI-Flag",
     "deviate_candidates": "Stilmittel der Erzeugung, CLI-Flag",
+    # Die naheliegende Variable MOSAIC_R5_NODE_BUDGET wirkt prozessweit (round5.rs node_budget):
+    # auch auf die Heuristik-Bahn und das Label 4->5. Eine Spec, die sie setzte, aenderte also
+    # mehr als ihre Seite; das Budget gilt darum NUR ueber das Spec-Feld.
+    "r5_solver_node_budget": "Seiten-Feld; MOSAIC_R5_NODE_BUDGET wirkt prozessweit (Labels, Heuristik)",
 }
 
 

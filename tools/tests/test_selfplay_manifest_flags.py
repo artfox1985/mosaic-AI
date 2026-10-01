@@ -49,6 +49,7 @@ WORKER_ENV = {
     "tie-mirror-p": "MOSAIC_TIE_MIRROR_P",
     "label-rng-split": "MOSAIC_LABEL_RNG_SPLIT",
     "excursion-reshuffle": "MOSAIC_EXCURSION_RESHUFFLE",
+    "excursion-kl-weight": "MOSAIC_EXCURSION_KL_WEIGHT",
 }
 
 

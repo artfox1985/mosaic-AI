@@ -855,6 +855,12 @@ fn engine_config_json() -> String {
         // Code-Review 2026-09-26 #14: Neumischung der verdeckten Welt am
         // Ausflug-Abzweig (Weg B). Gleiche Begruendung und OnceLock-Regel.
         "excursion_reshuffle": crate::self_play::excursion_reshuffle_enabled(),
+        // PREREG_targeted_branching.md par.7: Abzweig-Gewicht des Ausflugs
+        // (0 = Rundenprofil x Aktionszahl, Bestand; 1 = Rundenprofil x
+        // KL(Ziel || Prior)). Aendert, WELCHE Stellen der Ausflug-Korpus
+        // enthaelt, darum im Manifest; OnceLock-Regel wie oben. Als Zahl
+        // gemeldet, weil die Variable als Zahl gesetzt wird.
+        "excursion_kl_weight": u8::from(crate::self_play::excursion_kl_weight_enabled()),
         // PREREG_moon_stack_order.md par.4: Fan-out ueber die Reihenfolge der
         // Mondsteine nach einem Sonnenzug (1 = Bestand, 0 = nur die kanonische
         // Reihenfolge). Aus demselben Grund im Manifest wie `return_order_mode`
@@ -888,6 +894,12 @@ fn engine_config_json() -> String {
         "single_pass_other_val": crate::net_mcts::single_pass_other_val_env(),
         // R5-Schalter (PREREG_r5_net_vs_solver.md par.2): Env-Default der Seiten ohne Spec-Feld.
         "r5_net_solver": crate::round5::net_solver_enabled(),
+        // Loeser-Bauform und -Budget (PREREG_r5_net_vs_solver.md par.5a): ebenfalls
+        // Env-Defaults der Seiten ohne Spec-Feld. Das Budget stand bisher in keinem
+        // Manifest, obwohl `MOSAIC_R5_NODE_BUDGET` jede Runde-5-Entscheidung und das
+        // 4->5-Label aendert.
+        "r5_solver_iterative": crate::round5::solver_iterative_env(),
+        "r5_solver_node_budget": crate::round5::node_budget(),
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
         // Arm v29-b02). Gehoert ins Lauf-Manifest, weil er den EINGANG des Netzes

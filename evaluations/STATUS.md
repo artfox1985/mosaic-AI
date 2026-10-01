@@ -19,22 +19,67 @@ registriert, greppt nach seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**STAND 2026-10-01 -- Nachtkette des v33-Pakets FERTIG (2026-09-27 19:23), Ergebnisse registriert;
-nichts laeuft auf der Maschine.** Champion bleibt `v32-b01`.
-* **b02 Tor 1 verfehlt:** 405:395 = 50,6 %, z +0,37; gegen b01 auf denselben Seeds -0,019 je Block
-  (z -0,79) (`PREREG_v33_window.md` par.6e).
-* **E1 dazwischen:** 415:385, z +1,04, und 39,4 % billiger je Partie (`PREREG_evaluator_pretests.md`
-  par.8d) -> **v34-Erzeugung mit E1** (Nutzer 2026-10-01).
-* **R5: das Netz spielt Runde 5 besser als der Loeser**, 495:305 = 61,9 %, z +10,17, Sicht-Audit ohne
-  Leck (`PREREG_r5_net_vs_solver.md` par.6a). Seed 20261671 unter Nebenlast-Verdacht (Bloecke ab
-  Nr. 15 langsamer, Agenten-Aktivitaet), Verdikt traegt auf Seed 1 allein (z +6,49). Der Loeser ist
-  eine Tiefensuche ohne Vertiefung; **Stufe 2a (iterativer Loeser gegen das Netz) im Bau** (Agent,
-  Quelltext, par.5a). **v34-Erzeugung spielt Runde 5 per Netz** (Nutzer 2026-10-01, Seed 2 wird nicht wiederholt); offen: Champion-Spec,
-  R5-Kalibrierung (Wiedervorlage `docs/promotion_checklist.md`), Label 4->5.
-* **Uncommitted im Baum:** KL-Abzweig-Knopf (Rust, ungebaut), v34-Fenster-Prereg
-  (`PREREG_v34_window.md`, Entscheide bis auf E1/R5 gefallen), Rezept `models/v34.recipe.json`
-  (Generator v33-b01), Registrierungen. Naechster Schritt: Python-Nachzuege, Wheel-Runde mit
-  Anker-Invarianz, Generationswechsel, Start der v34-Erzeugung.
+**UEBERGABE 2026-10-01 (Sitzungswechsel, Kontext der alten Sitzung voll). Nichts laeuft auf der
+Maschine.** Champion bleibt `v32-b01`. Letzter Commit siehe `git log -1`; nicht gepusht.
+
+**Stand der Generation (registriert):**
+* b02 Tor 1 verfehlt (405:395, z +0,37; `PREREG_v33_window.md` par.6e). Keine Promotion.
+* E1 gleich stark (415:385, z +1,04), 39,4 % billiger -> **v34-Erzeugung mit E1** (Nutzer 2026-10-01,
+  `PREREG_evaluator_pretests.md` par.8d).
+* R5: **Netzsuche schlaegt den Runde-5-Loeser** 495:305, z +10,17 (`PREREG_r5_net_vs_solver.md`
+  par.6a), **v34-Erzeugung spielt Runde 5 per Netz** (Nutzer 2026-10-01, Seed 20261671 bleibt mit
+  Nebenlast-Vermerk stehen). Der Loeser ist eine Tiefensuche ohne Vertiefung (`round5.rs:590-624`).
+* v34-Fenster komplett entschieden (`PREREG_v34_window.md` par.1/par.5): b04-Zuschnitt, dritte Klasse
+  Weg C mit Huellenknopf, Generator `v33-b01`, Sockel 100 Sims, Stufenregel, E1 an, Runde 5 per Netz.
+  Rezept `models/v34.recipe.json` (Seeds 20260946/47/48, env E1 + R5-Netz, Waechter
+  `expect_engine_config` inkl. `excursion_kl_weight` 1 in der Ausflug-Klasse).
+
+**Gebaut in der Wheel-Runde 2026-10-01** (Wheel 1.1.0 neu installiert; `cargo test --release --lib`
+748 gruen, Integrationstests inkl. `net_parity_hash_matches_champion_fixture` gruen; Python-Suite 347
+gruen): KL-Abzweig-Knopf `MOSAIC_EXCURSION_KL_WEIGHT` / Flag `--excursion-kl-weight`
+(`PREREG_targeted_branching.md` par.7), iterativer R5-Loeser je Seite `r5_solver_iterative` /
+`r5_solver_node_budget` (`PREREG_r5_net_vs_solver.md` par.5a), Werkzeug der Offline-Pruefung
+`tools/probes/targeted_branching_pretest.py --model-new / --combine` (par.7a). Defaults geprueft:
+`engine_config` meldet excursion_kl_weight 0, r5_solver_iterative False, Budget 200.
+
+**ERSTE AUFGABEN DER NEUEN SITZUNG, in dieser Reihenfolge (alles exklusiv, eins nach dem anderen):**
+1. **Anker-Invarianz** (`/mosaic-anchor-invariance`, Drift und Konservierung gegen
+   `models/frozen_heuristics/hv4_anchor`, je unter 30 s). ROT = Nutzer-Entscheid, nicht reparieren.
+2. **Kalibriersonde iterativer Loeser** (par.5a Punkt 1): aus `engine/`, PATH mit Python-DLL,
+   `cargo test --release --lib r5_iterative_deepening_calibration_probe -- --ignored --nocapture`
+   (run_in_background, keine Pipe). Ergebnis in par.6 der R5-Prereg; die Quote "erstes Kind frisst
+   das Budget" beantwortet den Befund aus par.5a. Netzzeiten je R5-Entscheidung @400/@100 separat.
+3. **Smoke-Lauf mit dem v34-Rezept** (STATUS 3e): je Klasse wenige Partien in ein Probe-Verzeichnis
+   (`MOSAIC_DATA_DIR`), Manifest pruefen (`recipe`, `mosaic_env`, `engine_config`, Waechter gruen),
+   in der Ausflug-Klasse `branch_kl` am ersten Ausflug-Record vorhanden, `tie_mirrored` gesetzt.
+4. **Kostentor der Erzeugung** (`PREREG_v34_window.md` par.5 Punkt 3): je 100 Partien Sockel-Einstellung
+   mit und ohne `MOSAIC_R5_NET_SOLVER=0` (E1 in beiden an), Muster `tools/night_v33_package.sh`
+   Schritt 2. Ergebnis -> par.8 der v34-Prereg (Planungszahl der Erzeugung).
+5. **v33-Kontrolle der Offline-Pruefung** (`PREREG_targeted_branching.md` par.7a):
+   `python -X utf8 -u tools/probes/targeted_branching_pretest.py --model models/alphazero_v32-b01_brierbest.pth --model-new models/alphazero_v33-b01_brierbest.pth --out evaluations/artifacts/targeted_branching_did_v33_control.json`
+   (Default-Val-Liste `data/window_v33_val.txt`; rund 2-4 min). Ergebnis berichten, nicht deuten
+   (die Leseregel braucht v34).
+6. **Generationswechsel** `/mosaic-generation-turnover`: v33-b01 als Generator einfrieren (Artefakt mit
+   Wheel), restic daily mit Beleg, Loeschlisten dem Nutzer vorlegen (u. a. `data/probe_e1gate`, die
+   obsoleten v33-Kettenskripte; Rezept-Test `test_v34_draft_mirrors_the_v33_generation_flag_by_flag`
+   liest `tools/night_v33_generate.sh` und `night_v33_b03_b04.sh` und skippt, wenn sie fehlen),
+   Traeger-Manifest v34, Kettenskript `tools/night_v34_generate.sh` (Rezept je Klasse), STATUS
+   neu fassen.
+7. **Start der v34-Erzeugung NUR auf ausdrueckliche Nutzer-Freigabe.**
+
+**Parallel bzw. danach (nicht vor der Erzeugung):** R5 Stufe 2a A/B (iterativ @2000 gegen Netz, Seeds
+20261672/73, parallel zum v34-Training erlaubt: GPU + EIN CPU-Auftrag); Bau E2 (Python) und E4 (Encoder,
+Kompilieren erst nach der Erzeugung) fuer die v34-Trainings-Arme.
+
+**Nutzer-Freigaben und Verbote (woertlich bzw. stehend):** *"committe sobald es moeglich ist"*
+(2026-10-01). "Kein Push ohne Anweisung." "Jede Loeschung braucht restic-Beleg UND neue pfadgenaue
+Freigabe." "Nie committen: `player_profiles.json`, `player_profiles.json.bak`." Messungen exklusiv,
+ein Build ist Last; kein Commit waehrend eines Wanduhr-Laufs. "Mehrkosten sind kritisch abzuwaegen."
+"Stelle sicher dass du nichts faehrst was nicht schon bereits getestet wurde."
+
+**Offene Nutzer-Entscheide:** Champion-Spec mit Netz in Runde 5 jetzt oder erst nach Stufe 2a
+(Vorschlag: nach Stufe 2a, eine Promotion statt zwei; dann R5-Kalibrierung wieder Pflicht,
+`docs/promotion_checklist.md` Wiedervorlage). Nach v34: alternative Ansaetze statt v35.
 
 **STAND 2026-09-26 -- v33-Erzeugung fertig, Pflichtpruefungen und Vortests stehen an; die Kette wartet auf
 Nutzer-Freigabe.** Der vollstaendige STATUS vor diesem Wechsel steht woertlich in

@@ -64,6 +64,7 @@ RECIPE_RESERVED_ENV = {
     "MOSAIC_TIE_MIRROR_P": "tie_mirror_p",
     "MOSAIC_LABEL_RNG_SPLIT": "label_rng_split",
     "MOSAIC_EXCURSION_RESHUFFLE": "excursion_reshuffle",
+    "MOSAIC_EXCURSION_KL_WEIGHT": "excursion_kl_weight",
 }
 
 _RECIPE_PRE = None
@@ -210,7 +211,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       excursion_prob=0.0, excursion_profile=None,
                       start_slot_random_p=0.0, return_order_random_p=0.0,
                       tie_mirror_p=None, label_rng_split=False,
-                      excursion_reshuffle=False, engine_config_only=False):
+                      excursion_reshuffle=False, excursion_kl_weight=False,
+                      engine_config_only=False):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -305,6 +307,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
         os.environ["MOSAIC_LABEL_RNG_SPLIT"] = "1"
     if excursion_reshuffle:
         os.environ["MOSAIC_EXCURSION_RESHUFFLE"] = "1"
+    if excursion_kl_weight:
+        os.environ["MOSAIC_EXCURSION_KL_WEIGHT"] = "1"
     try:
         import mosaic_rust as mr
         if engine_config_only:
@@ -415,7 +419,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           start_slot_random_p=0.0,
                           return_order_random_p=0.0,
                           tie_mirror_p=None, label_rng_split=False,
-                          excursion_reshuffle=False) -> str | None:
+                          excursion_reshuffle=False,
+                          excursion_kl_weight=False) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -435,7 +440,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               deviate_prob, deviate_candidates, action_temp,
               excursion_prob, excursion_profile, start_slot_random_p,
               return_order_random_p, tie_mirror_p, label_rng_split,
-              excursion_reshuffle),
+              excursion_reshuffle, excursion_kl_weight),
     )
     proc.start()
     t_start = time.time()
@@ -546,6 +551,7 @@ def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
             "tie_mirror_p": knobs.get("tie_mirror_p"),
             "label_rng_split": knobs.get("label_rng_split", False),
             "excursion_reshuffle": knobs.get("excursion_reshuffle", False),
+            "excursion_kl_weight": knobs.get("excursion_kl_weight", False),
             "engine_config_only": True,
         },
     )
@@ -625,6 +631,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   tie_mirror_p: float | None = None,
                   label_rng_split: bool = False,
                   excursion_reshuffle: bool = False,
+                  excursion_kl_weight: bool = False,
                   recipe_info: dict | None = None):
     # `recipe_info` (Rezeptdatei, docs/working_rules.md): None ohne Rezept,
     # sonst {"recipe": Recipe, "class": str|None, "overrides": dict} aus
@@ -716,6 +723,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     if excursion_reshuffle and not excursion_prob:
         print("  ℹ️  --excursion-reshuffle ohne --excursion-prob: es entsteht kein Ausflug, "
               "der Knopf hat nichts zu mischen (Record-Bytes unveraendert).")
+    if excursion_kl_weight and not excursion_prob:
+        print("  ℹ️  --excursion-kl-weight ohne --excursion-prob: es entsteht kein Ausflug, "
+              "der Knopf gewichtet keinen Abzweig (Record-Bytes unveraendert).")
     # Doppelquelle: die drei Knoepfe gab es vor ihren Flags nur als Variable.
     # Wer das Flag setzt UND eine abweichende Variable aus Kette/Shell erbt,
     # haette zwei Quellen; das Manifest (`mosaic_env`) zeigte die geerbte, der
@@ -726,7 +736,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
              None if tie_mirror_p is None else str(tie_mirror_p)),
             ("--label-rng-split", "MOSAIC_LABEL_RNG_SPLIT", "1" if label_rng_split else None),
             ("--excursion-reshuffle", "MOSAIC_EXCURSION_RESHUFFLE",
-             "1" if excursion_reshuffle else None)):
+             "1" if excursion_reshuffle else None),
+            ("--excursion-kl-weight", "MOSAIC_EXCURSION_KL_WEIGHT",
+             "1" if excursion_kl_weight else None)):
         _have = os.environ.get(_env)
         if _want is not None and _have is not None and _have != _want:
             raise SystemExit(f"❌ {_flag} will {_env}={_want!r}, die Umgebung traegt schon "
@@ -791,6 +803,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                 "return_order_random_p": return_order_random_p,
                 "tie_mirror_p": tie_mirror_p, "label_rng_split": label_rng_split,
                 "excursion_reshuffle": excursion_reshuffle,
+                "excursion_kl_weight": excursion_kl_weight,
             })
     if recipe_info is not None:
         if _expected:
@@ -856,6 +869,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "tie_mirror_p": tie_mirror_p,
         "label_rng_split": label_rng_split,
         "excursion_reshuffle": excursion_reshuffle,
+        "excursion_kl_weight": excursion_kl_weight,
     }, recipe=_recipe_block, engine_config=_worker_cfg)
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -971,6 +985,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             return_order_random_p=return_order_random_p,
             tie_mirror_p=tie_mirror_p, label_rng_split=label_rng_split,
             excursion_reshuffle=excursion_reshuffle,
+            excursion_kl_weight=excursion_kl_weight,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1336,6 +1351,13 @@ if __name__ == "__main__":
                              "beiden Spieler kennt (self_play.rs reshuffle_hidden_world_for_"
                              "excursion). Setzt MOSAIC_EXCURSION_RESHUFFLE=1; ohne Flag bleibt "
                              "die Variable unberuehrt.")
+    parser.add_argument("--excursion-kl-weight", dest="excursion_kl_weight", action="store_true",
+                        help="PREREG_targeted_branching.md par.7: der Ausflug (Weg B, "
+                             "--excursion-prob) zieht seine Abzweigstelle mit Gewicht Rundenprofil "
+                             "x Policy-Diskrepanz KL(completed-Q-Ziel || Prior) statt Rundenprofil x "
+                             "Aktionszahl und schreibt `branch_kl` an den ersten Ausflug-Record. "
+                             "Setzt MOSAIC_EXCURSION_KL_WEIGHT=1; ohne Flag bleibt die Variable "
+                             "unberuehrt.")
     # Rezeptdatei: EIN zusaetzlicher Schritt statt `parser.parse_args()`. Ohne
     # --recipe ist `apply_to_parser` ein normaler parse_args (plus die zwei
     # Flags --recipe/--class), `_recipe_overrides` bleibt leer.
@@ -1413,6 +1435,7 @@ if __name__ == "__main__":
         tie_mirror_p=args.tie_mirror_p,
         label_rng_split=args.label_rng_split,
         excursion_reshuffle=args.excursion_reshuffle,
+        excursion_kl_weight=args.excursion_kl_weight,
         recipe_info=(None if _RECIPE_PRE is None else
                      {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
                       "overrides": _recipe_overrides}),

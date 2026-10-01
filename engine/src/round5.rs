@@ -211,7 +211,13 @@ pub const NET_SOLVER_DEFAULT: bool = true;
 /// niederschlagen wuerden. Eine Anker-Kante gegen den Status quo waere dann
 /// nicht interpretierbar -- sie mischte "ehrlich" mit "flacher". Damit die
 /// beiden Ursachen trennbar bleiben, ist das Budget separat stellbar.
-fn node_budget() -> u64 {
+///
+/// SEIT 2026-09-27 (`PREREG_r5_net_vs_solver.md` par.5a) zugleich der
+/// ENV-DEFAULT des Seiten-Felds `SearchConfig::r5_solver_node_budget`; darum
+/// `pub` (Manifest in `lib.rs`, Beispiele). Die Heuristik-Bahn,
+/// `exact_round5_outcome` und [`choose_action`] lesen weiter nur diese
+/// Funktion.
+pub fn node_budget() -> u64 {
     static CELL: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         std::env::var("MOSAIC_R5_NODE_BUDGET")
@@ -221,6 +227,68 @@ fn node_budget() -> u64 {
             .unwrap_or(NODE_BUDGET)
     })
 }
+
+/// Bestand des Seiten-Felds `SearchConfig::r5_solver_iterative`: aus, der
+/// Loeser sucht wie seit jeher ohne Vertiefung ([`choose_action_deadlined`]).
+pub const SOLVER_ITERATIVE_DEFAULT: bool = false;
+
+/// Env-Default des Seiten-Felds `SearchConfig::r5_solver_iterative`
+/// (`MOSAIC_R5_SOLVER_ITERATIVE`, 0 oder 1, `PREREG_r5_net_vs_solver.md`
+/// par.5a). Muster `net_mcts::single_pass_other_val_env`: leer oder ungesetzt
+/// = Default, ein ungueltiger Text faellt mit Warnung auf den Default zurueck.
+/// Gelesen nur von `SearchConfig::from_env` und `from_spec_file` (wenn die Spec
+/// das Feld nicht traegt); der eingefrorene `round5_anchor.rs`, die
+/// Heuristik-Bahn und die Label-Pfade lesen ihn nicht.
+pub fn solver_iterative_env() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let Ok(raw) = std::env::var("MOSAIC_R5_SOLVER_ITERATIVE") else {
+            return SOLVER_ITERATIVE_DEFAULT;
+        };
+        match raw.trim() {
+            "" => SOLVER_ITERATIVE_DEFAULT,
+            "0" => false,
+            "1" => true,
+            _ => {
+                eprintln!(
+                    "MOSAIC_R5_SOLVER_ITERATIVE={raw:?} ungueltig (0 oder 1) -- {} gilt.",
+                    u8::from(SOLVER_ITERATIVE_DEFAULT)
+                );
+                SOLVER_ITERATIVE_DEFAULT
+            }
+        }
+    })
+}
+
+/// Worst-Case-Kosten eines Knotens aus der Kalibrierung (`NODE_BUDGET`-
+/// Kommentar oben: 0,3-4,4 ms je Knoten auf realistischen Stellungen).
+const WORST_CASE_NODE_COST: Duration = Duration::from_micros(4_400);
+/// Sicherheitsfaktor des Not-Deckels, derselbe wie bei `TIME_BUDGET`
+/// (200 Knoten x 4,4 ms ~ 0,9 s, x ~5 = 5 s).
+const DEADLINE_SAFETY_FACTOR: u32 = 5;
+
+/// Not-Deckel je Entscheidung fuer die ITERATIVE Suche
+/// (`PREREG_r5_net_vs_solver.md` par.5a): `max(TIME_BUDGET, budget x 4,4 ms x 5)`.
+/// Bindend soll das Knotenbudget sein; der Deckel ist nur Ausfallschutz und
+/// waechst deshalb mit dem Budget mit (bei 2000 Knoten 44 s, bei 400 Knoten
+/// 8,8 s, bei 200 Knoten greift das Minimum `TIME_BUDGET`). Greift er doch,
+/// ist das Ergebnis lastabhaengig -- dieselbe Lage wie beim heutigen Loeser.
+///
+/// Der NICHT-iterative Pfad behaelt bewusst `TIME_BUDGET` (unveraendert, auch
+/// bei einem Seiten-Budget ueber dem Default): sonst haette ein gesetztes
+/// `MOSAIC_R5_NODE_BUDGET` ohne Spec-Feld seinen Deckel geaendert.
+///
+/// Nach oben auf [`DEADLINE_CAP`] begrenzt, damit `Instant::now() + deckel`
+/// bei absurden Budgets nicht ueberlaeuft (der Deckel greift dann ab rund
+/// 785.000 Knoten nicht mehr proportional -- weit jenseits jedes Messarms).
+pub fn deadline_for_budget(budget: u64) -> Duration {
+    let factor = u32::try_from(budget).unwrap_or(u32::MAX).saturating_mul(DEADLINE_SAFETY_FACTOR);
+    let scaled = WORST_CASE_NODE_COST.checked_mul(factor).unwrap_or(DEADLINE_CAP);
+    scaled.min(DEADLINE_CAP).max(TIME_BUDGET)
+}
+
+/// Obergrenze von [`deadline_for_budget`]: ein Tag.
+const DEADLINE_CAP: Duration = Duration::from_secs(86_400);
 
 /// Kleine Manufakturen mit noch verdecktem Bonuschip.
 fn hidden_chip_factories(state: &GameState) -> Vec<usize> {
@@ -438,6 +506,13 @@ fn ordered_children(state: &GameState, chance: bool) -> Vec<Child> {
 /// Knoten ist der Verzicht billiger als die Buchhaltung -- und vor allem
 /// nachweisbar korrekt. Das aeussere Fenster des ELTERN-Knotens bleibt davon
 /// unberuehrt, dort wird weiter normal beschnitten.
+///
+/// `depth_cut` (seit 2026-09-27, `PREREG_r5_net_vs_solver.md` par.5a): wird
+/// auf `true` gesetzt, sobald irgendwo darunter ein Knoten an der
+/// TIEFENGRENZE (`depth_remaining == 0`, Runde noch im Drafting) statisch
+/// bewertet wurde. Nur die iterative Vertiefung liest das (Abbruch, wenn eine
+/// Iteration das Rundenende erreicht hat); die Bestandsaufrufer reichen eine
+/// Wegwerf-Variable. Es fliesst in keinen Wert ein.
 #[allow(clippy::too_many_arguments)]
 fn child_value(
     child: &Child,
@@ -449,10 +524,20 @@ fn child_value(
     node_budget: u64,
     deadline: Instant,
     chance: bool,
+    depth_cut: &mut bool,
 ) -> f64 {
     if child.outcomes.len() == 1 {
         return negamax(
-            &child.outcomes[0].1, depth_remaining, alpha, beta, perspective, node_count, node_budget, deadline, chance,
+            &child.outcomes[0].1,
+            depth_remaining,
+            alpha,
+            beta,
+            perspective,
+            node_count,
+            node_budget,
+            deadline,
+            chance,
+            depth_cut,
         );
     }
     let mut acc = 0.0;
@@ -468,11 +553,20 @@ fn child_value(
                 node_budget,
                 deadline,
                 chance,
+                depth_cut,
             );
     }
     acc
 }
 
+/// TIEFE, so wie sie hier zaehlt (am Code gelesen 2026-09-27): jeder
+/// ENTSCHEIDUNGSknoten kostet eine Tiefeneinheit (`child_value` reicht
+/// `depth_remaining - 1` an das Kind), auch ein Pflichtzug mit nur einem
+/// Kandidaten. Zufallsknoten kosten KEINE (`child_value` reicht alle Ausgaenge
+/// mit derselben Tiefe weiter). `negamax(s, 0, ..)` ist ein Blatt mit dem
+/// statischen Wert `leaf_value`. Jeder Aufruf zaehlt EINEN Knoten, auch ein
+/// Blatt; die Vorsortierung `ordered_children` (ebenfalls `leaf_value` je
+/// Kind) zaehlt nicht.
 #[allow(clippy::too_many_arguments)]
 fn negamax(
     state: &GameState,
@@ -484,6 +578,7 @@ fn negamax(
     node_budget: u64,
     deadline: Instant,
     chance: bool,
+    depth_cut: &mut bool,
 ) -> f64 {
     *node_count += 1;
     if state.phase != Phase::Drafting
@@ -491,6 +586,11 @@ fn negamax(
         || *node_count >= node_budget
         || Instant::now() >= deadline
     {
+        // Nur Buchfuehrung fuer die iterative Vertiefung, kein Einfluss auf
+        // den Rueckgabewert und kein zusaetzlicher Uhr- oder Zustandszugriff.
+        if depth_remaining == 0 && state.phase == Phase::Drafting {
+            *depth_cut = true;
+        }
         return leaf_value(state, perspective);
     }
     let children = ordered_children(state, chance);
@@ -507,7 +607,7 @@ fn negamax(
             break;
         }
         let val = child_value(
-            child, depth_remaining - 1, alpha, beta, perspective, node_count, node_budget, deadline, chance,
+            child, depth_remaining - 1, alpha, beta, perspective, node_count, node_budget, deadline, chance, depth_cut,
         );
         if maximizing {
             if val > best {
@@ -569,7 +669,8 @@ pub(crate) fn exact_round5_outcome(state: &GameState) -> [f64; 2] {
 /// greift (`NODE_BUDGET` ist der bindende Cutoff).
 fn outcome_diff(state: &GameState, deadline: Instant) -> f64 {
     let mut node_count: u64 = 0;
-    negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, node_budget(), deadline, chance_nodes_enabled())
+    let mut depth_cut_unused = false;
+    negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, node_budget(), deadline, chance_nodes_enabled(), &mut depth_cut_unused)
 }
 
 /// Wählt EINE Drafting-Aktion für `state` per exakter Alpha-Beta-Suche.
@@ -601,6 +702,7 @@ pub(crate) fn choose_action_deadlined(state: &GameState, chance: bool, budget: u
     }
 
     let mut node_count: u64 = 0;
+    let mut depth_cut_unused = false;
     let mut best_action = children[0].action.clone();
     let mut best_val = f64::NEG_INFINITY;
     let mut alpha = f64::NEG_INFINITY;
@@ -610,7 +712,16 @@ pub(crate) fn choose_action_deadlined(state: &GameState, chance: bool, budget: u
             break;
         }
         let val = child_value(
-            child, MAX_DEPTH.saturating_sub(1), alpha, beta, perspective, &mut node_count, budget, deadline, chance,
+            child,
+            MAX_DEPTH.saturating_sub(1),
+            alpha,
+            beta,
+            perspective,
+            &mut node_count,
+            budget,
+            deadline,
+            chance,
+            &mut depth_cut_unused,
         );
         if val > best_val {
             best_val = val;
@@ -628,6 +739,15 @@ pub(crate) fn choose_action_deadlined(state: &GameState, chance: bool, budget: u
 /// MCTS-Besuchsbaum). `mcts_q` trägt hier den exakten Alpha-Beta-Wert
 /// (Score-Differenz Ich-Gegner) statt einer Gewinnwahrscheinlichkeit.
 pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value) {
+    choose_action_with_analysis_budgeted(state, node_budget())
+}
+
+/// Kern von [`choose_action_with_analysis`] mit uebergebenem Knotenbudget
+/// (`PREREG_r5_net_vs_solver.md` par.5a: Seiten-Feld
+/// `SearchConfig::r5_solver_node_budget`). Mit `budget == node_budget()`
+/// derselbe Rechenweg wie bis 2026-09-26: das Budget wurde dort an derselben
+/// Stelle aus `node_budget()` gelesen, jetzt kommt es als Parameter.
+fn choose_action_with_analysis_budgeted(state: &GameState, budget: u64) -> (Option<Action>, Value) {
     // Task #32 (`profiling.rs`-Modulkopf "Task #32"): GANZER Funktionskörper
     // als Haupteinstiegspunkt der "round5_alphabeta"-Kategorie -- deckt ALLE
     // Aufrufer (`mcts.rs`, `net_mcts.rs`) automatisch ab, ohne dort einzeln
@@ -641,9 +761,9 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
         return (None, Value::Null);
     }
 
-    let budget = node_budget();
     let deadline = Instant::now() + TIME_BUDGET;
     let mut node_count: u64 = 0;
+    let mut depth_cut_unused = false;
     let mut alpha = f64::NEG_INFINITY;
     let beta = f64::INFINITY;
     let mut best_idx = 0usize;
@@ -657,7 +777,16 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
             child.outcomes.iter().map(|(w, s)| w * leaf_value(s, perspective)).sum()
         } else {
             child_value(
-                child, MAX_DEPTH.saturating_sub(1), alpha, beta, perspective, &mut node_count, budget, deadline, chance,
+                child,
+                MAX_DEPTH.saturating_sub(1),
+                alpha,
+                beta,
+                perspective,
+                &mut node_count,
+                budget,
+                deadline,
+                chance,
+                &mut depth_cut_unused,
             )
         };
         values.push(val);
@@ -670,12 +799,35 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
         }
     }
 
-    let moves: Vec<Value> = children
+    let entries: Vec<(&Action, f64)> = children.iter().map(|c| &c.action).zip(values.iter().copied()).collect();
+    let analysis = analysis_json(state, &entries, best_idx, node_count, "alphabeta_round5", Value::Null);
+    (Some(children[best_idx].action.clone()), analysis)
+    })
+}
+
+/// Rohe Punkte-Margin (`leaf_value`-Skala) auf die [0,1]-Gewinnwahrscheinlichkeit,
+/// dieselbe Formel wie im Analyse-Dict (siehe Kommentar in [`analysis_json`]).
+pub(crate) fn margin_to_win_prob(val: f64) -> f64 {
+    ((val / crate::mcts::VALUE_SCALE).tanh() + 1.0) / 2.0
+}
+
+/// Das debug.html-kompatible Analyse-Dict aus (Aktion, Alpha-Beta-Wert) je
+/// Wurzelkandidat. Ausgelagert 2026-09-27 aus [`choose_action_with_analysis`],
+/// damit die iterative Vertiefung dasselbe Format liefert; Inhalt und
+/// Schluessel fuer den Bestandsaufruf unveraendert (`algorithm`
+/// "alphabeta_round5", `max_depth` null).
+fn analysis_json(
+    state: &GameState,
+    entries: &[(&Action, f64)],
+    best_idx: usize,
+    node_count: u64,
+    algorithm: &str,
+    max_depth: Value,
+) -> Value {
+    let moves: Vec<Value> = entries
         .iter()
-        .zip(values.iter())
         .enumerate()
-        .map(|(i, (child, &val))| {
-            let a = &child.action;
+        .map(|(i, &(a, val))| {
             let sm = SearchMove::Draft(a.clone());
             let (typ, desc, cat, _mv) = label_search_move(&sm, Some(state));
             // `val` ist eine rohe Punkte-Margin (own_total - opp_total, siehe
@@ -689,7 +841,7 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
             // `crate::mcts::normalize_score`, nur für eine Differenz statt
             // eines absoluten Scores (passt zu `self_play.rs`s
             // `((own-opp)/VALUE_SCALE).tanh()`-Margin-Ziel).
-            let win_prob = ((val / crate::mcts::VALUE_SCALE).tanh() + 1.0) / 2.0;
+            let win_prob = margin_to_win_prob(val);
             json!({
                 "action_id": i,
                 "type": typ,
@@ -709,25 +861,267 @@ pub fn choose_action_with_analysis(state: &GameState) -> (Option<Action>, Value)
         })
         .collect();
 
-    let analysis = json!({
+    json!({
         "current_player": state.current_player,
         "ai_player": state.current_player,
         "value": Value::Null,
         "win_pct": Value::Null,
         "has_net": false,
-        "algorithm": "alphabeta_round5",
+        "algorithm": algorithm,
         "simulations": Value::Null,
-        "num_actions": children.len(),
-        "num_actions_considered": children.len(),
-        "max_depth": Value::Null,
+        "num_actions": entries.len(),
+        "num_actions_considered": entries.len(),
+        "max_depth": max_depth,
         "ai_action": best_idx,
         "moves": moves,
         "tree": Value::Null,
         "node_visits": node_count,
-    });
-
-    (Some(children[best_idx].action.clone()), analysis)
     })
+}
+
+// ── Seiten-Einstieg und iterative Vertiefung (PREREG_r5_net_vs_solver.md par.5a) ──
+//
+// BEFUND, der den Bau ausgeloest hat (`choose_action_deadlined` oben): die
+// Wurzelkinder werden der Reihe nach mit Tiefe `MAX_DEPTH - 1` und EINEM
+// Knotenzaehler durchsucht. Frisst schon das erste Kind das Budget, gibt der
+// Loeser `ordered_children[0]` zurueck, also die Vorsortierung "als ende die
+// Runde jetzt". Die iterative Vertiefung unten verteilt dasselbe Budget
+// stattdessen Tiefe um Tiefe auf ALLE Wurzelkinder.
+
+/// Runde-5-Zugwahl einer NETZ-Seite (`net_mcts::r5_solver_action`), mit den
+/// Seiten-Feldern `SearchConfig::r5_solver_iterative` und
+/// `SearchConfig::r5_solver_node_budget`.
+///
+/// `iterative == false` ist derselbe Rechenweg wie [`choose_action`]:
+/// `choose_action_inner(state, chance_nodes_enabled(), budget)`, und mit dem
+/// Default `budget == node_budget()` sind die Argumente dieselben wie dort
+/// (byte-identisch, Test `side_entry_default_matches_choose_action`). Ein
+/// abweichendes Budget wirkt im nicht-iterativen Pfad nur auf den
+/// Knotenzaehler; der Not-Deckel bleibt `TIME_BUDGET` (siehe
+/// [`deadline_for_budget`]).
+pub fn choose_action_for_side(state: &GameState, iterative: bool, budget: u64) -> Option<Action> {
+    if iterative {
+        choose_action_iterative(state, budget).map(|o| o.action)
+    } else {
+        choose_action_inner(state, chance_nodes_enabled(), budget)
+    }
+}
+
+/// Wie [`choose_action_for_side`], mit Analyse-Dict (GUI-/Debug-Einstieg
+/// `net_mcts::net_search_with_tree_inner`). Nicht-iterativ mit Default-Budget
+/// derselbe Rechenweg wie [`choose_action_with_analysis`].
+pub fn choose_action_with_analysis_for_side(state: &GameState, iterative: bool, budget: u64) -> (Option<Action>, Value) {
+    if !iterative {
+        return choose_action_with_analysis_budgeted(state, budget);
+    }
+    crate::profiling::selfplay_profile::timed(crate::profiling::selfplay_profile::SelfplayCat::Round5Alphabeta, || {
+        let Some(out) = choose_action_iterative(state, budget) else {
+            return (None, Value::Null);
+        };
+        let entries: Vec<(&Action, f64)> = out.root_values.iter().map(|(a, v)| (a, *v)).collect();
+        let best_idx = out.root_values.iter().position(|(a, _)| *a == out.action).unwrap_or(0);
+        let analysis = analysis_json(
+            state,
+            &entries,
+            best_idx,
+            out.nodes,
+            "alphabeta_round5_iterative",
+            json!(out.completed_depth),
+        );
+        (Some(out.action.clone()), analysis)
+    })
+}
+
+/// Ergebnis der iterativen Vertiefung. Die Felder ausser `action`/`value`
+/// sind Buchfuehrung fuer Analyse-Dict und Kalibriersonde.
+#[derive(Debug, Clone)]
+pub struct IterativeOutcome {
+    /// Gewaehlter Zug.
+    pub action: Action,
+    /// Sein Wert (Punkte-Margin aus Sicht des Ziehenden, `leaf_value`-Skala)
+    /// in der Iteration, aus der er stammt.
+    pub value: f64,
+    /// Tiefe der letzten VOLLSTAENDIGEN Iteration in Halbzuegen unter der
+    /// Wurzel. 1 = nur die Vorsortierung (`ordered_children`), es kam keine
+    /// tiefere Iteration zu Ende.
+    pub completed_depth: u32,
+    /// Verbrauchte Knoten ueber ALLE Iterationen, die abgebrochene
+    /// eingeschlossen (gemeinsames Budget).
+    pub nodes: u64,
+    /// `true`: die letzte vollstaendige Iteration hat keinen Knoten an der
+    /// Tiefengrenze gekappt -- jeder Pfad lief bis zum Rundenende, tiefer
+    /// suchen aendert nichts mehr. Dann wird nicht weiter vertieft.
+    pub reached_round_end: bool,
+    /// `true`: der Zug stammt aus der ANGEBROCHENEN Iteration (Ausnahme, siehe
+    /// [`choose_action_iterative_inner`]).
+    pub from_partial_iteration: bool,
+    /// Je Wurzelkind der Wert aus der letzten vollstaendigen Iteration, in
+    /// deren Suchreihenfolge (fuer das Analyse-Dict). Werte ausser dem besten
+    /// sind wie beim heutigen Loeser oft nur obere Schranken (Alpha-Beta an
+    /// der Wurzel, fail-low).
+    pub root_values: Vec<(Action, f64)>,
+}
+
+/// Iterative Vertiefung mit dem Seiten-Budget und dem mitwachsenden
+/// Not-Deckel [`deadline_for_budget`]; Zufallsknoten wie im Bestand ueber
+/// `chance_nodes_enabled()`.
+pub fn choose_action_iterative(state: &GameState, budget: u64) -> Option<IterativeOutcome> {
+    choose_action_iterative_inner(state, chance_nodes_enabled(), budget, Instant::now() + deadline_for_budget(budget))
+}
+
+/// Kern der iterativen Vertiefung (`PREREG_r5_net_vs_solver.md` par.5a).
+///
+/// ABLAUF:
+/// * Tiefe 1 ist die Vorsortierung selbst: `ordered_children` hat jedes
+///   Wurzelkind schon mit dem statischen Wert bewertet, und bei Tiefe 1 lieferte
+///   `child_value(kind, 0, ..)` genau diesen Wert (bei mehreren Ausgaengen
+///   denselben gewichteten Mittelwert). Sie kostet darum keinen Knoten.
+/// * Fuer d = 2, 3, ... bis `MAX_DEPTH`: die Wurzelkinder STABIL nach den
+///   Werten der vorigen Iteration absteigend sortieren (bei Gleichstand bleibt
+///   die vorige Reihenfolge), dann Alpha-Beta an der Wurzel wie in
+///   `choose_action_deadlined`, je Kind `child_value(kind, d - 1, ..)` --
+///   derselbe `negamax`, an der Tiefengrenze derselbe statische Blattwert.
+///   Unterhalb der Wurzel sortiert weiter `ordered_children` (keine
+///   Transpositionstabelle, kein Zugspeicher -- Lesbarkeit).
+/// * EIN Knotenzaehler ueber alle Iterationen; das Budget gilt fuer die Summe.
+///
+/// WANN EINE ITERATION VOLLSTAENDIG IST: wenn nach ihr `nodes < budget` und
+/// die Deadline nicht erreicht ist. Der Zaehler waechst monoton, und `negamax`
+/// kappt nur bei `nodes >= budget` (oder Deadline); liegt er nach der Iteration
+/// darunter, hat in ihr keine Budget-Kappung stattgefunden. Die Umkehrung gilt
+/// nicht ganz (der Knoten, der das Budget genau erreicht, kann ein natuerliches
+/// Blatt gewesen sein) -- dann wird die Iteration konservativ verworfen.
+///
+/// RUECKGABE: der beste Zug der letzten vollstaendigen Iteration. AUSNAHME
+/// (Standard bei iterativer Vertiefung, begruendet): in der angebrochenen
+/// Iteration steht das bisher beste Kind an erster Stelle. Ist es UND ein
+/// spaeteres Kind vollstaendig bewertet (Zaehler nach dem spaeteren Kind
+/// noch unter dem Budget, also keine Kappung bis dahin), und liegt der Wert
+/// des spaeteren Kinds ueber dem Fenster `alpha` (dann ist er exakt, keine
+/// Schranke), so ist dieses Kind auf der TIEFEREN Stufe nachweislich besser als
+/// der bisherige Beste auf derselben Stufe. Dann gilt es. Unvollstaendig
+/// bewertete Kinder zaehlen nie.
+///
+/// ENDE: Budget erschoepft, Deadline erreicht, `MAX_DEPTH` erreicht, oder eine
+/// vollstaendige Iteration ohne jede Tiefenkappung (`depth_cut == false`):
+/// dann lief jeder durchsuchte Pfad bis zum Rundenende (oder wurde von
+/// Alpha-Beta mit exakten Werten abgeschnitten), eine tiefere Iteration
+/// lieferte dieselben Werte.
+pub(crate) fn choose_action_iterative_inner(
+    state: &GameState,
+    chance: bool,
+    budget: u64,
+    deadline: Instant,
+) -> Option<IterativeOutcome> {
+    let perspective = state.current_player;
+    let mut children = ordered_children(state, chance);
+    if children.is_empty() {
+        return None;
+    }
+
+    // Tiefe 1 = Vorsortierung (siehe Doku). `ordered_children` sortiert aus
+    // Sicht des Ziehenden, an der Wurzel ist das `perspective`.
+    let mut values: Vec<f64> = children.iter().map(|c| c.order_value).collect();
+    let mut completed_depth: u32 = 1;
+    let mut reached_round_end = children
+        .iter()
+        .all(|c| c.outcomes.iter().all(|(_, s)| s.phase != Phase::Drafting));
+    let mut best_idx = 0usize;
+    let mut node_count: u64 = 0;
+
+    // Ein einziger Kandidat: wie im Bestand sofort zurueck, ohne Suche.
+    while children.len() > 1 && !reached_round_end && completed_depth < MAX_DEPTH {
+        // Wurzelkinder nach der vorigen Iteration ordnen (stabil). Nach der
+        // Sortierung steht der bisher beste Zug an Index 0.
+        let mut order: Vec<usize> = (0..children.len()).collect();
+        order.sort_by(|&a, &b| values[b].partial_cmp(&values[a]).unwrap_or(std::cmp::Ordering::Equal));
+        children = reorder(children, &order);
+        values = order.iter().map(|&i| values[i]).collect();
+        best_idx = 0;
+
+        let depth = completed_depth + 1;
+        let mut depth_cut = false;
+        let mut alpha = f64::NEG_INFINITY;
+        let beta = f64::INFINITY;
+        let mut iter_values: Vec<f64> = Vec::with_capacity(children.len());
+        let mut iter_best_idx = 0usize;
+        let mut iter_best_val = f64::NEG_INFINITY;
+        let mut complete = true;
+        for child in &children {
+            if node_count >= budget || Instant::now() >= deadline {
+                complete = false;
+                break;
+            }
+            let val = child_value(
+                child,
+                depth - 1,
+                alpha,
+                beta,
+                perspective,
+                &mut node_count,
+                budget,
+                deadline,
+                chance,
+                &mut depth_cut,
+            );
+            if node_count >= budget || Instant::now() >= deadline {
+                // In diesem Kind kann gekappt worden sein -- Wert verwerfen.
+                complete = false;
+                break;
+            }
+            let i = iter_values.len();
+            iter_values.push(val);
+            if val > iter_best_val {
+                iter_best_val = val;
+                iter_best_idx = i;
+            }
+            if val > alpha {
+                alpha = val;
+            }
+        }
+
+        if complete {
+            values = iter_values;
+            best_idx = iter_best_idx;
+            completed_depth = depth;
+            reached_round_end = !depth_cut;
+            continue;
+        }
+        // Angebrochene Iteration: Ausnahme nur, wenn mindestens das erste Kind
+        // (der bisherige Beste) UND ein besseres spaeteres Kind voll bewertet
+        // sind. `iter_best_idx > 0` heisst genau das: ein spaeteres Kind lag
+        // strikt ueber dem Wert des ersten, also ueber `alpha` -- exakt.
+        // `root_values` bleiben die der letzten VOLLSTAENDIGEN Iteration.
+        if !iter_values.is_empty() && iter_best_idx > 0 {
+            return Some(IterativeOutcome {
+                action: children[iter_best_idx].action.clone(),
+                value: iter_best_val,
+                completed_depth,
+                nodes: node_count,
+                reached_round_end,
+                from_partial_iteration: true,
+                root_values: children.iter().map(|c| c.action.clone()).zip(values.iter().copied()).collect(),
+            });
+        }
+        break;
+    }
+
+    Some(IterativeOutcome {
+        action: children[best_idx].action.clone(),
+        value: values[best_idx],
+        completed_depth,
+        nodes: node_count,
+        reached_round_end,
+        from_partial_iteration: false,
+        root_values: children.iter().map(|c| c.action.clone()).zip(values.iter().copied()).collect(),
+    })
+}
+
+/// `children` in die Reihenfolge `order` bringen (Indizes in die alte Liste),
+/// ohne `Child` klonen zu muessen.
+fn reorder(children: Vec<Child>, order: &[usize]) -> Vec<Child> {
+    let mut slots: Vec<Option<Child>> = children.into_iter().map(Some).collect();
+    order.iter().map(|&i| slots[i].take().expect("Index doppelt in der Sortierung")).collect()
 }
 
 #[cfg(test)]
@@ -1203,8 +1597,9 @@ mod tests {
 
         let deep = |st: &GameState, persp: usize| -> f64 {
             let mut nodes: u64 = 0;
+            let mut depth_cut_unused = false;
             negamax(st, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY,
-                    persp, &mut nodes, ORACLE, long(), false)
+                    persp, &mut nodes, ORACLE, long(), false, &mut depth_cut_unused)
         };
         let after = |st: &GameState, a: &Action| -> Option<GameState> {
             let mut g = Game { state: st.clone() };
@@ -1310,10 +1705,12 @@ mod tests {
                             let mut g = Game { state: state.clone() };
                             g.apply_drafting(a).ok()?;
                             let mut nodes: u64 = 0;
+                            let mut depth_cut_unused = false;
                             Some(negamax(
                                 &g.state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY,
                                 f64::INFINITY, mover, &mut nodes, ORACLE,
                                 Instant::now() + Duration::from_secs(120), false,
+                                &mut depth_cut_unused,
                             ))
                         };
                         if let (Some(v_on), Some(v_off)) = (deep(&on), deep(&off)) {
@@ -1506,6 +1903,7 @@ mod tests {
                     let deadline = Instant::now() + probe_budget;
                     let t0 = Instant::now();
                     let mut nodes: u64 = 0;
+                    let mut depth_cut_unused = false;
                     let _ = negamax(
                         &state,
                         MAX_DEPTH.saturating_sub(1),
@@ -1516,6 +1914,7 @@ mod tests {
                         u64::MAX,
                         deadline,
                         false,
+                        &mut depth_cut_unused,
                     );
                     let elapsed = t0.elapsed();
                     let deadline_hit = elapsed >= probe_budget;
@@ -1675,5 +2074,343 @@ mod tests {
             old, new,
             "Seed {seed} pi={pi}: alte und endaware-Rechnung liefern denselben Wert ({old})"
         );
+    }
+
+    // ── Seiten-Einstieg und iterative Vertiefung (PREREG_r5_net_vs_solver.md par.5a) ──
+
+    /// Not-Deckel der iterativen Suche: bei 200 Knoten das Bestandsminimum,
+    /// darueber `budget x 4,4 ms x 5`, nach oben gedeckelt.
+    #[test]
+    fn deadline_for_budget_scales_with_the_budget() {
+        assert_eq!(deadline_for_budget(NODE_BUDGET), TIME_BUDGET);
+        assert_eq!(deadline_for_budget(400), Duration::from_millis(8_800));
+        assert_eq!(deadline_for_budget(2000), Duration::from_secs(44));
+        assert_eq!(deadline_for_budget(u64::MAX), DEADLINE_CAP);
+    }
+
+    /// (a) Default-Pfad: der Seiten-Einstieg mit `iterative = false` und dem
+    /// Default-Budget liefert denselben Zug wie `choose_action` und dasselbe
+    /// Analyse-Dict wie `choose_action_with_analysis` -- auf dem Leerbrett UND
+    /// auf einer realistischen Stellung, auf der das Budget bindet.
+    #[test]
+    fn side_entry_default_matches_choose_action() {
+        use crate::round_transition::drive_to_round_start;
+        assert!(!SOLVER_ITERATIVE_DEFAULT);
+        let states = vec![round5_state(2), round5_state(3), drive_to_round_start(51, 5)];
+        for (i, s) in states.iter().enumerate() {
+            assert_eq!(
+                choose_action_for_side(s, false, node_budget()),
+                choose_action(s),
+                "Stellung {i}: Seiten-Einstieg weicht vom Bestand ab"
+            );
+            let (a_side, json_side) = choose_action_with_analysis_for_side(s, false, node_budget());
+            let (a_old, json_old) = choose_action_with_analysis(s);
+            assert_eq!(a_side, a_old, "Stellung {i}: Analyse-Zug weicht ab");
+            assert_eq!(json_side, json_old, "Stellung {i}: Analyse-Dict weicht ab");
+        }
+    }
+
+    /// Kleine Runde-5-Endstellungen (2-4 Legalzuege), deren VOLLE Suche bis
+    /// zum Rundenende in wenigen tausend Knoten fertig wird. Vorgerueckt wird
+    /// billig mit der Vorsortierung, nicht mit dem Loeser.
+    fn small_round5_endgames(max: usize) -> Vec<GameState> {
+        use crate::round_transition::drive_to_round_start;
+        let mut out = Vec::new();
+        for seed in [101u64, 202, 303, 404, 505, 606] {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut guard = 0u32;
+            while state.phase == Phase::Drafting && guard < 200 {
+                guard += 1;
+                let n = drafting_actions(&state).len();
+                if (2..=4).contains(&n) {
+                    let mut nodes: u64 = 0;
+                    let mut cut = false;
+                    let far = Instant::now() + Duration::from_secs(600);
+                    let _ = negamax(
+                        &state, MAX_DEPTH, f64::NEG_INFINITY, f64::INFINITY, state.current_player,
+                        &mut nodes, 20_000, far, true, &mut cut,
+                    );
+                    if nodes < 20_000 && !cut {
+                        out.push(state.clone());
+                        break;
+                    }
+                }
+                let children = ordered_children(&state, true);
+                let Some(first) = children.first() else { break };
+                let mut g = Game { state };
+                if g.apply_drafting(&first.action).is_err() {
+                    break;
+                }
+                state = g.state;
+            }
+            if out.len() >= max {
+                break;
+            }
+        }
+        out
+    }
+
+    /// (b) Mit sehr grossem Budget erreicht die iterative Suche auf einer
+    /// kleinen Endstellung das Rundenende und trifft den Wert der vollen Suche.
+    /// Verglichen wird der WERT und die Zugehoerigkeit zur Menge der besten
+    /// Zuege -- bei Gleichstand duerfen beide Suchen verschiedene, gleich gute
+    /// Zuege nennen (andere Wurzelreihenfolge).
+    #[test]
+    fn iterative_with_huge_budget_matches_the_full_search() {
+        let states = small_round5_endgames(3);
+        assert!(!states.is_empty(), "Testaufbau: keine kleine Endstellung gefunden");
+        for (k, s) in states.iter().enumerate() {
+            let perspective = s.current_player;
+            let far = Instant::now() + Duration::from_secs(600);
+            // Referenz: jedes Wurzelkind mit vollem Fenster und voller Tiefe.
+            let children = ordered_children(s, true);
+            let mut reference: Vec<(Action, f64)> = Vec::new();
+            for c in &children {
+                let mut nodes: u64 = 0;
+                let mut cut = false;
+                let v = child_value(
+                    c, MAX_DEPTH - 1, f64::NEG_INFINITY, f64::INFINITY, perspective,
+                    &mut nodes, 1_000_000, far, true, &mut cut,
+                );
+                assert!(nodes < 1_000_000 && !cut, "Stellung {k}: Referenz nicht vollstaendig");
+                reference.push((c.action.clone(), v));
+            }
+            let best = reference.iter().map(|(_, v)| *v).fold(f64::NEG_INFINITY, f64::max);
+            let argmax: Vec<&Action> =
+                reference.iter().filter(|(_, v)| (*v - best).abs() < 1e-9).map(|(a, _)| a).collect();
+
+            let out = choose_action_iterative_inner(s, true, 1_000_000, far).expect("Aktion");
+            assert!(out.reached_round_end, "Stellung {k}: Rundenende nicht erreicht ({out:?})");
+            assert!(!out.from_partial_iteration);
+            assert!((out.value - best).abs() < 1e-9, "Stellung {k}: Wert {} statt {best}", out.value);
+            assert!(argmax.contains(&&out.action), "Stellung {k}: Zug nicht unter den besten");
+        }
+    }
+
+    /// (c) Deterministisch bei gleichem Budget, und unabhaengig vom Not-Deckel,
+    /// solange der nicht greift (Task-#71-Muster wie
+    /// `outcome_is_independent_of_time_budget`).
+    #[test]
+    fn iterative_is_deterministic_and_node_bound() {
+        use crate::round_transition::drive_to_round_start;
+        let s = drive_to_round_start(51, 5);
+        let budget = 300;
+        let run = |deadline: Duration| {
+            choose_action_iterative_inner(&s, true, budget, Instant::now() + deadline).expect("Aktion")
+        };
+        let a = run(deadline_for_budget(budget));
+        let b = run(deadline_for_budget(budget));
+        let c = run(deadline_for_budget(budget) * 10);
+        for (tag, other) in [("Wiederholung", &b), ("10x Deckel", &c)] {
+            assert_eq!(a.action, other.action, "{tag}: Zug");
+            assert_eq!(a.value.to_bits(), other.value.to_bits(), "{tag}: Wert");
+            assert_eq!(a.nodes, other.nodes, "{tag}: Knoten");
+            assert_eq!(a.completed_depth, other.completed_depth, "{tag}: Tiefe");
+            assert_eq!(a.from_partial_iteration, other.from_partial_iteration, "{tag}: Ausnahme");
+        }
+        // Kleine Ueberschreitung ist Bestandsverhalten: `negamax` zaehlt VOR der
+        // Budgetpruefung, und die Ausgangsschleife eines Zufallsknotens
+        // (`child_value`) prueft das Budget nicht -- jeder weitere Ausgang kostet
+        // noch einen Knoten. Grob nach oben begrenzt (HERLEITUNG, nicht gemessen).
+        assert!(a.nodes < budget + 100, "Budget weit ueberschritten: {}", a.nodes);
+        assert!(a.completed_depth >= 1);
+    }
+
+    /// Buchfuehrung des HEUTIGEN Loesers fuer die Kalibriersonde: ein Nachbau
+    /// der Schleife aus `choose_action_deadlined`, damit der Bestandspfad
+    /// unberuehrt bleibt. Paritaet mit dem Original: Test darunter.
+    struct LegacySolverStats {
+        action: Option<Action>,
+        nodes: u64,
+        n_children: usize,
+        children_searched: usize,
+        /// Das Budget (oder der Deckel) war nach dem ERSTEN Kind erschoepft, es
+        /// gab weitere Kinder -- der Loeser gibt dann `ordered_children[0]`
+        /// zurueck, also die Vorsortierung.
+        first_child_ate_budget: bool,
+    }
+
+    fn legacy_choose_with_stats(state: &GameState, chance: bool, budget: u64, deadline: Instant) -> LegacySolverStats {
+        let perspective = state.current_player;
+        let children = ordered_children(state, chance);
+        let n_children = children.len();
+        if children.len() <= 1 {
+            return LegacySolverStats {
+                action: children.first().map(|c| c.action.clone()),
+                nodes: 0,
+                n_children,
+                children_searched: 0,
+                first_child_ate_budget: false,
+            };
+        }
+        let mut node_count: u64 = 0;
+        let mut depth_cut_unused = false;
+        let mut best_action = children[0].action.clone();
+        let mut best_val = f64::NEG_INFINITY;
+        let mut alpha = f64::NEG_INFINITY;
+        let mut children_searched = 0usize;
+        let mut first_child_ate_budget = false;
+        for child in &children {
+            if node_count >= budget || Instant::now() >= deadline {
+                if children_searched == 1 {
+                    first_child_ate_budget = true;
+                }
+                break;
+            }
+            let val = child_value(
+                child, MAX_DEPTH.saturating_sub(1), alpha, f64::INFINITY, perspective,
+                &mut node_count, budget, deadline, chance, &mut depth_cut_unused,
+            );
+            children_searched += 1;
+            if val > best_val {
+                best_val = val;
+                best_action = child.action.clone();
+            }
+            if val > alpha {
+                alpha = val;
+            }
+        }
+        LegacySolverStats { action: Some(best_action), nodes: node_count, n_children, children_searched, first_child_ate_budget }
+    }
+
+    #[test]
+    fn legacy_stats_replica_matches_choose_action_deadlined() {
+        use crate::round_transition::drive_to_round_start;
+        let s = drive_to_round_start(51, 5);
+        let far = || Instant::now() + Duration::from_secs(600);
+        let replica = legacy_choose_with_stats(&s, true, NODE_BUDGET, far());
+        assert_eq!(replica.action, choose_action_deadlined(&s, true, NODE_BUDGET, far()));
+        assert!(replica.children_searched >= 1);
+        assert!(replica.n_children >= 2, "Testaufbau: mehr als ein Kandidat");
+    }
+
+    /// KALIBRIERSONDE der iterativen Vertiefung (`PREREG_r5_net_vs_solver.md`
+    /// par.5a, Messung Stufe 1), manuell:
+    /// `cargo test --release --lib r5_iterative_deepening_calibration_probe -- --ignored --nocapture`
+    ///
+    /// Dieselben realistischen Stellungen wie `round5_node_calibration_probe`
+    /// (`drive_to_round_start(seed, 5)`, 8 Seeds), die Runde gespielt mit dem
+    /// HEUTIGEN Loeser @200. Je Entscheidung mit mehr als einem Kandidaten:
+    /// (i) heutiger Loeser @200 (Not-Deckel `TIME_BUDGET`): Knoten, ms,
+    /// durchsuchte Wurzelkinder, und ob das erste Kind das Budget frass;
+    /// (ii) iterativ @400 und @2000 (Not-Deckel `deadline_for_budget`): volle
+    /// Tiefe, Knoten, ms, Rundenende erreicht, Zug aus der angebrochenen
+    /// Iteration, gleicher Zug wie der heutige Loeser. Zufallsknoten wie in der
+    /// Produktion (`chance_nodes_enabled()`). Netz-Zeiten misst die Sonde NICHT.
+    /// Auf freier Maschine laufen lassen (CPU-Last verfaelscht die ms).
+    #[test]
+    #[ignore]
+    fn r5_iterative_deepening_calibration_probe() {
+        use crate::round_transition::drive_to_round_start;
+        use std::collections::BTreeMap;
+        use std::io::Write;
+
+        struct ArmLog {
+            ms: Vec<f64>,
+            nodes: Vec<f64>,
+            depth: BTreeMap<u32, usize>,
+            round_end: usize,
+            partial: usize,
+            same_as_legacy: usize,
+        }
+        let new_arm = || ArmLog {
+            ms: Vec::new(),
+            nodes: Vec::new(),
+            depth: BTreeMap::new(),
+            round_end: 0,
+            partial: 0,
+            same_as_legacy: 0,
+        };
+        let pct = |v: &[f64], q: f64| -> f64 {
+            if v.is_empty() {
+                return f64::NAN;
+            }
+            let mut s = v.to_vec();
+            s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            s[((s.len() - 1) as f64 * q).round() as usize]
+        };
+
+        let chance = chance_nodes_enabled();
+        let budgets = [400u64, 2000];
+        let mut legacy_ms: Vec<f64> = Vec::new();
+        let mut legacy_nodes: Vec<f64> = Vec::new();
+        let mut legacy_first_ate = 0usize;
+        let mut legacy_one_child = 0usize;
+        let mut arms: Vec<ArmLog> = budgets.iter().map(|_| new_arm()).collect();
+        let mut decisions = 0usize;
+        let t_total = Instant::now();
+        println!("R5-ITERATIV-SONDE chance={chance} budgets={budgets:?}");
+        let _ = std::io::stdout().flush();
+
+        for seed in [101u64, 202, 303, 404, 505, 606, 707, 808] {
+            let mut state = drive_to_round_start(seed, 5);
+            let mut step = 0u32;
+            while state.phase == Phase::Drafting && step < 200 {
+                let t0 = Instant::now();
+                let legacy = legacy_choose_with_stats(&state, chance, NODE_BUDGET, Instant::now() + TIME_BUDGET);
+                let legacy_elapsed = t0.elapsed().as_secs_f64() * 1000.0;
+                let Some(legacy_action) = legacy.action.clone() else { break };
+                if legacy.n_children > 1 {
+                    decisions += 1;
+                    legacy_ms.push(legacy_elapsed);
+                    legacy_nodes.push(legacy.nodes as f64);
+                    if legacy.first_child_ate_budget {
+                        legacy_first_ate += 1;
+                    }
+                    if legacy.children_searched == 1 {
+                        legacy_one_child += 1;
+                    }
+                    let mut line = format!(
+                        "seed={seed} step={step} kand={} | alt@{NODE_BUDGET} knoten={} ms={legacy_elapsed:.0} kinder={}/{} erstes_frisst={}",
+                        legacy.n_children, legacy.nodes, legacy.children_searched, legacy.n_children,
+                        legacy.first_child_ate_budget
+                    );
+                    for (arm, &budget) in arms.iter_mut().zip(budgets.iter()) {
+                        let t1 = Instant::now();
+                        let out = choose_action_iterative_inner(
+                            &state, chance, budget, Instant::now() + deadline_for_budget(budget),
+                        )
+                        .expect("Aktion");
+                        let ms = t1.elapsed().as_secs_f64() * 1000.0;
+                        arm.ms.push(ms);
+                        arm.nodes.push(out.nodes as f64);
+                        *arm.depth.entry(out.completed_depth).or_insert(0) += 1;
+                        arm.round_end += usize::from(out.reached_round_end);
+                        arm.partial += usize::from(out.from_partial_iteration);
+                        let same = out.action == legacy_action;
+                        arm.same_as_legacy += usize::from(same);
+                        line.push_str(&format!(
+                            " | it@{budget} tiefe={} knoten={} ms={ms:.0} ende={} partiell={} gleich_alt={same}",
+                            out.completed_depth, out.nodes, out.reached_round_end, out.from_partial_iteration
+                        ));
+                    }
+                    println!("{line}");
+                    let _ = std::io::stdout().flush();
+                }
+                let mut g = Game { state };
+                if g.apply_drafting(&legacy_action).is_err() {
+                    break;
+                }
+                state = g.state;
+                step += 1;
+            }
+        }
+
+        let n = decisions.max(1) as f64;
+        println!("ZUSAMMENFASSUNG, {decisions} Runde-5-Entscheidungen mit >=2 Kandidaten (8 Partien)");
+        println!(
+            "  alt@{NODE_BUDGET}: ms Median {:.0} p90 {:.0} max {:.0}; Knoten Median {:.0}; erstes Kind frisst Budget {legacy_first_ate}/{decisions} ({:.1} %); nur ein Kind durchsucht {legacy_one_child}/{decisions}",
+            pct(&legacy_ms[..], 0.5), pct(&legacy_ms[..], 0.9), pct(&legacy_ms[..], 1.0), pct(&legacy_nodes[..], 0.5),
+            100.0 * legacy_first_ate as f64 / n
+        );
+        for (arm, &budget) in arms.iter().zip(budgets.iter()) {
+            println!(
+                "  it@{budget}: ms Median {:.0} p90 {:.0} max {:.0}; Knoten Median {:.0}; Tiefe {:?}; Rundenende {}/{decisions}; Ausnahme angebrochen {}/{decisions}; gleicher Zug wie alt {}/{decisions}",
+                pct(&arm.ms[..], 0.5), pct(&arm.ms[..], 0.9), pct(&arm.ms[..], 1.0), pct(&arm.nodes[..], 0.5),
+                arm.depth, arm.round_end, arm.partial, arm.same_as_legacy
+            );
+        }
+        println!("  laufzeit: wanduhr_s={:.1} threads=1", t_total.elapsed().as_secs_f64());
+        let _ = std::io::stdout().flush();
     }
 }

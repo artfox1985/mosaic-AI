@@ -44,7 +44,7 @@ V33_B03_B04 = REPO / "tools" / "night_v33_b03_b04.sh"
 # In v34 absichtlich anders als in v33: Platzhalter (null) und die neuen Knoepfe.
 V34_SEEDS = {"policy": 20260946, "value-wegc": 20260947, "value-excursion": 20260948}
 PLACEHOLDER_OR_NEW = {"model", "version", "seed", "tie_mirror_p", "label_rng_split",
-                      "excursion_reshuffle", "recipe", "recipe_class"}
+                      "excursion_reshuffle", "excursion_kl_weight", "recipe", "recipe_class"}
 
 
 def fresh_parser():
@@ -210,12 +210,15 @@ class WithoutRecipeUnchanged(unittest.TestCase):
         self.assertIsNone(via["tie_mirror_p"])
         self.assertIs(via["label_rng_split"], False)
         self.assertIs(via["excursion_reshuffle"], False)
+        self.assertIs(via["excursion_kl_weight"], False)
 
     def test_new_knobs_only_touch_the_environment_when_given(self):
         text = SELF_PLAY.read_text(encoding="utf-8")
         self.assertIn('if tie_mirror_p is not None:\n        os.environ["MOSAIC_TIE_MIRROR_P"]', text)
         self.assertIn('if label_rng_split:\n        os.environ["MOSAIC_LABEL_RNG_SPLIT"] = "1"', text)
         self.assertIn('if excursion_reshuffle:\n        os.environ["MOSAIC_EXCURSION_RESHUFFLE"] = "1"',
+                      text)
+        self.assertIn('if excursion_kl_weight:\n        os.environ["MOSAIC_EXCURSION_KL_WEIGHT"] = "1"',
                       text)
 
 
@@ -274,7 +277,8 @@ class Ordering(unittest.TestCase):
     def test_new_knobs_reach_the_worker_before_the_engine_import(self):
         worker = self.text[self.text.index("def _worker_run_chunk("):]
         import_at = worker.index("import mosaic_rust as mr")
-        for env in ("MOSAIC_TIE_MIRROR_P", "MOSAIC_LABEL_RNG_SPLIT", "MOSAIC_EXCURSION_RESHUFFLE"):
+        for env in ("MOSAIC_TIE_MIRROR_P", "MOSAIC_LABEL_RNG_SPLIT", "MOSAIC_EXCURSION_RESHUFFLE",
+                    "MOSAIC_EXCURSION_KL_WEIGHT"):
             self.assertLess(worker.index(f'os.environ["{env}"]'), import_at)
 
 

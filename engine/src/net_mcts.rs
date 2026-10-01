@@ -1163,6 +1163,29 @@ pub struct SearchConfig {
     /// ([`crate::round5::net_solver_enabled`]). Umgekehrte Polung: `false` ist
     /// die Verhaltensaenderung.
     pub r5_net_solver: bool,
+    /// Runde-5-Loeser DIESER SEITE mit iterativer Vertiefung
+    /// (`PREREG_r5_net_vs_solver.md` par.5a, `round5::choose_action_iterative`).
+    /// `false` = Bestand (`round5::choose_action`-Rechenweg). Wirkt nur, wenn
+    /// [`Self::r5_net_solver`] an ist und Runde 5 laeuft
+    /// ([`r5_solver_takes_over`]); gelesen ueber [`r5_solver_action`] und
+    /// [`r5_solver_action_and_root_q`].
+    ///
+    /// Spec-Feld je Seite (`r5_solver_iterative`, OPTIONAL, 0 oder 1 als Zahl;
+    /// fehlt es, gilt der Env-Default `MOSAIC_R5_SOLVER_ITERATIVE`,
+    /// [`crate::round5::solver_iterative_env`]).
+    pub r5_solver_iterative: bool,
+    /// Knotenbudget des Runde-5-Loesers DIESER SEITE je Entscheidung
+    /// (`PREREG_r5_net_vs_solver.md` par.5a). Gilt fuer beide Bauformen: im
+    /// Bestandspfad nur fuer den Knotenzaehler (Not-Deckel bleibt
+    /// `round5::TIME_BUDGET`), im iterativen Pfad zusaetzlich fuer den
+    /// mitwachsenden Not-Deckel `round5::deadline_for_budget`.
+    ///
+    /// Spec-Feld je Seite (`r5_solver_node_budget`, OPTIONAL, ganze Zahl
+    /// >= 1; fehlt es, gilt der Env-Default `MOSAIC_R5_NODE_BUDGET`, also
+    /// [`crate::round5::node_budget`], ohne Variable `round5::NODE_BUDGET` =
+    /// 200). Die Label-Pfade (`round5::exact_round5_outcome`) und die
+    /// Heuristik-Bahn lesen weiter nur den Env-Wert.
+    pub r5_solver_node_budget: u64,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1279,6 +1302,8 @@ impl SearchConfig {
             net_tiling_tiebreak: read_net_tiling_tiebreak_env(),
             single_pass_other_val: single_pass_other_val_env(),
             r5_net_solver: crate::round5::net_solver_enabled(),
+            r5_solver_iterative: crate::round5::solver_iterative_env(),
+            r5_solver_node_budget: crate::round5::node_budget(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1341,6 +1366,8 @@ impl SearchConfig {
             "net_tiling_tiebreak",
             "single_pass_other_val",
             "r5_net_solver",
+            "r5_solver_iterative",
+            "r5_solver_node_budget",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1699,6 +1726,26 @@ impl SearchConfig {
         };
         let single_pass_other_val = spec_flag("single_pass_other_val", single_pass_other_val_env())?;
         let r5_net_solver = spec_flag("r5_net_solver", crate::round5::net_solver_enabled())?;
+        // Loeser-Bauform und -Budget je Seite (`PREREG_r5_net_vs_solver.md`
+        // par.5a): OPTIONAL, fehlt das Feld, gilt der Env-Default -- dieselbe
+        // Regel wie bei `r5_net_solver` darueber, eine Spec ohne die Felder
+        // beschreibt also weiter bitgenau den Bestand.
+        let r5_solver_iterative = spec_flag("r5_solver_iterative", crate::round5::solver_iterative_env())?;
+        let r5_solver_node_budget = match obj.get("r5_solver_node_budget") {
+            None => crate::round5::node_budget(),
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'r5_solver_node_budget' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(1.0..=1_000_000_000.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'r5_solver_node_budget' muss eine ganze Zahl \
+                         zwischen 1 und 1000000000 sein, ist {x}"
+                    ));
+                }
+                x as u64
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -1843,6 +1890,8 @@ impl SearchConfig {
             net_tiling_tiebreak,
             single_pass_other_val,
             r5_net_solver,
+            r5_solver_iterative,
+            r5_solver_node_budget,
             heuristic_variant,
             sims,
             root_noise,
@@ -6563,6 +6612,52 @@ pub(crate) fn r5_solver_takes_over(state: &GameState, search_config: &SearchConf
     search_config.r5_net_solver && crate::round5::applies(state)
 }
 
+/// Der Loeser-Zug DIESER SEITE, sobald [`r5_solver_takes_over`] greift
+/// (`PREREG_r5_net_vs_solver.md` par.5a): Bauform und Budget aus
+/// [`SearchConfig::r5_solver_iterative`] / [`SearchConfig::r5_solver_node_budget`].
+///
+/// Bis 2026-09-26 stand an diesen Stellen `crate::round5::choose_action(state)`.
+/// Mit den Default-Feldern (`false`, `round5::node_budget()`) ruft
+/// `choose_action_for_side` denselben Kern mit denselben Argumenten
+/// (`round5::choose_action_inner(state, chance_nodes_enabled(), node_budget())`),
+/// also byte-identisch; kein zusaetzlicher Zustands- oder RNG-Zugriff.
+fn r5_solver_action(state: &GameState, search_config: &SearchConfig) -> Option<Action> {
+    crate::round5::choose_action_for_side(
+        state,
+        search_config.r5_solver_iterative,
+        search_config.r5_solver_node_budget,
+    )
+}
+
+/// Loeser-Zug plus Wurzel-Q (Gewinnwahrscheinlichkeit aus Sicht des
+/// Ziehenden) fuer den Self-Play-Record-Einstieg
+/// [`net_root_child_stats_policy_and_prior`].
+///
+/// Bestandspfad (`r5_solver_iterative == false`) wie bis 2026-09-26: ZUERST der
+/// Zug ueber den Loeser, DANN der Wurzelwert aus einem zweiten Lauf
+/// `choose_action_with_analysis` (Begruendung siehe dort am Aufrufer). Mit
+/// Default-Budget dieselben Aufrufe in derselben Reihenfolge.
+///
+/// Iterativ: EIN Lauf liefert beides -- der Wurzelwert gehoert dann genau zum
+/// gespielten Zug, und ein zweiter Lauf mit bis zu 2000 Knoten waere doppelte
+/// Rechenzeit fuer eine Metadatenzahl.
+fn r5_solver_action_and_root_q(state: &GameState, search_config: &SearchConfig) -> (Option<Action>, Option<f64>) {
+    if search_config.r5_solver_iterative {
+        let out = crate::round5::choose_action_iterative(state, search_config.r5_solver_node_budget);
+        let root_q = out.as_ref().map(|o| crate::round5::margin_to_win_prob(o.value));
+        return (out.map(|o| o.action), root_q);
+    }
+    let chosen = r5_solver_action(state, search_config);
+    let root_q = crate::round5::choose_action_with_analysis_for_side(state, false, search_config.r5_solver_node_budget)
+        .1
+        .get("moves")
+        .and_then(|m| m.as_array())
+        .and_then(|moves| moves.iter().find(|mv| mv.get("chosen").and_then(Value::as_bool) == Some(true)))
+        .and_then(|mv| mv.get("mcts_q"))
+        .and_then(Value::as_f64);
+    (chosen, root_q)
+}
+
 /// Beste Drafting-Aktion per Netz-PUCT (meistbesuchtes Wurzelkind). None außerhalb
 /// der Drafting-Phase. `add_root_noise` nur im Self-Play aktivieren.
 /// `search_config` (PREREG_agent_encapsulation.md par.3/par.4): pro-Seite-
@@ -6586,7 +6681,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // gegatet: siehe `SearchConfig::r5_net_solver` fuer den Knopf je Seite und
     // `PREREG_r5_net_vs_solver.md` fuer die Gegenprobe.
     if r5_solver_takes_over(state, search_config) {
-        return crate::round5::choose_action(state);
+        return r5_solver_action(state, search_config);
     }
     // PREREG_ismcts_determinizations.md: Getter statt Konstante (siehe
     // `num_determinizations`-Doku) -- der `<= 1`-Kurzschluss bleibt exakt
@@ -6638,7 +6733,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
         return None;
     }
     if r5_solver_takes_over(state, search_config) {
-        return crate::round5::choose_action(state);
+        return r5_solver_action(state, search_config);
     }
     let k = num_determinizations();
     if k <= 1 {
@@ -6696,7 +6791,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     // Fallback (bei leerer Stats-Liste) nicht faelschlich fuer die
     // Aktionswahl zustaendig.
     if r5_solver_takes_over(state, search_config) {
-        return crate::round5::choose_action(state)
+        return r5_solver_action(state, search_config)
             .into_iter()
             .map(|a| (a, 1, 1.0))
             .collect();
@@ -6758,12 +6853,47 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     rng: &mut R,
     search_config: &SearchConfig,
 ) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>, Vec<(Action, f64)>) {
+    // Duenner Wrapper (PREREG_targeted_branching.md par.7): derselbe Rumpf,
+    // derselbe RNG-Verbrauch; der fuenfte Wert (Wurzel-Priors) wird verworfen.
+    let (stats, policy, root_q, root_child_q, _root_prior) =
+        net_root_child_stats_policy_and_prior(net, state, sims, c_puct, add_root_noise, rng, search_config);
+    (stats, policy, root_q, root_child_q)
+}
+
+/// Wie [`net_root_child_stats_and_policy`], liefert ZUSAETZLICH als fuenftes
+/// Element den PRIOR je Wurzelkandidat (PREREG_targeted_branching.md par.7:
+/// der Ausflug zweigt nach `KL(completed-Q-Ziel || Prior)` ab). EXAKT dieselbe
+/// Reihenfolge und Laenge wie das zweite Element (`completed_q_policy`) --
+/// beide laufen ueber `children ∪ untried` der Wurzel (siehe
+/// [`root_prior_raw`]). Der Prior ist genau der Wert, den `improved_policy`
+/// fuer das Policy-Ziel verwendet: die maskierte Softmax der Netz-Logits ueber
+/// die eindeutigen legalen Aktions-IDs (`build_untried_actions`), bei
+/// Mondstein-Varianten auf die Varianten aufgeteilt (Summe je ID = Softmax
+/// der ID). Im Gumbel-Pfad (`USE_GUMBEL_SEARCH`) wird an der Wurzel KEIN
+/// Dirichlet-Rauschen auf die Priors gemischt (das Gumbel-Rauschen geht nur
+/// in die Top-m-Auswahl, `build_gumbel_tree_inner_for`), der Prior ist also
+/// roh. Keine zweite Netzauswertung: die Werte liegen im Baum ohnehin vor.
+/// Leerer Vektor im Runde-5-Loeser-Zweig (dort gibt es keinen Netz-Prior)
+/// und bei leerer Suche.
+#[allow(clippy::type_complexity)]
+pub fn net_root_child_stats_policy_and_prior<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+    search_config: &SearchConfig,
+) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>, Vec<(Action, f64)>, Vec<(Action, f64)>) {
     if state.phase != Phase::Drafting {
-        return (Vec::new(), Vec::new(), None, Vec::new());
+        return (Vec::new(), Vec::new(), None, Vec::new(), Vec::new());
     }
     if r5_solver_takes_over(state, search_config) {
-        let stats: Vec<(Action, u32, f64)> =
-            crate::round5::choose_action(state).into_iter().map(|a| (a, 1, 1.0)).collect();
+        // Zug und Wurzel-Q in EINEM Helfer (par.5a), Bestandspfad mit derselben
+        // Aufruffolge wie bisher: erst der Zug, dann die Analyse (Kommentar
+        // unten zur Begruendung des zweiten Laufs).
+        let (chosen, root_q) = r5_solver_action_and_root_q(state, search_config);
+        let stats: Vec<(Action, u32, f64)> = chosen.into_iter().map(|a| (a, 1, 1.0)).collect();
         let n = stats.len().max(1);
         let policy: Vec<(Action, f64)> = stats.iter().map(|(a, _, _)| (a.clone(), 1.0 / n as f64)).collect();
         // Runde 5 hat KEINEN MCTS-Baum (Alpha-Beta statt Netz-Suche, siehe
@@ -6784,15 +6914,8 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         // billiger Alpha-Beta-Lauf (NODE_BUDGET=200, keine Netz-Evals) --
         // anders als beim MCTS-Pfad unten NICHT wortwörtlich kostenlos, aber
         // neben der dominanten Netz-Suchkoste vernachlässigbar.
-        let root_q = crate::round5::choose_action_with_analysis(state)
-            .1
-            .get("moves")
-            .and_then(|m| m.as_array())
-            .and_then(|moves| {
-                moves.iter().find(|mv| mv.get("chosen").and_then(Value::as_bool) == Some(true))
-            })
-            .and_then(|mv| mv.get("mcts_q"))
-            .and_then(Value::as_f64);
+        // SEIT 2026-09-27 steht diese Extraktion in `r5_solver_action_and_root_q`
+        // (oben aufgerufen); bei `r5_solver_iterative` entfaellt der zweite Lauf.
         // Task #35: Runde 5 hat -- anders als der Gumbel-Baumpfad unten --
         // KEIN echtes Geschwister-Set in `stats`/`policy` (by design nur die
         // EINE alphabeta-optimale Aktion, siehe oben), also auch kein echtes
@@ -6803,7 +6926,8 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         // für das Training kommen ausschließlich aus Runden 1-4.
         let root_child_q: Vec<(Action, f64)> =
             stats.iter().map(|(a, _, _)| (a.clone(), root_q.unwrap_or(0.5))).collect();
-        return (stats, policy, root_q, root_child_q);
+        // PREREG_targeted_branching.md par.7: kein Netz-Prior im Loeser-Zweig.
+        return (stats, policy, root_q, root_child_q, Vec::new());
     }
     let k = num_determinizations();
     if k <= 1 {
@@ -6816,6 +6940,7 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
             root_completed_q_policy(&nodes),
             root_q,
             root_completed_q_raw(&nodes),
+            root_prior_raw(&nodes),
         );
     }
     // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
@@ -6836,7 +6961,49 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
         average_completed_q_policy(&forest),
         root_q,
         average_completed_q_raw(&forest),
+        average_root_prior(&forest),
     )
+}
+
+/// PREREG_targeted_branching.md par.7: Prior je Wurzelkandidat, GLEICHE
+/// Traversierung und Reihenfolge wie [`root_completed_q_policy`] (erst
+/// `children` mit ihrem `Node::prior`, dann `untried` mit dem dort
+/// gespeicherten Prior) -- 1:1 per Index mit dem Policy-Ziel zippbar. Reines
+/// Auslesen, kein Netz-/RNG-Zugriff.
+fn root_prior_raw(nodes: &[Node]) -> Vec<(Action, f64)> {
+    let mut out: Vec<(Action, f64)> =
+        Vec::with_capacity(nodes[0].children.len() + nodes[0].untried.len());
+    for &cid in &nodes[0].children {
+        if let Some(a) = nodes[cid].action.clone() {
+            out.push((a, nodes[cid].prior as f64));
+        }
+    }
+    for (act, prior) in &nodes[0].untried {
+        out.push((act.clone(), *prior as f64));
+    }
+    out
+}
+
+/// Wie [`average_completed_q_raw`], aber fuer [`root_prior_raw`]:
+/// arithmetisches Mittel je Aktion ueber den Determinisierungs-Wald,
+/// Schluessel und Reihenfolge der ersten Welt. Keine Renormierung hier (der
+/// Verbraucher normiert je Aktions-ID, siehe `self_play::policy_kl_by_id`).
+fn average_root_prior(forest: &[Vec<Node>]) -> Vec<(Action, f64)> {
+    let per_world: Vec<Vec<(Action, f64)>> = forest.iter().map(|nodes| root_prior_raw(nodes)).collect();
+    let Some(reference) = per_world.first() else { return Vec::new() };
+    let mut out: Vec<(Action, f64)> = Vec::with_capacity(reference.len());
+    for (act, _) in reference {
+        let mut sum = 0.0f64;
+        let mut count = 0usize;
+        for world in &per_world {
+            if let Some(&(_, p)) = world.iter().find(|(a, _)| a == act) {
+                sum += p;
+                count += 1;
+            }
+        }
+        out.push((act.clone(), if count > 0 { sum / count as f64 } else { 0.0 }));
+    }
+    out
 }
 
 /// Zippt `improved_policy(nodes, 0)` (reine Zahlen, Reihenfolge
@@ -6988,7 +7155,13 @@ fn net_search_with_tree_inner<R: Rng + ?Sized>(
         return (None, Value::Null);
     }
     if r5_solver_takes_over(state, &search_config) {
-        return crate::round5::choose_action_with_analysis(state);
+        // par.5a: Bauform und Budget der Seite. Mit Default-Feldern derselbe
+        // Rechenweg wie `round5::choose_action_with_analysis`.
+        return crate::round5::choose_action_with_analysis_for_side(
+            state,
+            search_config.r5_solver_iterative,
+            search_config.r5_solver_node_budget,
+        );
     }
     // Debug-UI-/Mensch-vs-Netz-Einstieg (py.rs, kein Arena-/Self-Play-Pfad).
     //
@@ -9092,6 +9265,10 @@ mod tests {
             // Runde-5-Schalters ist der Loeser (an), `false` waere hier eine
             // Verhaltensaenderung.
             r5_net_solver: crate::round5::NET_SOLVER_DEFAULT,
+            // Loeser-Bauform und -Budget (par.5a): Bestand, als Konstanten
+            // statt Env-Getter, aus demselben Grund wie die Stilmittel unten.
+            r5_solver_iterative: crate::round5::SOLVER_ITERATIVE_DEFAULT,
+            r5_solver_node_budget: crate::round5::NODE_BUDGET,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -9378,6 +9555,49 @@ mod tests {
                 std::fs::remove_file(&p_bad).ok();
                 assert!(msg.contains(field), "Fehlermeldung nennt das Feld ({field}/{tag}): {msg}");
             }
+        }
+    }
+
+    /// `PREREG_r5_net_vs_solver.md` par.5a: Bauform und Budget des
+    /// Runde-5-Loesers je Seite. Beide OPTIONAL; fehlen sie, gelten die
+    /// Env-Defaults (also bei ungesetzter Umgebung der Bestand: aus, 200).
+    /// Gesetzt kommen sie an; ungueltige Werte sind harte Fehler.
+    #[test]
+    fn search_config_spec_r5_solver_fields_are_optional_and_validated() {
+        assert!(!search_config_off().r5_solver_iterative);
+        assert_eq!(search_config_off().r5_solver_node_budget, crate::round5::NODE_BUDGET);
+        let dir = std::env::temp_dir();
+        let write = |tag: &str, extra: &str| {
+            let path = dir.join(format!("mosaic_test_spec_r5it_{tag}_{}.json", std::process::id()));
+            std::fs::write(&path, format!("{{{SPEC_MIN_FIELDS}{extra}}}")).unwrap();
+            path
+        };
+        let p_missing = write("missing", "");
+        let cfg = SearchConfig::from_spec_file(p_missing.to_str().unwrap())
+            .expect("eine Spec ohne die Felder muss weiter laden");
+        std::fs::remove_file(&p_missing).ok();
+        assert_eq!(cfg.r5_solver_iterative, crate::round5::solver_iterative_env());
+        assert_eq!(cfg.r5_solver_node_budget, crate::round5::node_budget());
+
+        let p_set = write("set", r#", "r5_solver_iterative": 1, "r5_solver_node_budget": 2000"#);
+        let cfg_set = SearchConfig::from_spec_file(p_set.to_str().unwrap()).expect("gueltige Werte");
+        std::fs::remove_file(&p_set).ok();
+        assert!(cfg_set.r5_solver_iterative);
+        assert_eq!(cfg_set.r5_solver_node_budget, 2000);
+
+        let bad = [
+            ("r5_solver_iterative", "2"),
+            ("r5_solver_iterative", "true"),
+            ("r5_solver_node_budget", "0"),
+            ("r5_solver_node_budget", "1.5"),
+            ("r5_solver_node_budget", r#""2000""#),
+        ];
+        for (k, (field, value)) in bad.iter().enumerate() {
+            let p_bad = write(&format!("bad{k}"), &format!(r#", "{field}": {value}"#));
+            let msg = SearchConfig::from_spec_file(p_bad.to_str().unwrap())
+                .expect_err("ungueltiger Wert muss hart abgewiesen werden");
+            std::fs::remove_file(&p_bad).ok();
+            assert!(msg.contains(field), "Fehlermeldung nennt das Feld ({field}={value}): {msg}");
         }
     }
 
