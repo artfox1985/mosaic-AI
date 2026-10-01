@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Erzeugung fertig in 7,30 h (par.9): Spiegelknopf und KL-Abzweig gruen, aber Tor 2a GERISSEN (sp_voll 0,921 gegen 0,966), Nutzer-Vorlage. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Erzeugung fertig in 7,30 h (par.9): Spiegelknopf und KL-Abzweig gruen, aber Tor 2a GERISSEN (sp_voll 0,921 gegen 0,966); Diagnose par.9a: Runde 5 per Netz bei 100 Sims kostet gepaart -3,54 Punkte je Seite (z -5,9). Nutzer-Vorlage. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -256,4 +256,34 @@ erklaert den Rueckgang hoechstens zum Teil. Weitere Kandidaten, UNGEPRUEFT: Gene
 E1 und R5-Netz bei 100 Sims (ihre A/B liefen bei 400 Sims und zeigten dort MEHR volle Spalten und
 WENIGER Strafleiste, `PREREG_evaluator_pretests.md` par.8d, `PREREG_r5_net_vs_solver.md` par.6a).
 Nicht gedeutet; Entscheid beim Nutzer.
+
+### par.9a Diagnose des Tor-2a-Risses (2026-10-01, Nutzer: Option 1, ohne neue Partien)
+
+Die Kostentor-Korpora (par.8a: `data/probe_v34costgate`, v33-b01, Sockel-Flags, E1 an, Runde 5 per
+Loeser bzw. Netz, je 100 Partien, Seed 20261698; `data/probe_e1gate`: v32-b01, E1 aus/an, je 100
+Partien, Seed 20261699) aus restic `a3755374` in den Scratchpad zurueckgeholt (nicht nach `data/`),
+ausgewertet mit `tools/corpus_sanity_check.py` und einem gepaarten Vergleich.
+
+**R5 Loeser gegen Netz bei 100 Sims, GEPAART:** in **100 von 100** Partien ist der Spielerzustand am
+ersten Runde-5-Record in beiden Armen identisch; alle Unterschiede entstehen in Runde 5. Grundmenge
+100 Partien (Einheit Partie, beide Seiten summiert; 95-%-Intervall ueber Partien):
+
+| Netz minus Loeser | je Seite | je Partie | z | Partien mit Unterschied |
+| --- | --- | --- | --- | --- |
+| eigene Punkte | **-3,54** | -7,08 +- 2,36 | **-5,9** | 97 |
+| groesste Strafleiste in Runde 5 (Steine) | **+0,57** | +1,13 +- 0,43 | **+5,2** | 79 |
+| volle Spalten | -0,045 | -0,09 +- 0,15 | -1,2 | 30 |
+| volle Reihen | -0,025 | -0,05 +- 0,06 | -1,7 | 6 |
+
+Anderer Sieger in 24 von 100 Partien. **Groesse und Richtung decken sich mit dem Tor-2a-Riss**
+(Sockel v34 gegen v33: Punkte -3,63, Strafleiste +0,77, Spalten -0,045, Reihen -0,022). Lesart als
+HERLEITUNG, nicht gemessen: die Netzsuche in Runde 5 bei 100 Sims verliert im Self-Play gegen sich
+selbst Punkte und fuellt die Strafleiste; das ist KEINE Staerkeaussage (beide Seiten spielen gleich,
+das A/B bei 400 Sims Kopf an Kopf gewann das Netz 495:305, `PREREG_r5_net_vs_solver.md` par.6a, und
+dort hatte das Netz WENIGER Strafleiste). Der Spiegelknopf (par.9: gespiegelt -0,026 Spalten am
+Sockel) und der Generatorwechsel kommen fuer die Spalten dazu, ungetrennt.
+
+**E1 aus gegen an bei 100 Sims** (v32-b01, ungepaart, je 200 Seiten): Punkte 53,38 / 53,26,
+Strafleiste 4,96 / 4,85, volle Spalten 1,090 / 0,990 (+-0,105), volle Reihen 0,085 / 0,130. Kein
+Hinweis auf Punkte oder Strafleiste; die Spalten-Differenz liegt innerhalb der Streuung.
 

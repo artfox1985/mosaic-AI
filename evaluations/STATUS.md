@@ -18,7 +18,7 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**FERTIG: die v34-Erzeugung** (10:06:42-17:25:01, 7,30 h, je Klasse 4.000 Partien, 0 `[Watchdog]`-Zeilen). **Abnahmen 2026-10-01** (`PREREG_v34_window.md` par.9): Manifest-Diff und Waechter gruen, Tor 0 gruen, Spiegelknopf gruen (49,03 % am Sockel), KL-Abzweig GREIFT (Median 1,095 gegen q75 0,804). **Tor 2a GERISSEN:** `sp_voll` 0,921 gegen 0,966 (v33), dazu Punkte 49,70 gegen 53,33 und Strafleiste 5,76 gegen 4,99. **NUTZER-VORLAGE, nichts weiter gestartet** (Abschnitt 6 Punkt 1).
+**FERTIG: die v34-Erzeugung** (10:06:42-17:25:01, 7,30 h, je Klasse 4.000 Partien, 0 `[Watchdog]`-Zeilen). **Abnahmen 2026-10-01** (`PREREG_v34_window.md` par.9): Manifest-Diff und Waechter gruen, Tor 0 gruen, Spiegelknopf gruen (49,03 % am Sockel), KL-Abzweig GREIFT (Median 1,095 gegen q75 0,804). **Tor 2a GERISSEN:** `sp_voll` 0,921 gegen 0,966 (v33), dazu Punkte 49,70 gegen 53,33 und Strafleiste 5,76 gegen 4,99. **Diagnose** (par.9a, Kostentor-Korpora aus restic): Runde 5 per Netz bei 100 Sims kostet gepaart -3,54 Punkte und +0,57 Strafleisten-Steine je Seite (z -5,9 / +5,2), Groesse wie der Riss. **NUTZER-VORLAGE, nichts weiter gestartet** (Abschnitt 6 Punkt 1). Parallel: Planungs-Agent fuer den Bau des asymmetrischen Self-Plays (Wuerfel-Klasse, Nachziehstapel, Edge Cases), schreibt nur in den Scratchpad.
 
 **Start der Erzeugung (NUR auf ausdrueckliche Nutzer-Freigabe):**
 
@@ -188,7 +188,7 @@ Offline-Messungen laufen darauf).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-1. **Tor 2a der v34-Erzeugung gerissen** (`PREREG_v34_window.md` par.9): weiter mit Fenster und Training, oder erst die Ursache eingrenzen? Billige Diagnose ohne neue Partien: die geloeschten Kostentor-Korpora (`data/probe_v34costgate`: R5 Loeser gegen Netz bei 100 Sims, je 100 Partien, gleiche Seeds; `data/probe_e1gate`: E1 aus/an) liegen in restic `a3755374` und lassen sich auf Spalten, Punkte und Strafleiste vergleichen.
+1. **Tor 2a der v34-Erzeugung gerissen** (`PREREG_v34_window.md` par.9, Diagnose par.9a: Runde 5 per Netz bei 100 Sims): weiter mit Fenster und Training, oder erst die Ursache eingrenzen? Billige Diagnose ohne neue Partien: die geloeschten Kostentor-Korpora (`data/probe_v34costgate`: R5 Loeser gegen Netz bei 100 Sims, je 100 Partien, gleiche Seeds; `data/probe_e1gate`: E1 aus/an) liegen in restic `a3755374` und lassen sich auf Spalten, Punkte und Strafleiste vergleichen.
 2. **Zeitpunkt der R5-Stufe-2a-A/B:** jetzt vor der Erzeugung (blockiert die Maschine rund 3,5-4 h,
    HERLEITUNG) oder wie geplant parallel zum bzw. nach dem v34-Training (Vorschlag: nach der
    Erzeugung; die Erzeugung haengt nicht daran).

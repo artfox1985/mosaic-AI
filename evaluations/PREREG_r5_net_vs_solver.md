@@ -224,3 +224,14 @@ misst nur Loeser-Arme, Doc-Kommentar `round5.rs:2299`). @100 ergibt sich als Dif
 Kostentor der v34-Erzeugung (`PREREG_v34_window.md` par.5 Punkt 3) je Partie, nicht je
 Entscheidung; @400 steht AUS, bis eine Sonde dafuer gebaut ist (nicht vor Stufe 2 noetig, weil
 Stufe 2 die Wanduhr je Partie im Artefakt traegt).
+
+### par.6c Self-Play-Wirkung bei 100 Sims (2026-10-01, Diagnose, `PREREG_v34_window.md` par.9a)
+
+Im Kostentor der v34-Erzeugung (v33-b01, Sockel-Flags, E1 an, je 100 Partien, gleiche Seeds) ist
+der Spielerzustand zu Beginn von Runde 5 in 100 von 100 Partien identisch. Runde 5 per Netz statt
+Loeser, beide Seiten gleich: **-3,54 Punkte je Seite (z -5,9), +0,57 Steine groesste Strafleiste in
+Runde 5 (z +5,2)**, volle Spalten -0,045 (z -1,2). Das ist eine SELF-PLAY-Groesse, keine
+Staerkeaussage: Kopf an Kopf bei 400 Sims gewann das Netz (par.6a). Ob das Netz bei 100 Sims Kopf
+an Kopf gegen den Loeser besteht, ist UNGEMESSEN; die v34-Erzeugung spielte Runde 5 mit 100 Sims
+per Netz (Nutzer-Entscheid 2026-10-01), und ihr Tor 2a ist gerissen (`PREREG_v34_window.md` par.9).
+
