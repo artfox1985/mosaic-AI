@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2a (par.5a): iterativer Loeser gegen das Netz, Staerke gegen Zeit, Bau laeuft. -->
+<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2a (par.5a): iterativer Loeser gegen das Netz, gebaut; Sonde (par.6b): beim heutigen Loeser frisst das erste Kind in 86 von 117 Entscheidungen das Budget, iterativ @2000 kostet 129 ms Median je Entscheidung. Offen: A/B Stufe 2. -->
 
 # Vorregistrierung: Runde 5 -- Netz gegen Loeser
 
@@ -143,7 +143,8 @@ parallel zum v34-Training (GPU und EIN CPU-Auftrag, `docs/working_rules.md`). Di
 ERZEUGUNG Runde 5 spielt, bleibt fuer v34 damit beim Ergebnis aus Stufe 1 (Nutzer-Abwaegung
 2026-09-27, Kosten eines halben Tags Verzug gegen sauberere Ausgaenge).
 
-**Kosten (Herleitung):** Knotenkosten 0,3-4,4 ms (`round5.rs:81-83`); @2000 also rund 0,6-9 s je
+**Kosten (Herleitung, durch die Sonde UEBERHOLT, par.6b: @2000 gemessen 129 ms Median je
+Entscheidung):** Knotenkosten 0,3-4,4 ms (`round5.rs:81-83`); @2000 also rund 0,6-9 s je
 Entscheidung. Ein A/B-Seed dauerte in Stufe 1 6.504,5 s (16,26 s je Partie); mit @2000 auf einer
 Seite laenger, UNGEMESSEN, die Sonde liefert die Planungszahl vor dem Start.
 
@@ -191,3 +192,35 @@ liegt. Elo-Register zwei Zeilen 2026-09-27 (`v32-b01-r5net`).
 spielt Runde 5 per Netzsuche (Env im Rezept, `PREREG_v34_window.md` par.5 Punkt 3); Seed 20261671 bleibt
 mit Nebenlast-Vermerk stehen. Champion-Spec und R5-Kalibrierung bleiben offen bis zur naechsten
 Promotion bzw. Stufe 2a.
+
+### par.6b Stufe 2a, Punkt 1: Kalibriersonde (2026-10-01, exklusiv, Wheel 1.1.0)
+
+`cargo test --release --lib r5_iterative_deepening_calibration_probe -- --ignored --nocapture`
+(Test-Binary aus dem Cache, kein Kompilieren), Wanduhr 24,3 s, 1 Thread, Zufallsknoten an
+(`chance=true`). Rohzeilen: `evaluations/artifacts/r5_iterative_calibration_probe_20261001.txt`.
+**Grundmenge:** Runde-5-Entscheidungen mit mindestens 2 Kandidaten auf 8 Stellungen
+`drive_to_round_start(seed, 5)`, Seeds 101-808, die Runde gespielt mit dem heutigen Loeser @200;
+**n = 117 Entscheidungen**, Einheit je Spalte unten. Alle drei Arme auf denselben 117 Stellungen.
+
+| Arm | ms Median / p90 / max | Knoten Median | erreichte volle Tiefe (Anzahl Entscheidungen) | Rundenende erreicht | Zug aus angebrochener Iteration | gleicher Zug wie alt@200 |
+| --- | --- | --- | --- | --- | --- | --- |
+| alt@200 (heute) | 9 / 25 / 211 | 203 | -- | -- | -- | -- |
+| iterativ @400 | 24 / 126 / 257 | 400 | 1:8, 2:60, 3:20, 4:14, 5:9, 6:4, 7:2 | 19/117 | 8/117 | 93/117 (79,5 %) |
+| iterativ @2000 | 129 / 268 / 721 | 2000 | 2:33, 3:41, 4:18, 5:5, 6:5, 7:10, 8:4, 9:1 | 30/117 | 10/117 | 77/117 (65,8 %) |
+
+**Befund aus par.5a beantwortet:** beim heutigen Loeser frisst das ERSTE Wurzelkind das Budget in
+**86 von 117 Entscheidungen (73,5 %)**; in genau diesen 86 wurde nur ein Kind durchsucht. Dort
+entscheidet die Vorsortierung (`ordered_children[0]`), nicht die Suche. Die Bauform-Lesart aus
+par.5a ist damit gemessen, nicht mehr Herleitung.
+
+**Kosten, gegen die Herleitung in par.5a:** dort standen "@2000 rund 0,6-9 s je Entscheidung"
+(aus 0,3-4,4 ms je Knoten); gemessen sind 129 ms Median, p90 268 ms, max 721 ms je
+Entscheidung, also rund 0,06 ms je Knoten im Median. Die Herleitung lag um mehr als eine
+Groessenordnung zu hoch; die Planungszahl fuer Stufe 2 ist die gemessene. Einschraenkung:
+1 Thread auf freier Maschine; im A/B laufen 10 Partien parallel (Cache-/Speicherdruck UNGEMESSEN).
+
+**Nicht gemessen von der Sonde:** die Netzzeiten je Runde-5-Entscheidung @400 und @100 (die Sonde
+misst nur Loeser-Arme, Doc-Kommentar `round5.rs:2299`). @100 ergibt sich als Differenz aus dem
+Kostentor der v34-Erzeugung (`PREREG_v34_window.md` par.5 Punkt 3) je Partie, nicht je
+Entscheidung; @400 steht AUS, bis eine Sonde dafuer gebaut ist (nicht vor Stufe 2 noetig, weil
+Stufe 2 die Wanduhr je Partie im Artefakt traegt).

@@ -43,12 +43,12 @@ gruen): KL-Abzweig-Knopf `MOSAIC_EXCURSION_KL_WEIGHT` / Flag `--excursion-kl-wei
 `engine_config` meldet excursion_kl_weight 0, r5_solver_iterative False, Budget 200.
 
 **ERSTE AUFGABEN DER NEUEN SITZUNG, in dieser Reihenfolge (alles exklusiv, eins nach dem anderen):**
-1. **Anker-Invarianz** (`/mosaic-anchor-invariance`, Drift und Konservierung gegen
-   `models/frozen_heuristics/hv4_anchor`, je unter 30 s). ROT = Nutzer-Entscheid, nicht reparieren.
-2. **Kalibriersonde iterativer Loeser** (par.5a Punkt 1): aus `engine/`, PATH mit Python-DLL,
-   `cargo test --release --lib r5_iterative_deepening_calibration_probe -- --ignored --nocapture`
-   (run_in_background, keine Pipe). Ergebnis in par.6 der R5-Prereg; die Quote "erstes Kind frisst
-   das Budget" beantwortet den Befund aus par.5a. Netzzeiten je R5-Entscheidung @400/@100 separat.
+1. **ERLEDIGT 2026-10-01: Anker-Invarianz** gegen `hv4_anchor` auf Wheel 1.1.0, Drift UND
+   Konservierung GRUEN (1.763 Schritte Feld fuer Feld; `anchor_v2_drift_live_wheel_20261001.json`,
+   `anchor_v2_conservation_20261001.json`). Elo bleibt ueber die Wheel-Runde vergleichbar.
+2. **ERLEDIGT 2026-10-01: Kalibriersonde iterativer Loeser** (`PREREG_r5_net_vs_solver.md` par.6b):
+   erstes Kind frisst das Budget in 86 von 117 Runde-5-Entscheidungen (73,5 %); iterativ @2000
+   129 ms Median je Entscheidung (Herleitung lag bei 0,6-9 s). Netzzeiten misst die Sonde nicht.
 3. **Smoke-Lauf mit dem v34-Rezept** (STATUS 3e): je Klasse wenige Partien in ein Probe-Verzeichnis
    (`MOSAIC_DATA_DIR`), Manifest pruefen (`recipe`, `mosaic_env`, `engine_config`, Waechter gruen),
    in der Ausflug-Klasse `branch_kl` am ersten Ausflug-Record vorhanden, `tie_mirrored` gesetzt.
