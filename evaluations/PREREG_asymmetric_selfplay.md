@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: ENTWURF 2026-10-01, nichts gebaut. Wuerfel-Klasse W festgelegt (par.2), Stoerer-Klasse S skizziert (par.3); Zusammensetzung des Fensters nach den Sonden (par.5), Nutzer-Plan 4.000 W plus 2.000 Sockel ohne G-1/G-2 (par.4). Zeitpunkt: nach dem v34-Training. -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: ENTWURF 2026-10-01, nichts gebaut. Wuerfel-Klasse W festgelegt (par.2), Stoerer-Klasse S skizziert, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem eigenem Wert (par.3); Zusammensetzung des Fensters nach den Sonden (par.5), Nutzer-Plan 4.000 W plus 2.000 Sockel ohne G-1/G-2 (par.4). Zeitpunkt: nach dem v34-Training. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -88,7 +88,26 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
   er ein **Spec-Feld je Seite** (Bau). Review #11 (`net_mcts.rs:3357-3359`, `opp_points` im
   gebuendelten Paar-Pfad verworfen) betrifft genau diesen Kopf und kommt in derselben Wheel-Runde.
 * Den heuristischen Stoerer aus `PREREG_opponent_disruption.md` NICHT wiederbeleben (par.7.5 dort).
-* Offen: lambda (Pilot S4), welche Seite Records schreibt (Vorschlag: nur die normale Seite), Anteil.
+* **Records BEIDER Seiten** (Nutzer 2026-10-01: *"einerseits soll das netz lernen auf einen
+  aggressiven gegner zu reagieren und andererseits selbst ein paar moves abschauen wo es sinn
+  macht"*):
+  * normale Seite: volle Records (Policy und Wert), das ist das "Reagieren".
+  * Stoerer-Seite: Policy-Ziel NUR, wo sein Zug auch nach dem EIGENEN Wert (ohne lambda) fast
+    gleichwertig ist: `own_q_gap = Q_own(bester Zug) - Q_own(gewaehlter Zug) <= eps`, sonst
+    Policy-Gewicht 0. Das ist das "Abschauen, wo es Sinn macht", und genau die
+    "bei ~gleichwertigen eigenen Zuegen"-Bedingung, die dem heuristischen Stoerer fehlte
+    (`PREREG_opponent_disruption.md` par.7.5 Punkt 2). eps und die Wertziele der Stoerer-Seite:
+    VORSCHLAG eps aus dem Pilot S4 (Anteil der Zuege, die durchkommen), Wertziele behalten und in
+    S3/S4 messen, analog zur Klasse W.
+  * **Bau-Voraussetzung, am Code gelesen 2026-10-01:** jeder Knoten speichert Rohwert und
+    `opp_points_forecast` schon (`net_mcts.rs:2815-2835`), der lambda-Blend passiert aber am Blatt
+    (`blended_leaf_win_prob`, `net_mcts.rs:3021-3023`) und hochgereicht wird EIN gemischtes Q. Fuer
+    `own_q_gap` braucht jede Wurzelkante einen zweiten Akkumulator fuer den ungemischten Wert;
+    kein zusaetzlicher Netzaufruf (HERLEITUNG, Aufwand beim Bau pruefen).
+  * Record-Felder VOR der Erzeugung: `aggr_side` (Spielerindex des Stoerers) auf jedem Record,
+    `own_q_gap` auf jedem Record der Stoerer-Seite. Die eps-Schwelle wirkt dann im Training
+    (`corpus_dataset.py`), nicht in der Erzeugung: eps bleibt ohne Neuerzeugung verschiebbar.
+* Offen: lambda (Pilot S4), eps, Anteil im Fenster.
 
 ## par.4 ZUSAMMENSETZUNG DES FENSTERS (Nutzer-Plan, endgueltig nach den Sonden)
 
