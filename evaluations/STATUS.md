@@ -52,7 +52,7 @@ gruen): KL-Abzweig-Knopf `MOSAIC_EXCURSION_KL_WEIGHT` / Flag `--excursion-kl-wei
 3. **ERLEDIGT 2026-10-01: Smoke-Lauf** gruen nach Waechter-Fix je Klasse (`PREREG_v34_window.md` par.7a). Urspruenglich: **Smoke-Lauf mit dem v34-Rezept** (STATUS 3e): je Klasse wenige Partien in ein Probe-Verzeichnis
    (`MOSAIC_DATA_DIR`), Manifest pruefen (`recipe`, `mosaic_env`, `engine_config`, Waechter gruen),
    in der Ausflug-Klasse `branch_kl` am ersten Ausflug-Record vorhanden, `tie_mirrored` gesetzt.
-4. **Kostentor der Erzeugung** (`PREREG_v34_window.md` par.5 Punkt 3): je 100 Partien Sockel-Einstellung
+4. **ERLEDIGT 2026-10-01: Kostentor** (`PREREG_v34_window.md` par.8a): Runde 5 per Netz +11,5 % je Partie (2,727 gegen 2,446 s, je 100 Partien Sockel, E1 an), Planungszahl Erzeugung rund 8,8 h (Herleitung). Urspruenglich: **Kostentor der Erzeugung** (par.5 Punkt 3): je 100 Partien Sockel-Einstellung
    mit und ohne `MOSAIC_R5_NET_SOLVER=0` (E1 in beiden an), Muster `tools/night_v33_package.sh`
    Schritt 2. Ergebnis -> par.8 der v34-Prereg (Planungszahl der Erzeugung).
 5. **v33-Kontrolle der Offline-Pruefung** (`PREREG_targeted_branching.md` par.7a):

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Gebaut, Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a). Offen: Kostentor der Erzeugung (par.8). Nichts erzeugt. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Kostentor: Runde 5 per Netz +11,5 % je Partie, Sockel 2,73 s je Partie (par.8a). Nichts erzeugt. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -183,7 +183,34 @@ je Partie einheitlich und in allen 60 Partien gesetzt (25 True). **Keine Planung
 je Klasse, die Ausflug-Klasse zaehlt Ausfluege als Partien mit. Die Smoke-Dateien liegen in
 `data/probe_v34smoke` (Loeschliste des Generationswechsels).
 
-## par.8 KOSTEN (Herleitung, nicht gemessen fuer v34)
+## par.8 KOSTEN
+
+### par.8a Kostentor der Erzeugung, GEMESSEN 2026-10-01 (par.5 Punkt 3, exklusiv, Wheel 1.1.0)
+
+`bash tools/v34_cost_gate.sh`: Generator `v33-b01`, Spec `v33_generation.spec.json`, Flags der
+Klasse `policy` aus dem Rezept (ohne `--recipe`, damit der Loeser-Arm nicht am Waechter scheitert),
+E1 in BEIDEN Armen an, Seed 20261698, 11 Threads, 100 Sims. Grundmenge je Arm 100 Partien,
+Einheit Sekunden Wanduhr je Partie (Manifest `laufzeit`, `data/probe_v34costgate`).
+
+| Arm | `r5_net_solver` (engine_config) | Partien | Zuege | Wanduhr | s je Partie |
+| --- | --- | --- | --- | --- | --- |
+| Loeser in Runde 5 | True | 100 | 19.840 | 244,6 s | 2,446 |
+| Netz in Runde 5 (v34-Rezept) | False | 100 | 19.907 | 272,7 s | 2,727 |
+
+**Ergebnis: Runde 5 per Netz kostet in der Sockel-Einstellung +11,5 % je Partie** (+0,28 s). Ein
+Lauf je Arm, keine Streuung gemessen. Netzzeit je Runde-5-Entscheidung @100 als HERLEITUNG:
+28,1 s Mehr-Wanduhr x 11 Threads auf 3.223 Records mit Runde 5 im Netz-Arm (zaehlt alle
+Record-Arten der Runde) ergibt rund 0,1 s Faden-Zeit mehr je Runde-5-Record; nicht je echter
+Entscheidung gemessen (`PREREG_r5_net_vs_solver.md` par.6b).
+
+**Planungszahl Erzeugung (HERLEITUNG):** v33 12,99 h; E1 -39,4 % (Kostentor v33, Sockel) und
+R5-Netz +11,5 % (hier, Sockel) ergeben multiplikativ rund 12,99 x 0,606 x 1,115 = 8,8 h, WENN
+beide Faktoren fuer alle drei Klassen gelten (UNGEPRUEFT fuer Weg C und Ausflug). Direkter
+Anhalt: der Sockel mit beiden Knoepfen lief hier 2,73 s je Partie, 4.000 Partien also rund
+3,0 h fuer die Sockel-Klasse.
+
+### par.8b Herleitungen vor der Messung (Stand 2026-09-27)
+
 
 * Erzeugung v33: 12,99 h fuer 3 x 4.000 Partien (`PREREG_v33_window.md` par.9). Mit E1 rund
   7,9 h, WENN die -39,4 % des Kostentors (gemessen nur an der Sockel-Einstellung, je 100 Partien)
