@@ -18,9 +18,7 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**Nichts laeuft. Die v34-Erzeugung ist startbereit und wartet auf die Nutzer-Freigabe.**
-Champion bleibt `v32-b01`; Generator der v34-Erzeugung ist `v33-b01`. Push-Stand: `main` liegt
-vor `origin/main` (Zahl mit `git rev-list --count origin/main..main`), NICHT gepusht.
+**FERTIG: die v34-Erzeugung** (Nutzer-Freigabe 2026-10-01), `bash tools/night_v34_generate.sh` 10:06:42-17:25:01, Exit 0: je Klasse 400 Dateien / 4.000 Partien, Waechter je Klasse gruen, 0 `[Watchdog]`-Zeilen; Wanduhr 9.472,7 / 9.474,3 / 7.335,7 s (policy / value-wegc / value-excursion), zusammen 7,30 h gegen 8,8 h hergeleitet. Nebenlast waehrend policy: drei Datei-Edits per kurzem `python` (je rund 1 s), gemeldet. Naechster Schritt: Abnahmen par.4.
 
 **Start der Erzeugung (NUR auf ausdrueckliche Nutzer-Freigabe):**
 
@@ -87,8 +85,9 @@ gegen dich selber spielst"*). Entwurf `PREREG_asymmetric_selfplay.md`: Wuerfel-K
 (ALLE Platten der Wuerfel-Seite gewuerfelt, Quelle/ID bzw. Stapeltiefe d in 1..max mit Obergrenze 7 in Runde 2 und 3 in Runde 3/Rotation, Platz
 per Suche @600, erzwungene Zuege ohne Record, alle Wertziele bleiben, Start normal); Stoerer-Klasse
 S skizziert (lambda_aggr je Seite, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem
-eigenem Wert). Nutzer-Plan 4.000 W plus 2.000 Sockel, G-1/G-2 fallen weg; endgueltige
-Zusammensetzung nach den Sonden S1-S4. Bau in der Wheel-Runde nach der v34-Erzeugung.
+eigenem Wert). Ziel-Zusammensetzung (Nutzer 2026-10-01): Sockel 4 x 2.000 (G-G, G-W, W-S, G-S),
+Schwarm 4.000 Weg C plus 4.000 Ausflug, G-1/G-2 fallen weg; grob 12 h (HERLEITUNG); endgueltig nach
+den Sonden S1-S4 (par.4). Bau in der Wheel-Runde nach der v34-Erzeugung.
 
 ### RICHTUNG (Nutzer-Entscheid 2026-09-27)
 

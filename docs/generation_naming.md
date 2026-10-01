@@ -196,6 +196,12 @@ Rolle generator, KEIN Champion). Fensterzuschnitt in b04-Form: die ganze v34-Erz
 `selfplay_v33-b01-value-wegc_*`, `selfplay_v33-b01-value-excursion_*` (Rezept
 `models/v34.recipe.json`). Die Trainings-Arme E2 und E4 (`PREREG_v34_window.md` par.3) bekommen
 `v34-b02` / `v34-b03` erst mit ihrer Registrierung; weitere Arme nur mit eigener Registrierung.
+**Klassen-Umbenennung, freigegeben 2026-10-01** (Nutzer: *"value-deviate ist freigegeben"*): die
+Weg-C-Klasse heisst ab der Erzeugung NACH v34 **`value-deviate`** (passt zum Flag `--deviate-prob`
+und zur Log-Marke `[deviate]`). Bis einschliesslich der v34-Erzeugung heisst sie `value-wegc`
+(Dateien `selfplay_v32-b01-value-wegc_*`, `selfplay_v33-b01-value-wegc_*`); beide Namen meinen
+dieselbe Klasse, Fenster- und Val-Muster muessen beide kennen. Das v34-Rezept wurde NICHT
+umbenannt, weil es waehrend der laufenden Erzeugung je Klasse frisch gelesen wird.
 
 **Reserviert 2026-09-25 (Generationswechsel v32 -> v33):**
 **`v33-b01`** (erster Arm der Generation v33 auf dem v33-Fenster; Generator der Erzeugung ist

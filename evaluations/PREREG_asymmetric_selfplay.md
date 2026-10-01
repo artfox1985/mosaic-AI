@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: ENTWURF 2026-10-01, nichts gebaut. Wuerfel-Klasse W festgelegt (par.2), Stoerer-Klasse S skizziert, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem eigenem Wert (par.3); Zusammensetzung des Fensters nach den Sonden (par.5), Nutzer-Plan 4.000 W plus 2.000 Sockel ohne G-1/G-2 (par.4). Zeitpunkt: nach dem v34-Training. -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: ENTWURF 2026-10-01, nichts gebaut. Wuerfel-Klasse W festgelegt (par.2), Stoerer-Klasse S skizziert, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem eigenem Wert (par.3); Zusammensetzung des Fensters nach den Sonden (par.5), Ziel-Zusammensetzung (Nutzer): Sockel 4 x 2.000 (G-G, G-W, W-S, G-S), Schwarm 4.000 Weg C plus 4.000 Ausflug, ohne G-1/G-2 (par.4). Zeitpunkt: nach dem v34-Training. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -130,6 +130,35 @@ noch ueberlegen, je nachdem was uns die sonden sagen"*.
 | Sockel normal | 2.000 | ja | geplant |
 | G-1 / G-2 (Traeger aelterer Generationen) | 0 | -- | faellt weg (Nutzer) |
 | S, Weg C, Ausflug | offen | -- | nach den Sonden |
+
+**ABGELOEST durch den Nutzer-Vorschlag vom selben Tag** (*"vorschlag fuer asymetric play ab v34+:
+sockel: 2000 g vs g, 2000 g vs kuppelklasse, 2000 kuppelklasse vs. stoerklasse, 2000 g vs.
+stoerklasse; schwarm wie gehabt mit 4000 wegc und 4000 ausflug"*). Zielzusammensetzung, endgueltig
+nach den Sonden S1-S4 (par.5):
+
+| Klasse (Arbeitsname) | Paarung | Partien | Policy-Ziel | Wertziel |
+| --- | --- | --- | --- | --- |
+| `policy` | G gegen G | 2.000 | beide Seiten | alle |
+| `policy-dice` | G gegen W | 2.000 | G voll; W ausser den erzwungenen Plattenzuegen (kein Record) | alle |
+| `policy-dice-aggr` | W gegen S | 2.000 | W wie oben; S nur bei `own_q_gap <= eps` | alle |
+| `policy-aggr` | G gegen S | 2.000 | G voll; S nur bei `own_q_gap <= eps` | alle |
+| `value-deviate` (bis v34 `value-wegc`) | G gegen G, Weg C | 4.000 | nein | alle |
+| `value-excursion` | G gegen G, Ausflug | 4.000 | nein | alle |
+| G-1 / G-2 | -- | 0 | -- | faellt weg (Nutzer, oben) |
+
+Annahmen, als VORSCHLAG markiert: die behinderte Seite (W bzw. S) sitzt je Partie 50:50 auf
+Spieler 0 oder 1; in `policy-dice-aggr` traegt jede Seite ihre eigene Regel (Wuerfel bzw.
+lambda_aggr), beide Record-Regeln gelten nebeneinander; Seeds und Klassennamen beim Bau.
+**Kosten (HERLEITUNG, ungemessen):** 16.000 statt 12.000 Partien; mit dem v34-Satz (rund 8,8 h fuer
+12.000, `PREREG_v34_window.md` par.8a) rund 11,7 h, dazu die Platzsuchen @600 der Wuerfel-Seite in
+4.000 Partien (rund +20 % je solcher Partie, par.2) und der zweite Akkumulator des Stoerers (kein
+zusaetzlicher Netzaufruf): grob 12 h. S1 liefert die gemessene Zahl. **Kosten vom Nutzer
+akzeptiert** (2026-10-01: *"damit kann ich leben, dann sind wir wieder auf dem stand vor der
+einsparung"*; v33-Erzeugung ohne E1: 12,99 h, `PREREG_v34_window.md` par.8).
+**Gewicht im Fenster (HERLEITUNG):** in 6.000 der 16.000 Partien spielt mindestens eine behinderte
+Seite; das Policy-Material der normalen Suche stammt aus `policy` (beide Seiten) und den G-Seiten
+von `policy-dice` / `policy-aggr`. Die Wertziele dieser 6.000 Partien bleiben alle (Nutzer, par.2);
+ihre Verzerrung misst S3, getrennt je Paarung.
 
 Stuetze fuer den Wegfall von G-1/G-2 (am Bestand): die Fensterarme b02-b04 waren ununterscheidbar,
 Menge und Alter des Value-Materials kein Hebel (`PREREG_v33_window.md` par.6d, STATUS RICHTUNG).
