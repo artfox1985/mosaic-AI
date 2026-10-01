@@ -48,10 +48,16 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
 * **Jeder Plattenzug der Wuerfel-Seite in Runde 1-4** wird gewuerfelt, VOR der Suche:
   1. Quelle Auslage/Stapel: Muenze 50:50 (VORSCHLAG). Ist die Auslage leer, Stapel; ist der Stapel
      leer, Auslage.
-  2. Auslage: Platte gleichverteilt unter den offenen. Stapel: **Tiefe d gleichverteilt in 1..max**,
-     max = Zahl der Platten im Stapel (Nutzer: *"wuerfel waehlt d in 1..max"*); es werden d Platten
-     gezogen (kostet d Punkte, Untergrenze 0), **behalten wird die d-te**, der Rest geht zurueck
+  2. Auslage: Platte gleichverteilt unter den offenen. Stapel: **Tiefe d gleichverteilt in
+     1..max**, max = min(Obergrenze der Runde, Platten im Stapel); es werden d Platten gezogen
+     (kostet d Punkte, Untergrenze 0), **behalten wird die d-te**, der Rest geht zurueck
      (Rueckgabe-Reihenfolge wie im Sockel, `return_order_random_p`).
+     **Obergrenzen je Runde** (Nutzer 2026-10-01: *"Setz mir das maximum in runde 2 auf 7 und runde
+     3 auf 3. Runde 4 hat sowieso nur noch 1 im stapel"*; zuvor *"wuerfel waehlt d in 1..max"*):
+     Runde 1 keine (ganzer Stapel), Runde 2 **7**, Runde 3 **3**, Runde 4 ergibt sich aus dem
+     Stapel. Begruendung des Nutzers fuer die Tiefe: *"Dafuer kennt sie aber auch den Stapel"* --
+     die gezogenen Vorderseiten sind danach der Wuerfel-Seite bekannt (Rueckgabe-Reihenfolge nur ihr,
+     `engine_manual.md` 4A).
   3. Rotation gleichverteilt in 0-3.
   4. **Den Platz waehlt die Suche mit 600 Sims**, unter festgehaltener Platte UND Rotation: an der
      Wurzel nur Plaetze fuer die gewuerfelte Platte, im Baum ist die Rotationsstufe auf den
@@ -71,11 +77,13 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
   insbesondere ob die Weg-C-Abweichung (`deviate_prob` 1,0) in W bleibt.
 
 **Folgen, als HERLEITUNG vorab benannt (ungemessen):**
-* Stapel-Kosten: nach den 2 Startplatten liegen 3 in der Auslage und 13 im Stapel (18 - 2 - 3).
-  Mit d gleichverteilt in 1..13 kostet ein Stapelzug in Runde 1 im Mittel 7 Punkte; der Stapel
-  schrumpft danach. Die Wuerfel-Seite landet damit oft bei 0 Punkten, wo weitere Stapelzuege frei
-  sind (`engine_manual.md` 4A, `PREREG_score_clamp_incentive.md` par.11). Das ist gewollt
-  provozierte Stellung, verschiebt aber die Siegquote der Wuerfel-Seite stark (S3 misst das).
+* Stapel zu Rundenbeginn (aus `engine_manual.md` 2/3/4A: 18 Platten, 2 Startplatten, Auslage zu
+  jeder Runde auf 3 aufgefuellt, je Runde 1-4 vier Platten gelegt): Runde 1 **13**, Runde 2 **9**,
+  Runde 3 **5**, Runde 4 **1**; innerhalb der Runde sinkt er um jede vom Stapel GELEGTE Platte
+  (zurueckgelegte gehen wieder darunter). Erwartete Kosten eines Stapelzugs bei vollem Rundenstapel
+  und d gleichverteilt: Runde 1 **7** Punkte (1..13), Runde 2 **4** (1..7), Runde 3 **2** (1..3),
+  Runde 4 **1**. Bei 0 Punkten sind weitere Stapelzuege frei (`PREREG_score_clamp_incentive.md`
+  par.11); die Verschiebung der Siegquote misst S3.
 * Kosten je Partie: rund 8 Platzsuchen @600 auf einer Seite gegen rund 200 Entscheidungen je Partie
   (3.953 Zuege auf 20 Partien im Smoke, `PREREG_v34_window.md` par.7a): rund +20 % je Partie,
   ungemessen (S1).

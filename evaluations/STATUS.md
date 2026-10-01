@@ -84,7 +84,7 @@ Haengt NICHT an der Erzeugung; frueher moeglich, dann blockiert sie die Maschine
 **NACH dem v34-Training: asymmetrisches Self-Play** (Nutzer 2026-10-01: *"prinzipiell wuensch ich
 mir mehr asymetrisches self play um bewusst stellungen zu provozieren die nicht entstehen wenn du
 gegen dich selber spielst"*). Entwurf `PREREG_asymmetric_selfplay.md`: Wuerfel-Klasse W festgelegt
-(ALLE Platten der Wuerfel-Seite gewuerfelt, Quelle/ID bzw. Stapeltiefe d in 1..max/Rotation, Platz
+(ALLE Platten der Wuerfel-Seite gewuerfelt, Quelle/ID bzw. Stapeltiefe d in 1..max mit Obergrenze 7 in Runde 2 und 3 in Runde 3/Rotation, Platz
 per Suche @600, erzwungene Zuege ohne Record, alle Wertziele bleiben, Start normal); Stoerer-Klasse
 S skizziert (lambda_aggr je Seite, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem
 eigenem Wert). Nutzer-Plan 4.000 W plus 2.000 Sockel, G-1/G-2 fallen weg; endgueltige
