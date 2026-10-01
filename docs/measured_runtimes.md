@@ -503,3 +503,19 @@ tragen R4 (46 min) und die Champion-2-Kante (40 min).
 | Tor 2a `corpus_sanity_check.py` | 400 Dateien, 4.000 Partien | 1 | **278,7 s** | Konsolenausgabe |
 | Vielfaltssonde, zwei Arme | je 4.000 Partien | 1 | **4.482,8 s** (!) | Artefakt; teurer als erwartet, vor dem naechsten Einsatz `--n` verkleinern |
 | Bewerter-Vortests Stufe 1 | 60 Dateien, 86.190 Zustaende | 11 | **495,2 s** (Extraktion 330,6 s) | Artefakt `laufzeit` |
+
+## Generationswechsel v33 -> v34, gemessen am 2026-10-01, exklusiv (Wheel 1.1.0, 1a9e4bac...)
+
+| Lauf | Umfang | Threads | Wanduhr | Quelle |
+| --- | --- | --- | --- | --- |
+| Anker-Drift / -Konservierung `hv4_anchor` | je 1.763 Schritte | 11 | **23,0 s** / unter 30 s | Artefakt `laufzeit` / Konsole |
+| R5-Kalibriersonde (`cargo test` aus dem Cache) | 117 Runde-5-Entscheidungen, 3 Arme | 1 | **24,3 s** | Testausgabe, `PREREG_r5_net_vs_solver.md` par.6b |
+| Smoke v34-Rezept | je 20 Partien | 11 | **50,9 / 52,2 / 37,9 s** (policy / wegc / Ausflug) | Manifest `laufzeit` |
+| Kostentor Erzeugung, Sockel, E1 an | je 100 Partien | 11 | **244,6 s** (Loeser R5, 2,446 s je Partie) / **272,7 s** (Netz R5, 2,727 s) | Manifest, `PREREG_v34_window.md` par.8a |
+| Offline-Pruefung v33-Kontrolle (zwei Koepfe) | 60 Dateien, 67.302 Zustaende | 11 | **164,1 s** (cpu 1.200,3 s) | Artefakt `laufzeit` |
+| Golden Probe Generator-Artefakt @400 | 40 Partien, 10 Sonden | 1 | **1.311 s** | Konsole |
+| Referee-Selbsttest Artefakt | Handshake, 10 Sonden, 2 Partien | 1 | rund 1 min (nicht gemessen) | Konsole |
+| restic daily plus check | 6.830 Dateien, 5,4 GiB | -- | **9 s**; `verify_backup.ps1` 27 s | Konsole |
+
+Planungszahl v34-Erzeugung (HERLEITUNG aus v33 12,99 h, E1 -39,4 %, R5-Netz +11,5 %): rund 8,8 h.
+

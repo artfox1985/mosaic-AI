@@ -4,7 +4,7 @@
 # E1 in BEIDEN Armen an; Arm "r5solver" ohne, Arm "r5net" mit MOSAIC_R5_NET_SOLVER=0.
 # Ohne --recipe, weil der Rezept-Waechter r5_net_solver false erwartet und den Loeser-Arm
 # abbrechen wuerde; beide Arme tragen darum dieselben expliziten Flags, nur die Env unterscheidet
-# sich. Muster: tools/night_v33_package.sh Schritt 2 (E1-Kostentor).
+# sich. Muster: tools/night_v33_package.sh Schritt 2 (E1-Kostentor; Fassung in der Git-Historie).
 #
 # KEINE PIPE, keine eigene Umleitung; als DATEI starten, exklusiv.
 set -uo pipefail

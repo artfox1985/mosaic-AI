@@ -187,6 +187,16 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
 Weitere Arme ab `v29-b12` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
 
+**Reserviert 2026-10-01 (Generationswechsel v33 -> v34):**
+**`v34-b01`** (Grundarm der Generation v34 auf dem v34-Fenster, `PREREG_v34_window.md` par.1/par.6;
+Generator der Erzeugung ist `v33-b01_brierbest`, eingefroren unter `models/frozen_champions/v33-b01`,
+Rolle generator, KEIN Champion). Fensterzuschnitt in b04-Form: die ganze v34-Erzeugung plus aus G-1
+(`v32-b01-*`) und G-2 (`v31-b01-*`) NUR die Policy-Traeger. Seed **20260961**, Val-Pool
+`^selfplay_v33-b01-`. Die Erzeugungsdateien heissen nach dem GENERATOR: `selfplay_v33-b01-policy_*`,
+`selfplay_v33-b01-value-wegc_*`, `selfplay_v33-b01-value-excursion_*` (Rezept
+`models/v34.recipe.json`). Die Trainings-Arme E2 und E4 (`PREREG_v34_window.md` par.3) bekommen
+`v34-b02` / `v34-b03` erst mit ihrer Registrierung; weitere Arme nur mit eigener Registrierung.
+
 **Reserviert 2026-09-25 (Generationswechsel v32 -> v33):**
 **`v33-b01`** (erster Arm der Generation v33 auf dem v33-Fenster; Generator der Erzeugung ist
 `v32-b01_brierbest`, der amtierende Champion -- v32 hatte EINEN Arm). Fensterzuschnitt nach der
