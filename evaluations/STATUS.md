@@ -67,6 +67,26 @@ gruen): KL-Abzweig-Knopf `MOSAIC_EXCURSION_KL_WEIGHT` / Flag `--excursion-kl-wei
    neu fassen.
 7. **Start der v34-Erzeugung NUR auf ausdrueckliche Nutzer-Freigabe.**
 
+**Review-Rest EINGETAKTET** (Nutzer 2026-10-01: *"takte #11, #12, #15 und den Rest von #23 aus dem
+code review ein"*; Befunde `review/code_review_2026-09-26_verification.md`). Rest von #23 am Code
+geprueft 2026-10-01: `corpus_io.dump_records` ist schon atomar (`corpus_io.py:87-112`); offen sind
+(a) `train.py` Endstaende nicht atomar und ohne Ueberschreib-Waechter (`train.py:2655`, `:2710`,
+`:2734`), (b) Cache-Schluessel ohne Inhaltsmerkmal (`engine/py/file_cache_key.py:84-222`, `per_file_cache_key`),
+(c) Panic im Netz-Self-Play als "[Watchdog] ... Deadline" gemeldet (`self_play.rs:7099-7103`, `:7217`).
+* **Python, vor dem v34-TRAINING** (Schreiben jederzeit, Tests erst wenn die Maschine frei ist):
+  (a) atomar (tmp + `os.replace`, Muster `train.py:1066-1074`) plus Waechter gegen Ueberschreiben
+  eines vorhandenen Endstands (Abbruch, ausser ausdruecklichem Flag). (b) **Bauentscheid offen:**
+  jedes Inhaltsmerkmal im Schluessel aendert alle Schluessel einmal (G-1/G-2-Traegerbloecke neu
+  bauen, Kosten nach `docs/measured_runtimes.md` vorher lesen); Groesse ist billig, Inhalts-Hash
+  teuer, mtime unter OneDrive unzuverlaessig (HERLEITUNG). Vorlage an den Nutzer mit Kostenzahl.
+* **Engine, in der Wheel-Runde NACH der Erzeugung zusammen mit dem E4-Encoder** (eine Runde, eine
+  Anker-Invarianz): #11 `opp_points` in `try_batched_pair_ex` (`net_mcts.rs:3357-3359`, Stand 2026-10-01; Nachpruefung nannte 3191-3193), #12
+  ORT-Registry-Schluessel (`net_ort.rs:201`, nur Feature `ort_cuda_probe`), #15 Batcher-Registry
+  (`net_batcher.rs:272-301`), (c) Panic ehrlich melden (`catch_unwind` bzw. Payload unterscheiden,
+  Zaehler ins Manifest). #11/#12/#15 sind laut Nachpruefung latent (Knoepfe/Feature aus), also
+  keine Wirkung auf die v34-Erzeugung. **Ersatz fuer (c) in v34:** `[Watchdog]`-Zeilen in den
+  Aufgabenausgaben der Erzeugung zaehlen und berichten (obere Schranke fuer Panic plus Deadline).
+
 **Parallel bzw. danach (nicht vor der Erzeugung):** R5 Stufe 2a A/B (iterativ @2000 gegen Netz, Seeds
 20261672/73, parallel zum v34-Training erlaubt: GPU + EIN CPU-Auftrag); Bau E2 (Python) und E4 (Encoder,
 Kompilieren erst nach der Erzeugung) fuer die v34-Trainings-Arme.
