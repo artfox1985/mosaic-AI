@@ -196,6 +196,15 @@ class Ordering(unittest.TestCase):
         self.assertLess(guard, body.index("all_files"))
         self.assertLess(guard, body.index("write_train_manifest("))
 
+    def test_result_checkpoints_are_written_atomically(self):
+        """Code-Review #23: final, _best und _brierbest nur ueber save_checkpoint_atomic."""
+        body = self.text[self.text.index("\ndef train("):]
+        self.assertEqual(body.count("save_checkpoint_atomic("), 3)
+        for name in ("checkpoint, save_path", "best_checkpoint, best_save_path",
+                     "bb_checkpoint, bb_save_path"):
+            self.assertNotIn(f"torch.save({name.split(',')[0]}, str(", body)
+            self.assertIn(f"save_checkpoint_atomic({name})", body)
+
 
 if __name__ == "__main__":
     unittest.main()

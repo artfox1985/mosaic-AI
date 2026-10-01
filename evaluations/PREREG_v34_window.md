@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Erzeugung fertig in 7,30 h (par.9): Spiegelknopf und KL-Abzweig gruen, aber Tor 2a GERISSEN (sp_voll 0,921 gegen 0,966); Diagnose par.9a: Runde 5 per Netz bei 100 Sims kostet gepaart -3,54 Punkte je Seite (z -5,9). Nutzer-Vorlage. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Erzeugung fertig in 7,30 h (par.9): Spiegelknopf und KL-Abzweig gruen, aber Tor 2a GERISSEN (sp_voll 0,921 gegen 0,966); Diagnose par.9a: Runde 5 per Netz bei 100 Sims kostet gepaart -3,54 Punkte je Seite (z -5,9). Vom Nutzer als Self-Play-Effekt akzeptiert, weiter mit v34-b01. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -287,3 +287,14 @@ Sockel) und der Generatorwechsel kommen fuer die Spalten dazu, ungetrennt.
 Strafleiste 4,96 / 4,85, volle Spalten 1,090 / 0,990 (+-0,105), volle Reihen 0,085 / 0,130. Kein
 Hinweis auf Punkte oder Strafleiste; die Spalten-Differenz liegt innerhalb der Streuung.
 
+**NUTZER-ENTSCHEID 2026-10-01 zum Tor-2a-Riss:** *"nur spielen wir nicht mit 100 sims"* und *"das wurde
+nur gewaehlt fuers self play"*, auf Rueckfrage: die 100 Sims sind allein die Kosten-Einstellung der
+Erzeugung, gespielt wird mit 400. Der Riss gilt als Self-Play-Effekt von Runde 5 per Netz (par.9a),
+Tor 2a ist AKZEPTIERT, kein A/B bei 100 Sims, weiter mit dem Grundarm `v34-b01` (Fenster, Training,
+Tor 1 bei 400 Sims). Nutzer dazu: *"eigentlich ist es kein fairer vergleich wenn du loeser mit 200 sims aus dem v33 korpus
+gegen das netz mit 100 sims im v34 korpus vergleichst"*. Festgehalten: Tor 2a dieser Generation
+vergleicht zwei Sockel mit VERSCHIEDENER Runde-5-Methode (v33 Loeser, Knotenbudget 200; v34 Netz,
+100 Sims) und ist darum kein Generator-Vergleich unter gleichen Bedingungen; die gepaarte Diagnose
+par.9a stellt dieselben beiden Methoden gegeneinander. **Ab der naechsten Generation** (beide Sockel
+mit Netz in Runde 5) ist Tor 2a wieder gleich bedingt; bis dahin taugt die v34-Zahl 0,921 als
+Bezug nur fuer Sockel mit derselben Runde-5-Methode.

@@ -18,7 +18,7 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**FERTIG: die v34-Erzeugung** (10:06:42-17:25:01, 7,30 h, je Klasse 4.000 Partien, 0 `[Watchdog]`-Zeilen). **Abnahmen 2026-10-01** (`PREREG_v34_window.md` par.9): Manifest-Diff und Waechter gruen, Tor 0 gruen, Spiegelknopf gruen (49,03 % am Sockel), KL-Abzweig GREIFT (Median 1,095 gegen q75 0,804). **Tor 2a GERISSEN:** `sp_voll` 0,921 gegen 0,966 (v33), dazu Punkte 49,70 gegen 53,33 und Strafleiste 5,76 gegen 4,99. **Diagnose** (par.9a, Kostentor-Korpora aus restic): Runde 5 per Netz bei 100 Sims kostet gepaart -3,54 Punkte und +0,57 Strafleisten-Steine je Seite (z -5,9 / +5,2), Groesse wie der Riss. **NUTZER-VORLAGE, nichts weiter gestartet** (Abschnitt 6 Punkt 1). Parallel: Planungs-Agent fuer den Bau des asymmetrischen Self-Plays (Wuerfel-Klasse, Nachziehstapel, Edge Cases), schreibt nur in den Scratchpad.
+**LAEUFT: die v34-Kette** (`bash tools/night_v34_chain.sh`, Nutzer 2026-10-01: Tor 2a als Self-Play-Effekt akzeptiert, weiter mit `v34-b01`): Traeger-Manifest v34, Fenster b04-Form (1.380 Dateien, 147 Val), Bloecke, Monolith, Training warm von `v33-b01`, Tor 1 gegen `v33-b01` @400, Champion-Kante gegen `v32-b01` (berichtet). Dauer rund 8 h (HERLEITUNG). Nichts anderes starten, kein Build, kein Commit. Erzeugung und Abnahmen: `PREREG_v34_window.md` par.9/9a.
 
 **Start der Erzeugung (NUR auf ausdrueckliche Nutzer-Freigabe):**
 
@@ -61,11 +61,11 @@ kein Commit.
 **Review-Rest EINGETAKTET** (Nutzer 2026-10-01: *"takte #11, #12, #15 und den Rest von #23 aus dem
 code review ein"*; Befunde `review/code_review_2026-09-26_verification.md`). Am Code geprueft
 2026-10-01: `corpus_io.dump_records` ist schon atomar (`corpus_io.py:87-112`); offen sind
-(a) `train.py` Endstaende nicht atomar und ohne Ueberschreib-Waechter (`train.py:2655`, `:2710`,
-`:2734`), (b) Cache-Schluessel ohne Inhaltsmerkmal (`engine/py/file_cache_key.py:84-222`),
+(a) `train.py` Endstaende nicht atomar (der Ueberschreib-Waechter `--overwrite-model` steht schon seit
+`b00a9e09`, `train.py:1133-1150`; die Notiz vom Vormittag war falsch) -- GEBAUT 2026-10-01: `save_checkpoint_atomic`, (b) Cache-Schluessel ohne Inhaltsmerkmal (`engine/py/file_cache_key.py:84-222`),
 (c) Panic im Netz-Self-Play als "[Watchdog] ... Deadline" gemeldet (`self_play.rs:7099-7103`, `:7217`).
-* **Python, vor dem v34-TRAINING:** (a) atomar (tmp plus `os.replace`, Muster `train.py:1066-1074`)
-  plus Waechter gegen Ueberschreiben. (b) **Bauentscheid offen:** jedes Inhaltsmerkmal aendert alle
+* **Python, vor dem v34-TRAINING:** (a) ERLEDIGT 2026-10-01 (`save_checkpoint_atomic`, Test in
+  `tools/tests/test_train_recipe.py`). (b) **Bauentscheid offen:** jedes Inhaltsmerkmal aendert alle
   Schluessel einmal (Bloecke neu bauen); Vorlage an den Nutzer mit Kostenzahl.
 * **Engine, in der Wheel-Runde nach der Erzeugung mit E4:** #11 `opp_points` in
   `try_batched_pair_ex` (`net_mcts.rs:3357-3359`), #12 ORT-Registry-Schluessel (`net_ort.rs:201`,

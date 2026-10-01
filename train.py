@@ -1076,6 +1076,19 @@ def save_resume_state(path: Path, state: dict) -> float:
     return time.time() - t0
 
 
+def save_checkpoint_atomic(obj, path: Path) -> None:
+    """Ergebnis-Checkpoint ATOMAR schreiben (tmp + os.replace), Muster `save_resume_state`.
+
+    Code-Review 2026-09-26 #23: die Endstaende (final, `_best`, `_brierbest`)
+    wurden direkt geschrieben; ein Abbruch mitten im `torch.save` liess eine
+    halbe Datei unter dem Ergebnisnamen liegen. Der temporaere Name liegt im
+    selben Ordner, weil `os.replace` nur innerhalb eines Dateisystems atomar ist.
+    """
+    tmp = path.with_suffix(".pth.tmp")
+    torch.save(obj, str(tmp))
+    os.replace(str(tmp), str(path))
+
+
 def load_resume_state(path: Path) -> dict:
     """Laedt den Zwischenstand; harter Abbruch, wenn er fehlt (kein stiller
     Neustart von vorn -- Muster des --load-Waechters)."""
@@ -2653,7 +2666,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             round(val_ranking_acc_history[-1], 4)
             if val_ranking_acc_history and val_ranking_acc_history[-1] is not None else None),
     }
-    torch.save(checkpoint, str(save_path))
+    save_checkpoint_atomic(checkpoint, save_path)
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
 
     best_version_name = None
@@ -2708,7 +2721,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             else None)
         best_version_name = f"{version_name}_best"
         best_save_path = MODELS_DIR / f"alphazero_{best_version_name}.pth"
-        torch.save(best_checkpoint, str(best_save_path))
+        save_checkpoint_atomic(best_checkpoint, best_save_path)
         print(f"⭐ Bestes Modell (Epoche {best_epoch}, {best_checkpoint['selected_by']}="
               f"{best_combined_metric:.4f}) zusätzlich gespeichert unter:\n📂 {best_save_path}")
     elif best_state_dict is not None:
@@ -2732,7 +2745,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         bb_checkpoint["final_value_val_brier"] = round(best_brier_metric, 4)
         brierbest_version_name = f"{version_name}_brierbest"
         bb_save_path = MODELS_DIR / f"alphazero_{brierbest_version_name}.pth"
-        torch.save(bb_checkpoint, str(bb_save_path))
+        save_checkpoint_atomic(bb_checkpoint, bb_save_path)
         print(f"🎯 Value-optimales Modell (Epoche {best_brier_epoch}, val_brier={best_brier_metric:.4f}) "
               f"zusätzlich gespeichert unter:\n📂 {bb_save_path}")
 
