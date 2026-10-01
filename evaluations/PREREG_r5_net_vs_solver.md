@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2a (par.5a): iterativer Loeser gegen das Netz, gebaut; Sonde (par.6b): beim heutigen Loeser frisst das erste Kind in 86 von 117 Entscheidungen das Budget, iterativ @2000 kostet 129 ms Median je Entscheidung. Offen: A/B Stufe 2. -->
+<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2 (par.6d, 400 gegen 400): das Netz schlaegt auch den iterativen Loeser, 480:320, Block-z -7,32 fuer den Loeser; am Spielpunkt spielt das Netz Runde 5. Offen nur fuers Self-Play: 2E und Sim-Leiter 2S (par.5b), nach der Wheel-Runde. -->
 
 # Vorregistrierung: Runde 5 -- Netz gegen Loeser
 
@@ -148,6 +148,89 @@ Entscheidung):** Knotenkosten 0,3-4,4 ms (`round5.rs:81-83`); @2000 also rund 0,
 Entscheidung. Ein A/B-Seed dauerte in Stufe 1 6.504,5 s (16,26 s je Partie); mit @2000 auf einer
 Seite laenger, UNGEMESSEN, die Sonde liefert die Planungszahl vor dem Start.
 
+## par.5b ENTWURF 2026-10-01: die Reihe legt Methode UND Sim-Zahl fuer Runde 5 fest, je Betriebspunkt
+
+**Nutzer 2026-10-01:** *"aber die runde 5 umsetzung koennen wir noch exakter festlegen in dieser
+generation, da sowieso noch eine versuchsreihe mit dem exakten loeser offen ist. dann entscheidet sich
+was wir fuer runde 5 verwenden und in welcher sim anzahl"*. Anlass: Stufe 1 (par.6a) mass nur den
+Spiel-Betriebspunkt (400 Sims), die v34-Erzeugung lief aber bei 100 Sims mit Netz in Runde 5, und
+dort kostet es im Self-Play Punkte (par.6c); der Vergleich Loeser 200 Knoten gegen Netz 100 Sims ist
+zudem nicht gleich bedingt (Nutzer, `PREREG_v34_window.md` par.9a).
+
+**Am Code gelesen 2026-10-01:** der Loeser hat ein Knotenbudget je Seite (`r5_solver_node_budget`,
+`engine/src/net_mcts.rs:1183-1188`); die Netzsuche in Runde 5 hat KEINEN eigenen Sim-Regler, sie
+laeuft mit den Sims der ganzen Partie. Eine Sim-Zahl nur fuer Runde 5 braucht ein neues Spec-Feld je
+Seite (Bau, Default aus = byte-identisch).
+
+**Vorschlag der Reihe (Nutzer-Entscheid offen):**
+
+| Stufe | Betriebspunkt | A gegen B | Seeds | Frage |
+| --- | --- | --- | --- | --- |
+| 2 (registriert, par.5a) | Spiel, 400 Sims | iterativer Loeser @2000 gegen Netz | 20261672/73 | Champion-Spec |
+| 2E (neu) | Erzeugung, 100 Sims | iterativer Loeser @2000 gegen Netz | 20261676/77 | Erzeugungs-Rezept |
+| 2E-b (neu, nur mit Bau) | Erzeugung, 100 Sims | Netz mit eigener R5-Sim-Zahl (z. B. 400) gegen Netz @100 | 20261678/79 | lohnt mehr Suche nur in Runde 5? |
+
+Je A/B 200 Paare, Blockgroesse 5, fester Umfang, `--log-games`, Block-z; berichtet zusaetzlich je
+Seite Punkte, groesste Strafleiste in Runde 5, volle Spalten/Reihen und die Wanduhr je Partie
+(Kosten des Betriebspunkts). Kosten (HERLEITUNG): ein Seed @400 rund 1,8-2 h (Stufe 1: 6.504,5 s),
+@100 grob ein Viertel davon.
+
+**NUTZER-ENTSCHEID 2026-10-01 zum Zuschnitt** (Stufen 2, 2E und 2E-b freigegeben; zum Budget:
+*"ich wuerd mal @400 netz gegen loeser fahren fuer beide. sonst vergleichen wir wieder unterschiedliche
+dinge. dann laesst sich auch abschaetzen wieviel uns die sims von der zeit her kosten"*). Damit gilt,
+die Tabelle oben ersetzend:
+
+| Stufe | Betriebspunkt (Sims ausserhalb Runde 5) | A | B | Seeds |
+| --- | --- | --- | --- | --- |
+| 2 | Spiel, 400 | iterativer Loeser **@400 Knoten** | Netz in Runde 5 @400 Sims | 20261672/73 |
+| 2E | Erzeugung, 100 | iterativer Loeser **@400 Knoten** | Netz in Runde 5 **@400 Sims** (neues R5-Sim-Feld) | 20261676/77 |
+| 2E-b | Erzeugung, 100 | Netz in Runde 5 @400 Sims | Netz in Runde 5 @100 Sims (Stand der v34-Erzeugung) | 20261678/79 |
+
+Gleiches Budget beidseits macht 2 und 2E zu Vergleichen der METHODE; 2E-b misst, was die vierfache
+Suche nur in Runde 5 bringt und kostet. Die Wanduhr je Partie aus denselben Laeufen ist die
+Kostenzahl. Bau vorher: Spec-Feld je Seite fuer die Sims der Netzsuche in Runde 5 (Default ungesetzt =
+Sims der Partie, byte-identisch), Wheel-Runde mit Anker-Invarianz. Die Kalibriersonde (par.6b) nennt
+fuer den iterativen Loeser @400 24 ms Median je Entscheidung.
+
+**Leseregel, VORAB (je Betriebspunkt getrennt):** A schlaegt B mit Block-z >= +1,96 -> A spielt dort
+Runde 5; z <= -1,96 -> B; dazwischen -> das je Partie billigere (Wanduhr aus demselben Lauf).
+Spiel- und Erzeugungs-Betriebspunkt duerfen verschieden ausgehen. Die Entscheidung gilt ab der
+naechsten Erzeugung (die v34-Erzeugung ist mit Netz @100 gelaufen) und fuer die naechste Promotion.
+
+**KORREKTUR DER KOSTENGROESSE, eingetragen 2026-10-01 waehrend Stufe 2 lief (Zwischenstand Seed
+20261672 nach 8 von 40 Bloecken 37:43, also VOR jedem Verdikt):** "Wanduhr aus demselben Lauf" ist
+im gepaarten A/B nicht trennbar, beide Methoden spielen in denselben Partien; Stufe 2 laeuft zudem
+neben dem GPU-Training. Die Kostenzahl je Betriebspunkt kommt darum aus einem EIGENEN Kostentor
+(Muster `tools/v34_cost_gate.sh`): je Methode 100 Self-Play-Partien mit derselben Spec wie im A/B,
+gleicher Seed, exklusiv, Wanduhr je Partie aus dem Manifest. Die Leseregel bleibt sonst wortgleich.
+
+**STUFE 2S, ENTWURF 2026-10-01: Sim-Leiter der Netzsuche in Runde 5** (Nutzer, waehrend Stufe 2 lief,
+Seed 20261672 163:237 fuer das Netz: *"wenn r5 mit dem netz besser ist, gilt es dennoch
+herauszufinden welche sim anzahl gesund ist"*). Braucht das Spec-Feld "Sims nur in Runde 5" (Bau oben).
+
+* **Instrument 1, gepaarte Self-Play-Sonde (billig, misst NUR Runde 5):** bei gleichem Seed sind die
+  Partien bis zum ersten Runde-5-Record identisch (Kostentor v34: 100 von 100, par.6c). Je Betriebspunkt
+  je R5-Sim-Stufe 100 Partien, Seed 20261698 wie das Kostentor, exklusiv. Berichtet je Stufe gegen die
+  naechsthoehere: Punkte, groesste Strafleiste in Runde 5, volle Spalten/Reihen (gepaart, z ueber
+  Partien) und Wanduhr je Partie. Stufen: Erzeugungspunkt (Rest 100 Sims) R5 = 100 / 200 / 400 / 800.
+  **Nur fuer das Self-Play** (Nutzer 2026-10-01: *"fuer die self plays, fuer die arena stellt sich die
+  frage nicht"*): im Spiel und in der Arena laeuft Runde 5 mit der Sim-Zahl der Partie (400), eine
+  Spielpunkt-Leiter entfaellt.
+* **Instrument 2, Kopf an Kopf (teuer, misst Staerke):** A/B wie Stufe 2 (200 Paare, 2 Seeds,
+  Blockgroesse 5) nur fuer die Stufen, an denen Instrument 1 einen Knick zeigt; mindestens 2E-b
+  (Erzeugungspunkt, R5 400 gegen 100). Seeds ab 20261682 (20261680/81 belegt durch das b04-A/B,
+  20261682-89 am 2026-10-01 frei geprueft).
+* **Leseregel, VORAB:** "gesund" ist die kleinste R5-Sim-Stufe, die gegen die naechsthoehere in
+  Instrument 1 bei keiner der drei Groessen Punkte, Strafleiste, volle Spalten mit |z| >= 1,96
+  schlechter ist und, wo ein A/B lief, dort nicht signifikant verliert (Erzeugungspunkt).
+  Zeigt die Leiter bis 800 keine Saettigung, wird das berichtet, nicht weiter verlaengert ohne
+  Nutzer-Entscheid.
+* **Kosten (HERLEITUNG):** Instrument 1 je Stufe rund 5 min bei 100 Sims (Kostentor 244-273 s je 100
+  Partien), bei 400 Sims ein Mehrfaches (ungemessen); Instrument 2 je Seed rund 2 h bei 400.
+
+**Zeitplan:** CPU-Laeufe, also NACH der laufenden v34-Kette (Fenster, Training, Tor 1,
+Champion-Kante); einzelne Seeds parallel zu einem spaeteren GPU-Training erlaubt.
+
 ## par.6 ERGEBNISSE
 
 ### par.6a Stufe 1 (Nachtkette `tools/night_v33_package.sh`, 2026-09-27 15:33-19:23)
@@ -224,6 +307,27 @@ misst nur Loeser-Arme, Doc-Kommentar `round5.rs:2299`). @100 ergibt sich als Dif
 Kostentor der v34-Erzeugung (`PREREG_v34_window.md` par.5 Punkt 3) je Partie, nicht je
 Entscheidung; @400 steht AUS, bis eine Sonde dafuer gebaut ist (nicht vor Stufe 2 noetig, weil
 Stufe 2 die Wanduhr je Partie im Artefakt traegt).
+
+### par.6d Stufe 2 (Spielpunkt, 400 gegen 400), gefahren 2026-10-01 18:37-22:54, `tools/r5_stage2_ab.sh`
+
+Champion `v32-b01` beidseits; A = iterativer Loeser @400 Knoten (`models/v33_gating_r5iter400.spec.json`),
+B = Netzsuche in Runde 5 @400 Sims (`models/v33_gating_r5net.spec.json`); je 200 Paare, fester Umfang,
+Blockgroesse 5, `--log-games`. Lief NEBEN dem GPU-Training der v34-Kette (Laufzeit gebremst markiert).
+
+| Seed | A : B | gepaarte Differenz je Paar | volle Spalten je Seite A / B | Wanduhr |
+| --- | --- | --- | --- | --- |
+| 20261672 | 163:237 | -0,370 [-0,512; -0,228] | 0,935 / 1,068 | 8.772,2 s (21,93 s je Partie, neben Training) |
+| 20261673 | 157:243 | -0,430 [-0,551; -0,309] | 0,960 / 1,040 | 6.663,4 s (16,66 s je Partie, Ende neben Training) |
+| **gepoolt** | **320:480 = 40,0 %** | | | Block-z **-7,32** (80 Bloecke, `gating_block_z.py`) |
+
+Seed 20261672: alle 400 Partien vollstaendig (`floor_per_round` mit 5 Eintraegen, Schritte Median 200),
+also kein Abschnitt durch das 180-s-Limit trotz Nebenlast. Seed 20261673 ebenso: 400 von 400 vollstaendig, Schritte Median 200.
+
+**Verdikt nach par.5a/par.5b: z <= -1,96 -> das Netz spielt Runde 5 am Spielpunkt** (Champion/GUI, 400
+Sims). Der iterative Loeser mit gleichem Budget verliert deutlicher als der alte Loeser in Stufe 1
+gegen das Netz (dort 305:495 = 38,1 %, hier 40,0 %; verschiedene Budgets, nicht direkt vergleichbar).
+Die Kostenfrage stellt sich am Spielpunkt nach der Leseregel nicht. Offen fuer das Self-Play: 2E und
+die Sim-Leiter 2S (par.5b), beide nach der Wheel-Runde.
 
 ### par.6c Self-Play-Wirkung bei 100 Sims (2026-10-01, Diagnose, `PREREG_v34_window.md` par.9a)
 

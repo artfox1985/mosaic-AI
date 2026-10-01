@@ -18,18 +18,11 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**LAEUFT: die v34-Kette** (`bash tools/night_v34_chain.sh`, Nutzer 2026-10-01: Tor 2a als Self-Play-Effekt akzeptiert, weiter mit `v34-b01`): Traeger-Manifest v34, Fenster b04-Form (1.380 Dateien, 147 Val), Bloecke, Monolith, Training warm von `v33-b01`, Tor 1 gegen `v33-b01` @400, Champion-Kante gegen `v32-b01` (berichtet). Dauer rund 8 h (HERLEITUNG). Nichts anderes starten, kein Build, kein Commit. Erzeugung und Abnahmen: `PREREG_v34_window.md` par.9/9a.
+**LAEUFT: die v34-Promotions-Kante** (`bash tools/v34_promotion_gate.sh`, `PREREG_v34_window.md` par.2a): `v34-b01` mit Runde 5 per Netz gegen den Champion `v32-b01` wie er heute spielt, 2 Seeds a 200 Paare, rund 3,4 h (HERLEITUNG). Tor 1 gegen `v33-b01` auf Nutzer-Entscheid 2026-10-01 abgebrochen und ersetzt. Fenster und Training aus `tools/night_v34_chain.sh` (Schritt 1-5) fertig: `v34-b01` in 2.956,6 s. Nichts anderes starten, kein Build, kein Commit.
 
-**Start der Erzeugung (NUR auf ausdrueckliche Nutzer-Freigabe):**
-
-```
-bash tools/night_v34_generate.sh
-```
-
-als Datei, `run_in_background`, ohne Pipe. Drei Klassen nacheinander aus `models/v34.recipe.json`
-(policy, value-wegc, value-excursion, je 4.000 Partien), Waechter je Klasse. Planungszahl rund
-8,8 h (HERLEITUNG, `PREREG_v34_window.md` par.8a). Waehrend des Laufs: nichts anderes, kein Build,
-kein Commit.
+**Stand 2026-10-01 21:30:** Erzeugung fertig (7,30 h) und abgenommen; Training `v34-b01` fertig
+(2.956,6 s); Tor 1 wartet auf das R5-Stufe-2-A/B (`tools/r5_stage2_ab.sh`, Seed 20261672: iterativer
+Loeser @400 163:237 Netz @400, alle 400 Partien vollstaendig; Seed 20261673 laeuft).
 
 **Erledigt im Wechsel am 2026-10-01** (alles exklusiv, alles committet):
 * Anker-Invarianz gegen `hv4_anchor` auf Wheel 1.1.0 (`1a9e4bac...`): Drift und Konservierung gruen.
@@ -71,13 +64,29 @@ code review ein"*; Befunde `review/code_review_2026-09-26_verification.md`). Am 
   `try_batched_pair_ex` (`net_mcts.rs:3357-3359`), #12 ORT-Registry-Schluessel (`net_ort.rs:201`,
   nur Feature `ort_cuda_probe`), #15 Batcher-Registry (`net_batcher.rs:272-301`), (c) Panic ehrlich
   melden. #11/#12/#15 latent (Knoepfe/Feature aus), keine Wirkung auf die v34-Erzeugung.
+* **Partie-Zeitlimit ersetzen** (Nutzer 2026-10-01: *"takte das fuer die Wheel-Runde ein. vielleicht
+  gibt es auch einen besseren weg. der waechter ist eigentlich ein artefakt aus fruehen zeiten"*).
+  Befund, am Code gelesen: die Arena-Partie (Tor 1, alle A/B) hat ein Wanduhr-Limit
+  `net_game_timeout_secs(max Sims)` = 0,45 s je Sim, bei 400 Sims **180 s**, ohne Zuschlag
+  (`self_play.rs:5833`, `:89-90`); wird es erreicht, bricht die Schleife ab (`:4354`), die Endwertung
+  entfaellt (`:4945-4947`), und die Partie geht OHNE Markierung mit dem Zwischenstand in die Wertung
+  (Summary traegt kein `completed`, `paired_gating.py` prueft nichts). Im Self-Play gibt es
+  `completed: false` und den harten Waechter (+60 s, `:6982-6984`). In allen 15 registrierten
+  Arena-Artefakten seit v33 (5.890 Partien) hat jede Partie 5 Runden abgerechnet (`floor_per_round`,
+  `round_end.rs:451`): bisher kein Abschnitt. Vorschlag: (1) deterministisches Schrittlimit statt
+  Wanduhr (der Zaehler `guard` steht schon in der Schleife; normale Partie rund 200 Schritte),
+  (2) Wanduhr nur noch als grosszuegiger Haenger-Alarm, der den Lauf laut abbricht statt zu werten,
+  (3) `completed` ins Arena-Ergebnis, `paired_gating.py` zaehlt unvollstaendige Partien und bricht ab.
+  HERLEITUNG, ungeprueft: die Wanduhr ist ein Weg, ueber den CPU-Last Partien lastabhaengig
+  verstuemmelt (CLAUDE.md, Signatur "Endstand 3:1"). Anker-Invarianz danach Pflicht (der Anker-Lauf
+  geht durch dieselbe Schleife).
 
-**R5 Stufe 2a A/B** (`PREREG_r5_net_vs_solver.md` par.5a Punkt 2): iterativer Loeser @2000 gegen
-das Netz in Runde 5, Seeds 20261672/73 a 200 Paare. Geplant parallel zum v34-Training (GPU plus
-EIN CPU-Auftrag), rund 2 x 1,8 h (HERLEITUNG). Fehlt noch: Spec fuer Seite A
-(`r5_solver_iterative: 1`, `r5_solver_node_budget: 2000`, sonst `models/v33_gating.spec.json`).
-Haengt NICHT an der Erzeugung; frueher moeglich, dann blockiert sie die Maschine (Nutzer-Frage
-2026-10-01 beantwortet, Entscheid offen, Abschnitt 6).
+**R5-Reihe** (`PREREG_r5_net_vs_solver.md` par.5b, Nutzer 2026-10-01, 400 gegen 400): Stufe 2
+(Spielpunkt, iterativer Loeser @400 Knoten gegen Netz @400) LAEUFT seit 18:37 neben dem Training,
+`tools/r5_stage2_ab.sh`. Danach, nur fuer das SELF-PLAY: 2E (Loeser @400 gegen Netz mit R5-Sims 400
+bei sonst 100) und die Sim-Leiter 2S (R5-Sims 100/200/400/800, gepaarte Sonde plus A/B am Knick);
+beide brauchen das neue Spec-Feld "Sims nur in Runde 5" aus der Wheel-Runde. Kostenzahl je
+Methode aus einem eigenen Kostentor (Korrektur der Leseregel, eingetragen vor dem Verdikt).
 
 **NACH dem v34-Training: asymmetrisches Self-Play** (Nutzer 2026-10-01: *"prinzipiell wuensch ich
 mir mehr asymetrisches self play um bewusst stellungen zu provozieren die nicht entstehen wenn du

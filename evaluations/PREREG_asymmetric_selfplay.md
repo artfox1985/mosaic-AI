@@ -81,8 +81,22 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
   jeder Runde auf 3 aufgefuellt, je Runde 1-4 vier Platten gelegt): Runde 1 **13**, Runde 2 **9**,
   Runde 3 **5**, Runde 4 **1**; innerhalb der Runde sinkt er um jede vom Stapel GELEGTE Platte
   (zurueckgelegte gehen wieder darunter). Erwartete Kosten eines Stapelzugs bei vollem Rundenstapel
-  und d gleichverteilt: Runde 1 **7** Punkte (1..13), Runde 2 **4** (1..7), Runde 3 **2** (1..3),
-  Runde 4 **1**. Bei 0 Punkten sind weitere Stapelzuege frei (`PREREG_score_clamp_incentive.md`
+  und d gleichverteilt, OHNE Deckel: Runde 1 7 Punkte (1..13), Runde 2 4 (1..7), Runde 3 2 (1..3),
+  Runde 4 1. **KORREKTUR 2026-10-01 (Bauplan, am Code geprueft):** der Startstand ist 5
+  (`engine/src/board.rs:286`, `engine_manual.md` Abschnitt 2), im Drafting gibt es keine Punkte, und
+  die Zahlung ist auf den Stand gedeckelt (`board.rs:345-349`); der erste R1-Stapelzug kostet darum
+  E[min(d, 5)] = 55/13, rund **4,2** Punkte, danach ist die Wuerfel-Seite in 9 von 13 Faellen auf 0.
+  **Das gilt NUR fuer den ersten Stapelzug in Runde 1** (Nutzer 2026-10-01: *"ziehen kann mehr kosten
+  als deine 5 punkte zu beginn. wenn du zb schon 12 punkte hast nach runde 2 kannst sehr schnell wieder
+  runterkommen von den punkten wenn du zweimal tief ziehst"*). Allgemein kostet ein Zug
+  min(d, Punktestand); nach den Wertungen ist der Stand hoeher, also greift der Deckel spaeter kaum.
+  Beispiel (HERLEITUNG): 12 Punkte zu Beginn von Runde 2, Obergrenze 7: ein Zug kostet im Mittel 4,
+  hoechstens 7, zwei tiefe Zuege koennen den Stand auf 0 bringen. S3 misst den tatsaechlichen
+  Punkteverlauf der Wuerfel-Seite je Runde.
+  Und es sind **hoechstens 7** Platzsuchen @600 je Partie, nicht 8: die letzte Platte hat nur noch
+  einen freien Platz (HERLEITUNG aus 9 Plaetzen = Startplatte plus 8).
+  **Bauplan:** `evaluations/asymmetric_selfplay_build_plan.md` (2026-10-01, 26 Edge Cases mit
+  Pruefstellen, offene Fragen F1-F8, FS1-FS4). Bei 0 Punkten sind weitere Stapelzuege frei (`PREREG_score_clamp_incentive.md`
   par.11); die Verschiebung der Siegquote misst S3.
 * Kosten je Partie: rund 8 Platzsuchen @600 auf einer Seite gegen rund 200 Entscheidungen je Partie
   (3.953 Zuege auf 20 Partien im Smoke, `PREREG_v34_window.md` par.7a): rund +20 % je Partie,

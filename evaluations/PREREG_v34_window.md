@@ -51,6 +51,26 @@ Seeds einzeln Block-z >= +1,96 aus, laeuft Seed 20261602 mit identischen Einstel
 dem gepoolten Block-z ueber alle gelaufenen Seeds, Kriterium unveraendert
 (`PREREG_v33_window.md` par.2a).
 
+### par.2a NUTZER-ENTSCHEID 2026-10-01 23:10: Tor 1 gegen den Generator entfaellt, direkt die Promotions-Kante
+
+Nutzer, als Tor 1 gegen `v33-b01` lief: *"erachte ich nur bedingt als sinnvoll. ich denk wir bedienen hier
+nur den prozess. ich haett die r5 kette vorgezogen und dann mit v34 und der optimierten r5 die promotion
+gemacht"*; auf Rueckfrage: Kette abbrechen, Promotion messen, Champion spielt "wie er heute spielt".
+Tor 1 gegen `v33-b01` wurde nach rund 15 min abgebrochen (kein Artefakt, keine Wertung), verwaiste
+Prozesse beendet. **Stattdessen, vor dem Lauf registriert:**
+
+* **A:** `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json` (Startkuppel-Suche an, Runde 5 per
+  Netz, R5-Verdikt `PREREG_r5_net_vs_solver.md` par.6d). **B:** Champion `v32-b01_brierbest` mit seiner
+  eingefrorenen Spec `models/frozen_champions/v32-b01/spec.json` (Loeser in Runde 5, ohne
+  Startkuppel-Suche), also so, wie er heute spielt.
+* Seeds 20261600/20261601 a 200 Paare, 400 Sims, Blockgroesse 5, SPRT 0,001 wie Tor 1, `--log-games`,
+  Stufenregel par.2 (dritter Seed 20261602 bei Widerspruch). Kriterium wie Tor 1: z >= +1,96 oder
+  gepoolt >= 52,5 % ohne Gegenbefund; danach Nutzer-Entscheid und `/mosaic-champion-promotion`.
+* **Zuordnung, vorab benannt:** ein Gewinn gehoert dem Paket "v34-Netz plus Startkuppel-Suche plus
+  Runde 5 per Netz", nicht dem Netz allein; der R5-Anteil ist ueber Stufe 1/2 gesondert belegt.
+* Die Kette `tools/night_v34_chain.sh` bleibt fuer Schritt 1-5 (Fenster, Training) der Bezug; ihre
+  Schritte 6-7 sind fuer v34 ersetzt durch `tools/v34_promotion_gate.sh`.
+
 ## par.3 DAS PAKET: was sich gegenueber v33 aendert
 
 | Aenderung | Quelle | Stand |
