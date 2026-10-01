@@ -19,7 +19,8 @@ except Exception:
 # und vor dem ersten Projekt-Import. Nur im Hauptprozess: DataLoader-Worker
 # (spawn) importieren das Modul als `__mp_main__` neu und erben die Umgebung.
 from tools.recipe_config import (RecipeError, apply_recipe_env_from_argv,  # noqa: E402
-                                 apply_to_parser, check_engine_config, manifest_block)
+                                 apply_to_parser, check_engine_config,
+                                 expected_engine_config, manifest_block)
 
 # Variablen, die train.py SELBST aus einem Flag setzt (am Ende dieser Datei):
 # im Rezept das FLAG setzen, nicht die Variable -- sonst zwei Quellen.
@@ -3281,7 +3282,7 @@ if __name__ == "__main__":
                         "overrides": _recipe_overrides}
         # Waechter wie im Self-Play: hat das Rezept `expect_engine_config`,
         # wird es gegen das geladene Wheel geprueft, bevor Daten geladen werden.
-        _expected = _RECIPE_PRE["recipe"].get("expect_engine_config") or {}
+        _expected = expected_engine_config(_RECIPE_PRE["recipe"], _RECIPE_PRE["class"])
         if _expected:
             import mosaic_rust as _mr_check
             _deviations = check_engine_config(json.loads(_mr_check.engine_config_json()), _expected)

@@ -49,7 +49,7 @@ gruen): KL-Abzweig-Knopf `MOSAIC_EXCURSION_KL_WEIGHT` / Flag `--excursion-kl-wei
 2. **ERLEDIGT 2026-10-01: Kalibriersonde iterativer Loeser** (`PREREG_r5_net_vs_solver.md` par.6b):
    erstes Kind frisst das Budget in 86 von 117 Runde-5-Entscheidungen (73,5 %); iterativ @2000
    129 ms Median je Entscheidung (Herleitung lag bei 0,6-9 s). Netzzeiten misst die Sonde nicht.
-3. **Smoke-Lauf mit dem v34-Rezept** (STATUS 3e): je Klasse wenige Partien in ein Probe-Verzeichnis
+3. **ERLEDIGT 2026-10-01: Smoke-Lauf** gruen nach Waechter-Fix je Klasse (`PREREG_v34_window.md` par.7a). Urspruenglich: **Smoke-Lauf mit dem v34-Rezept** (STATUS 3e): je Klasse wenige Partien in ein Probe-Verzeichnis
    (`MOSAIC_DATA_DIR`), Manifest pruefen (`recipe`, `mosaic_env`, `engine_config`, Waechter gruen),
    in der Ausflug-Klasse `branch_kl` am ersten Ausflug-Record vorhanden, `tie_mirrored` gesetzt.
 4. **Kostentor der Erzeugung** (`PREREG_v34_window.md` par.5 Punkt 3): je 100 Partien Sockel-Einstellung

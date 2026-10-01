@@ -289,7 +289,10 @@ gemessen).
   * Das Lauf-Manifest traegt das Rezept (Pfad, sha256, Inhalt) und alle `MOSAIC_*` der
     Umgebung (`mosaic_env`), wie heute schon `spec_file`.
   * Wo die Engine meldet, was sie tatsaechlich gelesen hat (`engine_config_json`), vergleicht ein
-    Waechter das VOR dem Start mit dem Rezept und bricht bei Abweichung ab.
+    Waechter das VOR dem Start mit dem Rezept und bricht bei Abweichung ab. Die Erwartung
+    (`expect_engine_config`) steht rezeptweit UND je Klasse; die Klasse ergaenzt bzw.
+    ueberschreibt. Ein Knopf, den nur eine Klasse setzt, gehoert in deren Erwartung (Smoke v34
+    2026-10-01: rezeptweit brach er die anderen Klassen vor dem ersten Spiel ab).
   * Abgrenzung: die Spec (`models/*.spec.json`) bleibt die Suchkonfiguration JE SEITE, die auch
     Arena und GUI laden; das Rezept beschreibt den LAUF und verweist auf die Spec.
   Erste Anwendung: die v34-Erzeugung (STATUS Fahrplan 3e), danach Training und Arena. Rezepte

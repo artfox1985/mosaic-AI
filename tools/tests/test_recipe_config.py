@@ -42,6 +42,7 @@ from recipe_config import (  # noqa: E402
     apply_recipe_env_from_argv,
     apply_to_parser,
     check_engine_config,
+    expected_engine_config,
     load_recipe,
     manifest_block,
     mosaic_env_snapshot,
@@ -232,6 +233,39 @@ class Resolve(RecipeFileCase):
         with self.assertRaises(RecipeError):
             resolve(self.load(content), "policy")
 
+
+
+class ClassExpectation(RecipeFileCase):
+    """Waechter-Erwartung je Klasse (Smoke-Lauf v34, 2026-10-01): ein Knopf,
+    den nur eine Klasse setzt, darf die anderen nicht vor dem Start abbrechen."""
+
+    def content(self):
+        content = base_content()
+        content["expect_engine_config"] = {"tie_mirror_p": 0.5, "excursion_kl_weight": 0}
+        content["classes"]["value"]["expect_engine_config"] = {"excursion_kl_weight": 1}
+        return content
+
+    def test_class_extends_and_overrides_the_recipe_wide_expectation(self):
+        recipe = self.load(self.content())
+        self.assertEqual(expected_engine_config(recipe, "value"),
+                         {"tie_mirror_p": 0.5, "excursion_kl_weight": 1})
+        self.assertEqual(expected_engine_config(recipe, "policy"),
+                         {"tie_mirror_p": 0.5, "excursion_kl_weight": 0})
+
+    def test_class_expectation_is_not_an_argument(self):
+        args, _env = resolve(self.load(self.content()), "value")
+        self.assertNotIn("expect_engine_config", args)
+
+    def test_class_expectation_must_be_an_object(self):
+        content = self.content()
+        content["classes"]["value"]["expect_engine_config"] = [1]
+        with self.assertRaises(RecipeError):
+            self.load(content)
+
+    def test_v34_recipe_expects_kl_only_in_the_excursion_class(self):
+        recipe = load_recipe(_TOOLS.parent / "models" / "v34.recipe.json")
+        got = {c: expected_engine_config(recipe, c)["excursion_kl_weight"] for c in recipe["classes"]}
+        self.assertEqual(got, {"policy": 0, "value-wegc": 0, "value-excursion": 1})
 
 class UnknownKeys(RecipeFileCase):
     def test_unknown_key_aborts_with_suggestion(self):

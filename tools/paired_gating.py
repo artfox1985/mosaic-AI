@@ -158,6 +158,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recipe_config import (RecipeError, apply_recipe_env_from_argv,  # noqa: E402
                            apply_to_parser, check_engine_config, manifest_block,
                            mosaic_env_snapshot)
+from recipe_config import expected_engine_config as expected_engine_config_for  # noqa: E402
 
 _RECIPE_PRE = None
 if __name__ == "__main__":
@@ -660,7 +661,7 @@ def main(argv=None, recipe_pre=None) -> None:
     if recipe_pre:
         recipe_block = manifest_block(recipe_pre["recipe"], recipe_pre["recipe"].path,
                                       recipe_pre["class"], recipe_overrides)
-        expected_engine_config = recipe_pre["recipe"].get("expect_engine_config") or None
+        expected_engine_config = expected_engine_config_for(recipe_pre["recipe"], recipe_pre["class"]) or None
 
     sims_a = args.sims if args.sims is not None else args.sims_a
     sims_b = args.sims if args.sims is not None else args.sims_b

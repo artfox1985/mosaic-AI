@@ -72,7 +72,7 @@ TOP_LEVEL_KEYS = frozenset({
 # Werkzeug mit einem dest `env` oder `description` koennte diese nicht je
 # Klasse setzen -- keines der drei Zielwerkzeuge hat einen (geprueft
 # 2026-09-26 an self_play.py, train.py, tools/paired_gating.py).
-CLASS_META_KEYS = frozenset({"env", "description"})
+CLASS_META_KEYS = frozenset({"env", "description", "expect_engine_config"})
 
 # dests, die `add_recipe_arguments` selbst anlegt. Ein Rezept, das sein
 # eigenes Rezept oder seine Klasse setzen will, ist ein Zirkel.
@@ -201,6 +201,9 @@ def _structure_problems(content) -> list[str]:
                 problems += _env_section_problems(body.get("env", {}), where + ".env")
                 if "description" in body and not isinstance(body["description"], str):
                     problems.append(f"{where}.description muss Text sein")
+                if ("expect_engine_config" in body
+                        and not isinstance(body["expect_engine_config"], dict)):
+                    problems.append(f"{where}.expect_engine_config muss ein Objekt sein")
                 problems += _args_section_problems(
                     {k: v for k, v in body.items() if k not in CLASS_META_KEYS}, where)
     if "expect_engine_config" in content and not isinstance(content["expect_engine_config"], dict):
@@ -269,6 +272,24 @@ def resolve(recipe: dict, class_name: str | None) -> tuple[dict, dict]:
     common.update({k: v for k, v in body.items() if k not in CLASS_META_KEYS})
     env.update(body.get("env", {}))
     return common, env
+
+
+def expected_engine_config(recipe: dict, class_name: str | None) -> dict:
+    """Soll fuer den Waechter: `expect_engine_config` des Rezepts, ergaenzt
+    bzw. ueberschrieben durch `classes.<name>.expect_engine_config`.
+
+    Warum je Klasse (Smoke-Lauf v34, 2026-10-01): ein Knopf, den nur EINE
+    Klasse setzt (`excursion_kl_weight` in `value-excursion`), stand
+    rezeptweit in der Erwartung -- der Waechter brach `policy` vor dem
+    ersten Spiel ab. Klassenwahl und Fehler wie `resolve`; ohne `classes`
+    gilt nur die rezeptweite Erwartung.
+    """
+    expected = dict(recipe.get("expect_engine_config") or {})
+    classes = recipe.get("classes")
+    if classes is None or class_name is None or class_name not in classes:
+        return expected
+    expected.update(classes[class_name].get("expect_engine_config") or {})
+    return expected
 
 
 # ---------------------------------------------------------------------------

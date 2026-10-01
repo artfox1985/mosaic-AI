@@ -1,7 +1,7 @@
 {
   "recipe_version": 1,
   "tool": "self_play",
-  "description": "ENTWURF 2026-09-27 fuer die v34-Erzeugung (evaluations/PREREG_v34_window.md par.6), noch nicht gefahren. Aufruf: python -X utf8 -u self_play.py --recipe models/v34.recipe.json --class <policy|value-wegc|value-excursion>. Generator v33-b01 (Nutzer 2026-09-27), Spec models/v33_generation.spec.json = byte-gleiche Kopie von v32_generation.spec.json (sha256 4a3f9db3...), Seeds 20260946/47/48 im Vierer-Schritt nach v33 (42/43/44). Klassen-Flags wie v33: policy und value-excursion aus tools/night_v33_generate.sh, value-wegc aus tools/night_v33_b03_b04.sh Phase 2. NEU gegenueber v33: tie_mirror_p 0.5 (PREREG_tie_mirror.md), label_rng_split (Review #13), excursion_reshuffle (Review #14). excursion_kl_weight in value-excursion (PREREG_targeted_branching.md par.7). ENTSCHIEDEN 2026-10-01 (Nutzer): E1 an und Runde 5 per Netz, beide ueber env (MOSAIC_SINGLE_PASS_OTHER_VAL=1 auch fuer die Label-Pfade, MOSAIC_R5_NET_SOLVER=0); die Spec setzt keines der beiden Felder, also gilt der Env-Default (Spec-Felder je Seite mit Env-Default; engine_config meldet den Env-Default, der Waechter ist nur aussagekraeftig, solange die Spec das Feld nicht setzt).",
+  "description": "ENTWURF 2026-09-27 fuer die v34-Erzeugung (evaluations/PREREG_v34_window.md par.6), noch nicht gefahren. Aufruf: python -X utf8 -u self_play.py --recipe models/v34.recipe.json --class <policy|value-wegc|value-excursion>. Generator v33-b01 (Nutzer 2026-09-27), Spec models/v33_generation.spec.json = byte-gleiche Kopie von v32_generation.spec.json (sha256 4a3f9db3...), Seeds 20260946/47/48 im Vierer-Schritt nach v33 (42/43/44). Klassen-Flags wie v33: policy und value-excursion aus tools/night_v33_generate.sh, value-wegc aus tools/night_v33_b03_b04.sh Phase 2. NEU gegenueber v33: tie_mirror_p 0.5 (PREREG_tie_mirror.md), label_rng_split (Review #13), excursion_reshuffle (Review #14). excursion_kl_weight in value-excursion (PREREG_targeted_branching.md par.7); die Waechter-Erwartung dafuer steht JE KLASSE (Smoke-Lauf 2026-10-01: rezeptweit brach sie policy vor dem ersten Spiel ab). ENTSCHIEDEN 2026-10-01 (Nutzer): E1 an und Runde 5 per Netz, beide ueber env (MOSAIC_SINGLE_PASS_OTHER_VAL=1 auch fuer die Label-Pfade, MOSAIC_R5_NET_SOLVER=0); die Spec setzt keines der beiden Felder, also gilt der Env-Default (Spec-Felder je Seite mit Env-Default; engine_config meldet den Env-Default, der Waechter ist nur aussagekraeftig, solange die Spec das Feld nicht setzt).",
   "common": {
     "mode": "network",
     "model": "models/alphazero_v33-b01_brierbest.onnx",
@@ -28,14 +28,16 @@
       "description": "Sockel (Traeger), policy-aktiv. v33: night_v33_generate.sh Schritt 1 (--deviate-prob 1.0, Seed 20260942, Version v32-b01-policy).",
       "version": "v33-b01-policy",
       "seed": 20260946,
-      "deviate_prob": 1.0
+      "deviate_prob": 1.0,
+      "expect_engine_config": {"excursion_kl_weight": 0}
     },
     "value-wegc": {
       "description": "Schwarm, value-only, Weg C, Huellenknopf AN (Spec wie common). ENTSCHIEDEN 2026-09-27 als dritte Klasse statt value-tempc-nohull (PREREG_v34_window.md par.5 Punkt 2). v33-Vorbild: night_v33_b03_b04.sh Phase 2 (--value-only --deviate-prob 1.0, Seed 20260945, Version v32-b01-value-wegc); die dortigen 10 Threads galten nur wegen des parallelen b04-Trainings, v34 faehrt die 11 aus common.",
       "version": "v33-b01-value-wegc",
       "seed": 20260947,
       "value_only": true,
-      "deviate_prob": 1.0
+      "deviate_prob": 1.0,
+      "expect_engine_config": {"excursion_kl_weight": 0}
     },
     "value-excursion": {
       "description": "Schwarm, value-only, Ausflug (Weg B). v33: night_v33_generate.sh Schritt 3 (--value-only --excursion-prob 1.0 --no-root-noise, Seed 20260944, Version v32-b01-value-excursion). excursion_reshuffle (common) wirkt nur hier; in den anderen Klassen entsteht kein Ausflug.",
@@ -44,7 +46,8 @@
       "value_only": true,
       "excursion_prob": 1.0,
       "no_root_noise": true,
-      "excursion_kl_weight": true
+      "excursion_kl_weight": true,
+      "expect_engine_config": {"excursion_kl_weight": 1}
     }
   },
   "expect_engine_config": {
@@ -52,7 +55,6 @@
     "label_rng_split": true,
     "excursion_reshuffle": true,
     "single_pass_other_val": true,
-    "r5_net_solver": false,
-    "excursion_kl_weight": 1
+    "r5_net_solver": false
   }
 }

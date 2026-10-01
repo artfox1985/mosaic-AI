@@ -45,7 +45,8 @@ except Exception:
 # `__mp_main__` neu und erben die Umgebung des Elternprozesses beim Start --
 # ein zweites Anwenden faende die Variablen schon gesetzt vor.
 from tools.recipe_config import (RecipeError, apply_recipe_env_from_argv,  # noqa: E402
-                                 apply_to_parser, check_engine_config, manifest_block)
+                                 apply_to_parser, check_engine_config,
+                                 expected_engine_config, manifest_block)
 
 # Variablen, die dieses Werkzeug SELBST aus einem Flag setzt (Worker
 # `_worker_run_chunk`). Stuende eine davon im `env` eines Rezepts, gaebe es zwei
@@ -786,7 +787,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         _recipe = recipe_info["recipe"]
         _recipe_block = manifest_block(_recipe, _recipe.path, recipe_info.get("class"),
                                        recipe_info.get("overrides"))
-        _expected = _recipe.get("expect_engine_config") or {}
+        _expected = expected_engine_config(_recipe, recipe_info.get("class"))
     # Die engine_config des MANIFESTS kommt IMMER aus einem Chunk-Prozess (2026-09-27): der
     # Elternprozess sieht die Knoepfe nicht, die erst der Worker aus Flags setzt
     # (tie_mirror_p, label_rng_split, ...), und haette sonst z.B. tie_mirror_p 0,0 gemeldet,

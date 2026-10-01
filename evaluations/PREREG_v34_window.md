@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Offen: Bau, Wheel-Runde, Kostentor der Erzeugung. Nichts erzeugt. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Gebaut, Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a). Offen: Kostentor der Erzeugung (par.8). Nichts erzeugt. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -150,6 +150,38 @@ je Klasse `version` und `seed` (Vorschlag 20260946 / 47 / 48 im Vierer-Schritt n
 Training: Referenz-Manifest des v33-Grundarms (`models/manifest_train_v33-b01_*.json`), Rezept
 unveraendert (warm, 12 Epochen, lr 5e-5 cosine, WDL, nortv, lambda 0,7, `--select-by-brier`);
 erwartete Manifest-Abweichungen `load`, `name`, `file_list`, `cache_file`, `seed`, `val_pool`.
+
+## par.7 VORPRUEFUNGEN VOR DEM START
+
+### par.7a Smoke-Lauf des Rezepts (2026-10-01, exklusiv, Wheel 1.1.0)
+
+`MOSAIC_DATA_DIR=data/probe_v34smoke python -X utf8 -u self_play.py --recipe models/v34.recipe.json
+--class <klasse> --games 20 --version smoke-v34-<klasse>`, je Klasse nacheinander.
+
+**Erster Versuch ROT, Rezeptfehler gefunden:** `expect_engine_config` war rezeptweit und trug
+`excursion_kl_weight: 1`, das nur die Ausflug-Klasse setzt; der Waechter brach `policy` vor dem
+ersten Spiel ab (`excursion_kl_weight: erwartet 1, Engine meldet 0`), ohne Spur in `data/`.
+**Behoben:** Waechter-Erwartung je Klasse (`classes.<name>.expect_engine_config` ergaenzt bzw.
+ueberschreibt die rezeptweite, `tools/recipe_config.py::expected_engine_config`, eingehaengt in
+`self_play.py`, `train.py`, `tools/paired_gating.py`; 4 neue Tests, Rezept-Tests 104 gruen). Im
+Rezept erwartet `value-excursion` 1, `policy` und `value-wegc` erwarten 0 (faengt auch ein
+Env-Leck). Rezept-sha256 danach `5ca42e9b1592...`.
+
+**Zweiter Versuch GRUEN** (Grundmenge je Klasse 20 angeforderte Partien, Einheit Partie):
+
+| Klasse | Waechter | Partien (Haupt / Ausflug) | Records | `tie_mirrored` True / False (Partien) | `branch_kl` | s je Partie (n = 20) |
+| --- | --- | --- | --- | --- | --- | --- |
+| policy | gruen, 6 Knoepfe | 20 / 0 | 3.953 | 11 / 9 | auf 0 Records | 2,54 |
+| value-wegc | gruen, 6 Knoepfe | 20 / 0 | 3.979 | 8 / 12 | auf 0 Records | 2,61 |
+| value-excursion | gruen, 6 Knoepfe | 10 / 10 | 3.275 | 6 / 14 | auf genau 10 Records = erster Record jedes Ausflugs, Werte 0,09-3,92 | 1,90 |
+
+Manifest je Klasse: `recipe` mit `path`, `sha256`, `class`, `content`, `overrides` (nur `games` und
+`version`, wie gewollt), `engine_config_check` (Abweichungen leer), `mosaic_env`
+(`MOSAIC_R5_NET_SOLVER=0`, `MOSAIC_SINGLE_PASS_OTHER_VAL=1`, `MOSAIC_STACK_DRAW_RESEARCH=1`, dazu
+`MOSAIC_DATA_DIR` des Smokes); `engine_config` meldet die sechs erwarteten Werte. `tie_mirrored` ist
+je Partie einheitlich und in allen 60 Partien gesetzt (25 True). **Keine Planungsgroesse:** n = 20
+je Klasse, die Ausflug-Klasse zaehlt Ausfluege als Partien mit. Die Smoke-Dateien liegen in
+`data/probe_v34smoke` (Loeschliste des Generationswechsels).
 
 ## par.8 KOSTEN (Herleitung, nicht gemessen fuer v34)
 
