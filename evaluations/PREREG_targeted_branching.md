@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a): roh TOT (misst die Huelle), Policy-KL A +0,029. Stufe 2 NEU registriert (par.7, Nutzer): der Ausflug zweigt nach Rundenprofil x Policy-Diskrepanz ab (Aktionszahl faellt weg), Knopf MOSAIC_EXCURSION_KL_WEIGHT, faehrt in v34 im Paket. Wirkung auf den Kopf: Offline-Pruefung nach dem v34-Training registriert (par.7a); v33-Kontrolle gefahren, DiD(v33) -0,00071 [-0,00160; +0,00020] (par.7b). -->
+<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a) roh TOT, Policy-KL A +0,029. Stufe 2 (par.7) KL-Abzweig in v34, Abnahme GREIFT (Median 1,095 gegen q75 0,804, par.7c). Offen: Offline-Pruefung nach dem v34-Training (par.7a, Kontrolle par.7b). -->
 
 # Vorregistrierung: gezielt abzweigen statt zufaellig
 
@@ -256,3 +256,21 @@ Policy-KL-Zeile reproduziert par.6a (A +0,02915 [+0,0221; +0,0364]).
 
 **Berichtet, nicht gedeutet** (die Leseregel par.7a braucht E = DiD(v34) - DiD(v33)). Die
 Bootstrap-Ziehungen liegen im Artefakt (Feld `did.<menge>.draws`) fuer die paarweise Differenz.
+
+### par.7c KL-Abnahme in der v34-Erzeugung (2026-10-01, `tools/probes/excursion_kl_acceptance.py`, 382,5 s)
+
+Beide Seiten in der OFFLINE-Definition (`targeted_branching_pretest.policy_kl`, Prior aus dem
+Generator `v33-b01`). **Abzweig:** der erste Record jedes Ausflugs (traegt `branch_kl`), n = 2.000
+von 2.000 (0 ausgefiltert); je Runde 599 / 656 / 522 / 223. **Referenz:** alle Drafting-Records R1-4
+aus 20 Dateien je Klasse (Seed 20261001), n = 67.094. Einheit Record. Filter wie im Vortest ohne
+die `root_q`/`winner`-Bedingung.
+
+| Menge | Median | q25 / q75 | Mittel |
+| --- | --- | --- | --- |
+| Abzweig | **1,095** | 0,541 / 1,870 | 1,361 |
+| Referenz | 0,347 | -- / **0,804** (q90 1,490) | 0,597 |
+
+**Abnahme: GREIFT** (Median Abzweig 1,095 > q75 Referenz 0,804; der Median liegt auf dem
+83,3-%-Quantil der Referenz). `branch_kl` (Engine) Median 1,156, Spearman gegen die Werkzeug-KL
+derselben Records **+0,899**. Referenz-Median je Klasse: policy 0,331, value-wegc 0,342,
+value-excursion 0,376. Artefakt `excursion_kl_acceptance_v34.json`.

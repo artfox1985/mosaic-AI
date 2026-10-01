@@ -519,3 +519,15 @@ tragen R4 (46 min) und die Champion-2-Kante (40 min).
 
 Planungszahl v34-Erzeugung (HERLEITUNG aus v33 12,99 h, E1 -39,4 %, R5-Netz +11,5 %): rund 8,8 h.
 
+## v34-Erzeugung und Abnahmen, gemessen am 2026-10-01, exklusiv
+
+| Lauf | Umfang | Threads | Wanduhr | Quelle |
+| --- | --- | --- | --- | --- |
+| Erzeugung Sockel `v33-b01-policy` (E1 an, R5 per Netz) | 4.000 Partien | 11 | **9.472,7 s** (2,37 s je Partie) | Manifest `laufzeit` |
+| Erzeugung `v33-b01-value-wegc` | 4.000 Partien | 11 | **9.474,3 s** (2,37 s) | Manifest |
+| Erzeugung `v33-b01-value-excursion` (KL-Abzweig) | 4.000 Partien | 11 | **7.335,7 s** (1,83 s) | Manifest |
+| Erzeugung gesamt | 12.000 Partien | 11 | **7,30 h** (v33: 12,99 h) | Summe |
+| Tor 0 / Tor 2a `corpus_sanity_check.py` | je 400 Dateien | 1 | 282,4 / 280,1 / 232,1 s | Artefakt `laufzeit` |
+| Spiegelknopf-Abnahme | 1.200 Dateien | 1 | **698,0 s** | Artefakt `laufzeit` |
+| KL-Abnahme Ausflug | 2.000 + 67.094 Records | 11 | **382,5 s** (cpu 860 s) | Artefakt `laufzeit` |
+

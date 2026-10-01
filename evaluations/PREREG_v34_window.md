@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Kostentor: Runde 5 per Netz +11,5 % je Partie, Sockel 2,73 s je Partie (par.8a). Nichts erzeugt. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Erzeugung fertig in 7,30 h (par.9): Spiegelknopf und KL-Abzweig gruen, aber Tor 2a GERISSEN (sp_voll 0,921 gegen 0,966), Nutzer-Vorlage. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -217,3 +217,43 @@ Anhalt: der Sockel mit beiden Knoepfen lief hier 2,73 s je Partie, 4.000 Partien
   fuer alle Klassen gelten; UNGEPRUEFT fuer Weg C und Ausflug. Weg C lief bei b03 20:02-00:44 fuer
   4.000 Partien, 10 Threads, UNTER NEBENLAST (keine Planungsgroesse).
 * Tor 1 rund 3,4 h (2 x 40 Bloecke a rund 150 s).
+
+## par.9 ERZEUGUNG UND ABNAHMEN (2026-10-01)
+
+**Erzeugung** (`bash tools/night_v34_generate.sh`, Nutzer-Freigabe 2026-10-01, 10:06:42-17:25:01, Exit 0):
+je Klasse 400 Dateien / 4.000 Partien, Rezept-Waechter je Klasse gruen (6 Knoepfe), **0
+`[Watchdog]`-Zeilen** in der Aufgabenausgabe (obere Schranke fuer verworfene Panics plus
+Deadlines, Review #23). Wanduhr (Manifest `laufzeit`, 11 Threads): policy 9.472,7 s (2,37 s je
+Partie), value-wegc 9.474,3 s (2,37 s), value-excursion 7.335,7 s (1,83 s); **zusammen 7,30 h**
+gegen 8,8 h hergeleitet (par.8a). Nebenlast waehrend policy: drei Datei-Edits per kurzem `python`
+(je rund 1 s), gemeldet; seedgetrieben, also ohne Wirkung auf die Partien.
+
+| Abnahme (par.4) | Ergebnis |
+| --- | --- |
+| Manifest-Diff je Klasse gegen v33 (`manifest_v32-b01-*`) | **GRUEN**: erwartet `cli_args.model/seed/spec/version`, `version`, `spec_file.path` (Inhalt gleich), Rezept-Block, `mosaic_env`, neue `engine_config`-Schluessel. Zusaetzlich, erklaert: `engine_config.return_order_random_p` 0,0 -> 0,81 (v33 meldete noch der Elternprozess, behoben 2026-09-27; `cli_args` gleich), neuer Block `engine_config_parent`, `r5_solver_iterative`/`r5_solver_node_budget` (Default aus/200), `value-wegc` threads 10 -> 11 (im Rezept vermerkt) |
+| Waechter `expect_engine_config` | **GRUEN** je Klasse, Abweichungen leer |
+| Tor 0 je Klasse (`corpus_sanity_check.py`) | Exit 0 in allen drei Klassen; Kennzahlen unten |
+| **Tor 2a** (Sockel, n = 8.000 Seiten) | `sp_voll` **0,921 (+-0,017)** gegen **0,966 (+-0,017)** bei v33 (`v32-b01-policy`): **GERISSEN** (-0,045; z rund -3,7, HERLEITUNG aus den beiden 95-%-Intervallen). Nach `PREREG_v30_window.md` par.3 H4/Punkt 5: Nutzer-Vorlage, keine stille Fortsetzung |
+| Spiegelknopf (`PREREG_tie_mirror.md` par.3 Punkt 2) | **GRUEN**: 49,03 / 48,95 / 48,35 % gespiegelte Hauptpartien (Fenster 47-53 %), `tie_mirror_acceptance_v34.json` |
+| KL-Abzweig (`PREREG_targeted_branching.md` par.7) | **GREIFT**: Median 1,095 gegen q75 0,804 der Referenz, `excursion_kl_acceptance_v34.json` |
+
+**Sechs Standard-Kennzahlen je Klasse** (`corpus_sanity_<klasse>.json`, je 4.000 Partien / 8.000
+Seiten; Margin per Konstruktion 0), Sockel v33 zum Vergleich:
+
+| Kennzahl | Sockel v33 (`v32-b01-policy`) | **Sockel v34** | value-wegc v34 | value-excursion v34 |
+| --- | --- | --- | --- | --- |
+| volle Reihen / Fuellstand | 0,092 / 2,95 | **0,070 / 2,89** | 0,071 / 2,90 | 0,079 / 2,94 |
+| volle Spalten / >= 4 / >= 3 | 0,966 / 2,26 / 3,21 | **0,921 / 2,21 / 3,13** | 0,942 / 2,22 / 3,13 | 1,032 / 2,27 / 3,16 |
+| Strafleiste (Steine je Partie und Seite) | 4,99 | **5,76** | 5,71 | 4,97 |
+| eigene Punkte | 53,33 | **49,70** | 50,10 | 53,51 |
+| Plattenpunkte k1 / k3 / k4 / k5 / k6 | 7,07 / 3,34 / 10,29 / 8,87 / -9,41 | **6,83 / 3,21 / 10,16 / 8,98 / -9,57** | 6,91 / 3,15 / 10,11 / 8,94 / -9,53 | 7,57 / 3,14 / 10,27 / 9,21 / -9,45 |
+
+**Spalten nach `tie_mirrored` getrennt** (Seiten, `tie_mirror_acceptance_v34.json`): Sockel 0,907
+gespiegelt (n 3.922) gegen 0,933 ungespiegelt (n 4.078); value-wegc 0,920 / 0,962; value-excursion
+1,017 / 1,046. Auch der ungespiegelte Sockel liegt unter v33 (0,933 gegen 0,966): der Spiegelknopf
+erklaert den Rueckgang hoechstens zum Teil. Weitere Kandidaten, UNGEPRUEFT: Generatorwechsel
+(`v33-b01` baute in Tor 1 gepoolt 1,024 gegen 1,060 volle Spalten je Seite, par.10 der v33-Prereg),
+E1 und R5-Netz bei 100 Sims (ihre A/B liefen bei 400 Sims und zeigten dort MEHR volle Spalten und
+WENIGER Strafleiste, `PREREG_evaluator_pretests.md` par.8d, `PREREG_r5_net_vs_solver.md` par.6a).
+Nicht gedeutet; Entscheid beim Nutzer.
+

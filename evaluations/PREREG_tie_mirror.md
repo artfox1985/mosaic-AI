@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kippt der Spiegelknopf (MOSAIC_TIE_MIRROR_P, je Partie eine Muenze) die Gleichstandsregeln von Huellenwahl und Tiling-Zelle in der Erzeugung zu 50:50, und verschiebt das die vollen Spalten nach rechts, ohne Staerke zu kosten? | Beleg: gebaut 2026-09-26, NICHT kompiliert, nicht gemessen (par.2); Abnahme vorab in par.3, Ergebnisse leer (par.4). -->
+<!-- STATUS: OFFEN | Frage: Kippt der Spiegelknopf (MOSAIC_TIE_MIRROR_P, je Partie eine Muenze) die Gleichstandsregeln von Huellenwahl und Tiling-Zelle in der Erzeugung zu 50:50, und verschiebt das die vollen Spalten nach rechts, ohne Staerke zu kosten? | Beleg: v34-Erzeugung (par.4a): Muenze im Fenster (49,03 % am Sockel), aber keine Verschiebung nach rechts; gespiegelte Partien vollenden weniger Spalten (0,907 gegen 0,933 am Sockel). Staerke (Tor 1) steht aus. -->
 
 # Vorregistrierung: Spiegelknopf fuer die Gleichstandsregeln der Erzeugung
 
@@ -163,4 +163,21 @@ Record-Feld nur bei p > 0; Waechter setzt zurueck), `envelope.rs::tie_mirror_fli
 
 ## par.4 Ergebnisse
 
-(leer)
+### par.4a v34-Erzeugung (2026-10-01, `tools/probes/tie_mirror_acceptance.py`, 698,0 s)
+
+Grundmenge Hauptpartien je Klasse (Ausfluege erben den Wert), Einheit Partie; Feld in allen
+Partien gesetzt und je Partie einheitlich (0 uneinheitlich, 0 ohne Feld).
+
+| Klasse | gespiegelt / Hauptpartien | Anteil (SE) | Tor (50 +- 3 %) | rechts c4+c5 an vollen Spalten gespiegelt / ungespiegelt | volle Spalten je Seite gespiegelt / ungespiegelt |
+| --- | --- | --- | --- | --- | --- |
+| policy (Sockel) | 1.961 / 4.000 | 49,03 % (0,79) | **GRUEN** | 0,001 / 0,001 | 0,907 (n 3.922) / 0,933 (n 4.078) |
+| value-wegc | 1.958 / 4.000 | 48,95 % (0,79) | GRUEN | 0,000 / 0,000 | 0,920 / 0,962 |
+| value-excursion | 967 / 2.000 | 48,35 % (1,12) | GRUEN | 0,000 / 0,000 | 1,017 / 1,046 |
+
+**Punkt 2 (Tor): GRUEN.** **Punkt 3 (berichtet):** die erwartete Richtung (gespiegelte Partien bauen
+mehr rechts) ist in dieser Generation NICHT zu sehen; rechts entstehen in beiden Gruppen praktisch
+keine vollen Spalten. Gespiegelte Partien vollenden in allen drei Klassen WENIGER volle Spalten
+(-0,026 / -0,042 / -0,029 je Seite), Signifikanz nicht gerechnet. Zusammenhang mit dem gerissenen
+Tor 2a der v34-Erzeugung: `PREREG_v34_window.md` par.9. **Punkt 4** (Staerke) steht mit Tor 1 aus.
+Punkt 1 (Default byte-identisch) lief in der Wheel-Runde (Netz-Paritaets-Fixture, Anker-Drift gruen
+2026-10-01).

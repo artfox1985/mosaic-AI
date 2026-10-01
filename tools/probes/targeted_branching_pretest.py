@@ -58,6 +58,20 @@ DEFAULT_VAL_LIST = "data/window_v33_val.txt"
 ROUNDS = (1, 2, 3, 4)
 
 
+def policy_kl(logits_row, targ: dict) -> float:
+    """KL(Ziel || Prior) in der OFFLINE-Definition (par.3/par.7): Prior = Softmax der Logits,
+    eingeschraenkt auf die Aktions-IDs des Ziels, f64, Epsilon 1e-12. Einzige Stelle der Formel;
+    auch die KL-Abnahme am Ausflug (`excursion_kl_acceptance.py`) rechnet hierueber."""
+    ids = np.array(list(targ.keys()), dtype=np.int64)
+    t = np.array(list(targ.values()), dtype=np.float64)
+    t = t / t.sum()
+    lg = logits_row[ids].astype(np.float64)
+    lg = lg - lg.max()
+    prior = np.exp(lg) / np.exp(lg).sum()
+    return float(np.sum(np.where(t > 0, t * (np.log(np.clip(t, 1e-12, None))
+                                             - np.log(np.clip(prior, 1e-12, None))), 0.0)))
+
+
 def boot_group_diff(values, fidx, n_files, mask_a, mask_b) -> dict:
     """Mittel(values | mask_a) - Mittel(values | mask_b), Block-Bootstrap ueber Dateien."""
     def sums(mask):
@@ -221,13 +235,7 @@ def main() -> None:
                     out_n = model_new(flat)
             pn = ((out_n[1][:, 0] + 1.0) / 2.0).numpy()
         for i, (_st, fi, rnd, win, rq, targ) in enumerate(buf):
-            ids = np.array(list(targ.keys()), dtype=np.int64)
-            t = np.array(list(targ.values()), dtype=np.float64)
-            t = t / t.sum()
-            lg = logits[i][ids].astype(np.float64)
-            lg = lg - lg.max()
-            prior = np.exp(lg) / np.exp(lg).sum()
-            kl = float(np.sum(np.where(t > 0, t * (np.log(np.clip(t, 1e-12, None)) - np.log(np.clip(prior, 1e-12, None))), 0.0)))
+            kl = policy_kl(logits[i], targ)
             rows["file"].append(fi); rows["round"].append(rnd); rows["win"].append(win)
             rows["root_q"].append(rq); rows["p_head"].append(float(ph[i])); rows["kl"].append(kl)
             rows["p_new"].append(float(pn[i]) if pn is not None else float("nan"))

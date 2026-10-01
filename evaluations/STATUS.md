@@ -18,7 +18,7 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**FERTIG: die v34-Erzeugung** (Nutzer-Freigabe 2026-10-01), `bash tools/night_v34_generate.sh` 10:06:42-17:25:01, Exit 0: je Klasse 400 Dateien / 4.000 Partien, Waechter je Klasse gruen, 0 `[Watchdog]`-Zeilen; Wanduhr 9.472,7 / 9.474,3 / 7.335,7 s (policy / value-wegc / value-excursion), zusammen 7,30 h gegen 8,8 h hergeleitet. Nebenlast waehrend policy: drei Datei-Edits per kurzem `python` (je rund 1 s), gemeldet. Naechster Schritt: Abnahmen par.4.
+**FERTIG: die v34-Erzeugung** (10:06:42-17:25:01, 7,30 h, je Klasse 4.000 Partien, 0 `[Watchdog]`-Zeilen). **Abnahmen 2026-10-01** (`PREREG_v34_window.md` par.9): Manifest-Diff und Waechter gruen, Tor 0 gruen, Spiegelknopf gruen (49,03 % am Sockel), KL-Abzweig GREIFT (Median 1,095 gegen q75 0,804). **Tor 2a GERISSEN:** `sp_voll` 0,921 gegen 0,966 (v33), dazu Punkte 49,70 gegen 53,33 und Strafleiste 5,76 gegen 4,99. **NUTZER-VORLAGE, nichts weiter gestartet** (Abschnitt 6 Punkt 1).
 
 **Start der Erzeugung (NUR auf ausdrueckliche Nutzer-Freigabe):**
 
@@ -188,7 +188,7 @@ Offline-Messungen laufen darauf).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-1. **Start der v34-Erzeugung** (`bash tools/night_v34_generate.sh`).
+1. **Tor 2a der v34-Erzeugung gerissen** (`PREREG_v34_window.md` par.9): weiter mit Fenster und Training, oder erst die Ursache eingrenzen? Billige Diagnose ohne neue Partien: die geloeschten Kostentor-Korpora (`data/probe_v34costgate`: R5 Loeser gegen Netz bei 100 Sims, je 100 Partien, gleiche Seeds; `data/probe_e1gate`: E1 aus/an) liegen in restic `a3755374` und lassen sich auf Spalten, Punkte und Strafleiste vergleichen.
 2. **Zeitpunkt der R5-Stufe-2a-A/B:** jetzt vor der Erzeugung (blockiert die Maschine rund 3,5-4 h,
    HERLEITUNG) oder wie geplant parallel zum bzw. nach dem v34-Training (Vorschlag: nach der
    Erzeugung; die Erzeugung haengt nicht daran).
