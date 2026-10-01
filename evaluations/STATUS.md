@@ -55,7 +55,7 @@ gruen): KL-Abzweig-Knopf `MOSAIC_EXCURSION_KL_WEIGHT` / Flag `--excursion-kl-wei
 4. **ERLEDIGT 2026-10-01: Kostentor** (`PREREG_v34_window.md` par.8a): Runde 5 per Netz +11,5 % je Partie (2,727 gegen 2,446 s, je 100 Partien Sockel, E1 an), Planungszahl Erzeugung rund 8,8 h (Herleitung). Urspruenglich: **Kostentor der Erzeugung** (par.5 Punkt 3): je 100 Partien Sockel-Einstellung
    mit und ohne `MOSAIC_R5_NET_SOLVER=0` (E1 in beiden an), Muster `tools/night_v33_package.sh`
    Schritt 2. Ergebnis -> par.8 der v34-Prereg (Planungszahl der Erzeugung).
-5. **v33-Kontrolle der Offline-Pruefung** (`PREREG_targeted_branching.md` par.7a):
+5. **ERLEDIGT 2026-10-01: v33-Kontrolle** DiD(v33) -0,00071 [-0,00160; +0,00020], n 6.731 / 33.651 Zustaende (`PREREG_targeted_branching.md` par.7b). Urspruenglich (par.7a):
    `python -X utf8 -u tools/probes/targeted_branching_pretest.py --model models/alphazero_v32-b01_brierbest.pth --model-new models/alphazero_v33-b01_brierbest.pth --out evaluations/artifacts/targeted_branching_did_v33_control.json`
    (Default-Val-Liste `data/window_v33_val.txt`; rund 2-4 min). Ergebnis berichten, nicht deuten
    (die Leseregel braucht v34).
@@ -86,6 +86,15 @@ geprueft 2026-10-01: `corpus_io.dump_records` ist schon atomar (`corpus_io.py:87
   Zaehler ins Manifest). #11/#12/#15 sind laut Nachpruefung latent (Knoepfe/Feature aus), also
   keine Wirkung auf die v34-Erzeugung. **Ersatz fuer (c) in v34:** `[Watchdog]`-Zeilen in den
   Aufgabenausgaben der Erzeugung zaehlen und berichten (obere Schranke fuer Panic plus Deadline).
+
+**NEU, nach dem v34-Training: asymmetrisches Self-Play** (Nutzer 2026-10-01: *"ich will das self play
+um zwei neue klassen erweitern ... prinzipiell wuensch ich mir mehr asymetrisches self play um bewusst
+stellungen zu provozieren die nicht entstehen wenn du gegen dich selber spielst"*). (1) Ausflug mit
+zufaelliger Kuppelplatte: Wuerfel fuer Rotation 0-3, Quelle Auslage/Stapel, ID in der Auslage bzw.
+Stapeltiefe, VOR der Suche gesetzt; den Platz waehlt die Suche, 600 Sims. (2) Asymmetrisch gegen
+einen stoerenden Gegner, dem die eigenen Punkte weniger wichtig sind. Zusammensetzung im Gespraech,
+Prereg folgt nach den Nutzer-Antworten. Vorlaeufer (gemessen): `PREREG_asymmetric_curriculum.md`,
+`PREREG_opponent_disruption.md` (+v2), `PREREG_task28_aggression.md`, `PREREG_denial_tiebreak.md`.
 
 **Parallel bzw. danach (nicht vor der Erzeugung):** R5 Stufe 2a A/B (iterativ @2000 gegen Netz, Seeds
 20261672/73, parallel zum v34-Training erlaubt: GPU + EIN CPU-Auftrag); Bau E2 (Python) und E4 (Encoder,

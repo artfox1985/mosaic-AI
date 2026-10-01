@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a): roh TOT (misst die Huelle), Policy-KL A +0,029. Stufe 2 NEU registriert (par.7, Nutzer): der Ausflug zweigt nach Rundenprofil x Policy-Diskrepanz ab (Aktionszahl faellt weg), Knopf MOSAIC_EXCURSION_KL_WEIGHT, faehrt in v34 im Paket. Wirkung auf den Kopf: Offline-Pruefung nach dem v34-Training registriert (par.7a, Doppel-Differenz gegen den v33-Schritt). -->
+<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a): roh TOT (misst die Huelle), Policy-KL A +0,029. Stufe 2 NEU registriert (par.7, Nutzer): der Ausflug zweigt nach Rundenprofil x Policy-Diskrepanz ab (Aktionszahl faellt weg), Knopf MOSAIC_EXCURSION_KL_WEIGHT, faehrt in v34 im Paket. Wirkung auf den Kopf: Offline-Pruefung nach dem v34-Training registriert (par.7a); v33-Kontrolle gefahren, DiD(v33) -0,00071 [-0,00160; +0,00020] (par.7b). -->
 
 # Vorregistrierung: gezielt abzweigen statt zufaellig
 
@@ -239,3 +239,20 @@ aber bewusst nicht vorgesehen (Kosten einer ganzen Erzeugung).
 Fortschrittszaehler wie bisher. **Kosten, HERLEITUNG, ungemessen:** der Vortest brauchte 122,5 s fuer
 ein Modell auf 60 Dateien; zwei Mengen mit je zwei Koepfen also rund 4 x 2 min, unter 10 min.
 
+### par.7b v33-KONTROLLE der Offline-Pruefung, gefahren 2026-10-01 (164,1 s, exklusiv)
+
+`python -X utf8 -u tools/probes/targeted_branching_pretest.py --model models/alphazero_v32-b01_brierbest.pth
+--model-new models/alphazero_v33-b01_brierbest.pth --out evaluations/artifacts/targeted_branching_did_v33_control.json`
+(Generator `v32-b01`, neu `v33-b01`; Val-Liste `data/window_v33_val.txt`, 60 Dateien; cpu 1.200,3 s,
+11 Threads). **Grundmenge:** Drafting-Records Runde 1-4 mit `root_q` (completed), **n = 67.302
+Zustaende**, Einheit Zustand, Block Datei, 2.000 Bootstrap-Ziehungen. Substrat-Pruefung: die
+Policy-KL-Zeile reproduziert par.6a (A +0,02915 [+0,0221; +0,0364]).
+
+| Menge | n oberstes Dezil / untere Haelfte | Brier Dezil Generator / neu | Brier Haelfte Generator / neu | DiD(v33) [95 %-CI] |
+| --- | --- | --- | --- | --- |
+| gesamt | 6.731 / 33.651 | 0,22320 / 0,22181 | 0,19405 / 0,19337 | **-0,00071 [-0,00160; +0,00020]** |
+| Ausflug-Dateien | 2.214 / 9.278 | 0,21874 / 0,21845 | 0,19203 / 0,19231 | -0,00057 [-0,00209; +0,00091] |
+| uebrige Klassen | 4.517 / 24.373 | 0,22538 / 0,22345 | 0,19482 / 0,19378 | -0,00088 [-0,00194; +0,00018] |
+
+**Berichtet, nicht gedeutet** (die Leseregel par.7a braucht E = DiD(v34) - DiD(v33)). Die
+Bootstrap-Ziehungen liegen im Artefakt (Feld `did.<menge>.draws`) fuer die paarweise Differenz.
