@@ -22,10 +22,15 @@ SPEC=models/v33_gating_r5net.spec.json
 for f in "$GEN" "$E2" "$E4" "$SPEC" models/v34_gen_r5net_sims{100,200,400}.spec.json; do
   [ -f "$f" ] || { echo "ABBRUCH: $f fehlt"; exit 1; }
 done
-for f in "$ART"/ab_v34-b02_vs_v34-b01_s2026168[458].json "$ART"/ab_v34-b03_vs_v34-b01_s2026168[679].json \
-         "$ART"/ab_gen-r5net400_vs_gen-r5net200_s2026168[23].json "$ART/r5_cost_gate_v34-b01.json"; do
-  [ -f "$f" ] && { echo "ABBRUCH: $f liegt schon"; exit 4; }
-done
+guard_absent() {  # bricht ab, wenn eines der Artefakte schon liegt (je Modus geprueft)
+  for f in "$@"; do [ -f "$f" ] && { echo "ABBRUCH: $f liegt schon"; exit 4; }; done
+}
+case "$WHAT" in
+  all|arms) guard_absent "$ART"/ab_v34-b02_vs_v34-b01_s2026168[458].json "$ART"/ab_v34-b03_vs_v34-b01_s2026168[679].json ;;
+esac
+case "$WHAT" in
+  all|r5) guard_absent "$ART"/ab_gen-r5net400_vs_gen-r5net200_s2026168[23].json ;;
+esac
 . "$(cd "$(dirname "$0")" && pwd)/lib/cpu_free.sh"
 BUSY='[s]elf_play\.py|[p]aired_gating|[p]aired_arena|[f]rozen_referee|[b]uild_cache|[w]indow_train_split|[a]rgmax_profile'
 
@@ -34,6 +39,7 @@ block_z() {  # Block-z EINES Artefakts auf stdout
 }
 
 if [ "$WHAT" = all ] || [ "$WHAT" = cost ]; then
+  [ -f "$ART/r5_cost_gate_v34-b01.json" ] && { echo "ABBRUCH: Kostentor-Artefakt liegt schon"; exit 4; }
   BUSY_PATTERN="$BUSY|[t]rain\.py" wait_for_free_cpu "Kostentor R5 (exklusiv)"
   echo "== Kostentor R5-Sims, exklusiv $(date +%F' '%H:%M:%S)"
   mkdir -p data/probe_r5cost
@@ -99,7 +105,7 @@ if [ "$WHAT" = all ] || [ "$WHAT" = arms ]; then
   SMOKE="$ART/smoke_v34-b03_paired.json"; rm -f "$SMOKE"
   python -X utf8 -u tools/paired_gating.py --model-a "$E4" --spec-a "$SPEC" --model-b "$B01" --spec-b "$SPEC" \
     --name-a v34-b03 --name-b v34-b01 --sims-a 50 --sims-b 50 --c-puct 1.5 --block-size 5 --max-pairs 5 \
-    --sprt-alpha 1e-12 --sprt-beta 1e-12 --seed 1 --threads 10 --no-promote-winner --out "$SMOKE"
+    --sprt-alpha 1e-12 --sprt-beta 1e-12 --seed 1 --threads 10 --log-games --no-promote-winner --out "$SMOKE"
   rc=$?
   [ $rc -eq 0 ] || { echo "STOPP: Probelauf E4 Exit $rc"; exit 21; }
   python -X utf8 -c "import json,sys; g=json.load(open(sys.argv[1],encoding='utf-8'))['games']; ok=len(g)==10 and all(x.get('completed') for x in g); print('   Probelauf:',len(g),'Partien, alle completed' if ok else 'NICHT vollstaendig'); sys.exit(0 if ok else 22)" "$SMOKE" \

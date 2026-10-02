@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: ENTWURF 2026-09-27. ENTSCHIEDEN (Nutzer): Zuschnitt in b04-Form (par.1), dritte Klasse Weg C mit Huellenknopf, Generator v33-b01 (par.5). Sockel bleibt bei 100 Sims. Stufenregel gilt (par.2). E1 an, Runde 5 per Netz (par.5). Smoke-Lauf gruen nach Waechter-Fix je Klasse (par.7a); Erzeugung fertig in 7,30 h (par.9): Spiegelknopf und KL-Abzweig gruen, aber Tor 2a GERISSEN (sp_voll 0,921 gegen 0,966); Diagnose par.9a: Runde 5 per Netz bei 100 Sims kostet gepaart -3,54 Punkte je Seite (z -5,9). Vom Nutzer als Self-Play-Effekt akzeptiert, weiter mit v34-b01. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: v34-b01 schlaegt den Champion v32-b01 als Paket mit Runde 5 per Netz 239:121, Block-z +7,37 (par.2a); die Arme E2 (z -0,36) und E4 (z +0,96) tragen nicht (par.10b/10c). Tor 2a gerissen als Self-Play-Effekt akzeptiert (par.9a). Nutzer 2026-10-02: v34-b01 wird promoviert (par.10d); offen nur der Promotions-Ablauf. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -428,3 +428,40 @@ tragenden Arme gegen den Champion (Muster par.2a); traegt keiner, bleibt die Pro
 v34-b01 (par.2a) die einzige. Promotion nur auf Nutzer-Entscheid. Vor dem ersten A/B ein Probelauf
 E4 gegen v34-b01 (5 Paare, 50 Sims, eigener Ausgabepfad), weil ein Netz mit Eingabebreite 936 noch
 nie durch `paired_gating.py` lief.
+
+### par.10b ERGEBNIS A/B E2 gegen v34-b01 (2026-10-02 11:31-15:23, `tools/v34_arms_ab_chain.sh`, exklusiv)
+
+| Seed | v34-b02 (E2) : v34-b01 | Block-z |
+| --- | --- | --- |
+| 20261684 | 192:208 | -0,85 |
+| 20261685 | 203:197 | +0,29 |
+| **gepoolt** | **395:405 = 49,4 %** | **-0,36** (80 Bloecke) |
+
+**Verdikt nach par.10a: E2 traegt NICHT** (kein Seed >= +1,96, keine Stufenregel). Einschraenkung wie in
+par.10 benannt: das gegatete Netz hat nur eine Epoche Schwellen-Training. Die sechs Kennzahlen (Reihen,
+Spalten, Strafleiste, Plattenpunkte, Punkte, Marge) liegen in `ab_v34-b02_vs_v34-b01_s2026168{4,5}*.json`
+samt `_plate_points`/`arena_columns_`-Artefakten; die Auswertung folgt nach der Kette (waehrend der
+Arena laeuft kein Python-Lauf). Laufzeit je Seed rund 1 h 57 min (40 Bloecke, 400 Partien).
+
+### par.10c ERGEBNIS A/B E4 gegen v34-b01 (2026-10-02 15:23-20:25, `tools/v34_arms_ab_chain.sh`, exklusiv)
+
+| Seed | v34-b03 (E4) : v34-b01 | Block-z |
+| --- | --- | --- |
+| 20261686 | 205:195 | +0,46 |
+| 20261687 | 208:192 | +0,98 |
+| **gepoolt** | **413:387 = 51,6 %** | **+0,96** (80 Bloecke) |
+
+**Verdikt nach par.10a: E4 traegt NICHT** (z +0,96 < +1,96, 51,6 % < 52,5 %; kein Seed >= +1,96, keine
+Stufenregel). Richtung beide Seeds positiv, passend zum etwas besseren Val-Brier (par.10), aber unter
+der Schwelle. **Folge (par.10a):** keine weitere Promotions-Kante; Kandidat bleibt `v34-b01` mit der
+Kante par.2a. E4b (Quellen getrennt) entfaellt nach seiner Bedingung ("nur wenn E4 traegt", par.3).
+Sechs Kennzahlen: Auswertung folgt aus den Artefakten `ab_v34-b03_vs_v34-b01_s2026168{6,7}*.json`.
+Laufzeit: Seed 20261686 2 h 19 min, Seed 20261687 2 h 44 min (je 400 Partien, exklusiv).
+
+### par.10d NUTZER-ENTSCHEID 2026-10-02 abends: v34-b01 wird promoviert
+
+Nach den Verdikten par.10b/par.10c (kein Arm traegt) auf die Vorlage "Kandidat ist v34-b01 mit der Kante
+par.2a": *"ja er wird promoviert"*. Promoviert wird das PAKET der Kante par.2a: Netz
+`v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json` (Startkuppel-Suche, Runde 5 per Netz).
+Ablauf `/mosaic-champion-promotion` (Checkliste `docs/promotion_checklist.md`) nach dem Neustart der
+Maschine (Nutzer: Neustart nach dem R5-A/B 400 gegen 200).

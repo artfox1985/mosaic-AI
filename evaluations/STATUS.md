@@ -18,31 +18,29 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**LAEUFT: die v34-Promotions-Kante** (`bash tools/v34_promotion_gate.sh`, `PREREG_v34_window.md` par.2a): `v34-b01` mit Runde 5 per Netz gegen den Champion `v32-b01` wie er heute spielt, 2 Seeds a 200 Paare, rund 3,4 h (HERLEITUNG). Tor 1 gegen `v33-b01` auf Nutzer-Entscheid 2026-10-01 abgebrochen und ersetzt. Fenster und Training aus `tools/night_v34_chain.sh` (Schritt 1-5) fertig: `v34-b01` in 2.956,6 s. Nichts anderes starten, kein Build, kein Commit.
+**UEBERGABE-STAND 2026-10-02 21:50 (Nutzer startet die Maschine neu; NICHTS laeuft).** Letzter Lauf:
+R5-A/B 400 gegen 200 am Erzeugungspunkt, vollstaendig (800 von 800 Partien), registriert
+(`PREREG_r5_net_vs_solver.md` par.6h, 435:365, z +3,90): **v35 faehrt Runde 5 per Netz mit 400 R5-Sims**;
+die Prereg ist geschlossen. Server-Paket aus Code-Review 2 getestet und committet.
 
-**UEBERGABE-STAND 2026-10-02 ca. 00:30 (Nutzungslimit der Sitzung erreicht):** Promotions-Kante
-`tools/v34_promotion_gate.sh` laeuft im Hintergrund (Seed 20261600 bei Block 9: 54:36 fuer v34-b01-r5net),
-Ende hochgerechnet gegen 03:15. UNGECOMMITTET und NICHT KOMPILIERT im Baum (alles Quelltext von
-Agenten, Kernbefunde vom Koordinator gelesen): (1) Wheel-Runde A (Schrittlimit `MAX_GAME_STEPS` 2.000
-statt Wanduhr, Arena-Haenger-Alarm Faktor 10, `completed`/`abort_reason` im Summary, Abbruch in
-`tools/paired_gating.py`, Spec-Feld `r5_net_sims`, Review #11/#12/#15, Panic ehrlich via
-`catch_unwind`; engine/src/self_play.rs, net_mcts.rs, net_batcher.rs, net_ort.rs, spec_env.py);
-(2) E2-Arm (train.py `--margin-thresholds`, `engine/py/margin_thresholds.py`, Cache-Knopf
-`MOSAIC_CACHE_FINAL_MARGIN` samt KnobEntry; Cache-Neubau noetig, PREREG_v34_window.md par.3);
-(3) E4-Encoder (`engine/src/supply_demand.rs`, features.rs/lib.rs/knob_registry.rs, 48 Werte,
-Breite 936; Python-Teil als Patch `scratchpad/e4_python_patch.md`, NOCH NICHT ANGEWENDET; Zuschnitt
-nicht registriert, Nutzerfragen offen); (4) R4/R4b-Substrat einfrieren (`--dump-states` /
-`--states-file` in tools/r4_value_calibration.py und r4b_zone_probe.py). **Naechste Schritte nach der
-Arena:** Kante auswerten und in par.2a registrieren (Nebenlast: zwei kurze python-Prozesse um 23:3x,
-seedgetrieben ohne Wirkung); `cargo test --release --lib` (Python-DLL im PATH), `--no-run`,
-`--features ort_cuda_probe` check, Integrationstests inkl. Paritaets-Fixture, Wheel bauen, Python-Suite,
-`generate_knob_docs.py`, `/mosaic-anchor-invariance`; erst dann E4-Patch anwenden und testen; R4-Dump
-und Gegenprobe der game_ids; E2-Cache bauen und `v34-b02` trainieren (GPU) parallel zu den R5-Sonden
-(CPU, par.5b Stufe 2E/2S). Promotion selbst NUR auf Nutzer-Entscheid.
+**v34 ist entschieden:** kein Arm traegt (E2 395:405 z -0,36, E4 413:387 z +0,96; `PREREG_v34_window.md`
+par.10b/par.10c). **NUTZER-ENTSCHEID 2026-10-02: `v34-b01` wird promoviert** (par.10d), als Paket der
+Kante par.2a: `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json`, Kante gegen v32-b01
+239:121, Block-z +7,37.
 
-**Stand 2026-10-01 21:30:** Erzeugung fertig (7,30 h) und abgenommen; Training `v34-b01` fertig
-(2.956,6 s); Tor 1 wartet auf das R5-Stufe-2-A/B (`tools/r5_stage2_ab.sh`, Seed 20261672: iterativer
-Loeser @400 163:237 Netz @400, alle 400 Partien vollstaendig; Seed 20261673 laeuft).
+**Nach dem Neustart, in dieser Reihenfolge:**
+1. **`/mosaic-champion-promotion` fuer v34-b01** (Checkliste `docs/promotion_checklist.md`; Champion-Spec
+   ist `models/v33_gating_r5net.spec.json`, R5-Kalibrierung gilt dann als Pflicht laut Checkliste pruefen).
+2. **Offline-Pruefung par.7a** (`PREREG_targeted_branching.md`, E = DiD(v34) - DiD(v33); Kontrolle
+   par.7b liegt vor), danach die Prereg schliessen.
+3. Sechs Kennzahlen fuer die A/Bs E2 und E4 aus den Artefakten (`ab_v34-b0{2,3}_vs_v34-b01_*`), in
+   par.10b/par.10c nachtragen; `PREREG_evaluator_pretests.md` schliessen (E4b entfaellt).
+4. Code-Review 2, Paket Messkette (#1-#7), Python.
+
+**Erledigt 2026-10-02** (Belege in den Preregs): Promotions-Kante v34-b01 (par.2a); Wheel-Runde A
+(Schrittlimit statt Wanduhr, `completed` in der Arena, `r5_net_sims`); E2/E4 gebaut, trainiert, gesund,
+A/B (par.10-10c); R5-Reihe am Erzeugungspunkt: Netz @400 in Runde 5 (`PREREG_r5_net_vs_solver.md`
+par.6e-6g); R4-Substrat eingefroren; `v33_window` und `tie_mirror` geschlossen.
 
 **Erledigt im Wechsel am 2026-10-01** (alles exklusiv, alles committet):
 * Anker-Invarianz gegen `hv4_anchor` auf Wheel 1.1.0 (`1a9e4bac...`): Drift und Konservierung gruen.
@@ -57,19 +55,6 @@ Loeser @400 163:237 Netz @400, alle 400 Partien vollstaendig; Seed 20261673 laeu
   Referee-Selbsttest gruen); restic daily `a3755374` mit Pruefung; Aufraeumen A-H mit Freigabe
   (`data/` 9,5 -> 2,0 GB, Liste im Generationsbericht v33).
 
-**Nach der Erzeugung, in dieser Reihenfolge:**
-1. **Abnahmen der Erzeugung** (`PREREG_v34_window.md` par.4): Manifest-Diff je Klasse gegen v33,
-   Waechter-Protokoll, Tor 0 je Klasse, Tor 2a am Sockel, `tie_mirrored`-Anteil, KL-Abnahme am
-   Ausflug (par.7 von `PREREG_targeted_branching.md`), `[Watchdog]`-Zeilen je Klasse aus der
-   Aufgabenausgabe zaehlen (obere Schranke fuer verworfene Panics, Review #23).
-2. **Bauten fuer die Trainings-Arme:** E2 (Python, rund ein halber Tag) und E4 (Encoder, Kompilieren
-   erst nach der Erzeugung) (`PREREG_evaluator_pretests.md`, `PREREG_v34_window.md` par.3).
-   **In derselben Wheel-Runde** der Engine-Teil des Review-Rests (unten), dann EINE Anker-Invarianz.
-3. **Python-Teil des Review-Rests VOR dem v34-Training** (unten).
-4. **Kette fuer Fenster und Training schreiben** (Traeger-Manifest v34 per
-   `tools/generate_carrier_manifest.py`, Fenster b04-Form, Monolith, Grundarm `v34-b01` plus E2/E4,
-   Tor 1 gegen `v33-b01`); Muster in der Git-Historie (`tools/night_v33_chain.sh`).
-5. **Offline-Pruefung par.7a** nach dem Training (E = DiD(v34) - DiD(v33)).
 
 **Review-Rest EINGETAKTET** (Nutzer 2026-10-01: *"takte #11, #12, #15 und den Rest von #23 aus dem
 code review ein"*; Befunde `review/code_review_2026-09-26_verification.md`). Am Code geprueft
@@ -116,8 +101,14 @@ Brier-beste Epoche weder die letzte noch `best_epoch` ist). Reihenfolge:
   Dateinamen, `set -e` bzw. harte Stopps, `gating_block_z.py` ohne Division durch null,
   `paired_gating.py` prueft `--block-size`/`--h1`, `train.py` faengt `n_batches == 0` ab; dazu #6
   (Resume-Fingerabdruck) und #7 nach Pruefung.
-* **Paket Server (#8 bis #15, dazu #16 `json_to_state`):** Codearbeit fuer ein Messfenster; #16 ist
-  Engine und kommt in die naechste Wheel-Runde.
+* **Paket Server (#8 bis #15) ERLEDIGT 2026-10-02** (Nutzer: *"ja, mach das Server-Paket"*; Tests
+  `tools/tests/test_server_edge_cases.py` 11 gruen, nach der Arm-Kette gelaufen): `server.py` baut neue
+  Partie und Replay erst lokal und stellt die Globalen in einem Zug um (#8, #13), `_json_body`
+  (#12), `_human_turn_guard` in allen Drafting-Routen und Startplatten-Pruefung (#9),
+  `_tiling_player` mit Server-Merker `_tiling_ended` (#10, Engine-Teil bleibt Wheel-Runde),
+  Chip-Rumpf im try (#11), `OverflowError` bei `Infinity` (#12), Namen bereinigt und verschieden
+  (#14), KI-Sperre auch um new_game/replay, eindeutiger Logname, Schreibsperre in
+  `player_profiles.py` (#15). #16 (`json_to_state`) ist Engine und kommt in die naechste Wheel-Runde.
 * **Wheel-Runde:** #20 (Stufe-3-Arena in `tools/arena.py:531` noch mit 3600-s-Wanduhr, ohne
   `completed`), #21 (Env-Parser), #22 (Engine-Raender). Fuer die laufende R5-Reihe geprueft: alle
   vier Leiter-Specs setzen `r5_net_solver: 0` zusammen mit `r5_net_sims`, #22 trifft sie nicht.
@@ -132,7 +123,7 @@ fuer den Loeser, par.6d). Fuer das SELF-PLAY gelaufen 2026-10-02 08:39-11:07 (pa
 `v34-b01`): das Netz spielt Runde 5 auch am Erzeugungspunkt (2E 302:498 fuer den Loeser, z -9,74), und
 zwar mit **400 statt 100 R5-Sims** (2E-b 464:336, z +7,56); die Sim-Leiter senkt mit mehr R5-Suche die
 Self-Play-Punkte beider Seiten (gegenseitig haerter, nicht schwaecher), Knick 200-400, ab 400 flach.
-Gilt ab v35. Offen: A/B 400 gegen 200 (Knick, registriert) und ein exklusives Kostentor je Stufe;
+Gilt ab v35. 400 schlaegt auch 200 (435:365, z +3,90, par.6h); Kosten @400 +19,2 % je Partie (par.6g);
 Folge fuer Tor 2a v35 gegen v34 (wieder ungleich bedingt): `PREREG_v34_window.md` par.9a Nachtrag.
 
 **NACH dem v34-Training: asymmetrisches Self-Play** (Nutzer 2026-10-01: *"prinzipiell wuensch ich
@@ -229,41 +220,38 @@ Generator, 12 Epochen, lr 5e-5 cosine mit `--lr-t-max 12`, WDL, nortv, lambda 0,
 Val-Dateien der Wert-Klassen aus `window_v32_val.txt` / `window_v33_val.txt` (registrierte
 Offline-Messungen laufen darauf).
 
-## 5. PREREG-BESTAND (8 OFFEN laut Index 2026-10-01; Ziel rund 7)
+## 5. PREREG-BESTAND (Stand 2026-10-02 abends: 5 OFFEN; Ziel rund 7)
+
+`v33_window`, `tie_mirror` und `r5_net_vs_solver` am 2026-10-02 geschlossen (Nutzer; Spiegelknopf bleibt fuer v35 an,
+als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b).
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v34_window` | Erzeugung (wartet auf Freigabe), Abnahmen par.4, Fenster, Arme, Tore |
-| `v33_window` | Kopf auf ENTSCHIEDEN ziehen, sobald nichts mehr nachgetragen wird (keine Promotion, Generator v33-b01) |
-| `evaluator_pretests` | E2- und E4-Arm in v34 (Bau offen) |
-| `r5_net_vs_solver` | Stufe 2a A/B (par.5a Punkt 2), danach ggf. Stufe 3 |
-| `targeted_branching` | KL-Abnahme in der v34-Erzeugung, Offline-Pruefung par.7a nach dem Training |
-| `tie_mirror` | Abnahme in der v34-Erzeugung (Anteil `tie_mirrored` je Klasse) |
-| `asymmetric_selfplay` | ENTWURF 2026-10-01: Bau, Sonden S1-S4, Zusammensetzung |
+| `v34_window` | Promotion v34-b01 durchfuehren (entschieden, par.10d), dann schliessen |
+| `evaluator_pretests` | schliessbar: E1 an, E2 und E4 tragen nicht (par.10b/10c der v34-Prereg), E3 tot, E4b entfaellt; Kennzahlen nachtragen |
+| `targeted_branching` | Offline-Pruefung par.7a nach dem v34-Training (E = DiD(v34) - DiD(v33)) |
+| `asymmetric_selfplay` | v35: Bau, Sonden S1-S4, Zusammensetzung |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-1. **Tor 2a der v34-Erzeugung gerissen** (`PREREG_v34_window.md` par.9, Diagnose par.9a: Runde 5 per Netz bei 100 Sims): weiter mit Fenster und Training, oder erst die Ursache eingrenzen? Billige Diagnose ohne neue Partien: die geloeschten Kostentor-Korpora (`data/probe_v34costgate`: R5 Loeser gegen Netz bei 100 Sims, je 100 Partien, gleiche Seeds; `data/probe_e1gate`: E1 aus/an) liegen in restic `a3755374` und lassen sich auf Spalten, Punkte und Strafleiste vergleichen.
-2. **Zeitpunkt der R5-Stufe-2a-A/B:** jetzt vor der Erzeugung (blockiert die Maschine rund 3,5-4 h,
-   HERLEITUNG) oder wie geplant parallel zum bzw. nach dem v34-Training (Vorschlag: nach der
-   Erzeugung; die Erzeugung haengt nicht daran).
-3. **Champion-Spec mit Netz in Runde 5** jetzt oder erst nach Stufe 2a (Vorschlag: nach Stufe 2a,
-   eine Promotion statt zwei; dann ist die R5-Kalibrierung wieder Pflicht).
-4. **Cache-Schluessel mit Inhaltsmerkmal** (Review #23b): Vorlage mit Kostenzahl folgt.
-5. **Asymmetrisches Self-Play, offene Punkte im Entwurf** (`PREREG_asymmetric_selfplay.md`):
+1. ~~Promotion v34-b01~~ ENTSCHIEDEN 2026-10-02 (ja, `PREREG_v34_window.md` par.10d); Ablauf nach dem
+   Neustart, Abschnitt 1.
+2. **Loeschfreigabe** `data/selfplay_v30-b02-policy_*` (400 Dateien, restic `a3755374`; das R4-Substrat
+   ist eingefroren), pfadgenau.
+3. **Code-Review 2, nur nach Entscheid:** #17 (Loeser-Prognose ohne Untergrenze 0), #18, #19
+   (Anker- bzw. Regelpfad, danach Anker-Invarianz).
+4. **Asymmetrisches Self-Play, offene Punkte im Entwurf** (`PREREG_asymmetric_selfplay.md`):
    Muenze Auslage/Stapel 50:50, Wuerfel-Seite je Partie 50:50, Weg-C-Abweichung in W (Vorschlaege);
-   lambda und eps des Stoerers nach Pilot S4; Zusammensetzung nach den Sonden.
-6. **v33-Prereg-Kopf** auf ENTSCHIEDEN ziehen (keine Promotion; Verdikt-Absatz steht in par.6e/par.10).
-7. **Aeltere, weiterhin offene Punkte** (Wortlaut im Archivkapitel vom 2026-10-01, Abschnitt 6):
+   lambda und eps des Stoerers nach Pilot S4; Zusammensetzung nach den Sonden; Fragen F1-F9, FS1-FS4.
+5. **Aeltere, weiterhin offene Punkte** (Wortlaut im Archivkapitel vom 2026-10-01, Abschnitt 6):
    Budget-Knopf fuer die Hilfsknoten (Wirkung ungemessen); Gruppe B des Aufraeumens (Wrapper
    `resolve_and_apply_stack_draw`, drei Spec-Felder in `KNOWN_FIELDS`); R5/R4b-Sonden der
    Promotionsliste Pflicht oder je Promotion; Brier-Regel gegen `frozen_eval_set` aus aelterer
    Verteilung; Sichtluecke bei gezogenen Stapelplatten (`stack_top_feature` par.16/16a);
    Paritaets-Tor und Alt-Records (`rust_data_layer` par.9/9a); drei Sonden zeigen auf das
    geloeschte `hv1_anchor`; `-Deep`-Lauf der Backup-Verifikation (zuletzt 2026-10-01 wieder nicht
-   gefahren); Dry-Artefakte `evaluations/artifacts/_dry_*.json`; R4/R4b-Substrat
-   `selfplay_v30-b02-policy_*` (die 72 Zustaende einfrieren, dann darf die Klasse rotieren).
+   gefahren); Dry-Artefakte `evaluations/artifacts/_dry_*.json`.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

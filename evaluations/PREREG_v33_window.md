@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: angelegt 2026-09-25 im Generationswechsel v32 -> v33. par.1 steht (Rotation, gezaehlt). par.6 ENTSCHIEDEN: Rezept wie v32, Schwarm a ohne Huellenknopf als `value-tempc-nohull`, Tor 1 beidseits mit start_by_search (v33_gating.spec.json). Erzeugung abgenommen (par.9). Tor 1 GENAU AUF DER KANTE: 420:380 = 52,50 %, Block-z +1,41, formal getragen (par.10). Fenster-Arme b02/b03/b04 alle ohne messbaren Unterschied (par.6a, par.6d): weder Menge noch Alter des Value-Materials ist ein Hebel. Nutzer-Entscheid: v34-Fenster im b04-Zuschnitt (par.6d). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Beleg: Tor 1 auf der Kante getragen (420:380, Block-z +1,41, par.10); Fenster-Arme b02-b04 ohne messbaren Unterschied (par.6a/par.6d); v33-b02 verfehlt die Champion-Kante (405:395, z +0,37, par.6e), keine Promotion. v33-b01 war Generator der v34-Erzeugung; v34-Fenster im b04-Zuschnitt. Geschlossen 2026-10-02 (Nutzer). -->
 
 
 # Vorregistrierung: das v33-Fenster

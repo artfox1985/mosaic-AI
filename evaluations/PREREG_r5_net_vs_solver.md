@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Das Netz spielt Runde 5 an beiden Betriebspunkten: Spiel (par.6d, gegen iterativen Loeser 480:320, z -7,32 fuer den Loeser) und Erzeugung (par.6f, 2E z -9,74); in der Erzeugung mit 400 statt 100 R5-Sims (2E-b 464:336, z +7,56). Offen: A/B 400 gegen 200 (Knick der Sim-Leiter par.6e) und exklusives Kostentor. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Das Netz spielt Runde 5 an beiden Betriebspunkten: Spiel (par.6d, gegen iterativen Loeser 480:320, z -7,32 fuer den Loeser) und Erzeugung (par.6f, 2E z -9,74). Erzeugung ab v35 mit 400 R5-Sims: schlaegt @100 (z +7,56, par.6f) und @200 (435:365, z +3,90, par.6h), Kosten +19,2 % je Partie (par.6g). -->
 
 # Vorregistrierung: Runde 5 -- Netz gegen Loeser
 
@@ -412,3 +412,37 @@ nebenbei Determinismus-Gegenprobe: gleicher Seed und gleiche Spec wie die Leiter
 Endstaende je Partie werden verglichen und Abweichungen gemeldet (die Leiter lief neben Training). (2) **A/B 400 gegen 200** am Erzeugungspunkt (Instrument 2 am Knick, par.5b), Seeds
 20261682/83, Aufbau wie 2E-b. Leseregel par.5b: z >= +1,96 -> 400; z <= -1,96 -> 200; dazwischen ->
 die billigere Stufe nach dem Kostentor.
+
+### par.6g Kostentor R5-Sims am Erzeugungspunkt, EXKLUSIV (2026-10-02 11:13-11:28, `tools/v34_arms_ab_chain.sh cost`)
+
+Aufbau wie registriert (oben): Generator `v34-b01`, Erzeugungs-Spec mit R5-Sims N, je 100 Partien,
+Seed 20261698, 11 Threads, keine GPU-Last daneben. Artefakt `evaluations/artifacts/r5_cost_gate_v34-b01.json`.
+**Grundmenge:** 100 Partien je Stufe, Einheit Sekunden Wanduhr je Partie (19.725-19.794 Zuege je Stufe).
+
+| R5-Sims | 100 | 200 | 400 |
+| --- | --- | --- | --- |
+| s je Partie, exklusiv | 2,563 | 2,808 | 3,055 |
+| gegen 100 | -- | +9,6 % | +19,2 % |
+| zum Vergleich Leiter par.6e (neben Training) | 2,935 | 3,010 | 3,444 |
+
+**Determinismus-Gegenprobe:** 300 von 300 Partien mit demselben Endstand wie in der Leiter par.6e
+(je Stufe 100 von 100); die Nebenlast durch das Training hat dort also nur gebremst, nicht verstuemmelt.
+**Lesart:** R5 @400 kostet die Erzeugung rund ein Fuenftel mehr Wanduhr je Partie als @100 (HERLEITUNG
+fuer die v35-Planung: bei sonst gleichem Rezept rund +19 % auf die Sockel- und Schwarm-Laufzeit, soweit
+deren Partien Runde 5 erreichen). Die Wahl zwischen 400 und 200 entscheidet das A/B 20261682/83.
+
+### par.6h A/B R5-Sims 400 gegen 200 am Erzeugungspunkt (2026-10-02 20:25-21:42, exklusiv)
+
+Aufbau wie 2E-b (par.6f), Seeds 20261682/83, je 200 Paare, alle 800 Partien `completed`.
+
+| Seed | Netz R5 @400 : @200 | Block-z | Punkte A / B | Strafleiste A / B |
+| --- | --- | --- | --- | --- |
+| 20261682 | 210:190 | +1,53 | 59,84 / 58,39 | 6,91 / 7,48 |
+| 20261683 | 225:175 | +4,15 | 60,03 / 58,45 | 7,09 / 7,86 |
+| **gepoolt** | **435:365 = 54,4 %** | **+3,90** (80 Bloecke) | | |
+
+Punkte und Strafleiste je Seite und Partie (`avg_score_*`, `avg_floor_*`); Spalten und Plattenpunkte in
+den `_plate_points`/`arena_columns_`-Artefakten. **Verdikt nach der Leseregel (gepoolt z >= +1,96): die
+Erzeugung spielt Runde 5 ab v35 mit 400 R5-Sims** (Netz), Kosten +19,2 % je Partie gegen @100 (par.6g).
+Die Reihe ist damit vollstaendig: Netz statt Loeser an beiden Betriebspunkten, am Erzeugungspunkt 400
+gegen 100 (par.6f) und gegen 200 (hier) besser, 800 im Self-Play flach (par.6e).

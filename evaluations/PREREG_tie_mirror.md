@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kippt der Spiegelknopf (MOSAIC_TIE_MIRROR_P, je Partie eine Muenze) die Gleichstandsregeln von Huellenwahl und Tiling-Zelle in der Erzeugung zu 50:50, und verschiebt das die vollen Spalten nach rechts, ohne Staerke zu kosten? | Beleg: v34-Erzeugung (par.4a): Muenze im Fenster (49,03 % am Sockel), aber keine Verschiebung nach rechts; gespiegelte Partien vollenden weniger Spalten (0,907 gegen 0,933 am Sockel). Staerke (Tor 1) steht aus. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kippt der Spiegelknopf (MOSAIC_TIE_MIRROR_P, je Partie eine Muenze) die Gleichstandsregeln von Huellenwahl und Tiling-Zelle in der Erzeugung zu 50:50, und verschiebt das die vollen Spalten nach rechts, ohne Staerke zu kosten? | Beleg: Muenze greift (49,03 % am Sockel), aber keine Verschiebung nach rechts (par.4a); Staerke einzeln nicht messbar. Nutzer 2026-10-02: Knopf bleibt fuer v35 als Diversitaets-Mittel an (par.4b). -->
 
 # Vorregistrierung: Spiegelknopf fuer die Gleichstandsregeln der Erzeugung
 
@@ -181,3 +181,12 @@ keine vollen Spalten. Gespiegelte Partien vollenden in allen drei Klassen WENIGE
 Tor 2a der v34-Erzeugung: `PREREG_v34_window.md` par.9. **Punkt 4** (Staerke) steht mit Tor 1 aus.
 Punkt 1 (Default byte-identisch) lief in der Wheel-Runde (Netz-Paritaets-Fixture, Anker-Drift gruen
 2026-10-01).
+
+### par.4b NUTZER-ENTSCHEID 2026-10-02: Knopf bleibt an fuer v35, Prereg geschlossen
+
+Punkt 4 (Staerke) ist einzeln nicht mehr messbar: Tor 1 gegen den Generator entfiel (Nutzer-Entscheid
+2026-10-01, `PREREG_v34_window.md` par.2a), und die Promotions-Kante misst das ganze v34-Paket. Nutzer
+auf die Rueckfrage (Empfehlung des Koordinators war "aus", weil die Verschiebung nach rechts ausblieb):
+*"Spiegelknopf an fuer v35. wollen ja ein wenig diversitaet"*. Der Knopf bleibt damit als
+Diversitaets-Mittel im Rezept (`MOSAIC_TIE_MIRROR_P` 0,5), NICHT als Mittel gegen die Linkslastigkeit;
+diese Begruendung aus par.1 ist durch par.4a nicht gedeckt.
