@@ -78,8 +78,12 @@ code review ein"*; Befunde `review/code_review_2026-09-26_verification.md`). Am 
 `b00a9e09`, `train.py:1133-1150`; die Notiz vom Vormittag war falsch) -- GEBAUT 2026-10-01: `save_checkpoint_atomic`, (b) Cache-Schluessel ohne Inhaltsmerkmal (`engine/py/file_cache_key.py:84-222`),
 (c) Panic im Netz-Self-Play als "[Watchdog] ... Deadline" gemeldet (`self_play.rs:7099-7103`, `:7217`).
 * **Python, vor dem v34-TRAINING:** (a) ERLEDIGT 2026-10-01 (`save_checkpoint_atomic`, Test in
-  `tools/tests/test_train_recipe.py`). (b) **Bauentscheid offen:** jedes Inhaltsmerkmal aendert alle
-  Schluessel einmal (Bloecke neu bauen); Vorlage an den Nutzer mit Kostenzahl.
+  `tools/tests/test_train_recipe.py`). (b) **ENTSCHIEDEN 2026-10-02 (Nutzer: *"ja, so einplanen"*):** die
+  DATEIGROESSE kommt in den Block-Schluessel (`engine/py/file_cache_key.py::per_file_cache_key`, als
+  versionierter Marker wie `|finalmargin_v1`), billigste Form, kein Inhalts-Hash. Eingebaut wird es
+  beim NAECHSTEN Generationswechsel, wenn die Bloecke ohnehin neu gebaut werden (`/mosaic-generation-turnover`),
+  nicht vorher. Begruendung: Self-Play-Dateien tragen einen Zeitstempel im Namen, ein Ersetzen unter
+  gleichem Namen kommt praktisch nicht vor; der Schaden waere ein still veralteter Block.
 * **Engine, in der Wheel-Runde nach der Erzeugung mit E4:** #11 `opp_points` in
   `try_batched_pair_ex` (`net_mcts.rs:3357-3359`), #12 ORT-Registry-Schluessel (`net_ort.rs:201`,
   nur Feature `ort_cuda_probe`), #15 Batcher-Registry (`net_batcher.rs:272-301`), (c) Panic ehrlich

@@ -75,6 +75,10 @@ Laufzeiten im Artefakt, Regel 0 (geprueft oder markiert).
 
 ### 4. Self-Plays, Bloecke und Monolithe der toten Fenster loeschen
 
+- **Einmalig beim naechsten Wechsel (eingeplant 2026-10-02, Code-Review #23b):** die Dateigroesse in
+  den Block-Schluessel (`engine/py/file_cache_key.py`, versionierter Marker), weil die Bloecke ohnehin
+  neu gebaut werden. Danach diesen Punkt hier streichen.
+
 - Zuerst die Fensterliste der NAECHSTEN Generation bauen (Prereg par.1 der
   neuen Fenster-Prereg, `tools/generate_carrier_manifest.py --pick`,
   `window_v<G+1>.txt`). Alles in `data/`, was weder dort steht noch
