@@ -90,6 +90,134 @@ fn net_game_timeout_secs(sims: u32) -> u64 {
     ((sims as u64 * 9) / 20).max(MIN_GAME_TIMEOUT_SECS)
 }
 
+// ── Partie-Abbruch: Schrittlimit statt Wanduhr (STATUS "Partie-Zeitlimit
+// ersetzen", Nutzer 2026-10-01) ─────────────────────────────────────────────
+//
+// Bis 2026-10-01 brach die Arena-Partie bei Wanduhr >= `net_game_timeout_secs`
+// ab (bei 400 Sims 180 s) und ging OHNE Markierung mit dem Zwischenstand in
+// die Wertung. Eine Wanduhr als Abbruchbedingung ist lastabhaengig: dieselbe
+// Partie endet unter CPU-Nebenlast frueher als ohne, das Ergebnis haengt also
+// an der Maschine statt am Seed. Neu:
+//
+//   1. Die EIGENTLICHE Abbruchbedingung ist ein deterministisches
+//      Schrittlimit ([`MAX_GAME_STEPS`]) -- gleicher Seed, gleiche Partie,
+//      gleicher Abbruchpunkt, unabhaengig von der Last.
+//   2. Die Wanduhr bleibt nur als Haenger-Alarm: in den Arena-Pfaden
+//      [`ARENA_HANG_ALARM_FACTOR`]-mal grosszuegiger als das alte Limit
+//      ([`net_arena_hang_alarm_secs`], [`heuristic_arena_hang_alarm_secs`]).
+//      Greift er, ist das Ergebnis als unvollstaendig markiert (`completed:
+//      false`, `abort_reason: "hang_alarm"`) und `tools/paired_gating.py`
+//      bricht den Lauf ab, statt die Partie zu werten.
+//   3. Die Self-Play-Pfade behalten ihre bisherigen Wanduhr-Werte: dort sind
+//      sie mit `EXTRA_GAME_TIMEOUT_SECS` bereits grosszuegig (Netz) bzw. bei
+//      Heuristik-Partien ein Vielfaches der Normaldauer, jedes Ergebnis traegt
+//      schon `completed`, und der praeemptive Watchdog
+//      (`run_with_watchdog`, Deadline = alter Wert + `WATCHDOG_MARGIN_SECS`)
+//      ist an genau diesen Wert gekoppelt -- ein groesserer Schleifen-Alarm
+//      dort wuerde nie greifen, weil der Watchdog vorher abbricht.
+
+/// Deterministisches Schrittlimit je Partie: Zahl der Schleifendurchlaeufe
+/// (Startsetzung, Drafting-Entscheide inkl. der Zusatzknoten fuer Kuppel/
+/// Rueckgabe, Tiling-Einzelschritte), also dieselbe Zaehlung wie das
+/// Summary-Feld `steps` plus der eine Abschluss-Durchlauf.
+///
+/// Begruendung der Groesse, GEPRUEFT 2026-10-01: in allen 20
+/// `evaluations/artifacts/ab_*.json` (v32/v33-Aera, 5.440 Partien,
+/// Grundmenge Arena-Partien, Einheit `steps` je Partie) liegt `steps` zwischen
+/// 169 und 230. 2.000 ist rund das 8,7-Fache des Maximums: weit genug weg,
+/// dass keine regulaere Partie es je erreicht (also kein Zug sich bei Default
+/// aendert), und eng genug, dass eine Endlosschleife ohne Fortschritt nach
+/// Sekundenbruchteilen statt nach 100.000 Durchlaeufen endet. Das alte Limit
+/// 100.000 stammt aus der Zeit vor jeder Messung und war faktisch nie die
+/// greifende Bedingung -- die Wanduhr war es.
+pub(crate) const MAX_GAME_STEPS: u32 = 2_000;
+
+/// Faktor des Arena-Haenger-Alarms gegenueber dem alten Wanduhr-Limit.
+/// Beleg (`docs/measured_runtimes.md`, Zeile "Tor 1, Seed 20261500"): 200
+/// Paare @400 Sims, "rund 180 s je Block zu 5 Paaren". Ein Block sind zwei
+/// NACHEINANDER laufende Rust-Aufrufe mit je 5 parallelen Partien
+/// (`tools/paired_gating.py::play_pair_block`). HERLEITUNG daraus, nicht je
+/// Partie gemessen: eine Partie dauert im Mittel rund 90 s Wanduhr, das alte
+/// 180-s-Limit lag also nur Faktor 2 darueber -- die laengste Partie eines
+/// Blocks unter Nebenlast kommt dem nahe. Faktor 10 legt den Alarm (1.800 s
+/// bei 400 Sims) so weit darueber, dass er einen echten Haenger meldet, nicht
+/// eine langsame Partie unter Last.
+const ARENA_HANG_ALARM_FACTOR: u64 = 10;
+
+/// Haenger-Alarm (Sekunden) netzbeteiligter Arena-Partien, siehe
+/// [`ARENA_HANG_ALARM_FACTOR`]. `sims` ist das Maximum aller Sim-Zahlen,
+/// die in der Partie vorkommen (inkl. eigener Runde-5-Sims einer Seite).
+fn net_arena_hang_alarm_secs(sims: u32) -> u64 {
+    net_game_timeout_secs(sims).saturating_mul(ARENA_HANG_ALARM_FACTOR)
+}
+
+/// Wie [`net_arena_hang_alarm_secs`] fuer die reine Heuristik-Arena.
+fn heuristic_arena_hang_alarm_secs(sims: u32) -> u64 {
+    heuristic_game_timeout_secs(sims).saturating_mul(ARENA_HANG_ALARM_FACTOR)
+}
+
+/// Warum eine Partie-Schleife VOR `Phase::End` endete. `as_str` ist der Wert
+/// des Summary-Feldes `abort_reason`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GameAbort {
+    /// [`MAX_GAME_STEPS`] (bzw. das Limit der Konfiguration) erreicht.
+    StepLimit,
+    /// Wanduhr-Haenger-Alarm hat gegriffen.
+    HangAlarm,
+}
+
+impl GameAbort {
+    fn as_str(self) -> &'static str {
+        match self {
+            GameAbort::StepLimit => "step_limit",
+            GameAbort::HangAlarm => "hang_alarm",
+        }
+    }
+}
+
+/// Die eine Abbruchpruefung aller Partie-Schleifen (am Anfang jedes
+/// Durchlaufs, NACH dem Hochzaehlen von `guard`). Schrittlimit zuerst: es ist
+/// deterministisch und soll bei gleichzeitigem Erreichen gewinnen.
+fn game_loop_abort(
+    guard: u32,
+    max_steps: u32,
+    t_start: std::time::Instant,
+    hang_alarm_secs: u64,
+) -> Option<GameAbort> {
+    if guard > max_steps {
+        Some(GameAbort::StepLimit)
+    } else if t_start.elapsed().as_secs() >= hang_alarm_secs {
+        Some(GameAbort::HangAlarm)
+    } else {
+        None
+    }
+}
+
+/// Laute Zeile, wenn eine Partie abgebrochen wurde (beide Ursachen sind im
+/// Normalbetrieb nie erreicht, siehe [`MAX_GAME_STEPS`]).
+fn report_game_abort(abort: GameAbort, game_seed: u64, steps: u32, t_start: std::time::Instant) {
+    eprintln!(
+        "⚠️  [game_abort] reason={} game_seed={game_seed} steps={steps} elapsed_s={:.1} -- \
+         Partie UNVOLLSTAENDIG (completed=false), darf nicht gewertet werden.",
+        abort.as_str(),
+        t_start.elapsed().as_secs_f64()
+    );
+}
+
+/// Schreibt die Vollstaendigkeits-Felder in ein Arena-Ergebnis: `completed`
+/// IMMER (true nur bei `Phase::End`), `abort_reason` nur bei unvollstaendiger
+/// Partie (`"step_limit"`, `"hang_alarm"`, oder `"loop_exit"`, wenn die
+/// Schleife aus einem anderen Grund vor `Phase::End` endete).
+fn insert_completion_fields(result: &mut Value, completed: bool, abort: Option<GameAbort>) {
+    if let Value::Object(map) = result {
+        map.insert("completed".into(), json!(completed));
+        if !completed {
+            let reason = abort.map(GameAbort::as_str).unwrap_or("loop_exit");
+            map.insert("abort_reason".into(), json!(reason));
+        }
+    }
+}
+
 // ── Fortschritts-Tracking: Einzelspiel-Flush + Heartbeat (Task #71) ─────────
 // Wurzel-Problem (siehe self_play.py-Modulkommentar zum Chunk-Hänger-
 // Supervisor): ein Chunk lief bisher komplett in EINEM Rust-Aufruf, der ALLE
@@ -925,7 +1053,7 @@ pub(crate) struct ReturnOrderRandom<'a> {
     /// Runde dieses Halbzugs (`game.state.round_number`, 1-basiert). Gestreut
     /// wird nur im Fenster aus par.11b, siehe [`return_order_round_allowed`].
     round_number: u32,
-    /// Nebenausgabe an den Record-Bau (`Cell`-Muster wie `vorzug_greift` und
+    /// Nebenausgabe an den Record-Bau (`Cell`-Muster wie `preference_hits` und
     /// `excursion_deviated`): `true`, sobald die Muenze GEFALLEN ist -- nicht
     /// erst, wenn die gezogene Permutation von der Ziehreihenfolge abweicht.
     /// Markiert wird die BEHANDLUNG, nicht ihr Ergebnis; eine Ziehung darf die
@@ -3831,7 +3959,10 @@ pub(crate) fn net_arena_choose_action(
         return actions[0].clone();
     }
     let vorzug_kandidat = if vorzug { builder_drafting_preference(state) } else { None };
-    let s = net_effective_sims(base_sims, actions.len());
+    // par.5b (`PREREG_r5_net_vs_solver.md`): eigene Runde-5-Sims dieser Seite,
+    // bei ungesetztem Feld exakt `base_sims` (Bestand).
+    let base = crate::net_mcts::r5_adjusted_base_sims(state, base_sims, search_config);
+    let s = net_effective_sims(base, actions.len());
     vorzug_kandidat
         .or_else(|| net_search_drafting_action(net, state, s, c_puct, false, search_rng, search_config))
         .unwrap_or_else(|| actions[0].clone())
@@ -3885,9 +4016,12 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
         // Muenzwurf aus `search_rng` -- nur gezogen, wenn PCR aktiv ist
         // (siehe `pcr_decide_full`-Doku; `None` laesst den RNG unberuehrt).
         let pcr_is_full: Option<bool> = pcr_decide_full(self.pcr_full_prob, actions.len(), search_rng);
+        // par.5b (`PREREG_r5_net_vs_solver.md`): eigene Runde-5-Sims ersetzen
+        // die VOLLEN Sims; ein PCR-Billigzug bleibt billig. Bei ungesetztem
+        // Feld exakt `self.base_sims` (Bestand).
         let effective_sims = match pcr_is_full {
             Some(false) => self.pcr_cheap_sims,
-            _ => self.base_sims,
+            _ => crate::net_mcts::r5_adjusted_base_sims(state, self.base_sims, &self.search_config),
         };
         let vorzug_kandidat = if self.vorzug { builder_drafting_preference(state) } else { None };
         // Sechster Wert (PREREG_targeted_branching.md par.7): Policy-Diskrepanz,
@@ -4138,11 +4272,15 @@ impl PlayerLoopConfig<'_> {
 
 /// Gesamt-Konfiguration der vereinheitlichten Schleife.
 struct GameLoopConfig<'a> {
-    /// Haenger-Schutz: Wall-Clock-Deckel je Partie (Schritt-Limit 100_000
-    /// ist fest). Die Wrapper berechnen ihn wie ihre Vorgaenger-Kopien
-    /// (`heuristic_game_timeout_secs`/`net_game_timeout_secs`, ggf. +
-    /// `EXTRA_GAME_TIMEOUT_SECS` bei Label-Sampling).
-    timeout_secs: u64,
+    /// Haenger-ALARM: Wanduhr-Deckel je Partie (seit 2026-10-01 nicht mehr
+    /// die eigentliche Abbruchbedingung, siehe [`MAX_GAME_STEPS`]). Arena-
+    /// Wrapper: [`net_arena_hang_alarm_secs`]; Self-Play-Wrapper: die
+    /// Bestandswerte (`heuristic_game_timeout_secs`/`net_game_timeout_secs`,
+    /// ggf. + `EXTRA_GAME_TIMEOUT_SECS`), weil der Watchdog daran haengt.
+    hang_alarm_secs: u64,
+    /// Deterministisches Schrittlimit; alle Produktions-Wrapper setzen
+    /// [`MAX_GAME_STEPS`], nur Tests setzen kleinere Werte.
+    max_steps: u32,
     /// Such-Seed-Zaehler-Konvention (PREREG_search_rng_split.md):
     /// `true` -> Alle-Schritte-Zaehler `steps` (StartPlacement+Drafting+
     /// Tiling, Arena-Pfade), `false` -> 1-basierter Nur-Drafting-Zaehler
@@ -4169,7 +4307,7 @@ struct GameLoopConfig<'a> {
     /// `AtomicU64`-Paar: die Schleife laeuft sequenziell in EINEM Thread (kein
     /// Rayon-Zugriff auf denselben Zaehler), gleiche Wahl wie `GAME_WEIGHT`
     /// in net_mcts.rs.
-    vorzug_greift: Option<&'a std::cell::Cell<[u64; 2]>>,
+    preference_hits: Option<&'a std::cell::Cell<[u64; 2]>>,
     /// Startpositions-Seeding (`PREREG_start_position_seeding.md` par.3):
     /// `Some(state)` -> die Partie beginnt an DIESEM (bereits
     /// deserialisierten) Zustand statt bei `Game::start`;
@@ -4215,7 +4353,7 @@ struct GameLoopConfig<'a> {
     excursion_deviated: Option<&'a std::cell::Cell<bool>>,
     /// Weg B (`PREREG_start_position_seeding.md` par.9f): Nebenausgabe des
     /// per gewichtetem Reservoir-Sampling gezogenen Ausflug-Kandidaten
-    /// (Cell-Muster wie `vorzug_greift` oben). Die Schleife BESCHREIBT die
+    /// (Cell-Muster wie `preference_hits` oben). Die Schleife BESCHREIBT die
     /// Zelle waehrend des Samplings (siehe `EXCURSION_SEED_DISTINGUISHER`-
     /// Kommentar), der Aufrufer LIEST sie NACH `unified_game_loop`s
     /// Rueckkehr aus (`.take()`). `Some(cell)` NUR im Netz-Self-Play
@@ -4343,15 +4481,21 @@ fn unified_game_loop<R: Rng + ?Sized>(
     // aktuelle Halbzug den bisherigen Kandidaten (siehe Modulkommentar vor
     // `EXCURSION_SEED_DISTINGUISHER`).
     let mut reservoir_weight_sum: f64 = 0.0;
+    // Grund eines vorzeitigen Abbruchs (Schrittlimit/Haenger-Alarm), `None`
+    // bei regulaerem Ende. Landet im Summary-Ergebnis als `abort_reason`.
+    let mut abort: Option<GameAbort> = None;
     loop {
         guard += 1;
         if let Some(hb) = cfg.move_heartbeat {
             hb.fetch_add(1, Ordering::Relaxed);
         }
-        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je
-        // Partie. Bricht pathologische Nicht-Terminierungen ab, statt den
-        // ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= cfg.timeout_secs {
+        // Abbruch: deterministisches Schrittlimit, Wanduhr nur noch als
+        // Haenger-Alarm (siehe [`MAX_GAME_STEPS`]). Bricht pathologische
+        // Nicht-Terminierungen ab, statt den ganzen Lauf zu blockieren --
+        // und meldet es laut, statt still einen Zwischenstand zu liefern.
+        if let Some(a) = game_loop_abort(guard, cfg.max_steps, t_start, cfg.hang_alarm_secs) {
+            report_game_abort(a, cfg.game_seed, steps, t_start);
+            abort = Some(a);
             break;
         }
         match game.state.phase {
@@ -4497,7 +4641,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // den ENTSCHEID des Agenten, steht deshalb VOR der
                     // Abweichung unten (die den Vorzug nicht neu bewertet, nur
                     // die gespielte Aktion ersetzt).
-                    if let Some(cell) = cfg.vorzug_greift {
+                    if let Some(cell) = cfg.preference_hits {
                         if d.vorzug.is_some() {
                             let mut counts = cell.get();
                             counts[player] += 1;
@@ -5050,6 +5194,11 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 // der Platten-Konfiguration haengt.
                 "scoring_tile_ids": game.state.scoring_tile_ids,
             });
+            // STATUS "Partie-Zeitlimit ersetzen" (2026-10-01): bis dahin trug
+            // das Arena-Ergebnis kein `completed`, ein abgebrochener
+            // Zwischenstand ging ununterscheidbar in die Wertung. Jetzt
+            // `completed` immer, `abort_reason` nur bei Abbruch.
+            insert_completion_fields(&mut result, completed, abort);
             // Auftrag 2026-08-11: opt-in Log-Export (Default AUS haelt
             // bestehende Aufrufer unveraendert) -- `game_seed`/`names`/
             // `first_player` fuer das exakte Replay in analyze_game_log.py.
@@ -5148,15 +5297,17 @@ pub fn play_one_game<R: Rng + ?Sized>(
         net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
     };
     let cfg = GameLoopConfig {
-        timeout_secs: heuristic_game_timeout_secs(base_sims)
+        // Self-Play: Bestandswert als Haenger-Alarm (siehe `MAX_GAME_STEPS`-Abschnitt).
+        hang_alarm_secs: heuristic_game_timeout_secs(base_sims)
             + if net.is_some() { crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS } else { 0 },
+        max_steps: MAX_GAME_STEPS,
         seed_from_steps: false,
         game_seed,
         move_heartbeat,
         labels: net.map(|n| LabelSamplingConfig { net: n, record_rtv, profiled: false }),
         mode: LoopMode::Records { game_id },
         players: [player, player],
-        vorzug_greift: None,
+        preference_hits: None,
         start_state: None,
         // Weg C (par.9c): der Heuristik-Self-Play weicht nicht ab -- die
         // Abweichung filtert per NETZBEWERTUNG des Folgezustands, dieser
@@ -5398,13 +5549,15 @@ fn play_arena_game<R: Rng + ?Sized>(
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
-    let timeout_secs = heuristic_game_timeout_secs(sims[0].max(sims[1]));
+    // Seit 2026-10-01: Schrittlimit als Abbruch, Wanduhr nur als Haenger-
+    // Alarm, Ergebnis mit `completed` (siehe `MAX_GAME_STEPS`-Abschnitt).
+    let hang_alarm_secs = heuristic_arena_hang_alarm_secs(sims[0].max(sims[1]));
+    let mut abort: Option<GameAbort> = None;
     loop {
         guard += 1;
-        // Hänger-Schutz: Schritt-Limit ODER sims-skalierte Wall-Clock je Partie.
-        // Bricht pathologische Nicht-Terminierungen ab (eine teure Netz-Suche pro
-        // Schritt würde sonst stundenlang grinden), statt den ganzen Lauf zu blockieren.
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+        if let Some(a) = game_loop_abort(guard, MAX_GAME_STEPS, t_start, hang_alarm_secs) {
+            report_game_abort(a, game_seed, steps, t_start);
+            abort = Some(a);
             break;
         }
         match game.state.phase {
@@ -5495,7 +5648,8 @@ fn play_arena_game<R: Rng + ?Sized>(
             _ => break,
         }
     }
-    if game.state.phase == Phase::End {
+    let completed = game.state.phase == Phase::End;
+    if completed {
         let _ = game.apply_end_scoring();
     }
     let p0 = &game.state.players[0];
@@ -5527,6 +5681,7 @@ fn play_arena_game<R: Rng + ?Sized>(
         // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
         "scoring_tile_ids": game.state.scoring_tile_ids,
     });
+    insert_completion_fields(&mut out, completed, abort);
     if log_games {
         if let Some(obj) = out.as_object_mut() {
             obj.insert("log".to_string(), json!(game.state.log));
@@ -5688,14 +5843,19 @@ fn play_net_game<R: Rng + ?Sized>(
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
     let cfg = GameLoopConfig {
-        timeout_secs: net_game_timeout_secs(net_sims.max(heur_sims)),
+        // Arena: grosszuegiger Haenger-Alarm statt Abbruch-Wanduhr (siehe
+        // `MAX_GAME_STEPS`-Abschnitt); eigene Runde-5-Sims zaehlen mit.
+        hang_alarm_secs: net_arena_hang_alarm_secs(
+            net_sims.max(heur_sims).max(search_config.r5_net_sims.unwrap_or(0)),
+        ),
+        max_steps: MAX_GAME_STEPS,
         seed_from_steps: true,
         game_seed,
         move_heartbeat: None,
         labels: None,
         mode: LoopMode::Summary { log_games },
         players,
-        vorzug_greift: None,
+        preference_hits: None,
         start_state: None,
         // Weg C (par.9c): Arena-Pfad -- die Abweichung ist eine Regel der
         // ERZEUGUNG, nie des Messens.
@@ -5790,6 +5950,10 @@ pub fn run_net_arena_match(
             Err(_) => (0..n_games).map(play).collect(),
         },
     };
+    // Review #15: Gegenstueck zu `ensure_batcher_for` oben -- sonst haelt ein
+    // Prozess, der diesen Einstieg wiederholt ruft, je Aufruf ein Modell fest.
+    // No-Op bei Knopf aus.
+    crate::net_batcher::release_batcher_for(&net);
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
 
@@ -5830,7 +5994,15 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     let agent_b =
         NetArenaAgent { net: net_b, base_sims: sims_b, c_puct: c_puct_b, vorzug: true, search_config: search_config_b };
     let cfg = GameLoopConfig {
-        timeout_secs: net_game_timeout_secs(sims_a.max(sims_b)),
+        // Arena: grosszuegiger Haenger-Alarm statt Abbruch-Wanduhr (siehe
+        // `MAX_GAME_STEPS`-Abschnitt); eigene Runde-5-Sims zaehlen mit.
+        hang_alarm_secs: net_arena_hang_alarm_secs(
+            sims_a
+                .max(sims_b)
+                .max(search_config_a.r5_net_sims.unwrap_or(0))
+                .max(search_config_b.r5_net_sims.unwrap_or(0)),
+        ),
+        max_steps: MAX_GAME_STEPS,
         seed_from_steps: true,
         game_seed,
         move_heartbeat: None,
@@ -5872,7 +6044,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 net_tiling_tiebreak: search_config_b.net_tiling_tiebreak,
             },
         ],
-        vorzug_greift: None,
+        preference_hits: None,
         start_state: None,
         // Weg C (par.9c): Arena-Pfad -- die Abweichung ist eine Regel der
         // ERZEUGUNG, nie des Messens.
@@ -5994,10 +6166,15 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
-    let timeout_secs = net_game_timeout_secs(sims_hybrid.max(sims_plain));
+    // Seit 2026-10-01: Schrittlimit als Abbruch, Wanduhr nur als Haenger-
+    // Alarm, Ergebnis mit `completed` (siehe `MAX_GAME_STEPS`-Abschnitt).
+    let hang_alarm_secs = net_arena_hang_alarm_secs(sims_hybrid.max(sims_plain));
+    let mut abort: Option<GameAbort> = None;
     loop {
         guard += 1;
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+        if let Some(a) = game_loop_abort(guard, MAX_GAME_STEPS, t_start, hang_alarm_secs) {
+            report_game_abort(a, game_seed, steps, t_start);
+            abort = Some(a);
             break;
         }
         match game.state.phase {
@@ -6100,12 +6277,13 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
             _ => break,
         }
     }
-    if game.state.phase == Phase::End {
+    let completed = game.state.phase == Phase::End;
+    if completed {
         let _ = game.apply_end_scoring();
     }
     let p0 = &game.state.players[0];
     let p1 = &game.state.players[1];
-    json!({
+    let mut out = json!({
         "scores": [p0.score, p1.score],
         "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
@@ -6131,7 +6309,9 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
         // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
         "scoring_tile_ids": game.state.scoring_tile_ids,
-    })
+    });
+    insert_completion_fields(&mut out, completed, abort);
+    out
 }
 
 /// `n_games` Spiele Hybrid-Netz (Priors/Moon von `hybrid_policy_path`, Value
@@ -6786,15 +6966,18 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // hierher zurueck, ob seine erzwungene Abweichung wirklich zustande kam.
     let excursion_deviated: std::cell::Cell<bool> = std::cell::Cell::new(false);
     let cfg = GameLoopConfig {
-        timeout_secs: net_game_timeout_secs(base_sims)
+        // Self-Play: Bestandswert als Haenger-Alarm; der Watchdog in
+        // `run_net_self_play` liegt `WATCHDOG_MARGIN_SECS` darueber.
+        hang_alarm_secs: net_game_timeout_secs(base_sims)
             + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS,
+        max_steps: MAX_GAME_STEPS,
         seed_from_steps: false,
         game_seed,
         move_heartbeat,
         labels: Some(LabelSamplingConfig { net, record_rtv, profiled: true }),
         mode: LoopMode::Records { game_id },
         players: [player0, player1],
-        vorzug_greift: if asym { Some(&greif_counter) } else { None },
+        preference_hits: if asym { Some(&greif_counter) } else { None },
         start_state,
         // Weg C (par.9c): der EINZIGE Pfad mit Abweichung. Default AUS
         // (`MOSAIC_DEVIATE_PROB=0`) ist byte-identisch zum Bestand.
@@ -6864,17 +7047,90 @@ const WATCHDOG_MARGIN_SECS: u64 = 60;
 /// selbst terminiert oder der Prozess endet, und bindet bis dahin einen
 /// CPU-Kern. Das ist bewusst hingenommen: besser 1 verwaister Kern als der
 /// gesamte Chunk/Batch, der laut Beobachtung sonst komplett blockiert.
-fn run_with_watchdog<F, T>(deadline: std::time::Duration, f: F) -> Option<T>
+///
+/// Review-Befund #23c (2026-10-01): bis dahin lieferte diese Funktion
+/// `Option<T>`, und eine PANIC im Partie-Thread sah genauso aus wie eine
+/// ueberschrittene Deadline -- der Thread endete, `tx` fiel ungesendet, und
+/// `recv_timeout` kehrte (sofort!) mit `Disconnected` zurueck, was als
+/// `None` und damit als "[Watchdog] ... Deadline" gemeldet wurde. Panicende
+/// Partien fielen so still und falsch etikettiert aus den Korpora. Jetzt
+/// faengt der Thread die Panic (`catch_unwind`) und reicht ihre Meldung als
+/// [`WatchdogOutcome::Panicked`] zurueck; nur ein echtes Ueberschreiten ist
+/// [`WatchdogOutcome::TimedOut`]. Der Standard-Panic-Hook druckt die Panic
+/// weiterhin selbst nach stderr (mit Ort), `catch_unwind` aendert daran nichts.
+fn run_with_watchdog<F, T>(deadline: std::time::Duration, f: F) -> WatchdogOutcome<T>
 where
     F: FnOnce() -> T + Send + 'static,
     T: Send + 'static,
 {
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel::<Result<T, String>>();
     std::thread::spawn(move || {
-        let result = f();
+        // `AssertUnwindSafe`: nach einer Panic wird KEIN Zustand der Closure
+        // weiterverwendet -- die Partie wird verworfen, ihre thread-lokalen
+        // Groessen sterben mit diesem frischen Thread.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
+            .map_err(|payload| panic_payload_message(&*payload));
         let _ = tx.send(result);
     });
-    rx.recv_timeout(deadline).ok()
+    match rx.recv_timeout(deadline) {
+        Ok(Ok(v)) => WatchdogOutcome::Done(v),
+        Ok(Err(msg)) => WatchdogOutcome::Panicked(msg),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => WatchdogOutcome::TimedOut,
+        // Der Thread endete, ohne zu senden, obwohl `catch_unwind` jede
+        // abwickelnde Panic faengt -- bleibt nur ein Abbruch ohne Abwicklung
+        // (z. B. eine Panic in einem Destruktor waehrend der Abwicklung). Als
+        // Panic gemeldet, nicht als Deadline: es ging keine Zeit verloren.
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+            WatchdogOutcome::Panicked("Partie-Thread endete ohne Ergebnis und ohne fangbare Panic".into())
+        }
+    }
+}
+
+/// Ergebnis von [`run_with_watchdog`]: fertig, Panic im Partie-Thread, oder
+/// harte Deadline ueberschritten (Review #23c: die beiden letzten sind
+/// verschiedene Fehler und werden getrennt gemeldet und gezaehlt).
+enum WatchdogOutcome<T> {
+    Done(T),
+    Panicked(String),
+    TimedOut,
+}
+
+/// Zaehler der verworfenen Partien eines `run_net_self_play`-Aufrufs, getrennt
+/// nach Ursache (Review #23c). Hauptpartien und Ausfluege zusammen.
+#[derive(Default)]
+struct SelfPlayAbortCounts {
+    panics: AtomicU64,
+    timeouts: AtomicU64,
+}
+
+impl SelfPlayAbortCounts {
+    fn note_panic(&self) {
+        self.panics.fetch_add(1, Ordering::Relaxed);
+    }
+    fn note_timeout(&self) {
+        self.timeouts.fetch_add(1, Ordering::Relaxed);
+    }
+    /// Summenzeile fuer stderr, `None` wenn nichts abgebrochen ist.
+    fn summary_line(&self, prefix: &str) -> Option<String> {
+        let p = self.panics.load(Ordering::Relaxed);
+        let t = self.timeouts.load(Ordering::Relaxed);
+        if p == 0 && t == 0 {
+            return None;
+        }
+        Some(format!("[selfplay_aborts] prefix={prefix} panics={p} watchdog_timeouts={t}"))
+    }
+}
+
+/// Lesbarer Text einer Panic-Nutzlast (`panic!("...")` liefert `&str` oder
+/// `String`, alles andere ist selten und wird nur benannt).
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "<Panic-Nutzlast ohne Text>".to_string()
+    }
 }
 
 /// Netzgeführtes Self-Play: `n_games` Partien (rayon-parallel), Netz vs. sich
@@ -6982,6 +7238,8 @@ pub fn run_net_self_play(
     let watchdog_deadline = std::time::Duration::from_secs(
         net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS + WATCHDOG_MARGIN_SECS,
     );
+    // Review #23c: Panics und Deadline-Abbrueche dieses Laufs getrennt zaehlen.
+    let abort_counts = SelfPlayAbortCounts::default();
     let play = |i: usize| -> Vec<Value> {
         let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
         let mut rng = StdRng::seed_from_u64(partie_seed);
@@ -7095,8 +7353,19 @@ pub fn run_net_self_play(
             )
         });
         let (mut steps, excursion_branch) = match result {
-            Some((v, b, _)) => (v, b),
-            None => {
+            WatchdogOutcome::Done((v, b, _)) => (v, b),
+            WatchdogOutcome::Panicked(msg) => {
+                // Review #23c: eine Panic ist ein Programmfehler, keine
+                // Zeitueberschreitung -- eigene Zeile, eigener Zaehler.
+                abort_counts.note_panic();
+                eprintln!(
+                    "⚠️  [Panic] Spiel {gid} (seed={partie_seed}) brach mit einer Panic ab -- \
+                     verworfen: {msg}"
+                );
+                (Vec::new(), None)
+            }
+            WatchdogOutcome::TimedOut => {
+                abort_counts.note_timeout();
                 eprintln!(
                     "⚠️  [Watchdog] Spiel {gid} ueberschritt die harte {watchdog_deadline:?}-Deadline -- \
                      als unvollstaendig verworfen (verwaister Thread laeuft im Hintergrund weiter)."
@@ -7178,6 +7447,22 @@ pub fn run_net_self_play(
                     },
                 )
             });
+            let ex_result = match ex_result {
+                WatchdogOutcome::Done(v) => Some(v),
+                WatchdogOutcome::Panicked(msg) => {
+                    abort_counts.note_panic();
+                    eprintln!(
+                        "⚠️  [Panic] Ausflug {ex_gid} (seed={excursion_seed}) brach mit einer Panic ab -- \
+                         verworfen: {msg}"
+                    );
+                    // Bereits gemeldet; `Some(..)`-Zweige unten greifen nicht.
+                    Some((Vec::new(), None, false))
+                }
+                WatchdogOutcome::TimedOut => {
+                    abort_counts.note_timeout();
+                    None
+                }
+            };
             match ex_result {
                 // Der Ausflug zaehlt NUR, wenn seine erzwungene Abweichung
                 // wirklich zustande kam. Faellt sie aus -- Vorzugs-Waechter
@@ -7232,6 +7517,15 @@ pub fn run_net_self_play(
         }
     };
     stop_heartbeat_reporter(hb_stop, hb_handle);
+    // Review #23c: EINE Summenzeile je Aufruf, nur wenn etwas abgebrochen ist
+    // (sonst bleibt stderr wie bisher). Bewusst KEIN Diagnose-Record im
+    // Rueckgabe-Array: `self_play.py` filtert nur die ihm bekannten
+    // Diagnose-Records heraus (`perspective_divergence_diagnostics`,
+    // `batcher_diagnostics`), ein neuer wuerde als Pseudo-Partie gruppiert.
+    // Der Weg ins Manifest braucht deshalb zuerst den Python-Konsumenten.
+    if let Some(line) = abort_counts.summary_line(prefix) {
+        eprintln!("{line}");
+    }
     let mut flat: Vec<Value> = all.into_iter().flatten().collect();
     // Audit-Objekt anhaengen -- gleiches Muster wie `stage3_diagnostics`
     // weiter unten (arena.py/self_play.py lesen es separat aus, kein
@@ -7254,6 +7548,8 @@ pub fn run_net_self_play(
             "max_batch_seen": batcher.stats.max_batch_seen.load(Ordering::Relaxed),
         }));
     }
+    // Review #15: erst NACH dem Auslesen der Batcher-Statistik abmelden.
+    crate::net_batcher::release_batcher_for(&net);
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
@@ -8903,14 +9199,15 @@ pub(crate) mod tests {
                 net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
             };
             let cfg = GameLoopConfig {
-                timeout_secs: 600,
+                hang_alarm_secs: 600,
+                max_steps: MAX_GAME_STEPS,
                 seed_from_steps: false,
                 game_seed: seed,
                 move_heartbeat: None,
                 labels: None,
                 mode: LoopMode::Records { game_id: "seeded_g1" },
                 players: [player, player],
-                vorzug_greift: None,
+                preference_hits: None,
                 start_state: Some(state),
                 deviate_net: None,
                 excursion_branch: None,
@@ -8934,6 +9231,163 @@ pub(crate) mod tests {
         assert!(
             out.last().unwrap().get("winner").is_some(),
             "Partie muss zu Ende gespielt und gestempelt sein"
+        );
+    }
+
+    // ── Partie-Abbruch: Schrittlimit statt Wanduhr (2026-10-01) ─────────────
+
+    /// Eine reine Heuristik-Partie im SUMMARY-Modus (Arena-Ausgabe) mit
+    /// waehlbarem Schrittlimit und Haenger-Alarm. Kein Netz noetig.
+    fn heuristic_summary_game(seed: u64, max_steps: u32, hang_alarm_secs: u64) -> Value {
+        let agent = HeuristicArenaAgent { base_sims: 8, c: SELF_PLAY_C, variant: crate::mcts::HeuristicVariant::Hv1 };
+        let player = PlayerLoopConfig {
+            agent: &agent,
+            tiling_net: None,
+            envelope_tiling_w: 0.0,
+            envelope_profile: crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+            envelope_tiling_value_w: 0.0,
+            apply_via_chosen_action: false,
+            column_build_trace: false,
+            return_order_mode: 0,
+            start_search: None,
+            heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+            net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+        };
+        let cfg = GameLoopConfig {
+            hang_alarm_secs,
+            max_steps,
+            seed_from_steps: true,
+            game_seed: seed,
+            move_heartbeat: None,
+            labels: None,
+            mode: LoopMode::Summary { log_games: false },
+            players: [player, player],
+            preference_hits: None,
+            start_state: None,
+            deviate_net: None,
+            excursion_branch: None,
+            is_excursion: false,
+            excursion_deviated: None,
+        };
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        match unified_game_loop(ids, ["A".into(), "B".into()], 0, &mut rng, cfg) {
+            LoopOutput::Summary(v) => v,
+            LoopOutput::Records(_) => unreachable!("Summary-Modus konfiguriert"),
+        }
+    }
+
+    /// Regulaere Partie: `completed == true`, KEIN `abort_reason`, und die
+    /// Schrittzahl liegt weit unter [`MAX_GAME_STEPS`] (die Konstante darf
+    /// keine normale Partie beruehren).
+    #[test]
+    fn summary_marks_regular_game_completed() {
+        let out = heuristic_summary_game(31_001, MAX_GAME_STEPS, 3_600);
+        assert_eq!(out["completed"], json!(true), "regulaere Partie muss completed tragen");
+        assert!(out.get("abort_reason").is_none(), "kein abort_reason bei regulaerem Ende");
+        let steps = out["steps"].as_u64().expect("steps");
+        assert!(
+            steps * 4 < MAX_GAME_STEPS as u64,
+            "Partie mit {steps} Schritten liegt zu nah an MAX_GAME_STEPS={MAX_GAME_STEPS}"
+        );
+    }
+
+    /// Schrittlimit greift DETERMINISTISCH: gleicher Seed, gleiches Limit ->
+    /// byte-gleiches Ergebnis, Abbruch genau nach `max_steps` Schritten,
+    /// `completed == false` und `abort_reason == "step_limit"`.
+    #[test]
+    fn step_limit_aborts_deterministically_and_marks_incomplete() {
+        let a = heuristic_summary_game(31_002, 50, 3_600);
+        let b = heuristic_summary_game(31_002, 50, 3_600);
+        assert_eq!(a, b, "Schrittlimit muss lastunabhaengig dieselbe Partie liefern");
+        assert_eq!(a["completed"], json!(false));
+        assert_eq!(a["abort_reason"], json!("step_limit"));
+        assert_eq!(a["steps"], json!(50), "Abbruch genau nach max_steps Schritten");
+    }
+
+    /// Haenger-Alarm (hier auf 0 s gesetzt, greift also im ersten Durchlauf)
+    /// macht das Ergebnis als unvollstaendig erkennbar.
+    #[test]
+    fn hang_alarm_marks_incomplete() {
+        let out = heuristic_summary_game(31_003, MAX_GAME_STEPS, 0);
+        assert_eq!(out["completed"], json!(false));
+        assert_eq!(out["abort_reason"], json!("hang_alarm"));
+    }
+
+    /// Reine Pruefung: Schrittlimit gewinnt gegen den gleichzeitig faelligen
+    /// Alarm (deterministischer Grund zuerst), sonst die Reihenfolge der Faelle.
+    #[test]
+    fn game_loop_abort_prefers_step_limit() {
+        let t0 = std::time::Instant::now();
+        assert_eq!(game_loop_abort(10, 10, t0, 3_600), None);
+        assert_eq!(game_loop_abort(11, 10, t0, 3_600), Some(GameAbort::StepLimit));
+        assert_eq!(game_loop_abort(5, 10, t0, 0), Some(GameAbort::HangAlarm));
+        assert_eq!(game_loop_abort(11, 10, t0, 0), Some(GameAbort::StepLimit));
+    }
+
+    /// `insert_completion_fields`: `completed` immer, `abort_reason` nur bei
+    /// Abbruch, `"loop_exit"` fuer einen Abbruch ohne Limit-Grund.
+    #[test]
+    fn completion_fields_follow_the_contract() {
+        let mut done = json!({"scores": [1, 2]});
+        insert_completion_fields(&mut done, true, None);
+        assert_eq!(done, json!({"scores": [1, 2], "completed": true}));
+        let mut cut = json!({});
+        insert_completion_fields(&mut cut, false, Some(GameAbort::HangAlarm));
+        assert_eq!(cut, json!({"completed": false, "abort_reason": "hang_alarm"}));
+        let mut other = json!({});
+        insert_completion_fields(&mut other, false, None);
+        assert_eq!(other["abort_reason"], json!("loop_exit"));
+    }
+
+    /// Haenger-Alarm der Arena ist ein Vielfaches des alten Limits (bei 400
+    /// Sims 1.800 s statt 180 s).
+    #[test]
+    fn arena_hang_alarm_is_generous() {
+        assert_eq!(net_game_timeout_secs(400), 180);
+        assert_eq!(net_arena_hang_alarm_secs(400), 1_800);
+        assert_eq!(heuristic_arena_hang_alarm_secs(400), 1_200);
+    }
+
+    // ── Review #23c: Panic im Partie-Thread ehrlich melden ──────────────────
+
+    #[test]
+    fn watchdog_reports_done_panic_and_timeout_separately() {
+        let deadline = std::time::Duration::from_secs(10);
+        match run_with_watchdog(deadline, || 7u32) {
+            WatchdogOutcome::Done(v) => assert_eq!(v, 7),
+            _ => panic!("fertige Closure muss Done liefern"),
+        }
+        match run_with_watchdog(deadline, || -> u32 { panic!("kaputt im Test") }) {
+            WatchdogOutcome::Panicked(msg) => assert!(msg.contains("kaputt im Test"), "{msg}"),
+            WatchdogOutcome::TimedOut => panic!("Panic darf NICHT als Deadline gemeldet werden"),
+            WatchdogOutcome::Done(_) => panic!("Panic darf kein Ergebnis liefern"),
+        }
+        let n = 3;
+        match run_with_watchdog(deadline, move || -> u32 { panic!("formatiert {n}") }) {
+            WatchdogOutcome::Panicked(msg) => assert!(msg.contains("formatiert 3"), "{msg}"),
+            _ => panic!("String-Nutzlast muss als Panic ankommen"),
+        }
+        let short = std::time::Duration::from_millis(50);
+        match run_with_watchdog(short, || {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            1u32
+        }) {
+            WatchdogOutcome::TimedOut => {}
+            _ => panic!("langsame Closure muss TimedOut liefern"),
+        }
+    }
+
+    #[test]
+    fn selfplay_abort_counts_summary_only_when_something_aborted() {
+        let c = SelfPlayAbortCounts::default();
+        assert_eq!(c.summary_line("x"), None);
+        c.note_panic();
+        c.note_timeout();
+        c.note_timeout();
+        assert_eq!(
+            c.summary_line("v34"),
+            Some("[selfplay_aborts] prefix=v34 panics=1 watchdog_timeouts=2".to_string())
         );
     }
 

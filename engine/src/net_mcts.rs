@@ -1186,6 +1186,23 @@ pub struct SearchConfig {
     /// 200). Die Label-Pfade (`round5::exact_round5_outcome`) und die
     /// Heuristik-Bahn lesen weiter nur den Env-Wert.
     pub r5_solver_node_budget: u64,
+    /// Sim-Zahl der NETZSUCHE DIESER SEITE nur in Runde 5
+    /// (`PREREG_r5_net_vs_solver.md` par.5b, Stufen 2E/2E-b/2S). `None` =
+    /// Bestand: Runde 5 laeuft mit den Sims der ganzen Partie. `Some(n)`
+    /// ersetzt in Runde 5 die BASIS-Sims der Seite (vor `net_effective_sims`,
+    /// also mit derselben Aktionszahl-Skalierung wie jede andere Entscheidung).
+    ///
+    /// Wirkt nur, wenn die Netzsuche Runde 5 tatsaechlich spielt, also bei
+    /// `r5_net_solver == false`; bei `true` uebernimmt der Loeser und das Feld
+    /// ist wirkungslos. Gelesen ueber [`r5_adjusted_base_sims`] an den beiden
+    /// Agenten-Einstiegen (Arena `self_play::net_arena_choose_action`, auch
+    /// vom Referee benutzt, und Self-Play `NetSelfPlayAgent::decide`).
+    ///
+    /// Spec-Feld je Seite (`r5_net_sims`, OPTIONAL, ganze Zahl 1..1000000).
+    /// BEWUSST OHNE Env-Knopf: dieselbe Regel wie bei `sims` -- eine zweite,
+    /// prozessweite Quelle gaelte fuer beide Seiten und machte das A/B
+    /// "Netz @400 in Runde 5 gegen Netz @100" im selben Prozess unmoeglich.
+    pub r5_net_sims: Option<u32>,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1304,6 +1321,8 @@ impl SearchConfig {
             r5_net_solver: crate::round5::net_solver_enabled(),
             r5_solver_iterative: crate::round5::solver_iterative_env(),
             r5_solver_node_budget: crate::round5::node_budget(),
+            // KEIN Env-Knopf (par.5b): nur ueber das Spec-Feld, sonst Bestand.
+            r5_net_sims: None,
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1368,6 +1387,8 @@ impl SearchConfig {
             "r5_net_solver",
             "r5_solver_iterative",
             "r5_solver_node_budget",
+            // PREREG_r5_net_vs_solver.md par.5b: Netz-Sims nur in Runde 5.
+            "r5_net_sims",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1827,6 +1848,9 @@ impl SearchConfig {
             }
         };
         let sims = spec_u32("sims", 1.0, 1_000_000.0)?;
+        // par.5b: OPTIONAL, fehlt es, bleibt Runde 5 bei den Sims der Partie
+        // (`None`, Bestand). Gleiche Grenzen wie `sims`.
+        let r5_net_sims = spec_u32("r5_net_sims", 1.0, 1_000_000.0)?;
         let root_noise = match obj.get("root_noise") {
             None => None,
             Some(v) => Some(
@@ -1892,6 +1916,7 @@ impl SearchConfig {
             r5_net_solver,
             r5_solver_iterative,
             r5_solver_node_budget,
+            r5_net_sims,
             heuristic_variant,
             sims,
             root_noise,
@@ -3337,9 +3362,19 @@ fn try_batched_single_eval(
 /// Ownership-Verbraucher Teil 1: der Sammel-Faden liefert seit der
 /// Verdrahtung SECHS Spalten je Zeile, `ownership` kommt also auch ueber
 /// diesen Pfad durch (frueher waere hier still ein leerer Kopf entstanden).
-/// `opp_points` wird trotzdem weiterhin als LEER zurueckgegeben und der
-/// `points_utility_w()`-Waechter bleibt unangetastet -- siehe
+/// Der `points_utility_w()`-Waechter bleibt unangetastet -- siehe
 /// `net_batcher.rs`-Modulkommentar "Was NICHT Teil dieser Datei ist".
+///
+/// Review-Befund #11 (`evaluations/review/code_review_2026-09-26_verification.md`,
+/// 2026-10-01 behoben): bis dahin gab diese Funktion `opp_points` als LEERE
+/// Vecs zurueck, obwohl der Sammel-Faden die Spalte fuellt
+/// (`net_batcher.rs::collector_loop` ruft `eval_batch_ex`; der Test
+/// `batcher_eval_rows_matches_direct_eval_batch` prueft sie gegen den
+/// Direktaufruf). `make_node` liest daraus `opp_points_forecast` (K1-Marge,
+/// Denial-Stichentscheid) -- unter Verschraenkung sah die Suche also still
+/// "kein Kopf", ohne Verschraenkung den Kopf. Jetzt reicht
+/// [`split_batched_pair`] alle sechs Spalten durch. Bei Knopf aus (Default)
+/// wird diese Stelle nie erreicht (`lookup` liefert `None`): byte-identisch.
 #[allow(clippy::type_complexity)]
 fn try_batched_pair_ex(
     net: &Net,
@@ -3354,9 +3389,28 @@ fn try_batched_pair_ex(
     }
     let batcher = crate::net_batcher::lookup(net)?;
     let rows = batcher.eval_rows(&[feats_a, feats_b]).ok()?;
-    let (pa, va, ma, pta, _oppa, owna) = rows[0].clone();
-    let (pb, vb, mb, ptb, _oppb, ownb) = rows[1].clone();
-    Some(((pa, va, ma, pta, Vec::new(), owna), (pb, vb, mb, ptb, Vec::new(), ownb)))
+    split_batched_pair(rows)
+}
+
+/// Zerlegt die Antwort des Sammel-Faden fuer EIN Mover-/Gegner-Paar in die
+/// beiden 6-Tupel, ALLE Spalten unveraendert (Review #11). `None`, wenn nicht
+/// genau zwei Zeilen kamen -- der Aufrufer faellt dann auf den synchronen Pfad
+/// zurueck (defensiv; `Batcher::eval_rows` liefert bei `Ok` je Eingabezeile
+/// genau eine Antwort, `net_batcher.rs::eval_rows`).
+#[allow(clippy::type_complexity)]
+fn split_batched_pair(
+    rows: Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)>,
+) -> Option<(
+    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+    (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
+)> {
+    if rows.len() != 2 {
+        return None;
+    }
+    let mut it = rows.into_iter();
+    let a = it.next()?;
+    let b = it.next()?;
+    Some((a, b))
 }
 
 /// Netz-Blattwert für `state`: unabhängige Pro-Spieler-Werte. Das Netz liefert
@@ -6612,6 +6666,19 @@ pub(crate) fn r5_solver_takes_over(state: &GameState, search_config: &SearchConf
     search_config.r5_net_solver && crate::round5::applies(state)
 }
 
+/// Basis-Sims einer Netz-Entscheidung DIESER Seite
+/// (`PREREG_r5_net_vs_solver.md` par.5b, Feld [`SearchConfig::r5_net_sims`]):
+/// in Runde 5 (`round5::applies`), wenn die NETZSUCHE dort spielt
+/// (`r5_net_solver == false`) und das Feld gesetzt ist, dessen Wert; sonst
+/// `base_sims` unveraendert. Bei ungesetztem Feld (Default) ist das immer
+/// `base_sims` -- kein weiterer Zustands- oder RNG-Zugriff, byte-identisch.
+pub(crate) fn r5_adjusted_base_sims(state: &GameState, base_sims: u32, search_config: &SearchConfig) -> u32 {
+    match search_config.r5_net_sims {
+        Some(n) if !search_config.r5_net_solver && crate::round5::applies(state) => n,
+        _ => base_sims,
+    }
+}
+
 /// Der Loeser-Zug DIESER SEITE, sobald [`r5_solver_takes_over`] greift
 /// (`PREREG_r5_net_vs_solver.md` par.5a): Bauform und Budget aus
 /// [`SearchConfig::r5_solver_iterative`] / [`SearchConfig::r5_solver_node_budget`].
@@ -8090,6 +8157,21 @@ mod tests {
         ["P1".into(), "P2".into()]
     }
 
+    /// Review #11: die Paar-Zerlegung der Sammel-Faden-Antwort reicht ALLE
+    /// sechs Spalten durch, insbesondere `opp_points` (Index 4), und lehnt eine
+    /// Antwort mit falscher Zeilenzahl ab.
+    #[test]
+    fn split_batched_pair_keeps_opp_points_column() {
+        let row = |k: f32| (vec![k], vec![k + 0.1], vec![k + 0.2], vec![k + 0.3], vec![k + 0.4], vec![k + 0.5]);
+        let (a, b) = split_batched_pair(vec![row(1.0), row(2.0)]).expect("zwei Zeilen");
+        assert_eq!(a, row(1.0));
+        assert_eq!(b, row(2.0));
+        assert_eq!(a.4, vec![1.4f32], "opp_points der Mover-Zeile darf nicht leer werden");
+        assert_eq!(b.4, vec![2.4f32], "opp_points der Gegner-Zeile darf nicht leer werden");
+        assert!(split_batched_pair(vec![row(1.0)]).is_none());
+        assert!(split_batched_pair(vec![row(1.0), row(2.0), row(3.0)]).is_none());
+    }
+
     /// Weg A (`PREREG_moon_stack_order.md` par.12.2 Punkt 1): das Tor des
     /// Mondknotens ist als "mindestens zwei VERSCHIEDENE Farben" gebaut
     /// (`game::moon_order_has_real_choice`), die Prereg schreibt aber
@@ -9269,6 +9351,8 @@ mod tests {
             // statt Env-Getter, aus demselben Grund wie die Stilmittel unten.
             r5_solver_iterative: crate::round5::SOLVER_ITERATIVE_DEFAULT,
             r5_solver_node_budget: crate::round5::NODE_BUDGET,
+            // par.5b: Bestand = Sims der Partie auch in Runde 5.
+            r5_net_sims: None,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -9601,6 +9685,39 @@ mod tests {
         }
     }
 
+    /// `PREREG_r5_net_vs_solver.md` par.5b: `r5_net_sims` ist OPTIONAL (fehlt
+    /// es, bleibt es `None` = Bestand, unabhaengig von der Umgebung, weil es
+    /// keinen Env-Knopf hat), gesetzt kommt es an, ungueltige Werte sind harte
+    /// Fehler.
+    #[test]
+    fn search_config_spec_r5_net_sims_is_optional_and_validated() {
+        let dir = std::env::temp_dir();
+        let write = |tag: &str, extra: &str| {
+            let path = dir.join(format!("mosaic_test_spec_r5sims_{tag}_{}.json", std::process::id()));
+            std::fs::write(&path, format!("{{{SPEC_MIN_FIELDS}{extra}}}")).unwrap();
+            path
+        };
+        let p_missing = write("missing", "");
+        let cfg = SearchConfig::from_spec_file(p_missing.to_str().unwrap())
+            .expect("eine Spec ohne das Feld muss weiter laden");
+        std::fs::remove_file(&p_missing).ok();
+        assert_eq!(cfg.r5_net_sims, None);
+        assert_eq!(SearchConfig::from_env().r5_net_sims, None, "kein Env-Knopf");
+
+        let p_set = write("set", r#", "r5_net_solver": 0, "r5_net_sims": 400"#);
+        let cfg_set = SearchConfig::from_spec_file(p_set.to_str().unwrap()).expect("gueltiger Wert");
+        std::fs::remove_file(&p_set).ok();
+        assert_eq!(cfg_set.r5_net_sims, Some(400));
+
+        for (k, value) in ["0", "1.5", r#""400""#, "true"].iter().enumerate() {
+            let p_bad = write(&format!("bad{k}"), &format!(r#", "r5_net_sims": {value}"#));
+            let msg = SearchConfig::from_spec_file(p_bad.to_str().unwrap())
+                .expect_err("ungueltiger Wert muss hart abgewiesen werden");
+            std::fs::remove_file(&p_bad).ok();
+            assert!(msg.contains("r5_net_sims"), "Fehlermeldung nennt das Feld ({value}): {msg}");
+        }
+    }
+
     /// E1: bei `single_pass_other_val = true` laeuft an KEINER Blattstelle ein
     /// geflippter zweiter Pass (`net_leaf_eval_with`, `make_node`, gebuendelte
     /// Wurzel-Expansion), und der Blattwert ist per Konstruktion eine
@@ -9756,6 +9873,29 @@ mod tests {
         assert!(!crate::round5::applies(&r4));
         assert!(!r5_solver_takes_over(&r4, &on));
         assert!(!r5_solver_takes_over(&r4, &off));
+    }
+
+    /// `PREREG_r5_net_vs_solver.md` par.5b: `r5_net_sims` ersetzt die
+    /// Basis-Sims NUR in Runde 5 UND nur, wenn die Netzsuche dort spielt
+    /// (`r5_net_solver == false`). Ungesetzt ist es in jeder Lage `base_sims`
+    /// (Bestand), ebenso in Runde 1-4 und bei eingeschaltetem Loeser.
+    #[test]
+    fn r5_net_sims_applies_only_in_round5_with_net_search() {
+        use crate::round_transition::drive_to_round_start;
+        let r5 = drive_to_round_start(101, 5);
+        let r4 = drive_to_round_start(101, 4);
+        assert!(crate::round5::applies(&r5) && !crate::round5::applies(&r4), "Testaufbau");
+
+        let default = search_config_off();
+        assert_eq!(default.r5_net_sims, None, "Default muss ungesetzt sein");
+        for st in [&r5, &r4] {
+            assert_eq!(r5_adjusted_base_sims(st, 100, &default), 100);
+        }
+        let net_r5 = SearchConfig { r5_net_solver: false, r5_net_sims: Some(400), ..search_config_off() };
+        assert_eq!(r5_adjusted_base_sims(&r5, 100, &net_r5), 400, "Runde 5, Netzsuche: Feld greift");
+        assert_eq!(r5_adjusted_base_sims(&r4, 100, &net_r5), 100, "Runde 4: Feld wirkungslos");
+        let solver_r5 = SearchConfig { r5_net_solver: true, r5_net_sims: Some(400), ..search_config_off() };
+        assert_eq!(r5_adjusted_base_sims(&r5, 100, &solver_r5), 100, "Loeser an: Feld wirkungslos");
     }
 
     /// Dasselbe am echten Einstieg: mit Feld aus liefert

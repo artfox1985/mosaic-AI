@@ -68,6 +68,24 @@
 //! UNVERAENDERT -- Task #28 unter eingeschalteter Verschraenkung ist eine
 //! eigene, nie gemessene Kombination, und dieser Auftrag aendert daran
 //! bewusst nichts. Der Waechter ist damit strenger als noetig, nicht falsch.
+//! Seit Review #11 (2026-10-01) reicht `try_batched_pair_ex` die
+//! `opp_points`-Spalte aber durch (vorher still leer), damit K1-Marge und
+//! Denial-Stichentscheid unter Verschraenkung denselben Kopf sehen wie ohne.
+//!
+//! ## Registry-Lebensdauer (Review #15, 2026-10-01)
+//!
+//! Bis 2026-10-01 wurde [`REGISTRY`] produktiv nie geleert. Korrektheit war
+//! dadurch nicht gefaehrdet: der Faden haelt einen `Arc<Net>`-Klon
+//! (`spawn_batcher`), die Adresse des `Net` kann also nicht frei und an ein
+//! anderes Modell vergeben werden, der Schluessel bleibt eindeutig (anders als
+//! in `net_ort.rs` vor Review #12). Wohl aber der Speicher: jeder `run_*`-
+//! Einstieg laedt sein Netz NEU und registriert es (`ensure_batcher_for` in
+//! `self_play.rs::run_net_arena_match` und `run_net_self_play`), ein Prozess,
+//! der solche Einstiege mit eingeschalteter Verschraenkung wiederholt aufruft
+//! (z. B. ein Python-Werkzeug je Block), sammelte also je Aufruf einen
+//! ruhenden Faden plus ein ganzes Modell an. Minimal behoben: dieselben
+//! Einstiege melden ihr Netz am Laufende mit [`release_batcher_for`] wieder
+//! ab. Bei Knopf aus ist die Registry leer und das Abmelden ein No-Op.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -290,6 +308,25 @@ pub fn ensure_batcher_for(net_arc: &Arc<Net>) {
         .or_insert_with(|| spawn_batcher(Arc::clone(net_arc), configured_batch_max(), fill_timeout()));
 }
 
+/// Gegenstueck zu [`ensure_batcher_for`] (Review #15): entfernt den Eintrag
+/// fuer `net_arc` am Ende eines Laufs. Der Sammel-Faden endet, sobald der
+/// letzte `Batcher`-Klon (und damit der letzte `req_tx`) faellt -- noch
+/// laufende `eval_rows`-Aufrufe halten ihren Klon bis zur Antwort, ein danach
+/// kommender `lookup` liefert `None` und der Aufrufer faellt auf den
+/// synchronen Pfad zurueck (kein Fehler). No-Op bei Knopf aus.
+pub fn release_batcher_for(net_arc: &Arc<Net>) {
+    if !interleave_enabled() {
+        return;
+    }
+    remove_registration(Arc::as_ptr(net_arc) as usize);
+}
+
+/// Knopf-unabhaengiger Kern von [`release_batcher_for`] (testbar ohne den
+/// prozessweit gecachten `MOSAIC_INTERLEAVE_ENABLED`).
+fn remove_registration(key: usize) {
+    registry().lock().unwrap().remove(&key);
+}
+
 /// Sucht den registrierten Sammel-Faden fuer `net` (Zeigeridentitaet) --
 /// `None`, wenn keiner registriert ist (Knopf aus, `ensure_batcher_for` nie
 /// aufgerufen, oder ein anderes `Net` als das registrierte). Tiefe
@@ -302,9 +339,8 @@ pub fn lookup(net: &Net) -> Option<Arc<Batcher>> {
 
 /// NUR fuer Tests/Beispiele: entfernt alle registrierten Sammel-Faeden
 /// (schliesst ihre `req_tx`, die Faeden selbst enden dann beim naechsten
-/// `req_rx.recv()` mit `Disconnected`). Kein produktiver Aufrufer -- die
-/// Registry lebt sonst fuer die gesamte Prozesslaufzeit (ein Selfplay-/
-/// Arena-Lauf ist ohnehin ein Einweg-Prozess, siehe PyO3-Aufrufkonvention).
+/// `req_rx.recv()` mit `Disconnected`). Kein produktiver Aufrufer -- produktiv
+/// meldet jeder Lauf sein Netz einzeln ab ([`release_batcher_for`]).
 #[cfg(any(test, feature = "clone_profiling"))]
 pub fn clear_registry_for_test() {
     registry().lock().unwrap().clear();
@@ -345,6 +381,33 @@ mod tests {
             Ok(v) => v != "0" && !v.trim().is_empty(),
             Err(_) => false,
         }));
+    }
+
+    /// Review #15: nach dem Abmelden endet der Sammel-Faden und gibt sein
+    /// `Arc<Net>` frei -- sonst bliebe je Lauf ein ganzes Modell im Speicher.
+    /// Registriert direkt (nicht ueber `ensure_batcher_for`, das am
+    /// prozessweit gecachten Knopf haengt). Ein paralleles
+    /// `clear_registry_for_test` stoert nicht: es entfernt hoechstens frueher.
+    #[test]
+    fn released_batcher_drops_its_net() {
+        let net = Arc::new(load_test_net());
+        let weak = Arc::downgrade(&net);
+        let key = Arc::as_ptr(&net) as usize;
+        registry()
+            .lock()
+            .unwrap()
+            .insert(key, spawn_batcher(Arc::clone(&net), 2, Duration::from_millis(1)));
+        remove_registration(key);
+        assert!(lookup(&net).is_none(), "nach dem Abmelden darf lookup nichts finden");
+        drop(net);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while weak.upgrade().is_some() && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            weak.upgrade().is_none(),
+            "Sammel-Faden haelt das Netz nach dem Abmelden noch -- Speicherleck je Lauf"
+        );
     }
 
     #[test]

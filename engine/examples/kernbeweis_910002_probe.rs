@@ -140,6 +140,8 @@ fn main() {
         // las -- so bleibt die Sonde auch mit gesetztem MOSAIC_R5_NODE_BUDGET gleich.
         r5_solver_iterative: mosaic_rust::round5::SOLVER_ITERATIVE_DEFAULT,
         r5_solver_node_budget: mosaic_rust::round5::node_budget(),
+        // Eigene Runde-5-Sims (PREREG_r5_net_vs_solver.md par.5b): Bestand = ungesetzt.
+        r5_net_sims: None,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

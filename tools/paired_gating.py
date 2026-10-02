@@ -113,6 +113,16 @@ Schreibt `evaluations/paired_gating_result_<name_a>_vs_<name_b>.json`
 `elo_tracker.py add`-Kommandozeile (Zahlen aus der Fixed-n-Statistik, nicht
 aus dem SPRT-Zwischenstand).
 
+## 2026-10-01: unvollstaendige Partien brechen den Lauf ab
+
+Die Engine markiert jedes Arena-Ergebnis mit `completed` (und bei Abbruch
+`abort_reason`). Enthaelt ein Block eine unvollstaendige Partie, wird sie NICHT
+gewertet: der Lauf bricht mit `IncompleteGamesError` ab, `main` schreibt ein
+Abbruch-Artefakt `<out>_ABORTED.json` (Liste der Partien, bisherige Bloecke)
+und endet mit Exit-Code 2. Das regulaere Artefakt traegt je Eintrag in
+`blocks` die Felder `incomplete_games` (dann 0) und `completed_field_missing`
+(> 0 nur auf einem Wheel vor diesem Bau).
+
 ## 2026-09-09: `--log-games`
 
 Tor 2b (`docs/generation_loop.md`, Abschnitt Tor 2) will die volle Spaltenzahl
@@ -251,6 +261,48 @@ def _sprt_bounds_selftest() -> None:
 _sprt_bounds_selftest()
 
 
+# STATUS "Partie-Zeitlimit ersetzen" (2026-10-01): die Engine markiert jedes
+# Arena-Ergebnis mit `completed` (true nur bei regulaerem Partieende,
+# self_play.rs `insert_completion_fields`) und bei Abbruch mit `abort_reason`
+# ("step_limit", "hang_alarm" oder "loop_exit"). Bis dahin ging eine
+# abgebrochene Partie mit ihrem Zwischenstand OHNE Markierung in die Wertung.
+# Eine unvollstaendige Partie wird hier NIE gewertet: der Lauf bricht ab und
+# schreibt ein Abbruch-Artefakt (siehe `main`).
+class IncompleteGamesError(RuntimeError):
+    """Ein Block enthielt unvollstaendige Partien. `report` ist das
+    Abbruch-Artefakt (dict), das `main` unter `--out` ablegt."""
+
+    def __init__(self, message: str, report: dict):
+        super().__init__(message)
+        self.report = report
+
+
+def find_incomplete_games(g1: list[dict], g2: list[dict], first_pair_index: int,
+                          block_seed: int) -> list[dict]:
+    """Alle Partien eines Blocks mit `completed is False`, je Partie mit ihrer
+    Zuordnung (Paar, Orientierung, Abbruchgrund). Ein FEHLENDES Feld zaehlt
+    hier nicht (Wheel vor 2026-10-01, siehe `count_completed_field_missing`)."""
+    out = []
+    for orientation, block in ((1, g1), (2, g2)):
+        for i, g in enumerate(block):
+            if g.get("completed") is False:
+                out.append({
+                    "pair_index": first_pair_index + i,
+                    "orientation": orientation,
+                    "block_seed": block_seed,
+                    "abort_reason": g.get("abort_reason"),
+                    "steps": g.get("steps"),
+                    "game_seed": g.get("game_seed"),
+                })
+    return out
+
+
+def count_completed_field_missing(g1: list[dict], g2: list[dict]) -> int:
+    """Partien ohne `completed`-Feld (Wheel vor 2026-10-01): dort ist ein
+    Abbruch nicht erkennbar. Wird gezaehlt und ausgewiesen, nicht gewertet."""
+    return sum(1 for g in (*g1, *g2) if "completed" not in g)
+
+
 def play_pair_block(mr, model_a: str, model_b: str, sims_a: int, sims_b: int,
                      c_puct_a: float, c_puct_b: float, n: int, seed: int,
                      threads: int, spec_a: str | None = None,
@@ -387,6 +439,9 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     done_pairs = 0
     block_idx = 0
     block_logs: list[dict] = []
+    # 2026-10-01: Partien ohne `completed`-Feld (altes Wheel), siehe
+    # `count_completed_field_missing`.
+    completed_field_missing = 0
 
     print(f"Gepaartes Gating (Task #76): {name_a}@{sims_a} (c_puct={c_puct_a}) vs "
           f"{name_b}@{sims_b} (c_puct={c_puct_b}) -- Basis-Seed={base_seed}, "
@@ -412,6 +467,43 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                 "Wheel passt nicht zu engine/src/self_play.rs:2966 "
                 "(LoopMode::Summary { log_games }). Lauf abgebrochen."
             )
+
+        # 2026-10-01 ("Partie-Zeitlimit ersetzen"): VOR jeder Wertung pruefen.
+        # Eine unvollstaendige Partie traegt einen Zwischenstand ohne
+        # Endwertung; sie zu werten hiesse, ein lastabhaengiges Ergebnis in
+        # die SPRT-Statistik zu legen. Also: zaehlen, ausweisen, abbrechen.
+        missing = count_completed_field_missing(g1, g2)
+        if missing and completed_field_missing == 0:
+            print(f"  WARNUNG: {missing} Partien ohne Feld `completed` -- das Wheel ist "
+                  f"aelter als 2026-10-01, ein Abbruch waere NICHT erkennbar.", flush=True)
+        completed_field_missing += missing
+        incomplete = find_incomplete_games(g1, g2, done_pairs, seed)
+        if incomplete:
+            reasons = sorted({str(x["abort_reason"]) for x in incomplete})
+            message = (
+                f"Block {block_idx + 1} (Seed={seed}) enthaelt {len(incomplete)} "
+                f"UNVOLLSTAENDIGE Partie(n) (abort_reason: {', '.join(reasons)}). "
+                f"Sie werden nicht gewertet; der Lauf bricht ab. Bisher gewertet: "
+                f"{done_pairs} Paare in {block_idx} Bloecken."
+            )
+            report = {
+                "aborted": "incomplete_games",
+                "abort_message": message,
+                "name_a": name_a, "name_b": name_b, "model_a": model_a, "model_b": model_b,
+                "spec_a": spec_a, "spec_b": spec_b,
+                "sims_a": sims_a, "sims_b": sims_b, "c_puct_a": c_puct_a, "c_puct_b": c_puct_b,
+                "base_seed": base_seed,
+                "done_pairs_before_abort": done_pairs,
+                "incomplete_games": len(incomplete),
+                "incomplete_game_list": incomplete,
+                "completed_field_missing": completed_field_missing,
+                "blocks": block_logs,
+                "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
+                                           n_games=done_pairs * 2 + 2 * n),
+                "recipe": recipe_block,
+                "mosaic_env": mosaic_env_snapshot(),
+            }
+            raise IncompleteGamesError(message, report)
 
         for i in range(n):
             a_won_o1 = g1[i]["winner"] == 0  # A auf Brett 0 (Orientierung 1)
@@ -474,6 +566,13 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
             "pair_splits": splits, "llr": llr, "sprt_bounds": [sprt_lower, sprt_upper],
             "report_mcnemar_p": report_p, "mean_pair_diff": mean_d, "ci95": [ci_lo, ci_hi],
             "duration_s": dur,
+            # 2026-10-01: je Block ausgewiesen (bewusst nicht auf oberster
+            # Ebene: deren Feldmenge sichert test_paired_gating_recipe.py).
+            # `incomplete_games` ist hier per Konstruktion 0, sonst haette
+            # `IncompleteGamesError` vor der Wertung abgebrochen;
+            # `completed_field_missing` > 0 heisst altes Wheel.
+            "incomplete_games": 0,
+            "completed_field_missing": missing,
         }
         block_logs.append(block_log)
         print(f"  Block {block_idx} (Seed={seed}, n={n} Paare, {dur:.1f}s): kumulativ "
@@ -668,15 +767,30 @@ def main(argv=None, recipe_pre=None) -> None:
     c_puct_a = args.c_puct if args.c_puct is not None else args.c_puct_a
     c_puct_b = args.c_puct if args.c_puct is not None else args.c_puct_b
 
-    result = run_paired_gating(
-        args.model_a, args.model_b, name_a=args.name_a, name_b=args.name_b,
-        sims_a=sims_a, sims_b=sims_b, c_puct_a=c_puct_a, c_puct_b=c_puct_b,
-        block_size=args.block_size, max_pairs=args.max_pairs, sprt_p1=args.sprt_p1,
-        sprt_alpha=args.sprt_alpha, sprt_beta=args.sprt_beta,
-        base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
-        spec_a=args.spec_a, spec_b=args.spec_b, log_games=args.log_games,
-        expected_engine_config=expected_engine_config, recipe_block=recipe_block,
-    )
+    try:
+        result = run_paired_gating(
+            args.model_a, args.model_b, name_a=args.name_a, name_b=args.name_b,
+            sims_a=sims_a, sims_b=sims_b, c_puct_a=c_puct_a, c_puct_b=c_puct_b,
+            block_size=args.block_size, max_pairs=args.max_pairs, sprt_p1=args.sprt_p1,
+            sprt_alpha=args.sprt_alpha, sprt_beta=args.sprt_beta,
+            base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
+            spec_a=args.spec_a, spec_b=args.spec_b, log_games=args.log_games,
+            expected_engine_config=expected_engine_config, recipe_block=recipe_block,
+        )
+    except IncompleteGamesError as e:
+        # Abbruch-Artefakt statt Ergebnis: unter --out (bzw. dem Default-Pfad)
+        # mit dem Zusatz `_ABORTED`, damit kein Auswerter es fuer ein fertiges
+        # Gating haelt; kein Trend-Log, keine Champion-Uebernahme.
+        rep = e.report
+        base_out = Path(args.out) if args.out else (
+            Path(__file__).resolve().parent.parent / "evaluations"
+            / f"paired_gating_result_{rep['name_a']}_vs_{rep['name_b']}.json"
+        )
+        abort_path = base_out.with_name(base_out.stem + "_ABORTED" + base_out.suffix)
+        abort_path.write_text(json.dumps(rep, indent=2), encoding="utf-8")
+        print(f"ABBRUCH: {e}", flush=True)
+        print(f"Abbruch-Artefakt: {abort_path}", flush=True)
+        raise SystemExit(2)
 
     out_path = Path(args.out) if args.out else (
         Path(__file__).resolve().parent.parent / "evaluations"

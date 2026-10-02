@@ -47,9 +47,10 @@
 //! cuDNN-Algorithmus-Suche) ist NICHT billig -- deshalb [`SESSIONS`], eine
 //! nach Zeiger-Identitaet des `Net` schluesselnde Registry, exakt dasselbe
 //! Muster wie `net_batcher.rs::REGISTRY`/`ensure_batcher_for` (dortiger
-//! Kommentar "Registrierung nach Zeigeridentitaet" gilt hier unveraendert:
-//! sicher, WEIL dieselbe `Net`-Instanz -- typischerweise hinter einem
-//! `Arc<Net>` -- fuer die gesamte Laufzeit eines Selfplay-/Arena-Laufs lebt).
+//! Kommentar "Registrierung nach Zeigeridentitaet"). Anders als dort haelt
+//! diese Registry KEINE Referenz auf das `Net`; seit Review #12 (2026-10-01)
+//! traegt jeder Eintrag deshalb den Modellpfad mit und wird bei Abweichung
+//! neu gebaut, siehe `SessionEntry`.
 //!
 //! Thread-Sicherheit: der Sammel-Faden des Batchers (`net_batcher.rs`) ist
 //! heute der einzige *erwartete* Aufrufer von `eval_batch` bei eingeschalteter
@@ -158,10 +159,46 @@ enum SessionSlot {
     Unavailable,
 }
 
-static SESSIONS: OnceLock<Mutex<HashMap<usize, std::sync::Arc<SessionSlot>>>> = OnceLock::new();
+/// Registry-Eintrag: Modellpfad, fuer den der Slot gebaut wurde, plus Slot.
+///
+/// Review-Befund #12 (`evaluations/review/code_review_2026-09-26_verification.md`):
+/// bis 2026-10-01 schluesselte die Registry NUR nach der rohen `Net`-Adresse und
+/// hielt keine Referenz auf das `Net`. Anders als beim Batcher (der einen
+/// `Arc<Net>`-Klon haelt, `net_batcher.rs::spawn_batcher`, die Adresse also nie
+/// frei wird) kann hier ein `Net` freigegeben und ein ANDERES an derselben
+/// Adresse angelegt werden -- es haette dann die Session des alten Modells
+/// bekommen. Einen `Arc` zu halten geht hier nicht: `eval_batch` sieht nur
+/// `&Net`. Deshalb traegt der Eintrag den Modellpfad mit; weicht er beim
+/// Nachschlagen ab, wird der Slot neu gebaut und der alte ersetzt (die alte
+/// Session wird damit freigegeben). Rest-Annahme, bewusst hingenommen: dieselbe
+/// Adresse UND derselbe Pfad, aber eine zwischenzeitlich ueberschriebene Datei
+/// -- das waere auch fuer tract ein anderes Modell als das geladene.
+type SessionEntry = (String, std::sync::Arc<SessionSlot>);
 
-fn registry() -> &'static Mutex<HashMap<usize, std::sync::Arc<SessionSlot>>> {
+static SESSIONS: OnceLock<Mutex<HashMap<usize, SessionEntry>>> = OnceLock::new();
+
+fn registry() -> &'static Mutex<HashMap<usize, SessionEntry>> {
     SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Nachschlagen-oder-Bauen nach (Adresse, Modellpfad), generisch ueber den
+/// Slot-Typ, damit die Schluessel-Logik ohne CUDA testbar ist. `build` laeuft
+/// genau dann, wenn fuer `ptr` kein Eintrag existiert ODER der vorhandene zu
+/// einem anderen Pfad gehoert (dann wird er ersetzt).
+fn lookup_or_build_by_identity<V>(
+    map: &mut HashMap<usize, (String, std::sync::Arc<V>)>,
+    ptr: usize,
+    path: &str,
+    build: impl FnOnce() -> V,
+) -> std::sync::Arc<V> {
+    if let Some((stored_path, slot)) = map.get(&ptr) {
+        if stored_path == path {
+            return std::sync::Arc::clone(slot);
+        }
+    }
+    let slot = std::sync::Arc::new(build());
+    map.insert(ptr, (path.to_string(), std::sync::Arc::clone(&slot)));
+    slot
 }
 
 /// Baut die CUDA-Session fuer `onnx_path`. `error_on_failure()`: siehe
@@ -200,15 +237,16 @@ fn build_session(onnx_path: &str) -> Result<Session, String> {
 fn get_or_build_session(net: &Net) -> std::sync::Arc<SessionSlot> {
     let key = net as *const Net as usize;
     let mut map = registry().lock().unwrap();
-    std::sync::Arc::clone(map.entry(key).or_insert_with(|| {
-        std::sync::Arc::new(match build_session(net.onnx_path()) {
+    // Schluessel (Adresse, Modellpfad), siehe `SessionEntry` (Review #12).
+    lookup_or_build_by_identity(&mut map, key, net.onnx_path(), || {
+        match build_session(net.onnx_path()) {
             Ok(session) => SessionSlot::Ready(Mutex::new(session)),
             Err(e) => {
                 warn_ort_cuda_fallback_once(&e);
                 SessionSlot::Unavailable
             }
-        })
-    }))
+        }
+    })
 }
 
 /// Baut die ORT-Eingabetensoren fuer `feats` gemaess `layout` -- Pendant zu
@@ -351,6 +389,21 @@ mod tests {
         // (gleiches Vorsichts-Muster wie `net_batcher.rs`-Tests).
         static CELL: OnceLock<bool> = OnceLock::new();
         assert!(!read_bool_env_once(&CELL, "MOSAIC_TEST_ORT_CUDA_ENABLED_UNSET_XYZ", false));
+    }
+
+    /// Review #12: gleiche Adresse mit ANDEREM Modellpfad darf den alten Slot
+    /// nicht erben; gleiche Adresse mit gleichem Pfad baut nicht neu.
+    #[test]
+    fn session_registry_rebuilds_when_path_differs_at_same_address() {
+        let mut map: HashMap<usize, (String, std::sync::Arc<u32>)> = HashMap::new();
+        let mut builds = 0u32;
+        let a1 = lookup_or_build_by_identity(&mut map, 0x1000, "a.onnx", || { builds += 1; 1 });
+        let a2 = lookup_or_build_by_identity(&mut map, 0x1000, "a.onnx", || { builds += 1; 2 });
+        assert_eq!((*a1, *a2, builds), (1, 1, 1), "gleicher Schluessel darf nicht neu bauen");
+        let b = lookup_or_build_by_identity(&mut map, 0x1000, "b.onnx", || { builds += 1; 3 });
+        assert_eq!((*b, builds), (3, 2), "anderer Pfad an derselben Adresse muss neu bauen");
+        assert_eq!(map.len(), 1, "der alte Eintrag wird ersetzt, nicht daneben gelegt");
+        assert_eq!(map.get(&0x1000).map(|(p, _)| p.as_str()), Some("b.onnx"));
     }
 
     #[test]

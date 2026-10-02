@@ -116,6 +116,11 @@ UNMAPPED_ON_PURPOSE = {
     # auch auf die Heuristik-Bahn und das Label 4->5. Eine Spec, die sie setzte, aenderte also
     # mehr als ihre Seite; das Budget gilt darum NUR ueber das Spec-Feld.
     "r5_solver_node_budget": "Seiten-Feld; MOSAIC_R5_NODE_BUDGET wirkt prozessweit (Labels, Heuristik)",
+    # PREREG_r5_net_vs_solver.md par.5b (2026-10-01): Netz-Sims nur in Runde 5, je Seite. Es
+    # gibt bewusst keinen Env-Knopf (net_mcts.rs SearchConfig::r5_net_sims): ein prozessweiter
+    # Wert gaelte fuer beide Seiten und machte das A/B Netz@400 gegen Netz@100 in Runde 5
+    # im selben Prozess unmoeglich. Wirkt nur ueber den Rust-Spec-Leser.
+    "r5_net_sims": "Seiten-Feld ohne Env-Knopf; wirkt nur ueber den Rust-Spec-Leser",
 }
 
 
