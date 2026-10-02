@@ -134,6 +134,10 @@ _profile_p0: str | None = None
 _profile_p1: str | None = None
 _game_rated = False
 _hints_used_this_game = False
+# Code-Review 2 Befund 10: (Runde, Spieler), die /api/end_tiling schon
+# abgeschlossen haben -- die Engine merkt sich das (`tiling_done`), serialisiert
+# es aber nicht. Je Partie zurueckgesetzt.
+_tiling_ended: set = set()
 
 # Anker-Tabelle (Bradley-Terry-Fit aus evaluations/elo_history.csv) einmal
 # beim Serverstart berechnen -- WIEDERVERWENDET tools/elo_tracker.py::fit_all,
@@ -348,7 +352,9 @@ def _capped_sims(value, name: str) -> int:
     unbehandelter 500er aus `int()`)."""
     try:
         n = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: JSON `Infinity` wird zu float('inf'), int() wirft dann
+        # (Code-Review 2 Befund 12).
         raise ValueError(f"{name} muss eine ganze Zahl sein.")
     return max(1, min(n, MAX_REQUEST_SIMS))
 
@@ -400,6 +406,111 @@ def _require_game():
     if not _rust_active():
         return jsonify(err("Kein aktives Spiel"))
     return None
+
+
+def _with_ai_lock(fn):
+    """Code-Review 2026-09-26 Befund 22: `_ai_lock` war definiert, aber nie
+    benutzt. Jetzt umschliesst es jeden KI-ZUG (Pruefung "ist die KI dran?"
+    UND Ausfuehrung in einem Stueck), damit zwei ueberlappende Anfragen nicht
+    beide den Zugspieler-Check bestehen und zwei Zuege setzen. Nicht
+    blockierend: eine zweite Anfrage bekommt sofort eine Fehlermeldung statt
+    hinter einer langen Suche zu warten. Die GUI fragt ohnehin seriell
+    (`static/js/app.js` `triggerAIMove`: `AI_THINKING`-Sperre, `await` je
+    Schritt) und trifft das nie.
+
+    Code-Review 2 (2026-10-02) Befund 15: dieselbe Sperre umschliesst
+    /api/new_game und /api/debug/replay_log -- vorher konnte eine neue Partie
+    die Engine ersetzen, waehrend die KI-Suche auf der alten noch lief."""
+    import functools
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not _ai_lock.acquire(blocking=False):
+            return jsonify(err("Die KI berechnet bereits einen Zug."))
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _ai_lock.release()
+    return wrapper
+
+
+MAX_NAME_LEN = 40
+
+
+def _validated_names(raw) -> list:
+    """Code-Review 2 Befund 14: zwei Spielernamen als Text, ohne
+    Zeilenumbrueche und Steuerzeichen (eine Logzeile je Ereignis) und
+    VERSCHIEDEN -- `tools/analyze_game_log.py` ordnet Logzeilen ueber den
+    Namen einem Spieler zu, bei gleichen Namen fiel alles auf einen Index.
+    Gleiche Namen werden nicht abgewiesen, sondern der zweite bekommt ein
+    " (2)", damit z. B. ein Profil "Tessa" gegen die KI weiter spielbar bleibt."""
+    if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+        raise ValueError("names muss eine Liste mit zwei Namen sein.")
+    out = []
+    for n in raw:
+        if not isinstance(n, str):
+            raise ValueError("Spielernamen muessen Text sein.")
+        n = "".join(" " if ch.isspace() else ch for ch in n if ch.isprintable() or ch.isspace()).strip()
+        out.append(n[:MAX_NAME_LEN] or f"Spieler {len(out) + 1}")
+    if out[0] == out[1]:
+        out[1] = f"{out[1][:MAX_NAME_LEN - 4]} (2)"
+    return out
+
+
+def _create_unique_log(stem: str, header_lines: list) -> Path:
+    """Code-Review 2 Befund 15: legt `LOG_DIR/<stem>.log` NEU an (Modus `x`);
+    liegt der Name schon (gleiche Sekunde, gleicher Seed), kommt ein Zaehler
+    dazu. Vorher ueberschrieb `'w'` das Log der vorigen Partie."""
+    for i in range(1000):
+        path = LOG_DIR / (f"{stem}.log" if i == 0 else f"{stem}_{i}.log")
+        try:
+            with open(path, 'x', encoding='utf-8') as lf:
+                for line in header_lines:
+                    lf.write(f"{line}\n")
+            return path
+        except FileExistsError:
+            continue
+    raise OSError(f"kein freier Logname fuer {stem}")
+
+
+def _json_body() -> dict:
+    """Code-Review 2 (2026-10-02) Befund 12: der Rumpf als Objekt oder `{}`.
+    `request.get_json()` liefert bei einer JSON-LISTE eine Liste (danach
+    `.get` -> AttributeError, 500er) und wirft bei fehlendem Rumpf; mit
+    `silent=True` allein kam die Liste trotzdem durch."""
+    d = request.get_json(silent=True)
+    return d if isinstance(d, dict) else {}
+
+
+def _human_turn_guard():
+    """Code-Review 2 Befund 9: kein Zug-Endpunkt pruefte, WER am Zug ist. Ein
+    Doppelklick oder ein gebauter Request setzte den Zug der KI. Im
+    KI-Spiel nimmt das Drafting nur Zuege an, wenn der Mensch dran ist; ohne
+    KI (Hotseat) bleibt es bei der Engine-Pruefung."""
+    if _ai_player is not None and _rust.phase() == "drafting" and _rust.current_player() == _ai_player:
+        return jsonify(err("Die KI ist am Zug."))
+    return None
+
+
+def _tiling_player(d: dict):
+    """Code-Review 2 Befunde 9/10: Spielerindex fuer die Tiling-Routen aus dem
+    Rumpf, geprueft. Im KI-Spiel tilet der Mensch nur seine eigene Seite (die
+    KI tilet ueber /api/ai/move); nach /api/end_tiling nimmt der Server fuer
+    diese Seite und Runde keine Tiling-Aktion mehr an. Die Engine prueft
+    `tiling_done` in `apply_tiling` und den Chip-Varianten nicht
+    (`py.rs:476-489`, Engine-Teil in der naechsten Wheel-Runde); bis dahin
+    haelt der Server die Linie. Gibt (pi, None) oder (None, Fehler-Response)."""
+    try:
+        pi = int(d['player'])
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None, jsonify(err("Parameter 'player' fehlt oder ist keine ganze Zahl."))
+    if pi not in (0, 1):
+        return None, jsonify(err(f"player muss 0 oder 1 sein (war {pi})."))
+    if _ai_player is not None and pi == _ai_player:
+        return None, jsonify(err("Die KI tilet ihre Seite selbst."))
+    if (_rust_state().get('round'), pi) in _tiling_ended:
+        return None, jsonify(err(f"Spieler {pi} hat das Tiling dieser Runde bereits beendet."))
+    return pi, None
 
 
 # ── Lehrer-Modus: Beschreibungs-Parsing + Analyse-Cache ─────────────────────
@@ -670,12 +781,13 @@ def debug_page():
 
 
 @app.route('/api/new_game', methods=['POST'])
+@_with_ai_lock
 def new_game():
     global _rust, _rust_logged, _ai_sims, _ai_player, _ai_model, _ai_debug_history, _game_log_path
     global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_history, _teacher_cache
     global _profile_p0, _profile_p1, _game_rated, _hints_used_this_game
-    data = request.get_json(silent=True) or {}
-    names      = data.get('names', ['Spieler 1', 'Spieler 2'])
+    data = _json_body()
+    names_raw  = data.get('names', ['Spieler 1', 'Spieler 2'])
     seed       = data.get('seed', None)
     ai_enabled = data.get('ai_enabled', False)
     difficulty = data.get('difficulty', 'medium')
@@ -686,22 +798,77 @@ def new_game():
     # laesst die laufende Partie unveraendert. `first_player` ging vorher
     # ungeprueft in `PyGame` (Panic im Konstruktor bei >= 2), `ai_side`
     # ungeprueft in `_ai_player`, die Sims ungedeckelt in die Suche.
+    # Code-Review 2 (2026-10-02) Befunde 8/12/14: dazu Seed (-1 aus dem
+    # GUI-Feld war ein 500er, NACHDEM Profile und Wertungsstatus schon
+    # umgestellt waren), `model` (eine Zahl brach nach dem Engine-Neubau ab,
+    # die neue Partie schrieb ins Log der alten), Namen (Zeilenumbruch zerlegt
+    # Logzeilen, gleiche Namen brechen das Replay) und `Infinity` (int() wirft
+    # OverflowError, die vorher niemand fing).
     try:
+        names = _validated_names(names_raw)
+        seed_req = None if seed is None else int(seed)
+        if seed_req is not None and not 0 <= seed_req < 2**63:
+            raise ValueError(f"seed muss zwischen 0 und 2^63-1 liegen (war {seed_req}).")
+        model_raw = data.get('model')
+        if model_raw is not None and not isinstance(model_raw, str):
+            raise ValueError("model muss ein Versionsname (Text) sein.")
         fp_raw = data.get('first_player', None)
         first_player_req = None if fp_raw is None else int(fp_raw)
         ai_player_req = int(ai_side) if ai_enabled else None
         teacher_sims       = _capped_sims(data.get('teacher_sims', 800) or 800, "teacher_sims")
         teacher_coach_sims = _capped_sims(data.get('teacher_coach_sims', 400) or 400, "teacher_coach_sims")
-        preset = _resolve_difficulty(difficulty, data.get('model'), data.get('sims')) if ai_enabled else None
+        preset = _resolve_difficulty(difficulty, model_raw, data.get('sims')) if ai_enabled else None
         ai_sims_req = _capped_sims(preset.get('sims') or 100, "sims") if ai_enabled else None
-    except (TypeError, ValueError) as e:
+    except (TypeError, ValueError, OverflowError) as e:
         return jsonify(err(f"Ungültige Eingabe: {e}"))
     if first_player_req is not None and first_player_req not in (0, 1):
         return jsonify(err(f"first_player muss 0 oder 1 sein (war {first_player_req})."))
     if ai_player_req is not None and ai_player_req not in (0, 1):
         return jsonify(err(f"ai_side muss 0 oder 1 sein (war {ai_player_req})."))
+    if _mr is None:
+        return jsonify(err("Rust-Engine (mosaic_rust) ist nicht installiert. "
+                           "Bitte im engine/-Verzeichnis `maturin build --release` ausführen "
+                           "und das Wheel installieren."))
 
-    _ai_debug_history = []
+    # Lehrer-Modus (Task #97): 0=aus (Default -- Bestandsverhalten unverändert),
+    # 1=Kandidaten, 2=+Bewertungen, 3=+Coach-Feedback. Pro Partie zurückgesetzt.
+    try:
+        teacher_level = int(data.get('teacher_level', 0) or 0)
+    except (TypeError, ValueError, OverflowError):
+        teacher_level = 0
+    if teacher_level not in (0, 1, 2, 3):
+        teacher_level = 0
+
+    # Code-Review 2 Befund 8: die neue Partie entsteht vollstaendig in LOKALEN
+    # Variablen (Engine, Netz, Logdatei); erst wenn alles steht, werden die
+    # globalen Zustaende in einem Zug umgestellt. Ein Fehler davor laesst die
+    # laufende Partie samt Profilen, Wertungsstatus und Log unberuehrt.
+    import random as _random
+    first_player = _random.randint(0, 1) if first_player_req is None else first_player_req
+    if seed_req is None:
+        seed_req = _random.randint(0, 999999)
+    try:
+        new_rust = _mr.PyGame((names[0], names[1]), first_player=first_player, seed=seed_req)
+    except Exception as e:
+        return jsonify(err(f"Partie konnte nicht angelegt werden: {e}"))
+    seed = new_rust.seed()
+
+    model_warning = None
+    new_ai_model = None
+    if ai_enabled:
+        requested_model = preset.get('model')
+        model_path = _resolve_model_path(requested_model)
+        if model_path is not None:
+            try:
+                new_rust.load_net(str(model_path))
+                new_ai_model = requested_model
+            except Exception as e:
+                model_warning = f"Netz '{requested_model}' konnte nicht geladen werden ({e}) - spiele gegen Heuristik."
+        elif requested_model and requested_model.strip().lower() not in ("", "heuristic", "heuristik"):
+            model_warning = (f"Modell '{requested_model}' nicht gefunden "
+                             f"(weder models/alphazero_{requested_model}.onnx noch "
+                             f"models/frozen_champions/{requested_model}/model.onnx) "
+                             f"- spiele gegen Heuristik.")
 
     # Spielerprofile (Nutzer-Feature 2026-08-02): ungueltige/leere IDs werden
     # stillschweigend als Gast (None, ungewertet) behandelt -- kein Hard-Error,
@@ -710,19 +877,52 @@ def new_game():
         pid = (raw or "").strip() if isinstance(raw, str) else None
         return pid if pid and _pp.get_profile(pid) is not None else None
 
-    _profile_p0 = _resolve_profile_id(data.get('profile_p0'))
-    _profile_p1 = _resolve_profile_id(data.get('profile_p1'))
+    new_profile_p0 = _resolve_profile_id(data.get('profile_p0'))
+    new_profile_p1 = _resolve_profile_id(data.get('profile_p1'))
+
+    # Log-Datei für dieses Spiel erstellen. Code-Review 2 Befund 15: gleiche
+    # Sekunde plus gleicher Seed ergab denselben Namen, `'w'` ueberschrieb das
+    # Log der vorigen Partie -- `'x'` legt nur neu an, sonst Zaehler-Suffix.
+    timestamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    new_ai_player = ai_player_req if ai_enabled else None
+    new_ai_sims = ai_sims_req if ai_enabled else _ai_sims
+    meta = {
+        "timestamp":    timestamp,
+        "seed":         seed,
+        "players":      names,
+        "first_player": first_player,
+        "ai_enabled":   ai_enabled,
+        "ai_player":    new_ai_player,
+        "ai_model":     new_ai_model or "heuristic",
+        "ai_sims":      new_ai_sims if ai_enabled else None,
+        "teacher_level":      teacher_level,
+        "teacher_sims":       teacher_sims if teacher_level else None,
+        "teacher_coach_sims": teacher_coach_sims if teacher_level == 3 else None,
+        # 2026-09-10: Spec-Pfad und die wirksamen Knoepfe in den Kopf -- bis heute war aus
+        # keinem Log ablesbar, ob der Champion mit seiner Spec spielte (Vorfall: zwei Tage
+        # ohne, STATUS 2026-09-10). Werte aus os.environ, so wie die Engine sie liest.
+        "champion_spec": (str(_resolve_champion_spec(new_ai_model).relative_to(MODELS_DIR.parent))
+                          if (new_ai_model and _resolve_champion_spec(new_ai_model)) else None),
+        "knobs": {env_name: os.environ.get(env_name) for env_name in _SPEC_TO_ENV.values()},
+    }
+    try:
+        new_log_path = _create_unique_log(f"game_{timestamp}_seed{seed}", [
+            "# MOSAIC GAME LOG",
+            f"# {_json.dumps(meta, ensure_ascii=False)}",
+            f"# {'='*60}",
+        ])
+    except OSError as e:
+        return jsonify(err(f"Spiel-Log konnte nicht angelegt werden: {e}"))
+
+    # Ab hier kann nichts mehr scheitern: globale Umstellung in einem Zug.
+    _rust, _rust_logged, _game_log_path = new_rust, 0, new_log_path
+    _ai_debug_history = []
+    _ai_player, _ai_model = new_ai_player, new_ai_model
+    _ai_sims = new_ai_sims
+    _profile_p0, _profile_p1 = new_profile_p0, new_profile_p1
     _game_rated = False
     _hints_used_this_game = False
-
-    # Lehrer-Modus (Task #97): 0=aus (Default -- Bestandsverhalten unverändert),
-    # 1=Kandidaten, 2=+Bewertungen, 3=+Coach-Feedback. Pro Partie zurückgesetzt.
-    try:
-        teacher_level = int(data.get('teacher_level', 0) or 0)
-    except (TypeError, ValueError):
-        teacher_level = 0
-    if teacher_level not in (0, 1, 2, 3):
-        teacher_level = 0
+    _tiling_ended.clear()
     _teacher_level      = teacher_level
     # Befund 22: gedeckelt oben (MAX_REQUEST_SIMS, Begruendung dort).
     _teacher_sims       = teacher_sims
@@ -746,71 +946,6 @@ def new_game():
     # Debug-Seite erreichbar, nicht Teil der Partie-UI.
     if teacher_level == 3 and ai_enabled:
         _hints_used_this_game = True
-
-    import random as _random
-    first_player = _random.randint(0, 1) if first_player_req is None else first_player_req
-    if seed is None:
-        seed = _random.randint(0, 999999)
-
-    if _mr is None:
-        return jsonify(err("Rust-Engine (mosaic_rust) ist nicht installiert. "
-                           "Bitte im engine/-Verzeichnis `maturin build --release` ausführen "
-                           "und das Wheel installieren."))
-    _rust = _mr.PyGame((names[0], names[1]), first_player=first_player, seed=seed)
-    _rust_logged = 0
-    seed = _rust.seed()
-
-    model_warning = None
-    if ai_enabled:
-        # `preset`, `ai_player_req` und `ai_sims_req` sind oben geprueft.
-        _ai_player = ai_player_req
-        _ai_sims   = ai_sims_req
-        requested_model = preset.get('model')
-        model_path = _resolve_model_path(requested_model)
-        if model_path is not None:
-            try:
-                _rust.load_net(str(model_path))
-                _ai_model = requested_model
-            except Exception as e:
-                model_warning = f"Netz '{requested_model}' konnte nicht geladen werden ({e}) - spiele gegen Heuristik."
-                _ai_model = None
-        else:
-            if requested_model and requested_model.strip().lower() not in ("", "heuristic", "heuristik"):
-                model_warning = (f"Modell '{requested_model}' nicht gefunden "
-                                 f"(weder models/alphazero_{requested_model}.onnx noch "
-                                 f"models/frozen_champions/{requested_model}/model.onnx) "
-                                 f"- spiele gegen Heuristik.")
-            _ai_model = None
-    else:
-        _ai_player = None
-        _ai_model = None
-
-    # Log-Datei für dieses Spiel erstellen
-    timestamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    _game_log_path = LOG_DIR / f"game_{timestamp}_seed{seed}.log"
-    with open(_game_log_path, 'w', encoding='utf-8') as lf:
-        meta = {
-            "timestamp":    timestamp,
-            "seed":         seed,
-            "players":      names,
-            "first_player": first_player,
-            "ai_enabled":   ai_enabled,
-            "ai_player":    _ai_player,
-            "ai_model":     _ai_model or "heuristic",
-            "ai_sims":      _ai_sims if ai_enabled else None,
-            "teacher_level":      _teacher_level,
-            "teacher_sims":       _teacher_sims if _teacher_level else None,
-            "teacher_coach_sims": _teacher_coach_sims if _teacher_level == 3 else None,
-            # 2026-09-10: Spec-Pfad und die wirksamen Knoepfe in den Kopf -- bis heute war aus
-            # keinem Log ablesbar, ob der Champion mit seiner Spec spielte (Vorfall: zwei Tage
-            # ohne, STATUS 2026-09-10). Werte aus os.environ, so wie die Engine sie liest.
-            "champion_spec": (str(_resolve_champion_spec(_ai_model).relative_to(MODELS_DIR.parent))
-                              if (_ai_model and _resolve_champion_spec(_ai_model)) else None),
-            "knobs": {env_name: os.environ.get(env_name) for env_name in _SPEC_TO_ENV.values()},
-        }
-        lf.write("# MOSAIC GAME LOG\n")
-        lf.write(f"# {_json.dumps(meta, ensure_ascii=False)}\n")
-        lf.write(f"# {'='*60}\n")
 
     response = ok()
     response['ai_enabled']  = ai_enabled
@@ -845,6 +980,7 @@ def new_game():
 
 
 @app.route('/api/debug/replay_log', methods=['POST'])
+@_with_ai_lock
 def debug_replay_log():
     """DEBUG-Werkzeug: setzt den Server auf die Stellung einer GELOGGTEN Partie.
 
@@ -868,15 +1004,24 @@ def debug_replay_log():
 
     if _mr is None:
         return jsonify(err("Rust-Engine (mosaic_rust) ist nicht installiert."))
-    data = request.get_json(silent=True) or {}
-    log_name = (data.get('log') or "").strip()
+    data = _json_body()
+    log_name = data.get('log') or ""
+    if not isinstance(log_name, str):
+        return jsonify(err("Parameter 'log' muss ein Dateiname sein."))
+    log_name = log_name.strip()
     if not log_name or "/" in log_name or "\\" in log_name:
         return jsonify(err("Parameter 'log' fehlt oder ist kein einfacher Dateiname."))
     log_path = LOG_DIR / log_name
     if not log_path.is_file():
         return jsonify(err(f"Logdatei '{log_name}' nicht gefunden."))
-    limit = data.get('limit')
-    limit = int(limit) if limit is not None else None
+    # Code-Review 2 Befund 12: `limit="abc"` war ein 500er ausserhalb jedes try.
+    try:
+        limit = data.get('limit')
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError, OverflowError):
+        return jsonify(err("Parameter 'limit' muss eine ganze Zahl sein."))
+    if limit is not None and limit < 0:
+        return jsonify(err("Parameter 'limit' darf nicht negativ sein."))
 
     import sys as _sys
     tools_dir = str(APP_DIR / "tools")
@@ -892,37 +1037,56 @@ def debug_replay_log():
     if divergence:
         return jsonify(err(f"Replay divergiert: {divergence}"))
 
-    header = rep.header
-    _rust = rep.g
-    _ai_debug_history = []
-    _ai_player = header.get('ai_player')
+    # Code-Review 2 Befund 13: alles erst LOKAL pruefen und aufbauen (Kopf,
+    # Netz, Logdatei), die globalen Zustaende erst danach in einem Zug
+    # umstellen. Vorher war `_rust` schon ersetzt, wenn das Netz scheiterte;
+    # ein Modell, das es nicht mehr gibt, liess die Partie still ohne Netz
+    # weiterlaufen ("Kein Netz geladen" beim ersten KI-Zug), und ein
+    # editierter Kopf (`ai_player: "1"`) fuehrte spaeter zu einem 500er.
+    header = rep.header if isinstance(rep.header, dict) else {}
+    new_rust = rep.g
+    ai_player_raw = header.get('ai_player')
+    if ai_player_raw is not None and (isinstance(ai_player_raw, bool) or ai_player_raw not in (0, 1)):
+        return jsonify(err(f"Log-Kopf: ai_player muss 0, 1 oder null sein (war {ai_player_raw!r})."))
     # Befund 22: auch aus dem Log-Kopf nur gedeckelt (MAX_REQUEST_SIMS).
     try:
-        _ai_sims = _capped_sims(header.get('ai_sims') or 100, "ai_sims")
-    except ValueError:
-        _ai_sims = 100
-    _ai_model = header.get('ai_model') if header.get('ai_model') != "heuristic" else None
-    if _ai_model:
-        model_path = _resolve_model_path(_ai_model)
-        if model_path is not None:
-            try:
-                _rust.load_net(str(model_path))
-            except Exception as e:
-                return jsonify(err(f"Netz '{_ai_model}' nicht ladbar: {e}"))
+        new_ai_sims = _capped_sims(header.get('ai_sims') or 100, "ai_sims")
+    except (ValueError, OverflowError):
+        new_ai_sims = 100
+    model_raw = header.get('ai_model')
+    if model_raw is not None and not isinstance(model_raw, str):
+        return jsonify(err(f"Log-Kopf: ai_model muss Text sein (war {model_raw!r})."))
+    new_ai_model = model_raw if model_raw and model_raw != "heuristic" else None
+    if new_ai_model:
+        model_path = _resolve_model_path(new_ai_model)
+        if model_path is None:
+            return jsonify(err(f"Netz '{new_ai_model}' aus dem Log-Kopf nicht gefunden."))
+        try:
+            new_rust.load_net(str(model_path))
+        except Exception as e:
+            return jsonify(err(f"Netz '{new_ai_model}' nicht ladbar: {e}"))
+
+    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    try:
+        new_log_path = _create_unique_log(f"game_{stamp}_replay_{log_path.stem}", [
+            "# MOSAIC GAME LOG (nachgestellte Stellung, /api/debug/replay_log)",
+            f"# {_json.dumps({'quelle': log_name, 'bis_zeile': li, 'seed': rep.seed}, ensure_ascii=False)}",
+            f"# {'='*60}",
+        ])
+    except OSError as e:
+        return jsonify(err(f"Spiel-Log konnte nicht angelegt werden: {e}"))
+
+    _rust, _game_log_path = new_rust, new_log_path
+    # Alles bis hierher steht schon im Quell-Log -- nur NEUE Zeilen mitschreiben.
+    _rust_logged = _rust.log_len()
+    _ai_debug_history = []
+    _ai_player, _ai_sims, _ai_model = ai_player_raw, new_ai_sims, new_ai_model
     _teacher_level, _teacher_sims, _teacher_coach_sims = 0, 800, 400
     _teacher_history, _teacher_cache = [], {"key": None, "analysis": None}
     _profile_p0 = _profile_p1 = None
     # Nachgestellte Stellung: nie werten, und Hilfen gelten als benutzt.
     _game_rated, _hints_used_this_game = True, True
-
-    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    _game_log_path = LOG_DIR / f"game_{stamp}_replay_{log_path.stem}.log"
-    with open(_game_log_path, 'w', encoding='utf-8') as lf:
-        lf.write("# MOSAIC GAME LOG (nachgestellte Stellung, /api/debug/replay_log)\n")
-        lf.write(f"# {_json.dumps({'quelle': log_name, 'bis_zeile': li, 'seed': rep.seed}, ensure_ascii=False)}\n")
-        lf.write(f"# {'='*60}\n")
-    # Alles bis hierher steht schon im Quell-Log -- nur NEUE Zeilen mitschreiben.
-    _rust_logged = _rust.log_len()
+    _tiling_ended.clear()
 
     response = ok()
     response.update({
@@ -963,7 +1127,7 @@ def list_profiles():
 @app.route('/api/profiles', methods=['POST'])
 def create_profile():
     """Legt ein neues Spielerprofil an (Start-Rating 1000)."""
-    data = request.get_json(silent=True) or {}
+    data = _json_body()
     try:
         profile = _pp.create_profile(data.get('name', ''))
         return jsonify({"ok": True, "profile": profile})
@@ -1008,7 +1172,9 @@ def move_stone():
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
-    d = request.get_json()
+    if (e := _human_turn_guard()) is not None:
+        return e
+    d = _json_body()
     try:
         raw = d.get('factory_id')
         fid = int(raw) if raw is not None else None
@@ -1036,7 +1202,9 @@ def move_dome():
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
-    d = request.get_json()
+    if (e := _human_turn_guard()) is not None:
+        return e
+    d = _json_body()
     try:
         tile_id, slot_row, slot_col = int(d['tile_id']), int(d['slot_row']), int(d['slot_col'])
         if _slot_out_of_range(slot_row, slot_col):
@@ -1065,6 +1233,8 @@ def move_dome_stack_peek():
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
+    if (e := _human_turn_guard()) is not None:
+        return e
     try:
         pre_analysis = _teacher_pre_move_snapshot()
         typ = _rust.apply_dome_stack_peek()
@@ -1088,7 +1258,9 @@ def move_dome_stack_choose():
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
-    d = request.get_json()
+    if (e := _human_turn_guard()) is not None:
+        return e
+    d = _json_body()
     try:
         return_order = d.get('return_order')
         if return_order is not None:
@@ -1119,7 +1291,9 @@ def move_bonus_chip():
         return e
     if not _both_start_placed():
         return jsonify(err("Startkacheln fehlen."))
-    d = request.get_json()
+    if (e := _human_turn_guard()) is not None:
+        return e
+    d = _json_body()
     try:
         factory_id = int(d['factory_id'])
         pre_analysis = _teacher_pre_move_snapshot()
@@ -1139,12 +1313,21 @@ def move_bonus_chip():
 def move_start_tile():
     if (e := _require_game()) is not None:
         return e
-    d = request.json
+    d = _json_body()
     try:
         slot_row, slot_col = int(d['slot_row']), int(d['slot_col'])
         if _slot_out_of_range(slot_row, slot_col):
             return jsonify(err(f"Ungültiger Slot ({slot_row},{slot_col})."))
-        _rust.apply_start_tile(int(d['player']), int(d['tile_id']),
+        # Code-Review 2 Befund 9: nur der Spieler, dessen Startplatte ansteht
+        # (`start_tile_pending`, wie `ai_start_tile`), und im KI-Spiel nie die KI.
+        player = int(d['player'])
+        vm = _rust_state().get("valid_moves", [])
+        pending = vm[0].get("player") if vm and vm[0].get("type") == "start_tile_pending" else None
+        if pending is None or player != pending:
+            return jsonify(err(f"Startplatte: Spieler {player} ist nicht dran."))
+        if _ai_player is not None and player == _ai_player:
+            return jsonify(err("Die KI legt ihre Startplatte selbst."))
+        _rust.apply_start_tile(player, int(d['tile_id']),
                                slot_row, slot_col,
                                int(d.get('rotation', 0)))
         _flush_game_log()
@@ -1161,6 +1344,8 @@ def move_pass():
         return jsonify(err("Startkacheln fehlen."))
     if _rust.phase() != "drafting":
         return jsonify(err("Passen nur in Phase 1 möglich."))
+    if (e := _human_turn_guard()) is not None:
+        return e
     real_moves = [m for m in _rust_state().get("valid_moves", []) if m.get("type") != "pass"]
     if real_moves:
         return jsonify(err("Passen nicht erlaubt - es gibt noch gültige Aktionen."))
@@ -1178,12 +1363,15 @@ def tiling():
         return e
     if _rust.phase() != "tiling":
         return jsonify(err("Nicht in der Tiling-Phase"))
-    d = request.get_json()
+    d = _json_body()
+    pi, e = _tiling_player(d)
+    if e is not None:
+        return e
     try:
         slot_row, slot_col = int(d['slot_row']), int(d['slot_col'])
         if _slot_out_of_range(slot_row, slot_col):
             return jsonify(err(f"Ungültiger Slot ({slot_row},{slot_col})."))
-        _rust.apply_tiling(int(d['player']), int(d['pattern_row']),
+        _rust.apply_tiling(pi, int(d['pattern_row']),
                            slot_row, slot_col,
                            int(d['space_index']))
         _flush_game_log()
@@ -1198,8 +1386,25 @@ def tiling_bonus_chips():
         return e
     if _rust.phase() != "tiling":
         return jsonify(err("Nicht in der Tiling-Phase"))
-    d = request.get_json()
-    pi, row = int(d['player']), int(d['pattern_row'])
+    d = _json_body()
+    pi, e = _tiling_player(d)
+    if e is not None:
+        return e
+    # Code-Review 2 Befund 11: Rumpf und Reihe wurden ausserhalb jedes try
+    # gelesen (`null`, fehlendes Feld oder `chip_uses` als Text: 500er).
+    try:
+        row = int(d['pattern_row'])
+        groups = d.get('chip_uses') or []
+        if not isinstance(groups, list) or not all(isinstance(g, dict) for g in groups):
+            return jsonify(err("chip_uses muss eine Liste von Gruppen sein."))
+        chip_ids = []
+        for g in groups:
+            ids = g.get('chip_ids') or []
+            if not isinstance(ids, list):
+                return jsonify(err("chip_ids muss eine Liste sein."))
+            chip_ids.extend(int(cid) for cid in ids)
+    except (KeyError, TypeError, ValueError, OverflowError) as ex:
+        return jsonify(err(f"Ungültige Eingabe: {ex}"))
     # Das Chip-Modal laesst den Spieler GENAU auswaehlen, welche Plaettchen er
     # ausgibt (`chip_uses` = Gruppen mit `chip_ids`). Bis 2026-08-30 hat dieser
     # Endpunkt die Auswahl weggeworfen und `apply_tiling_chips` gerufen -- das
@@ -1209,8 +1414,6 @@ def tiling_bonus_chips():
     # Vollendung konnte dadurch unmoeglich werden. Seit der additiven Bindung
     # `apply_tiling_chips_with` (py.rs) wird die Auswahl respektiert; die
     # Regelpruefung bleibt in der Engine.
-    groups = d.get('chip_uses') or []
-    chip_ids = [int(cid) for g in groups for cid in (g.get('chip_ids') or [])]
     try:
         if chip_ids:
             # chip_id -> Position in der Hand; die Serialisierung gibt
@@ -1240,9 +1443,12 @@ def tiling_bonus_chips():
 def tiling_move_to_floor():
     if (e := _require_game()) is not None:
         return e
-    d = request.get_json()
+    d = _json_body()
+    pi, e = _tiling_player(d)
+    if e is not None:
+        return e
     try:
-        _rust.move_row_to_floor(int(d['player']), int(d['pattern_row']))
+        _rust.move_row_to_floor(pi, int(d['pattern_row']))
         _flush_game_log()
         return jsonify(ok())
     except Exception as e:
@@ -1258,8 +1464,12 @@ def end_tiling():
     pi = (1 - _ai_player) if _ai_player is not None else _rust.current_player()
     if _rust.pending_tiling_count(pi):
         return jsonify(err("Du hast noch platzierbare Reihen. Bitte lege sie zuerst an die Kuppel!"))
+    round_before = _rust_state().get('round')
     try:
         _rust.end_tiling(pi)
+        # Befund 10: Runde VOR dem Aufruf merken -- beendet die zweite Seite
+        # das Tiling, springt die Engine schon in die naechste Runde.
+        _tiling_ended.add((round_before, pi))
         _flush_game_log()
         return jsonify(ok())
     except Exception as e:
@@ -1280,7 +1490,7 @@ def get_scoring_tiles():
 def select_scoring_tiles():
     if (e := _require_game()) is not None:
         return e
-    d = request.get_json()
+    d = _json_body()
     try:
         _rust.select_scoring([int(i) for i in d.get('ids', [])])
         _flush_game_log()
@@ -1625,7 +1835,7 @@ def set_aggression():
     500ers liefert."""
     if _mr is None or not hasattr(_mr, 'set_aggression_params'):
         return jsonify(err(_AGGRESSION_UNAVAILABLE_MSG)), 503
-    d = request.get_json(silent=True) or {}
+    d = _json_body()
     try:
         w = float(d.get('w', 0.0))
         lambda_aggr = float(d.get('lambda_aggr', 0.0))
@@ -1636,28 +1846,6 @@ def set_aggression():
     _mr.set_aggression_params(w, lambda_aggr)
     actual_w, actual_lambda_aggr = _mr.get_aggression_params()
     return jsonify({"ok": True, "w": actual_w, "lambda_aggr": actual_lambda_aggr})
-
-
-def _with_ai_lock(fn):
-    """Code-Review 2026-09-26 Befund 22: `_ai_lock` war definiert, aber nie
-    benutzt. Jetzt umschliesst es jeden KI-ZUG (Pruefung "ist die KI dran?"
-    UND Ausfuehrung in einem Stueck), damit zwei ueberlappende Anfragen nicht
-    beide den Zugspieler-Check bestehen und zwei Zuege setzen. Nicht
-    blockierend: eine zweite Anfrage bekommt sofort eine Fehlermeldung statt
-    hinter einer langen Suche zu warten. Die GUI fragt ohnehin seriell
-    (`static/js/app.js` `triggerAIMove`: `AI_THINKING`-Sperre, `await` je
-    Schritt) und trifft das nie."""
-    import functools
-
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not _ai_lock.acquire(blocking=False):
-            return jsonify(err("Die KI berechnet bereits einen Zug."))
-        try:
-            return fn(*args, **kwargs)
-        finally:
-            _ai_lock.release()
-    return wrapper
 
 
 @app.route('/api/ai/move', methods=['GET', 'POST'])
@@ -1855,7 +2043,7 @@ def teacher_config():
 def teacher_config_set():
     """Setzt Lehrer-Stufe/Sims während des Spiels (analog /api/ai/config)."""
     global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_cache
-    d = request.get_json(silent=True) or {}
+    d = _json_body()
     # Befund 22 (Code-Review 2026-09-26): Sims gedeckelt wie in /api/new_game
     # (eine Nicht-Zahl war vorher ein unbehandelter 500er) -- und alles erst
     # pruefen, dann setzen, damit ein Fehler nichts halb uebernimmt.
@@ -1867,7 +2055,7 @@ def teacher_config_set():
     if 'level' in d:
         try:
             lvl = int(d['level'])
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return jsonify(err("teacher_level muss 0-3 sein."))
         if lvl not in (0, 1, 2, 3):
             return jsonify(err("teacher_level muss 0-3 sein."))

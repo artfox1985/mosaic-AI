@@ -29,9 +29,11 @@ eigenes profiles/-Verzeichnis fuer eine einzige Datei.
 """
 from __future__ import annotations
 
+import functools
 import json
 import math
 import os
+import threading
 import uuid
 from datetime import datetime as _dt
 from pathlib import Path
@@ -331,12 +333,38 @@ def list_profiles() -> list[dict]:
     ]
 
 
+# Code-Review 2 (2026-10-02) Befund 15: jede schreibende Funktion ist ein
+# Lesen-Aendern-Schreiben ueber die ganze Datei. Der Flask-Server bedient
+# Anfragen in Threads; zwei gleichzeitige Schreiber haetten je den alten Stand
+# gelesen, und der zweite Save haette den ersten still ueberschrieben. Eine
+# Sperre je Prozess genuegt (der Server ist ein Prozess; Zweitinstanzen
+# schreiben laut Isolationsregel oben in eine eigene Datei).
+_write_lock = threading.RLock()
+
+
+def _locked(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with _write_lock:
+            return fn(*args, **kwargs)
+    return wrapper
+
+
+@_locked
 def create_profile(name: str) -> dict:
-    name = (name or "").strip()
+    # Code-Review 2 Befunde 12/14: ein Nicht-String lief in `.strip()` (500er),
+    # ein Zeilenumbruch im Namen zerlegt spaeter die Zeilen des Spiel-Logs.
+    if name is None:
+        name = ""
+    if not isinstance(name, str):
+        raise ValueError("Name muss ein Text sein.")
+    name = name.strip()
     if not name:
         raise ValueError("Name darf nicht leer sein.")
     if len(name) > 40:
         raise ValueError("Name zu lang (max. 40 Zeichen).")
+    if any(ch.isspace() and ch != " " or not ch.isprintable() for ch in name):
+        raise ValueError("Name darf keine Zeilenumbrueche oder Steuerzeichen enthalten.")
     data = _load_profiles_raw()
     pid = uuid.uuid4().hex[:12]
     profile = {
@@ -356,6 +384,7 @@ def get_profile(pid: str) -> dict | None:
     return _load_profiles_raw()["profiles"].get(pid)
 
 
+@_locked
 def apply_result(pid: str, opponent_label: str, opponent_rating: float,
                   opponent_is_estimate: bool, result: float,
                   hints_used: bool, seed=None, log=None) -> dict:
@@ -427,6 +456,7 @@ UNRATED_HINTS = "hints"
 UNRATED_NO_DIRECT_ANCHOR = "no_direct_anchor"
 
 
+@_locked
 def record_unrated(pid: str, opponent_label: str, opponent_rating: float | None,
                     opponent_is_estimate: bool, result: float, seed=None, log=None,
                     reason: str = UNRATED_HINTS) -> dict:
