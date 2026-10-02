@@ -404,3 +404,11 @@ gegenseitig haerteres Spiel, kein schwaecheres; Kopf an Kopf holt die @400-Seite
 weniger Strafleiste. Offen fuer die kleinste gesunde Stufe: das A/B 400 gegen 200 (Knick, par.6e) und
 die Kostenzahl aus einem exklusiven Kostentor (die s je Partie oben sind gepaarte, gebremste Werte).
 Gilt ab der naechsten Erzeugung (v35).
+
+**REGISTRIERT 2026-10-02 VOR dem Start (Fortsetzung par.6f):** (1) **Kostentor exklusiv**: Erzeugungs-Spec
+mit R5-Sims 100/200/400, je 100 Partien, Seed 20261698, 11 Threads, Generator `v34-b01`, kein GPU-Training
+daneben, Ausgabe `data/probe_r5cost`, Artefakt `evaluations/artifacts/r5_cost_gate_v34-b01.json`;
+nebenbei Determinismus-Gegenprobe: gleicher Seed und gleiche Spec wie die Leiter par.6e, die
+Endstaende je Partie werden verglichen und Abweichungen gemeldet (die Leiter lief neben Training). (2) **A/B 400 gegen 200** am Erzeugungspunkt (Instrument 2 am Knick, par.5b), Seeds
+20261682/83, Aufbau wie 2E-b. Leseregel par.5b: z >= +1,96 -> 400; z <= -1,96 -> 200; dazwischen ->
+die billigere Stufe nach dem Kostentor.

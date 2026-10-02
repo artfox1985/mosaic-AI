@@ -382,3 +382,49 @@ die Punkte BEIDER Seiten (Sim-Leiter, 400 gegen 100 rund -4,5 je Seite). Faehrt 
 Sims, ist Tor 2a v35 gegen v34 wieder NICHT gleich bedingt (Netz @400 gegen Netz @100); der Satz
 "ab der naechsten Generation wieder gleich bedingt" gilt dann erst ab v36. Ob Netz @100 Kopf an Kopf
 gegen den Loeser verliert, bleibt ungemessen.
+
+## par.10 ARME E2 UND E4: TRAINING UND NETZ-GESUNDHEIT (2026-10-02)
+
+Beide Arme mit Fenster, Split, Seed und Rezept von `v34-b01` (Ketten `tools/v34_e2_arm.sh`,
+`tools/v34_e4_arm.sh`); Val-Menge identisch (147 Dateien, `cmp` in der Kette). E2: Manifest-Diff gegen
+v34-b01 nur `cache_file`, `margin_thresholds`, `margin_threshold_weight`, `name`. Trainingsdauer 3.411,9 s
+(E2) und 3.045,7 s (E4), je 12 Epochen.
+
+**Gegatetes Netz, aus dem Log bestimmt (Code-Review 2 #1, `train.py:2879-2881`):** E2 schreibt KEIN
+`_brierbest` (Brier-Minimum in Epoche 1 = `best_epoch`), gegatet wird `v34-b02_best`; E4 schreibt
+`_brierbest` (Epoche 3), gegatet wird `v34-b03_brierbest`.
+
+| Arm | Val-Brier bestes (Epoche) | Epoche 12 | Verlauf |
+| --- | --- | --- | --- |
+| v34-b01 Grundarm | 0,18527 (4) | 0,18545 | flach |
+| v34-b02 E2 | 0,18546 (1) | 0,18613 | steigt ab Epoche 1 |
+| v34-b03 E4 | 0,18501 (3) | 0,18532 | durchgehend unter dem Grundarm |
+
+Unterschiede unter der Aufloesung der Offline-Metrik (Bezug `project_offline_metric_resolution_limit`);
+E2 traegt im gegateten Netz nur eine Epoche Schwellen-Training (Auswahlregel `--select-by-brier`, vorab
+registriert), der A/B misst also eine schwache E2-Dosis.
+
+**Netz-Gesundheit gegen den Warmstart `v33-b01_brierbest`** (Gewichte, kein Datensatz): keine NaN/Inf
+in allen vier Staenden; BN-Gamma mit |g| < 1e-3 in keiner der vier BN-Schichten (0 Einheiten, als
+Ersatzgroesse fuer tote Einheiten, Aktivierungen NICHT gemessen). Relative Gewichtsaenderung zum
+Warmstart: b01 3,96-15,62 %, b02 1,45-13,60 % (nur eine Epoche), b03 3,25-12,78 % je Schicht; Normen
+aller drei innerhalb 1 % voneinander, auffaellig nur `value_head.2` bei E2 (+13,60 %, die Schwellen
+teilen den WDL-Logit). **Ankopplung der 48 E4-Spalten** (`flat_branch.0.weight`, Spaltennorm, n = 48
+gegen 888): neu median 0,262 (min 0,127, max 0,723), alt median 2,366 (p10 1,004); gestartet bei 0
+(Warmstart null-initialisiert), nach 3 Epochen also angekoppelt, rund ein Neuntel der Altspalten,
+keine Spalte tot oder dominant. Verdikt: beide Arme gesund, weiter zum A/B gegen `v34-b01`.
+
+### par.10a A/B der Arme gegen v34-b01, REGISTRIERT 2026-10-02 VOR dem Start
+
+A = Arm (E2 `v34-b02_best`, E4 `v34-b03_brierbest`), B = `v34-b01_brierbest`, beide Seiten mit
+`models/v33_gating_r5net.spec.json` (Startkuppel-Suche, Runde 5 per Netz, so wie v34-b01 die
+Promotions-Kante gefahren hat, par.2a). 400 Sims, je 200 Paare, Blockgroesse 5, fester Umfang (SPRT
+1e-12), `--log-games`, 10 Threads. **Seeds:** E2 20261684/85, E4 20261686/87 (20261682-89 am
+2026-10-01 frei geprueft; 20261682/83 gehen an das R5-A/B 400 gegen 200). **Leseregel wie Tor 1
+(par.2):** Arm traegt bei gepooltem Block-z >= +1,96 oder gepoolt >= 52,5 % ohne Gegenbefund;
+Stufenregel: loest GENAU EINER der beiden Seeds einzeln z >= +1,96 aus, laeuft der dritte Seed
+(E2 20261688, E4 20261689). **Folge:** traegt ein Arm, misst EINE Promotions-Kante den besseren der
+tragenden Arme gegen den Champion (Muster par.2a); traegt keiner, bleibt die Promotions-Kante von
+v34-b01 (par.2a) die einzige. Promotion nur auf Nutzer-Entscheid. Vor dem ersten A/B ein Probelauf
+E4 gegen v34-b01 (5 Paare, 50 Sims, eigener Ausgabepfad), weil ein Netz mit Eingabebreite 936 noch
+nie durch `paired_gating.py` lief.
