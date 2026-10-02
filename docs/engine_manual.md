@@ -200,6 +200,12 @@ which 3 enter the game), so at most one plate per pair can ever apply.
 | 7   | ⭐ Spezialfelder        | −3 pts per Spezialfeld left empty                                                                                   | 4        |
 | 8   | 🎨 Farbenreiche Reihen | 4 pts per horizontal row holding at least 5 different colours (Spezialfliesen count as no colour; gaps are allowed) | 1        |
 
+*Engine reading (user decision 2026-10-02):* the three plates are first summed
+into one final-scoring total, and that total is settled against the running
+score in a single step, so the floor of 0 applies once, after the sum. Example:
+score 2, plate 7 at −9, plate 5 at +10 → 2 + 1 = 3 (not 10, which settling
+plate 7 first would give).
+
 The highest total after final scoring wins. A tie goes to the player holding
 the Startspielerstein – that is, whoever took it in round 5, and as noted in
 Phase 1, someone always does.
