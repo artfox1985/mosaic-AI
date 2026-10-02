@@ -375,3 +375,10 @@ vergleicht zwei Sockel mit VERSCHIEDENER Runde-5-Methode (v33 Loeser, Knotenbudg
 par.9a stellt dieselben beiden Methoden gegeneinander. **Ab der naechsten Generation** (beide Sockel
 mit Netz in Runde 5) ist Tor 2a wieder gleich bedingt; bis dahin taugt die v34-Zahl 0,921 als
 Bezug nur fuer Sockel mit derselben Runde-5-Methode.
+
+**NACHTRAG 2026-10-02 (`PREREG_r5_net_vs_solver.md` par.6e/par.6f):** am Erzeugungspunkt schlaegt das Netz
+mit 400 R5-Sims das Netz mit 100 Kopf an Kopf (464:336, z +7,56), und mehr R5-Suche senkt im Self-Play
+die Punkte BEIDER Seiten (Sim-Leiter, 400 gegen 100 rund -4,5 je Seite). Faehrt v35 Runde 5 mit 400
+Sims, ist Tor 2a v35 gegen v34 wieder NICHT gleich bedingt (Netz @400 gegen Netz @100); der Satz
+"ab der naechsten Generation wieder gleich bedingt" gilt dann erst ab v36. Ob Netz @100 Kopf an Kopf
+gegen den Loeser verliert, bleibt ungemessen.

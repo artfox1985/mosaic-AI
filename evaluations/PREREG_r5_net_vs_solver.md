@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Stufe 1 ENTSCHIEDEN (par.6a): das Netz spielt Runde 5 besser, 495:305 = 61,9 %, gepoolt z +10,17. Der heutige Loeser ist eine Tiefensuche ohne Vertiefung (round5.rs:590-624); Stufe 2 (par.6d, 400 gegen 400): das Netz schlaegt auch den iterativen Loeser, 480:320, Block-z -7,32 fuer den Loeser; am Spielpunkt spielt das Netz Runde 5. Offen nur fuers Self-Play: 2E und Sim-Leiter 2S (par.5b), nach der Wheel-Runde. -->
+<!-- STATUS: OFFEN | Frage: Spielt das Netz Runde 5 besser als der Expectiminimax-Loeser (200 Knoten, statischer Endwert am Blatt) -- und traegt danach ein besserer Loeser? | Beleg: Das Netz spielt Runde 5 an beiden Betriebspunkten: Spiel (par.6d, gegen iterativen Loeser 480:320, z -7,32 fuer den Loeser) und Erzeugung (par.6f, 2E z -9,74); in der Erzeugung mit 400 statt 100 R5-Sims (2E-b 464:336, z +7,56). Offen: A/B 400 gegen 200 (Knick der Sim-Leiter par.6e) und exklusives Kostentor. -->
 
 # Vorregistrierung: Runde 5 -- Netz gegen Loeser
 
@@ -324,8 +324,9 @@ Seed 20261672: alle 400 Partien vollstaendig (`floor_per_round` mit 5 Eintraegen
 also kein Abschnitt durch das 180-s-Limit trotz Nebenlast. Seed 20261673 ebenso: 400 von 400 vollstaendig, Schritte Median 200.
 
 **Verdikt nach par.5a/par.5b: z <= -1,96 -> das Netz spielt Runde 5 am Spielpunkt** (Champion/GUI, 400
-Sims). Der iterative Loeser mit gleichem Budget verliert deutlicher als der alte Loeser in Stufe 1
-gegen das Netz (dort 305:495 = 38,1 %, hier 40,0 %; verschiedene Budgets, nicht direkt vergleichbar).
+Sims). KORRIGIERT 2026-10-02: der iterative Loeser @400 verliert etwas WENIGER deutlich als der alte Loeser @200 in Stufe 1
+gegen das Netz (hier 320:480 = 40,0 %, dort 305:495 = 38,1 %; verschiedene Budgets und Seeds, nicht direkt
+vergleichbar; der fruehere Satz an dieser Stelle hatte die Richtung verdreht).
 Die Kostenfrage stellt sich am Spielpunkt nach der Leseregel nicht. Offen fuer das Self-Play: 2E und
 die Sim-Leiter 2S (par.5b), beide nach der Wheel-Runde.
 
@@ -339,3 +340,67 @@ Staerkeaussage: Kopf an Kopf bei 400 Sims gewann das Netz (par.6a). Ob das Netz 
 an Kopf gegen den Loeser besteht, ist UNGEMESSEN; die v34-Erzeugung spielte Runde 5 mit 100 Sims
 per Netz (Nutzer-Entscheid 2026-10-01), und ihr Tor 2a ist gerissen (`PREREG_v34_window.md` par.9).
 
+
+### par.6e Stufe 2S, Instrument 1: Sim-Leiter am Erzeugungspunkt (2026-10-02 08:39-09:03, `tools/r5_selfplay_series.sh`)
+
+Generator `v34-b01_brierbest`, Erzeugungs-Spec plus `r5_net_solver` 0 und `r5_net_sims` N
+(`models/v34_gen_r5net_sims{100,200,400,800}.spec.json`), 100 Sims ausserhalb Runde 5, E1 an, Seed
+20261698, je Stufe 100 Partien, 11 Threads. Lief NEBEN dem GPU-Training v34-b02 (Laufzeit gebremst
+markiert). Artefakt `evaluations/artifacts/r5_sims_ladder_v34-b01.json`. **Grundmenge:** 100 gepaarte
+Partien je Vergleich, in 100 von 100 bis zum ersten Runde-5-Record identisch; Einheit je Partie,
+beide Seiten summiert (je Seite = Haelfte). Vorzeichen: hoehere Stufe minus niedrigere.
+
+| Vergleich | Punkte je Partie [KI95], z | groesste Strafleiste R5, z | volle Spalten, z | volle Reihen, z |
+| --- | --- | --- | --- | --- |
+| 200 gegen 100 | -2,63 [-4,97; -0,29], z -2,20 | +0,30, z +1,32 | -0,06, z -0,97 | -0,05, z -1,68 |
+| 400 gegen 200 | -6,30 [-8,78; -3,82], z -4,98 | +0,43, z +1,90 | -0,12, z -1,71 | +0,02, z +0,53 |
+| 800 gegen 400 | -0,15 [-2,60; +2,30], z -0,12 | -0,15, z -0,71 | -0,05, z -0,76 | -0,02, z -0,71 |
+
+| R5-Sims | 100 | 200 | 400 | 800 |
+| --- | --- | --- | --- | --- |
+| s je Partie (100 Partien, 11 Threads, neben Training) | 2,94 | 3,01 | 3,44 | 4,19 |
+
+**Befund:** mehr Suche in Runde 5 senkt im Self-Play die Punkte BEIDER Seiten (100 -> 400 zusammen
+-8,93 je Partie, rund -4,5 je Seite) und hebt die Strafleiste in Runde 5 tendenziell; ab 400 flach
+(800 gegen 400 ueberall |z| < 1). Das ist dieselbe Richtung wie par.6c (Netz @100 gegen Loeser im
+Self-Play: -3,54 Punkte je Seite).
+
+**Lesart nach der Leseregel par.5b:** keine Stufe ist gegen die naechsthoehere bei Punkten,
+Strafleiste oder vollen Spalten mit |z| >= 1,96 SCHLECHTER (die niedrigere Stufe hat jeweils mehr
+Punkte und weniger Strafleiste); nach Instrument 1 allein waere 100 "gesund". **Einschraenkung,
+HERLEITUNG:** im symmetrischen Self-Play spielen beide Seiten mit derselben Stufe; ein in Runde 5
+staerkerer Spieler kann dem Gegner Reste aufzwingen, und das senkt die Punkte beider Seiten, ohne
+dass jemand schlechter spielt. Instrument 1 trennt "schwaecher" nicht von "gegenseitig haerter"; die
+Staerkefrage beantwortet erst 2E-b (Netz @400 gegen @100 Kopf an Kopf). Der Knick liegt zwischen
+200 und 400 (z -4,98), Saettigung ab 400. Instrument 2 ist nach par.5b fuer die Stufen am Knick
+registriert, also neben 2E-b auch 400 gegen 200 (KORRIGIERT 2026-10-02 11:15: hier stand zuerst "nur auf
+Nutzer-Entscheid", das widersprach der Registrierung).
+
+### par.6f Stufen 2E und 2E-b am Erzeugungspunkt (2026-10-02 09:03-11:07, `tools/r5_selfplay_series.sh`)
+
+Generator `v34-b01_brierbest` beidseits, Erzeugungs-Spec (100 Sims ausserhalb Runde 5, E1 an), je
+200 Paare, fester Umfang, Blockgroesse 5, `--log-games`. Alle 1.600 Partien mit `completed` true.
+Lief NEBEN den GPU-Trainings v34-b02/b03 (Laufzeit gebremst markiert). **Nebenlast-Vermerk:** waehrend
+Seed 20261677 lief rund 10:00 ein `python`-Aufruf des Koordinators unter 1 s (Kopfzeilen-Ersatz in
+dieser Datei), gemeldet; Seed 20261677 allein und Seed 20261676 allein tragen das Verdikt je fuer sich.
+
+| Stufe | Seed | A : B | Block-z | Punkte A / B | Strafleiste A / B | s je Partie |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2E Loeser @400 Knoten : Netz R5 @400 | 20261676 | 158:242 | -6,57 | 54,50 / 58,41 | 7,81 / 6,52 | 5,23 |
+| | 20261677 | 144:256 | -7,29 | 56,02 / 61,02 | 7,67 / 6,23 | 5,15 |
+| | **gepoolt** | **302:498 = 37,8 %** | **-9,74** (80 Bloecke) | | | |
+| 2E-b Netz R5 @400 : Netz R5 @100 | 20261678 | 232:168 | +5,39 | 59,45 / 55,91 | 6,91 / 8,19 | 4,14 |
+| | 20261679 | 232:168 | +5,24 | 60,33 / 56,95 | 6,70 / 7,79 | 4,15 |
+| | **gepoolt** | **464:336 = 58,0 %** | **+7,56** (80 Bloecke) | | | |
+
+Punkte und Strafleiste je Seite und Partie (Strafleiste = Summe ueber die Partie, `avg_floor_*`).
+Spalten und Plattenpunkte je Kriterium stehen aus; sie kommen mit der Runde-5-Aufschluesselung aus den
+`--log-games`-Logs (par.6a, offen).
+
+**Verdikt nach par.5b:** am Erzeugungspunkt spielt das NETZ Runde 5 (2E, z -9,74 fuer den Loeser), und
+zwar mit **400 R5-Sims statt 100** (2E-b, z +7,56). Damit ist R5 @100 nicht "gesund" (verliert das A/B).
+Instrument 1 (par.6e) ist damit gelesen: die niedrigeren Self-Play-Punkte bei mehr R5-Suche sind
+gegenseitig haerteres Spiel, kein schwaecheres; Kopf an Kopf holt die @400-Seite MEHR Punkte und
+weniger Strafleiste. Offen fuer die kleinste gesunde Stufe: das A/B 400 gegen 200 (Knick, par.6e) und
+die Kostenzahl aus einem exklusiven Kostentor (die s je Partie oben sind gepaarte, gebremste Werte).
+Gilt ab der naechsten Erzeugung (v35).

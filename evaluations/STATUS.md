@@ -105,12 +105,35 @@ code review ein"*; Befunde `review/code_review_2026-09-26_verification.md`). Am 
   verstuemmelt (CLAUDE.md, Signatur "Endstand 3:1"). Anker-Invarianz danach Pflicht (der Anker-Lauf
   geht durch dieselbe Schleife).
 
+**Code-Review 2 EINGETAKTET** (Nutzer 2026-10-02: *"ja, so eintakten"*; Dokument "Code-Review
+mosaic-AI: Grenzfaelle" auf `2d49b24`, 22 Befunde, ✔ = vom Review-Autor am Code gelesen, ◐ =
+Agenten-Befund). #1 am Code nachgelesen (`train.py:2879-2881`: `_brierbest` nur, wenn die
+Brier-beste Epoche weder die letzte noch `best_epoch` ist). Reihenfolge:
+* **Sofort, ohne Bau:** bei den A/Bs von E2/E4 das gegatete Netz aus den Logzeilen ("Value-optimales
+  Modell", "Bestes Modell (Epoche ...)") bestimmen, nie aus dem Dateinamen raten (#1).
+* **Paket Messkette (#1 bis #5), Python, NACH der R5-Reihe** (die ruft `paired_gating.py` in 2E/2E-b;
+  laufende Laeufe lesen ihre Dateien neu): Kette waehlt das Netz aus dem Log statt aus dem
+  Dateinamen, `set -e` bzw. harte Stopps, `gating_block_z.py` ohne Division durch null,
+  `paired_gating.py` prueft `--block-size`/`--h1`, `train.py` faengt `n_batches == 0` ab; dazu #6
+  (Resume-Fingerabdruck) und #7 nach Pruefung.
+* **Paket Server (#8 bis #15, dazu #16 `json_to_state`):** Codearbeit fuer ein Messfenster; #16 ist
+  Engine und kommt in die naechste Wheel-Runde.
+* **Wheel-Runde:** #20 (Stufe-3-Arena in `tools/arena.py:531` noch mit 3600-s-Wanduhr, ohne
+  `completed`), #21 (Env-Parser), #22 (Engine-Raender). Fuer die laufende R5-Reihe geprueft: alle
+  vier Leiter-Specs setzen `r5_net_solver: 0` zusammen mit `r5_net_sims`, #22 trifft sie nicht.
+* **Nur nach Nutzer-Entscheid** (Anker oder Regeln): #17 (Loeser-Prognose ohne Untergrenze 0), #18,
+  #19; danach `/mosaic-anchor-invariance`. Die zwei Regelfragen des Reviews sind entschieden
+  (Kappung erst nach der Plattensumme, `docs/engine_manual.md` Abschnitt 6; Startspielerstein in
+  Runde 5: kein Befund).
+
 **R5-Reihe** (`PREREG_r5_net_vs_solver.md` par.5b, Nutzer 2026-10-01, 400 gegen 400): Stufe 2
-(Spielpunkt, iterativer Loeser @400 Knoten gegen Netz @400) LAEUFT seit 18:37 neben dem Training,
-`tools/r5_stage2_ab.sh`. Danach, nur fuer das SELF-PLAY: 2E (Loeser @400 gegen Netz mit R5-Sims 400
-bei sonst 100) und die Sim-Leiter 2S (R5-Sims 100/200/400/800, gepaarte Sonde plus A/B am Knick);
-beide brauchen das neue Spec-Feld "Sims nur in Runde 5" aus der Wheel-Runde. Kostenzahl je
-Methode aus einem eigenen Kostentor (Korrektur der Leseregel, eingetragen vor dem Verdikt).
+(Spielpunkt) ENTSCHIEDEN, das Netz schlaegt auch den iterativen Loeser @400 (320:480, Block-z -7,32
+fuer den Loeser, par.6d). Fuer das SELF-PLAY gelaufen 2026-10-02 08:39-11:07 (par.6e/par.6f, Generator
+`v34-b01`): das Netz spielt Runde 5 auch am Erzeugungspunkt (2E 302:498 fuer den Loeser, z -9,74), und
+zwar mit **400 statt 100 R5-Sims** (2E-b 464:336, z +7,56); die Sim-Leiter senkt mit mehr R5-Suche die
+Self-Play-Punkte beider Seiten (gegenseitig haerter, nicht schwaecher), Knick 200-400, ab 400 flach.
+Gilt ab v35. Offen: A/B 400 gegen 200 (Knick, registriert) und ein exklusives Kostentor je Stufe;
+Folge fuer Tor 2a v35 gegen v34 (wieder ungleich bedingt): `PREREG_v34_window.md` par.9a Nachtrag.
 
 **NACH dem v34-Training: asymmetrisches Self-Play** (Nutzer 2026-10-01: *"prinzipiell wuensch ich
 mir mehr asymetrisches self play um bewusst stellungen zu provozieren die nicht entstehen wenn du
