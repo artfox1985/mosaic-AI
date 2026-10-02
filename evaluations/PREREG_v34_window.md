@@ -113,6 +113,34 @@ wie `v34-b01`. **Einschraenkungen, vorab benannt:** der t = 0-Term addiert Gewic
 Ausgang (Vermengung mit einem Hard-Outcome-Effekt; Alternative: nur die vier Schwellen ungleich 0,
 Nutzer-Entscheid offen); der Vortest lief auf Drafting R1-4, der Arm greift auf alle Records mit
 bekanntem Ausgang.
+**NUTZER-ENTSCHEID 2026-10-02 VOR dem Training:** *"ohne die 0, wie im urspruenglichen Vorschlag"* --
+Schwellen **t in {-10, -5, +5, +10}** (Recherche-Bericht `RESEARCH_evaluator_architecture_external_2026-09-25.md`
+E2 nannte genau diese vier; die 0 kam erst mit dem Vortest-Leser in `PREREG_evaluator_pretests.md` par.4
+dazu). Damit entfaellt die Vermengung mit einem Hard-Outcome-Effekt; der Vortest prueft streng genommen
+den Leser MIT der 0 (Abweichung benannt). Umgesetzt in `engine/py/margin_thresholds.py`
+(`MARGIN_THRESHOLDS`), Tests 24 gruen.
+
+**E4-Arm, Zuschnitt REGISTRIERT 2026-10-02 (Bau 2026-10-01 nachts, kompiliert und getestet 2026-10-02:
+Lib-Tests 768 gruen inkl. 8 E4-Tests, Python-Suite 390 gruen, Anker-Invarianz auf dem Wheel
+`9449b63c...` gruen):** Knopf `MOSAIC_SUPPLY_DEMAND_FEATURES=1`, Abschnitt `engine/src/supply_demand.rs`,
+**48 Werte = 2 Spieler (Zieher zuerst) x 6 Musterreihen x 4 Groessen**, ueber ALLE legalen Steinzuege
+zusammengefasst (Quellen nicht getrennt): A groesste Steinzahl ohne Ueberlauf / Kapazitaet, B ein Zug
+fuellt genau (0/1), C ein Zug fuellt ueberhaupt (0/1), D kleinster Ueberlauf beim Fuellen min(x,4)/4.
+A, B, D sind die Vortest-Groessen (par.8c der Bewerter-Prereg), C macht D eindeutig. Eingabe 888 -> 936,
+additiv: der Basisvertrag (Hash `6ef829e564c58bd5`) bleibt 888, die Engine erkennt ein E4-Modell an
+seiner Breite, Warmstart null-initialisiert die neuen Spalten (`train.py:1852-1866`). Name `v34-b03`,
+sonst Rezept wie `v34-b01`. Einschraenkung, vorab benannt: die Gegnerseite ist durch den Vortest nicht
+gedeckt (dort nur die eigene Seite). Nach dem Training Netz-Gesundheit gegen `v34-b01` (Normen, tote
+Einheiten, Ankopplung der 48 Spalten, Val-Brier), dann A/B.
+
+**VORGEMERKT als Folge-Arm E4b (Nutzer 2026-10-02: *"das hoert sich vernuenftig an, kannst
+registrieren. ob und wie es traegt wird sich zeigen"*):** die Groessen getrennt nach QUELLE,
+Sonnenseite gegen Mondbereich (Vorschlag aus `RESEARCH_evaluator_architecture_external_2026-09-25.md`
+E4: "groesste Menge der passenden Farbe aus EINER Sonnenseite", "aus dem Mondzug"), 96 Werte statt 48,
+Eingabe 984. Spieltechnischer Grund: ein Mondzug kann den Startspielerstein (-2) bringen und nimmt nur
+oberste Steine, ein Sonnenzug schiebt den Rest auf die Mondseite (`engine_manual.md` 4B/4C).
+Reihenfolge: NUR wenn E4 traegt; vorher ein eigener Vortest der getrennten Groessen (Muster par.8c,
+Luecke gegen den Trunk), da die Trennung ungetestet ist.
 
 **Zuordnung, vorab benannt:** die Erzeugungs-Knoepfe fahren gemeinsam; ein Tor-1-Gewinn des
 Grundarms ist dem Paket zuzuschreiben, keinem Einzelknopf. Einzeln lesbar sind nur die Trainings-Arme

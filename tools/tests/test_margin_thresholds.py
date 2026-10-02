@@ -58,7 +58,9 @@ def _bce(x: float, target: float) -> float:
 
 class RegisteredConstants(unittest.TestCase):
     def test_thresholds_are_the_registered_ones(self):
-        self.assertEqual(MARGIN_THRESHOLDS, (-10.0, -5.0, 0.0, 5.0, 10.0))
+        # Nutzer 2026-10-02: ohne die 0, wie im urspruenglichen Vorschlag (Recherche-Bericht E2).
+        self.assertEqual(MARGIN_THRESHOLDS, (-10.0, -5.0, 5.0, 10.0))
+        self.assertNotIn(0.0, MARGIN_THRESHOLDS)
         self.assertEqual(NUM_ROUNDS, 5)
         # Startwert wie im Vortest-Leser (tools/probes/evaluator_pretests.py, log_s = log(10)).
         self.assertEqual(INITIAL_SCALE_POINTS, 10.0)
@@ -75,28 +77,20 @@ class Targets(unittest.TestCase):
         targets, valid = margin_threshold_targets(y, m)
         self.assertTrue(bool(valid.all()))
         want = [
-            [1, 1, 1, 1, 0],   # +7: ueber -10, -5, (winner), +5; nicht ueber +10
-            [0, 0, 0, 0, 0],   # -12
-            [1, 1, 1, 1, 1],   # +11
-            [1, 0, 0, 0, 0],   # -5 strikt: nicht ueber -5
-            [1, 1, 1, 0, 0],   # +5 strikt: nicht ueber +5
+            [1, 1, 1, 0],   # +7: ueber -10, -5, +5; nicht ueber +10
+            [0, 0, 0, 0],   # -12
+            [1, 1, 1, 1],   # +11
+            [1, 0, 0, 0],   # -5 strikt: nicht ueber -5
+            [1, 1, 0, 0],   # +5 strikt: nicht ueber +5
         ]
         self.assertEqual(targets.tolist(), [[float(v) for v in row] for row in want])
 
-    def test_tie_goes_to_the_side_winner_names(self):
-        """par.4: 'die Marge 0 geht an die Seite, die winner nennt'."""
-        y = torch.tensor([1.0, 0.0])
-        m = torch.tensor([0.0, 0.0])
-        targets, valid = margin_threshold_targets(y, m)
-        self.assertTrue(bool(valid.all()))
-        self.assertEqual(targets[0].tolist(), [1.0, 1.0, 1.0, 0.0, 0.0])
-        self.assertEqual(targets[1].tolist(), [1.0, 1.0, 0.0, 0.0, 0.0])
-
-    def test_zero_threshold_follows_winner_not_the_margin_sign(self):
-        """Weicht `winner` vom Vorzeichen der ungeklemmten Marge ab, gilt an t=0
-        `winner` -- wie im Leser (`target = W if t == 0.0`)."""
-        targets, _ = margin_threshold_targets(torch.tensor([0.0]), torch.tensor([2.0]))
-        self.assertEqual(targets[0].tolist(), [1.0, 1.0, 0.0, 0.0, 0.0])
+    def test_targets_ignore_winner_without_zero_threshold(self):
+        """Ohne t = 0 haengen die Ziele nur an der Marge, nicht an `winner`."""
+        a, _ = margin_threshold_targets(torch.tensor([1.0]), torch.tensor([0.0]))
+        b, _ = margin_threshold_targets(torch.tensor([0.0]), torch.tensor([0.0]))
+        self.assertEqual(a.tolist(), b.tolist())
+        self.assertEqual(a[0].tolist(), [1.0, 1.0, 0.0, 0.0])
 
     def test_unknown_outcome_or_margin_is_masked(self):
         y = torch.tensor([-1.0, 1.0, 0.0])
@@ -109,7 +103,7 @@ class LossValue(unittest.TestCase):
     def _hand_loss(self, z, scale, margin, y):
         total = 0.0
         for t in MARGIN_THRESHOLDS:
-            target = y if t == 0.0 else (1.0 if margin > t else 0.0)
+            target = 1.0 if margin > t else 0.0
             total += _bce(z - t / scale, target)
         return total / len(MARGIN_THRESHOLDS)
 

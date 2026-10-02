@@ -3402,10 +3402,9 @@ if __name__ == "__main__":
                         help="E2-Arm (PREREG_evaluator_pretests.md par.4/par.8a, PREREG_v34_window.md "
                              "par.3): Proportional-Odds-Zusatzverlust am WDL-Logit z = l1 - l0, "
                              "P(Marge > t) = sigmoid(z - t/s_r) mit festen Schwellen t in "
-                             "{-10,-5,0,+5,+10} Punkten auf die Endmarge (scores_unclamped, Sicht des "
-                             "Ziehers) und fuenf lernbaren Rundenskalen s_r (kein neuer Kopf, nicht im "
-                             "Checkpoint-Modell). An t=0 ist das Ziel `winner` (Gleichstand entscheidet "
-                             "die Zusatzregel). Braucht --value-head wdl und Cache-Bloecke/Monolith mit "
+                             "{-10,-5,+5,+10} Punkten auf die Endmarge (scores_unclamped, Sicht des "
+                             "Ziehers; OHNE t=0, Nutzer 2026-10-02) und fuenf lernbaren Rundenskalen "
+                             "s_r (kein neuer Kopf, nicht im Checkpoint-Modell). Braucht --value-head wdl und Cache-Bloecke/Monolith mit "
                              "MOSAIC_CACHE_FINAL_MARGIN=1 (Zusatzfeld final_margin, eigener Schluessel "
                              "in BEIDEN Namensraeumen); train.py setzt die Variable selbst. STANDARD AUS "
                              "= byte-identisches Bestandsverhalten.")
