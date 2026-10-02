@@ -363,6 +363,26 @@ def moon_target_from_policy(step):
     return max(best_base, key=lambda ps: ps[0])[1]
 
 
+def final_margin_of_step(step) -> float:
+    """E2-Arm: rohe Endmarge eines Records in Punkten aus Sicht des Ziehers.
+
+    `scores_unclamped[p] - scores_unclamped[1-p]` mit `p = step["player"]`,
+    Rueckfall `scores` fuer Records ohne das ungeklemmte Feld -- dieselbe Quelle
+    wie das Wertziel der Bauschleife (`scores_src`) und wie der Vortest-Leser
+    (`PREREG_evaluator_pretests.md` par.2/par.4). NaN, wenn der Ausgang
+    unbekannt ist: kein `scores`/`winner` ODER `completed is False`, also exakt
+    die Faelle, in denen `wdl_outcome` den Sentinel -1 traegt (Audit-F2).
+    Gleichstaende bleiben 0.0; welche Seite sie gewinnt, sagt `winner`.
+    """
+    if "scores" not in step or "winner" not in step:
+        return float("nan")
+    if step.get("completed", True) is False:
+        return float("nan")
+    p = int(step["player"])
+    scores = step.get("scores_unclamped", step["scores"])
+    return float(scores[p]) - float(scores[1 - p])
+
+
 def window_cache_key(data_dir="data", files=None, *, value_target_variant="default",
                      encoder="flat", conjunction_head=False,
                      moon_target_source=None) -> WindowCacheKey:
@@ -657,6 +677,22 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     cache_key_material += "+featfmt_" + str(FEATURE_FORMULA_VERSION)
     cache_key_material += ("+featsrc_rust" if _features_from_rust_key()
                            else "+featsrc_record")
+    # E2-Arm (PREREG_evaluator_pretests.md par.4, PREREG_v34_window.md par.3):
+    # Zusatzfeld `final_margin` (rohe Endmarge aus Sicht des Ziehers). Steht
+    # auch im BLOCK-Schluessel (`file_cache_key._final_margin_key`), denn der
+    # Block traegt das Feld. Nur ANHAENGEN, wenn gesetzt -- der Bestand behaelt
+    # seinen Schluessel, kein vorhandener Monolith verfaellt.
+    from file_cache_key import _final_margin_key
+    if _final_margin_key():
+        cache_key_material += "+finalmargin_v1"
+    # E4-Arm (PREREG_v34_window.md par.3): Angebots-Bedarfs-Block, 48 Werte hinter
+    # dem 888er-Basisvektor. Steht auch im BLOCK-Schluessel
+    # (`file_cache_key._supply_demand_key`), denn der Block traegt den Flachvektor.
+    # Nur ANHAENGEN, wenn gesetzt -- der Bestand behaelt seinen Schluessel
+    # (Stolperdraht `KEY_WITH_SWITCH_OFF` in test_window_cache_key_planes_ablation.py).
+    from file_cache_key import _supply_demand_key
+    if _supply_demand_key():
+        cache_key_material += "+supplydemand_v1"
     digest = hashlib.md5(cache_key_material.encode()).hexdigest()
     return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
                           carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,
@@ -918,6 +954,12 @@ class MosaicDataset(Dataset):
         self._planes_eager_tensor = None
         self._planes_dataset_name = None  # 'planes' oder 'planes_packed' (RAM-Optimierung v21)
         self.bitpacked = False  # True, sobald masks/planes gepackt geladen/gebaut werden (unten)
+        # E2-Arm (`file_cache_key._final_margin_key`): rohe Endmarge je Zustand,
+        # NaN = unbekannt. None = Feld nicht aktiv; dann bleibt die Tupel-FORM
+        # von `__getitem__`/`get_batch` exakt die bisherige.
+        self.final_margin = None
+        from file_cache_key import _final_margin_key
+        _final_margin_active = _final_margin_key()
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
             raise ValueError(
@@ -1110,6 +1152,16 @@ class MosaicDataset(Dataset):
                     self.ranking_action_ids = torch.full((len(self.states), RANKING_TOPK), -1, dtype=torch.int16)
                     self.ranking_child_q    = torch.zeros((len(self.states), RANKING_TOPK), dtype=torch.float16)
                     self.ranking_mask       = torch.zeros(len(self.states), dtype=torch.float32)
+                # E2-Arm: nur bei gesetztem Knopf gelesen. Fehlt das Feld trotz
+                # Knopf, ist der Schluessel falsch gebildet worden -- harter
+                # Abbruch statt eines stillen E2-Laufs ohne Marge.
+                if _final_margin_active:
+                    if 'final_margin' not in hf:
+                        raise RuntimeError(
+                            f"HDF5-Cache {cache_path_h5}: MOSAIC_CACHE_FINAL_MARGIN=1, aber kein "
+                            f"Feld 'final_margin' -- der Cache wurde ohne den Knopf gebaut. "
+                            f"Bloecke und Monolith mit gesetztem Knopf neu bauen.")
+                    self.final_margin = torch.from_numpy(hf['final_margin'][:])
                 if self.encoder == "2d":
                     # Bitpacking (RAM-Optimierung v21): Dataset-Name
                     # selbstbeschreibend, unabhaengig vom `self.bitpacked`-
@@ -1150,6 +1202,12 @@ class MosaicDataset(Dataset):
                     f"eigentlich nicht vorkommen (der Suffix ist neuer als jeder .pt-Cache). "
                     f"Cache-Datei loeschen und neu bauen lassen."
                 )
+            if _final_margin_active:
+                # Kann praktisch nicht greifen ("+finalmargin_v1" ist juenger als
+                # jeder .pt-Cache); defensiv wie der 2d-Guard darueber.
+                raise RuntimeError(
+                    f"Alter .pt-Cache {cache_path_pt} passt zum '+finalmargin_v1'-Key -- das kann "
+                    f"eigentlich nicht vorkommen. Cache-Datei loeschen und neu bauen lassen.")
             print(f"📦 Migriere .pt → HDF5 Cache...")
             t0 = time.time()
             bundle = torch.load(cache_path_pt, weights_only=False)
@@ -1246,6 +1304,10 @@ class MosaicDataset(Dataset):
             ranking_mask_l = []  # Schema 19: 1.0 = Geschwister-Set vorhanden UND pol_w>0
             value_wdl_l = []    # Task #34: Gewinnwahrscheinlichkeit [0,1] (siehe WDL_CACHE_FIELDS)
             wdl_outcome_l = []  # Task #34: roher Spielausgang 0.0/1.0, -1.0 = unbekannt
+            # E2-Arm: rohe Endmarge (Punkte, Sicht des Ziehers), NaN = unbekannt.
+            # Nur bei gesetztem Knopf gesammelt; sonst None, kein Speicher, keine
+            # Rechenzeit, Block-Inhalt byte-identisch.
+            final_margin_l = [] if _final_margin_active else None
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
             # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
             # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
@@ -1536,6 +1598,12 @@ class MosaicDataset(Dataset):
                         opp_points_mask_l.append(opp_points_mask)
                         value_wdl_l.append([value_wdl])
                         wdl_outcome_l.append([wdl_outcome_val])
+                        # E2-Arm: Endmarge nur aus ECHTEN Ausgaengen, sonst NaN
+                        # (`final_margin_of_step`, dieselbe Bedingung wie
+                        # `wdl_outcome_val` oben). Gleichstand (Marge 0)
+                        # entscheidet beim Verlust `wdl_outcome` (`winner`).
+                        if final_margin_l is not None:
+                            final_margin_l.append(final_margin_of_step(step))
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for pe in step["policy"]:
@@ -1797,6 +1865,10 @@ class MosaicDataset(Dataset):
             ranking_ids_np  = np.array(ranking_ids_l,  dtype=np.int16);   del ranking_ids_l
             ranking_q_np    = np.array(ranking_q_l,    dtype=np.float16); del ranking_q_l
             ranking_mask_np = np.array(ranking_mask_l, dtype=np.float32); del ranking_mask_l
+            # E2-Arm: 1-D float32 (ganze Punktzahlen, exakt darstellbar), NaN = unbekannt.
+            final_margin_np = None
+            if final_margin_l is not None:
+                final_margin_np = np.array(final_margin_l, dtype=np.float32); del final_margin_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -1850,6 +1922,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('ranking_action_ids',   data=ranking_ids_np,   compression='lzf')
                 hf.create_dataset('ranking_child_q',      data=ranking_q_np,     compression='lzf')
                 hf.create_dataset('ranking_mask',         data=ranking_mask_np,  compression='lzf')
+                if final_margin_np is not None:
+                    hf.create_dataset('final_margin',     data=final_margin_np,  compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset(_planes_key,        data=planes_np,    compression='lzf')
                     if self.bitpacked:
@@ -1897,6 +1971,8 @@ class MosaicDataset(Dataset):
             self.ranking_action_ids  = torch.from_numpy(ranking_ids_np)
             self.ranking_child_q     = torch.from_numpy(ranking_q_np)
             self.ranking_mask        = torch.from_numpy(ranking_mask_np)
+            if final_margin_np is not None:
+                self.final_margin    = torch.from_numpy(final_margin_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -2089,6 +2165,10 @@ class MosaicDataset(Dataset):
                 # Q-Werte + Verfuegbarkeits-/pol_w-Maske fuer den paarweisen
                 # Policy-Ranking-Loss in train.py (`--ranking-loss-weight`).
                 self.ranking_action_ids[idx], self.ranking_child_q[idx], self.ranking_mask[idx])
+        # E2-Arm: NUR mit aktivem Feld als letztes Element angehaengt; ohne den
+        # Knopf (`final_margin is None`) bleibt die Tupel-Form die bisherige.
+        if self.final_margin is not None:
+            base = base + (self.final_margin[idx],)
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
         # vorangestellt -- `encoder="flat"` (Standard) behaelt exakt die
         # bisherige Tupel-FORM/-POSITION fuer Aufrufer, die den `encoder`-
@@ -2131,6 +2211,9 @@ class MosaicDataset(Dataset):
             return default_collate([field[int(i)] for i in idx.tolist()])
 
         base = tuple(take(getattr(self, name)) for name in self._BATCH_FIELDS)
+        # E2-Arm: wie in `__getitem__`, nur mit aktivem Feld, als letztes Element.
+        if self.final_margin is not None:
+            base = base + (take(self.final_margin),)
         if self.encoder == "2d":
             if self._planes_eager_tensor is not None:
                 planes = self._planes_eager_tensor[idx]

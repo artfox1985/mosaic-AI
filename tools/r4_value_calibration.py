@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import pickle
@@ -179,6 +180,31 @@ def select_states(data_glob: str, n_states: int, seed: int, pool_buffer_factor: 
         "pool_size_before_final_sample": len(pool),
     }
     return chosen, stats
+
+
+def dump_states(chosen, sel_stats, path: str, data_glob: str, n_states: int, seed: int) -> str:
+    """Friert die Auswahl ein (Nutzer 2026-10-01, STATUS "R4/R4b-Substrat"): die Sonden ziehen ihre
+    Zustaende aus dem GANZEN Glob, und jede fehlende Datei verschiebt die Auswahl. Einmal geschrieben,
+    lesen kuenftige Laeufe `--states-file` und der Korpus darf rotieren. Gibt den sha256 zurueck."""
+    payload = {
+        "source": {"data_glob": data_glob, "n_states": n_states, "state_seed": seed,
+                   "selection_stats": sel_stats},
+        "states": [{"file": os.path.basename(p), "game_id": gid, "r4_record": r4, "r5_record": r5}
+                   for p, gid, r4, r5 in chosen],
+    }
+    text = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+    pathlib.Path(path).write_text(text, encoding="utf-8")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def load_frozen_states(path: str):
+    """Gegenstueck zu `dump_states`: dieselben Tupel (Datei, game_id, R4-Record, R5-Record) wie
+    `select_states`, plus die Herkunft der Auswahl und der sha256 der Datei."""
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    payload = json.loads(text)
+    chosen = [(s["file"], s["game_id"], s["r4_record"], s["r5_record"]) for s in payload["states"]]
+    return chosen, payload["source"], hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 # ── Ground Truth (round5.rs via net_search_state_json, wie im R5-Werkzeug) ─
@@ -470,8 +496,14 @@ def main():
     ap.add_argument("--k-refills", type=int, default=16)
     # Der v18-Korpus ist geloescht; ein Glob, der nichts trifft, ist eine
     # Falschauskunft statt einer Bequemlichkeit.
-    ap.add_argument("--data-glob", required=True,
-                    help="Glob auf die Korpusdateien, aus denen die R4-Ende-Zustaende kommen")
+    ap.add_argument("--data-glob", default=None,
+                    help="Glob auf die Korpusdateien, aus denen die R4-Ende-Zustaende kommen "
+                         "(Pflicht, wenn --states-file fehlt)")
+    ap.add_argument("--states-file", default=None,
+                    help="eingefrorene Auswahl (aus --dump-states) statt Glob; Glob und Seed kommen "
+                         "dann aus der Datei, der Korpus darf rotieren")
+    ap.add_argument("--dump-states", default=None,
+                    help="die aus dem Glob gewaehlten Zustaende in diese Datei einfrieren und beenden")
     ap.add_argument("--state-seed", type=int, default=20260803)
     ap.add_argument("--n-bootstrap", type=int, default=1000)
     ap.add_argument("--out", default="evaluations/artifacts/r4_value_calibration_result.json")
@@ -503,9 +535,25 @@ def main():
 
     print(f"[r4_value_calibration] {'RAUCHTEST' if args.smoke else 'VOLLER LAUF'}: "
           f"n_states={n_states} k_refills={k_refills} models={models}")
-    print(f"[r4_value_calibration] Substrat-Auswahl aus {args.data_glob!r} (seed={args.state_seed}) ...")
-    chosen_states, sel_stats = select_states(args.data_glob, n_states, args.state_seed)
+    states_sha256 = None
+    if args.states_file:
+        chosen_states, source, states_sha256 = load_frozen_states(args.states_file)
+        args.data_glob, args.state_seed = source["data_glob"], source["state_seed"]
+        sel_stats = dict(source.get("selection_stats") or {}, states_file=args.states_file)
+        chosen_states = chosen_states[:n_states]
+        print(f"[r4_value_calibration] Substrat aus {args.states_file} (sha256 {states_sha256[:12]}), "
+              f"urspruenglich {args.data_glob!r} seed={args.state_seed}: {len(chosen_states)} Zustaende")
+    else:
+        if not args.data_glob:
+            raise SystemExit("--data-glob oder --states-file angeben.")
+        print(f"[r4_value_calibration] Substrat-Auswahl aus {args.data_glob!r} (seed={args.state_seed}) ...")
+        chosen_states, sel_stats = select_states(args.data_glob, n_states, args.state_seed)
     print(f"[r4_value_calibration] Auswahl-Statistik: {json.dumps(sel_stats, indent=2, ensure_ascii=False)}")
+    if args.dump_states:
+        sha = dump_states(chosen_states, sel_stats, args.dump_states, args.data_glob, n_states, args.state_seed)
+        print(f"[r4_value_calibration] {len(chosen_states)} Zustaende eingefroren: {args.dump_states} "
+              f"(sha256 {sha})")
+        return
 
     model_results = {}
     for pth_path in models:
@@ -525,7 +573,8 @@ def main():
         return
 
     summary = {
-        "data_glob": args.data_glob, "n_states": len(chosen_states), "k_refills": k_refills,
+        "data_glob": args.data_glob, "states_file": args.states_file, "states_sha256": states_sha256,
+        "n_states": len(chosen_states), "k_refills": k_refills,
         "sims": args.sims, "c_puct": args.c_puct, "state_seed": args.state_seed,
         "n_bootstrap": args.n_bootstrap, "selection_stats": sel_stats,
         "models": {k: {kk: vv for kk, vv in v.items() if kk != "per_state"} for k, v in model_results.items()},

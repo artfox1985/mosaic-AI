@@ -71,6 +71,21 @@ Prozesse beendet. **Stattdessen, vor dem Lauf registriert:**
 * Die Kette `tools/night_v34_chain.sh` bleibt fuer Schritt 1-5 (Fenster, Training) der Bezug; ihre
   Schritte 6-7 sind fuer v34 ersetzt durch `tools/v34_promotion_gate.sh`.
 
+**ERGEBNIS par.2a (2026-10-01 23:06 bis 2026-10-02 00:45, exklusiv bis auf zwei kurze python-Prozesse
+um 23:3x, seedgetrieben ohne Wirkung):** beide Seeds per SPRT vorzeitig entschieden.
+
+| Seed | v34-b01-r5net : v32-b01 | Paare | gepaarte Differenz je Paar | volle Spalten je Seite A / B |
+| --- | --- | --- | --- | --- |
+| 20261600 | **141:79** | 110 | +0,564 [+0,315; +0,812] | 1,182 / 0,868 |
+| 20261601 | **98:42** | 70 | +0,800 [+0,531; +1,069] | 1,186 / 0,814 |
+| gepoolt | **239:121 = 66,4 %** | 180 | | Block-z **+7,37** (36 Bloecke) |
+
+**Verdikt: das Kriterium ist klar erfuellt** (beide Seeds einzeln >= +1,96, keine Stufenregel).
+Zuordnung wie vorab benannt: dem Paket v34-Netz plus Startkuppel-Suche plus Runde 5 per Netz.
+Promotion selbst: Nutzer-Entscheid, danach `/mosaic-champion-promotion`. Vollstaendigkeit: alle 360
+Partien mit 5 abgerechneten Runden (`floor_per_round`), Schritte 180-223; Wanduhr 3.725,8 s und
+2.195,0 s (16,94 / 15,68 s je Partie, 10 Threads).
+
 ## par.3 DAS PAKET: was sich gegenueber v33 aendert
 
 | Aenderung | Quelle | Stand |
@@ -84,6 +99,20 @@ Prozesse beendet. **Stattdessen, vor dem Lauf registriert:**
 | Runde 5 per Netz statt Loeser (`r5_net_solver` 0) | `PREREG_r5_net_vs_solver.md` | **AN** (Nutzer 2026-10-01): A/B 495:305, z +10,17 (par.6a dort); Env `MOSAIC_R5_NET_SOLVER=0` im Rezept. R5-Policy-Ziele werden Besuchsverteilungen; das Label 4->5 (`exact_round5_outcome`) laeuft weiter ueber den Loeser |
 | Trainings-Arm E2 (Margen-Schwellen am WDL-Logit) | `PREREG_evaluator_pretests.md` par.8a, STATUS 6.17 | Bau offen (rund ein halber Tag) |
 | Trainings-Arm E4 (Angebots-Bedarfs-Abschnitt im Encoder, additiv) | `PREREG_evaluator_pretests.md` par.8c | Bau offen (1-2 Tage laut Recherche-Bericht) |
+
+**E2-Arm, Bau-Stand 2026-10-01 nachts (Agent, Quelltext, NICHT ausgefuehrt; Kernbefunde vom
+Koordinator am Code geprueft):** Verlust = Mittel von 5 BCEs P(Marge > t) = sigmoid(z - t/s_r),
+t in {-10,-5,0,5,10}, z = Logit-Differenz des WDL-Kopfs (`neural_net.py:1838`, zwei Ausgaenge
+[Niederlage, Sieg]; derselbe `logit_diff` wie im Wertverlust, `train.py:651`), s_r je Runde lernbar
+(Start ln 10, Muster des Vortest-Lesers), keine Modellschicht. An t = 0 ist das Ziel `winner`
+(Gleichstand wie registriert). Flags `--margin-thresholds` (Default aus), `--margin-threshold-weight`
+(1,0). **Cache-Neubau noetig:** `endgame_margin` ist der Runde-5-Wurzelwert, keine Marge
+(`corpus_dataset.py:1374-1384`); neuer Knopf `MOSAIC_CACHE_FINAL_MARGIN=1` schreibt `final_margin`
+(`scores_unclamped`-Differenz) und steht in beiden Cache-Schluesseln. Name `v34-b02`, sonst Rezept
+wie `v34-b01`. **Einschraenkungen, vorab benannt:** der t = 0-Term addiert Gewicht auf den harten
+Ausgang (Vermengung mit einem Hard-Outcome-Effekt; Alternative: nur die vier Schwellen ungleich 0,
+Nutzer-Entscheid offen); der Vortest lief auf Drafting R1-4, der Arm greift auf alle Records mit
+bekanntem Ausgang.
 
 **Zuordnung, vorab benannt:** die Erzeugungs-Knoepfe fahren gemeinsam; ein Tor-1-Gewinn des
 Grundarms ist dem Paket zuzuschreiben, keinem Einzelknopf. Einzeln lesbar sind nur die Trainings-Arme

@@ -38,7 +38,7 @@ for _s in (sys.stdout, sys.stderr):
     if hasattr(_s, "reconfigure"):
         _s.reconfigure(encoding="utf-8", errors="replace")
 
-from r4_value_calibration import select_states  # noqa: E402
+from r4_value_calibration import load_frozen_states, select_states  # noqa: E402
 from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock)
 
 # Bis 2026-09-21 standen hier zwei KONSTANTEN. Das war keine Bequemlichkeit,
@@ -129,8 +129,15 @@ def main() -> None:
     ref_ids = [r["game_id"] for r in per_state]
     summ = ref["summary"]
 
-    chosen, _ = select_states(summ["data_glob"], summ["n_states"],
-                              summ["state_seed"])
+    # Eingefrorenes Substrat (Nutzer 2026-10-01): traegt das Referenz-Artefakt eine
+    # `states_file`, kommt die Auswahl von dort und der Korpus darf rotieren; aeltere
+    # Artefakte ziehen weiter aus dem Glob.
+    if summ.get("states_file"):
+        chosen, _, _ = load_frozen_states(summ["states_file"])
+        chosen = chosen[: summ["n_states"]]
+    else:
+        chosen, _ = select_states(summ["data_glob"], summ["n_states"],
+                                  summ["state_seed"])
     got_ids = [c[1] for c in chosen]  # (path, game_id, r4_rec, r5_rec)
     if got_ids != ref_ids:
         raise SystemExit("Zustands-Reproduktion weicht vom R4b-JSON ab -- Abbruch.")

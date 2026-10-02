@@ -1989,10 +1989,31 @@ pub fn features_for_net(net: &crate::net::Net, state: &GameState) -> Vec<f32> {
 /// geladenen `Net`) -- damit ohne ONNX-Fixture unit-testbar (siehe
 /// `tests::features_for_layout_*` unten). `features_for_net` ist nur noch
 /// ein dünner Wrapper, der `net.layout()` einsetzt.
+///
+/// E4 (`supply_demand.rs`, Trainings-Arm E4 aus `PREREG_v34_window.md` par.3):
+/// verlangt das MODELL eine Flach-Breite von mindestens
+/// `supply_demand::SUPPLY_DEMAND_INPUT_SIZE` (936), haengt der
+/// Angebots-Bedarfs-Block (48 Werte) hinter den 888er-Basisvektor. Die
+/// Entscheidung faellt an der Eingabeform des geladenen Netzes, nicht an einem
+/// Knopf: jedes heutige Modell (888) bekommt Wert fuer Wert denselben Puffer
+/// wie vorher, und der Block wird fuer es nicht einmal gerechnet.
 fn features_for_layout(layout: crate::net::InputLayout, state: &GameState) -> Vec<f32> {
+    use crate::supply_demand::{supply_demand_values_direct, supply_demand_wanted};
     match layout {
-        crate::net::InputLayout::Flat(_) => state_to_features_direct(state),
-        crate::net::InputLayout::PlanesPlusFlat { .. } => state_to_features_2d_direct(state),
+        crate::net::InputLayout::Flat(n) => {
+            let mut f = state_to_features_direct(state);
+            if supply_demand_wanted(n) {
+                f.extend(supply_demand_values_direct(state));
+            }
+            f
+        }
+        crate::net::InputLayout::PlanesPlusFlat { flat, .. } => {
+            let mut f = state_to_features_2d_direct(state);
+            if supply_demand_wanted(flat) {
+                f.extend(supply_demand_values_direct(state));
+            }
+            f
+        }
         other => panic!(
             "features_for_net: InputLayout {other:?} wird von keinem Aufrufer unterstützt \
              (Ein-Input-Planes ist ein nie trainiertes Phase-1-Skelett) -- falsches Modell geladen?"
@@ -3370,6 +3391,76 @@ mod tests {
                     "seed={seed} step={i}: PlanesPlusFlat-Dispatch weicht von \
                      state_to_features_2d_direct ab"
                 );
+            }
+        }
+    }
+
+    // ── E4: Angebots-Bedarfs-Block hinter dem Basisvektor (supply_demand.rs) ──
+    //
+    // Die Entscheidung faellt an der MODELL-Breite. Geprueft wird beides: ein
+    // 888er-Modell sieht exakt den Bestandspuffer (die beiden Tests darueber
+    // decken Flat(INPUT_SIZE) und PlanesPlusFlat{flat: INPUT_SIZE} ab), ein
+    // 936er-Modell sieht Bestandspuffer plus Block, und der Block ist Wert fuer
+    // Wert der Export, den der Python-Zwilling aus dem Wheel holt.
+
+    #[test]
+    fn features_for_layout_appends_supply_demand_only_for_e4_width() {
+        use crate::supply_demand::{
+            supply_demand_values_direct, supply_demand_values_from_json, SUPPLY_DEMAND_INPUT_SIZE,
+            SUPPLY_DEMAND_VALUES,
+        };
+        let e4_flat = crate::net::InputLayout::Flat(SUPPLY_DEMAND_INPUT_SIZE);
+        let e4_2d = crate::net::InputLayout::PlanesPlusFlat {
+            c: NUM_PLANES_CHANNELS,
+            h: 6,
+            w: 6,
+            flat: SUPPLY_DEMAND_INPUT_SIZE,
+        };
+        // Altbreiten aus der Leiter: der Block darf fuer sie nie entstehen.
+        let legacy_widths = [LEN_BEFORE_SIGHT_APPENDIX, LEN_BEFORE_ORDERED_DESIGNS, INPUT_SIZE];
+        for seed in 0..3u64 {
+            for (i, s) in random_drafting_states(seed, 20).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let base = state_to_features_direct(&s);
+                let block = supply_demand_values_direct(&s);
+                assert_eq!(block.len(), SUPPLY_DEMAND_VALUES, "{ctx}: Blocklaenge");
+
+                let flat = features_for_layout(e4_flat, &s);
+                assert_eq!(flat.len(), SUPPLY_DEMAND_INPUT_SIZE, "{ctx}: Flat-E4-Laenge");
+                assert_eq!(&flat[..INPUT_SIZE], base.as_slice(), "{ctx}: Basisvektor veraendert");
+                assert_eq!(&flat[INPUT_SIZE..], block.as_slice(), "{ctx}: Block an falscher Stelle");
+
+                let two_d = features_for_layout(e4_2d, &s);
+                let planes = state_to_planes_direct(&s);
+                assert_eq!(two_d.len(), NUM_PLANES_VALUES + SUPPLY_DEMAND_INPUT_SIZE, "{ctx}: 2D-E4-Laenge");
+                assert_eq!(&two_d[..NUM_PLANES_VALUES], planes.as_slice(), "{ctx}: Planes veraendert");
+                assert_eq!(
+                    &two_d[NUM_PLANES_VALUES..NUM_PLANES_VALUES + INPUT_SIZE],
+                    base.as_slice(),
+                    "{ctx}: Flachteil vor dem Block veraendert"
+                );
+                assert_eq!(&two_d[NUM_PLANES_VALUES + INPUT_SIZE..], block.as_slice(), "{ctx}: 2D-Block");
+
+                // Der Schnitt, den `net.rs::build_inputs` fuer ein 936er-2D-Modell macht.
+                let (_, flat_part) = crate::net::split_planes_flat_batch_src(
+                    &[two_d.as_slice()],
+                    NUM_PLANES_VALUES,
+                    NUM_PLANES_VALUES,
+                    SUPPLY_DEMAND_INPUT_SIZE,
+                );
+                assert_eq!(&flat_part[INPUT_SIZE..], block.as_slice(), "{ctx}: Netz-Schnitt verfehlt den Block");
+
+                // Trainingspfad: der Export, den der Python-Zwilling anhaengt.
+                let via_json = supply_demand_values_from_json(&state_to_json(&s, true));
+                assert_eq!(via_json, block, "{ctx}: Export weicht vom Suchpfad ab");
+
+                for w in legacy_widths {
+                    assert_eq!(
+                        features_for_layout(crate::net::InputLayout::Flat(w), &s),
+                        base,
+                        "{ctx}: Altbreite {w} bekommt nicht mehr den Bestandspuffer"
+                    );
+                }
             }
         }
     }

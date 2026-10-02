@@ -46,7 +46,18 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 # PFLICHTSCHRITT beim Wheel-Bau von Abschnitt 16 (PREREG_stack_top_feature.md
 # par.17): diese Zeile im SELBEN Zug auf 794 setzen, in dem das neue Wheel
 # installiert wird -- vorher nicht, nachher nicht.
-INPUT_SIZE = 888        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13; +90 Tiling-Projektion Abschnitt 17, Variante C Arm v29-b07, PREREG_round_transition_search_sampling.md par.18, 2026-09-17; +4 geordnete eigene Designs Abschnitt 18, P.16/R2, PREREG_dome_return_order.md par.12.6/12.8, 2026-09-18)
+#
+# E4-Arm (Angebots-Bedarfs-Block, PREREG_v34_window.md par.3, Bau 2026-10-01): mit
+# MOSAIC_SUPPLY_DEMAND_FEATURES=1 haengt der Python-Encoder 48 Werte hinter den
+# 888er-Basisvektor (engine/src/supply_demand.rs, engine/py/supply_demand_features.py).
+# Der Basisvertrag (features.rs::INPUT_SIZE, Vertragshash 6ef829e564c58bd5) bleibt 888;
+# die Engine erkennt ein E4-Modell an seiner Flach-Breite (936), nicht an diesem Knopf.
+# Ohne Knopf steht hier wie bisher 888. Dieselbe Semantik wie
+# supply_demand_features.supply_demand_features_active (exakt "1"); die Gleichlauf-
+# Pruefung supply_demand_features.supply_demand_key bricht ab, wenn beide auseinanderlaufen.
+# Der Knopf muss VOR dem Prozessstart gesetzt sein: die Breite wird HIER beim Import gebunden.
+_SUPPLY_DEMAND_EXTRA = 48 if os.environ.get("MOSAIC_SUPPLY_DEMAND_FEATURES") == "1" else 0
+INPUT_SIZE = 888 + _SUPPLY_DEMAND_EXTRA  # state_to_tensor (564 Basis +74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13; +90 Tiling-Projektion Abschnitt 17, Variante C Arm v29-b07, PREREG_round_transition_search_sampling.md par.18, 2026-09-17; +4 geordnete eigene Designs Abschnitt 18, P.16/R2, PREREG_dome_return_order.md par.12.6/12.8, 2026-09-18)
                         # +11 Kuppelstapel-Wissen aus `dome_pool_view` (Praefixlaenge; eigene Bloecke Laenge/Spezial/Wild;
                         #  Typenfolge der obersten 4 Positionen des obersten eigenen Blocks; fremde Bloecke Laenge/Spezial/Wild)
                         #  -- Variante B, PREREG_dome_stack_information_sets.md par.7/par.15f, PREREG_v28_window.md par.6, 2026-09-11: 744 -> 755

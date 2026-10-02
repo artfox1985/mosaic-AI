@@ -56,6 +56,7 @@ pub mod serialize;
 pub mod column_build;
 pub mod state;
 pub mod supply;
+pub mod supply_demand;
 pub mod tie_mirror;
 pub mod tiling_solver;
 pub mod tile;
@@ -1982,6 +1983,35 @@ fn tiling_projection_values_from_json(state_json: String) -> PyResult<Vec<f32>> 
     Ok(f)
 }
 
+/// E4-Encoder-Abschnitt (Angebots-Bedarfs-Block, `supply_demand.rs`) als
+/// EIGENER Block: 48 Werte, die ein E4-Modell (Flach-Breite 936) hinter dem
+/// 888er-Basisvektor erwartet.
+///
+/// Warum einzeln: wie bei Abschnitt 17 darf der Python-Zwilling die Regel
+/// "wie viele Steine nimmt ein Zug, wohin laufen sie" nicht nachbauen
+/// (`PREREG_evaluator_pretests.md` par.5a). Der Zwilling ruft GENAU DIESE
+/// Funktion, und sie ist bitgleich zu dem, was die Suche ueber
+/// `features::features_for_layout` anhaengt (Test
+/// `features_for_layout_appends_supply_demand_only_for_e4_width`).
+///
+/// Rein additiv: kein Spielpfad liest diesen Export, er setzt keinen Knopf.
+/// `state_features_from_json` bleibt bei 888 Werten (Basisvertrag).
+#[pyfunction]
+fn supply_demand_values_from_json(state_json: String) -> PyResult<Vec<f32>> {
+    use pyo3::exceptions::PyValueError;
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let f = crate::supply_demand::supply_demand_values_from_json(&parsed);
+    if f.len() != crate::supply_demand::SUPPLY_DEMAND_VALUES {
+        return Err(PyValueError::new_err(format!(
+            "Angebots-Bedarfs-Block lieferte {} Werte, erwartet {}",
+            f.len(),
+            crate::supply_demand::SUPPLY_DEMAND_VALUES
+        )));
+    }
+    Ok(f)
+}
+
 /// Teil A der Rust-Datenschicht: der PLANES-Block aus einem Zustands-JSON,
 /// als flache Liste plus Form `(C, H, W)` -- C-Major/NCHW, also Kanal `c`,
 /// Zeile `r`, Spalte `w` bei Index `c*36 + r*6 + w` (dieselbe Linearisierung,
@@ -2471,6 +2501,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(state_features_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_projection_values_from_json, m)?)?;
+    m.add_function(wrap_pyfunction!(supply_demand_values_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(state_planes_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;

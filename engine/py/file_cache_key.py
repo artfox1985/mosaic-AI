@@ -81,6 +81,45 @@ def _special_planes_off_key() -> bool:
     return bool(v) and v != "0"
 
 
+def _final_margin_key() -> bool:
+    """Liest `MOSAIC_CACHE_FINAL_MARGIN` fuer BEIDE Cache-Schluessel.
+
+    E2-Arm (`PREREG_evaluator_pretests.md` par.4/par.8a, `PREREG_v34_window.md`
+    par.3): die Margen-Schwellen brauchen die rohe Endmarge je Zustand,
+    `scores_unclamped[p] - scores_unclamped[1-p]` aus Sicht des Ziehers. Kein
+    Bestandsfeld traegt sie: `endgame_margin` ist trotz des Namens der exakte
+    R5-Wurzelwert (`root_q`, corpus_dataset.py Bauschleife, Schema 18), und
+    `values`/`points_forecast`/`opp_points_forecast` sind tanh-gestaucht UND mit
+    `bootstrap_value` TD-geblendet, also nicht eindeutig rueckrechenbar.
+
+    Gesetzt = die Bauschleife schreibt das Zusatzfeld `final_margin`. Das
+    aendert den BLOCK-Inhalt, darum steht der Knopf hier UND im
+    Fenster-Schluessel (`feedback_feature_knob_belongs_in_both_cache_keys`).
+    Nur angehaengt, wenn gesetzt: alle vorhandenen Bloecke und Monolithen
+    behalten ihren Schluessel. Aus der Umgebung gelesen, kein Parameter
+    (Holschuld, `test_cache_key_knobs_are_env_coupled.py`). Exakt "1", nichts
+    sonst; train.py setzt ihn selbst aus `--margin-thresholds`.
+    """
+    import os
+    return os.environ.get("MOSAIC_CACHE_FINAL_MARGIN") == "1"
+
+
+def _supply_demand_key() -> bool:
+    """Liest `MOSAIC_SUPPLY_DEMAND_FEATURES` fuer BEIDE Cache-Schluessel (E4-Arm).
+
+    `PREREG_v34_window.md` par.3: mit dem Knopf traegt jeder Block 936 statt 888
+    Flachwerte (Angebots-Bedarfs-Block, `engine/src/supply_demand.rs`). Die Breite
+    steht schon als `str(INPUT_SIZE)` im Schluessel; der Marker steht trotzdem da,
+    weil er die FORMEL versioniert (`_v1`) und weil die Breite beim Import von
+    `config` gebunden wird, der Knopf aber hier zur Aufrufzeit. Die Gleichlauf-
+    Pruefung in `supply_demand_features.supply_demand_key` bricht ab, wenn beide
+    auseinanderlaufen (`feedback_feature_knob_belongs_in_both_cache_keys`).
+    Nur ANGEHAENGT, wenn gesetzt: alle vorhandenen Bloecke behalten ihren Schluessel.
+    """
+    from supply_demand_features import supply_demand_key
+    return supply_demand_key()
+
+
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
                        conjunction_head: bool, bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
@@ -219,4 +258,12 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     # den Monolithen (`feedback_feature_knob_belongs_in_both_cache_keys`).
     material += "|featfmt_" + str(FEATURE_FORMULA_VERSION)
     material += "|featsrc_rust" if _features_from_rust_key() else "|featsrc_record"
+    # E2-Arm: Zusatzfeld `final_margin` im Block (`_final_margin_key`). Nur
+    # ANGEHAENGT, wenn gesetzt -- der Hash jedes vorhandenen Blocks bleibt.
+    if _final_margin_key():
+        material += "|finalmargin_v1"
+    # E4-Arm: Angebots-Bedarfs-Block im Flachvektor (`_supply_demand_key`). Nur
+    # ANGEHAENGT, wenn gesetzt -- der Hash jedes vorhandenen Blocks bleibt.
+    if _supply_demand_key():
+        material += "|supplydemand_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

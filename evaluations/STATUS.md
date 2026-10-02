@@ -20,6 +20,26 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 **LAEUFT: die v34-Promotions-Kante** (`bash tools/v34_promotion_gate.sh`, `PREREG_v34_window.md` par.2a): `v34-b01` mit Runde 5 per Netz gegen den Champion `v32-b01` wie er heute spielt, 2 Seeds a 200 Paare, rund 3,4 h (HERLEITUNG). Tor 1 gegen `v33-b01` auf Nutzer-Entscheid 2026-10-01 abgebrochen und ersetzt. Fenster und Training aus `tools/night_v34_chain.sh` (Schritt 1-5) fertig: `v34-b01` in 2.956,6 s. Nichts anderes starten, kein Build, kein Commit.
 
+**UEBERGABE-STAND 2026-10-02 ca. 00:30 (Nutzungslimit der Sitzung erreicht):** Promotions-Kante
+`tools/v34_promotion_gate.sh` laeuft im Hintergrund (Seed 20261600 bei Block 9: 54:36 fuer v34-b01-r5net),
+Ende hochgerechnet gegen 03:15. UNGECOMMITTET und NICHT KOMPILIERT im Baum (alles Quelltext von
+Agenten, Kernbefunde vom Koordinator gelesen): (1) Wheel-Runde A (Schrittlimit `MAX_GAME_STEPS` 2.000
+statt Wanduhr, Arena-Haenger-Alarm Faktor 10, `completed`/`abort_reason` im Summary, Abbruch in
+`tools/paired_gating.py`, Spec-Feld `r5_net_sims`, Review #11/#12/#15, Panic ehrlich via
+`catch_unwind`; engine/src/self_play.rs, net_mcts.rs, net_batcher.rs, net_ort.rs, spec_env.py);
+(2) E2-Arm (train.py `--margin-thresholds`, `engine/py/margin_thresholds.py`, Cache-Knopf
+`MOSAIC_CACHE_FINAL_MARGIN` samt KnobEntry; Cache-Neubau noetig, PREREG_v34_window.md par.3);
+(3) E4-Encoder (`engine/src/supply_demand.rs`, features.rs/lib.rs/knob_registry.rs, 48 Werte,
+Breite 936; Python-Teil als Patch `scratchpad/e4_python_patch.md`, NOCH NICHT ANGEWENDET; Zuschnitt
+nicht registriert, Nutzerfragen offen); (4) R4/R4b-Substrat einfrieren (`--dump-states` /
+`--states-file` in tools/r4_value_calibration.py und r4b_zone_probe.py). **Naechste Schritte nach der
+Arena:** Kante auswerten und in par.2a registrieren (Nebenlast: zwei kurze python-Prozesse um 23:3x,
+seedgetrieben ohne Wirkung); `cargo test --release --lib` (Python-DLL im PATH), `--no-run`,
+`--features ort_cuda_probe` check, Integrationstests inkl. Paritaets-Fixture, Wheel bauen, Python-Suite,
+`generate_knob_docs.py`, `/mosaic-anchor-invariance`; erst dann E4-Patch anwenden und testen; R4-Dump
+und Gegenprobe der game_ids; E2-Cache bauen und `v34-b02` trainieren (GPU) parallel zu den R5-Sonden
+(CPU, par.5b Stufe 2E/2S). Promotion selbst NUR auf Nutzer-Entscheid.
+
 **Stand 2026-10-01 21:30:** Erzeugung fertig (7,30 h) und abgenommen; Training `v34-b01` fertig
 (2.956,6 s); Tor 1 wartet auf das R5-Stufe-2-A/B (`tools/r5_stage2_ab.sh`, Seed 20261672: iterativer
 Loeser @400 163:237 Netz @400, alle 400 Partien vollstaendig; Seed 20261673 laeuft).

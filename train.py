@@ -194,6 +194,10 @@ from neural_net import (
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
     value_head_variant_from_state, unpack_planes_batch, unpack_masks_batch, RANKING_TOPK,
 )
+# E2-Arm (PREREG_evaluator_pretests.md par.4, PREREG_v34_window.md par.3):
+# Margen-Schwellen als Zusatzverlust am WDL-Logit, kein neuer Kopf.
+from margin_thresholds import MARGIN_THRESHOLDS, initial_log_scale, margin_threshold_loss
+from file_cache_key import _final_margin_key
 
 
 # ── Lauf-Manifest + Korpus-Log (#64 Teil 2, Phase 2b, 2026-07-22) ───────────
@@ -422,6 +426,12 @@ class LossSetup:
     surprise_alpha: float
     surprise_confidence_min: float
     mse_loss: object
+    # E2-Arm (`--margin-thresholds`): die fuenf lernbaren Rundenskalen
+    # (`margin_thresholds.initial_log_scale`) oder None = AUS. Bei None wird
+    # der Term in beiden Durchgaengen komplett uebersprungen (kein Gradient,
+    # keine Rechenzeit, Batch-Tupel unveraendert) -- Bestand byte-identisch.
+    margin_log_scale: object = None
+    margin_threshold_weight: float = 0.0
 
 
 def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_batches, epoch, mem_log_every, ftz, loss_setup) -> dict:
@@ -437,6 +447,7 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
     t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
     t_endgameloss = 0  # Schema 18: nur != 0 relevant, wenn endgame_head aktiv
     t_rankingloss = 0  # Task #35b: nur != 0 relevant, wenn ranking_loss_weight>0
+    t_marginloss = 0  # E2-Arm: nur != 0 relevant, wenn --margin-thresholds aktiv
 
     for _batch_idx, _batch in enumerate(dataloader):
         if mem_log_every and _batch_idx % mem_log_every == 0:
@@ -444,6 +455,13 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
             if _mi is not None:
                 print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
                       f"rss={_mi[0]:.2f}GB commit={_mi[1]:.2f}GB", flush=True)
+        # E2-Arm: mit aktivem Knopf haengt das Dataset die Endmarge als LETZTES
+        # Element an (corpus_dataset.py, `final_margin`); hier abgetrennt, damit
+        # das Entpacken darunter unveraendert bleibt. Ohne Knopf: kein Zugriff.
+        s_final_margin = None
+        if loss_setup.margin_log_scale is not None:
+            s_final_margin = _batch[-1]
+            _batch = _batch[:-1]
         # Task #11 Phase 2 / Task #28 / Task #34: MosaicDataset liefert bei
         # encoder="2d" ein 14-Tupel (planes VORAN), bei encoder="flat"
         # (Standard) das 13-Tupel -- die letzten 4 Elemente
@@ -678,6 +696,17 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
         else:
             v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
 
+        # E2-Arm (`--margin-thresholds`, margin_thresholds.py): Proportional-
+        # Odds-Verlust auf DEMSELBEN Logit wie der Wertverlust oben
+        # (`logit_diff`, nur im WDL-Zweig gesetzt; train() bricht ohne
+        # `--value-head wdl` vorher ab). Ziel an der Schwelle 0 ist der rohe
+        # Ausgang `s_wdl_outcome`, an +-5/+-10 die Endmarge. `rw` (--exclude-
+        # round5) maskiert wie beim Wertverlust. Ohne Knopf uebersprungen.
+        if loss_setup.margin_log_scale is not None:
+            margin_loss, _ = margin_threshold_loss(
+                logit_diff, s_wdl_outcome, s_final_margin.to(device), s_rounds.to(device),
+                loss_setup.margin_log_scale, rw)
+
         # Task #12: bei aktivem Verteilungs-Kopf ist der Punkte-Verlust eine
         # KREUZENTROPIE gegen ein HL-Gauss-geglaettetes Ziel statt MSE auf
         # dem Erwartungswert -- reicheres Gradientensignal, robuster gegen
@@ -755,6 +784,12 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
                 + loss_setup.points_weight * opp_loss
                 + loss_setup.points_weight * endgame_loss
                 + loss_setup.ranking_loss_weight * ranking_loss)
+        # E2-Arm: Gewicht relativ zum Wertverlust (value_weight *
+        # margin_threshold_weight), damit 1.0 heisst "so schwer wie der
+        # bestehende Wertterm". Nur mit Knopf addiert -- ohne bleibt die
+        # Summe Operation fuer Operation die bisherige.
+        if loss_setup.margin_log_scale is not None:
+            loss = loss + (loss_setup.value_weight * loss_setup.margin_threshold_weight) * margin_loss
         if ftz.backward_ok(loss):   # nur im Freeze-Modus je restriktiv, s. Docstring
             loss.backward()
             optimizer.step()
@@ -769,8 +804,10 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
             t_endgameloss += endgame_loss.item()
         if loss_setup.ranking_loss_weight > 0.0:
             t_rankingloss += ranking_loss.item()
+        if loss_setup.margin_log_scale is not None:
+            t_marginloss += margin_loss.item()
 
-    return {"t_loss": t_loss, "t_ploss": t_ploss, "t_vloss": t_vloss, "t_pointsloss": t_pointsloss, "t_opp_pointsloss": t_opp_pointsloss, "t_endgameloss": t_endgameloss, "t_rankingloss": t_rankingloss}
+    return {"t_loss": t_loss, "t_ploss": t_ploss, "t_vloss": t_vloss, "t_pointsloss": t_pointsloss, "t_opp_pointsloss": t_opp_pointsloss, "t_endgameloss": t_endgameloss, "t_rankingloss": t_rankingloss, "t_marginloss": t_marginloss}
 
 
 def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, loss_setup) -> dict:
@@ -790,9 +827,11 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
     epoch_val_ranking_acc = None  # Task #35b: rein deskriptiv, siehe val_ranking_acc_history
     epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
     epoch_val_ownloss = None  # PREREG_frozen_trunk_head.md, s. val_ownloss_history
+    epoch_val_margin_loss = None  # E2-Arm: rein deskriptiv, NICHT Teil von val_combined
     own_meter = OwnershipValLoss(loss_setup.ownership_weight > 0.0)
     if val_dataloader is not None:
         model.eval()
+        val_margin_loss_sum, val_margin_w = 0.0, 0.0  # E2-Arm, nur mit Knopf befuellt
         val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
         val_opp_pointsloss_sum, val_opp_batches = 0.0, 0  # Task #28, nur relevant wenn opp_points_head aktiv
         val_endgame_sqerr_sum, val_endgame_n = 0.0, 0.0  # Schema 18, nur relevant wenn endgame_head aktiv
@@ -803,6 +842,13 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
         brier_sqerr_sum, n_brier = 0.0, 0  # Task #34
         with torch.no_grad():
             for _v_batch in val_dataloader:
+                # E2-Arm: Endmarge als letztes Element abtrennen (wie im
+                # Trainingsdurchgang); der Val-Cache traegt sie unter demselben
+                # Knopf (Fenster-Schluessel `+finalmargin_v1`).
+                v_final_margin = None
+                if loss_setup.margin_log_scale is not None:
+                    v_final_margin = _v_batch[-1]
+                    _v_batch = _v_batch[:-1]
                 if encoder == "2d":
                     (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
                      v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
@@ -918,6 +964,14 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
                         v_den = v_rw2.sum().clamp(min=1e-6)
                         v_bce = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target, reduction="none")
                         v_v_loss = (v_bce.view(-1, 1) * v_rw2).sum() / v_den
+                    # E2-Arm: Val-Verlust der Margen-Schwellen, gewichtet ueber
+                    # die gueltigen Zustaende gemittelt (rein deskriptiv).
+                    if loss_setup.margin_log_scale is not None:
+                        _vm_loss, _vm_w = margin_threshold_loss(
+                            v_logit_diff, v_wdl_outcome, v_final_margin.to(device),
+                            v_rounds.to(device), loss_setup.margin_log_scale, v_rw)
+                        val_margin_loss_sum += _vm_loss.item() * _vm_w
+                        val_margin_w += _vm_w
                 elif v_rw is None:
                     v_v_loss = loss_setup.mse_loss(v_pred_v, v_targets_v)
                 else:
@@ -1016,6 +1070,10 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
         epoch_val_ranking_acc = (val_rank_correct_sum / val_rank_n
                                  if val_rank_n > 0 else None)
         epoch_val_ownloss = own_meter.value()  # PREREG_frozen_trunk_head.md
+        # E2-Arm: None (statt einer erfundenen 0.0), wenn der Knopf aus ist oder
+        # kein gueltiger Zustand im Val-Split lag.
+        epoch_val_margin_loss = (val_margin_loss_sum / val_margin_w
+                                 if val_margin_w > 0 else None)
 
         def _r2(sum_y, sumsq_y, sqerr, n):
             if n == 0:
@@ -1030,7 +1088,7 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
         epoch_val_opp_points_r2 = _r2(opp_sum, opp_sumsq, opp_sqerr_sum, n_opp)
         epoch_val_brier = brier_sqerr_sum / n_brier if n_brier > 0 else None
 
-    return {"epoch_val_ploss": epoch_val_ploss, "epoch_val_vloss": epoch_val_vloss, "epoch_val_pointsloss": epoch_val_pointsloss, "epoch_val_value_r2": epoch_val_value_r2, "epoch_val_points_r2": epoch_val_points_r2, "epoch_val_opp_pointsloss": epoch_val_opp_pointsloss, "epoch_val_opp_points_r2": epoch_val_opp_points_r2, "epoch_val_endgame_mse": epoch_val_endgame_mse, "epoch_val_ranking_acc": epoch_val_ranking_acc, "epoch_val_brier": epoch_val_brier, "epoch_val_ownloss": epoch_val_ownloss}
+    return {"epoch_val_ploss": epoch_val_ploss, "epoch_val_vloss": epoch_val_vloss, "epoch_val_pointsloss": epoch_val_pointsloss, "epoch_val_value_r2": epoch_val_value_r2, "epoch_val_points_r2": epoch_val_points_r2, "epoch_val_opp_pointsloss": epoch_val_opp_pointsloss, "epoch_val_opp_points_r2": epoch_val_opp_points_r2, "epoch_val_endgame_mse": epoch_val_endgame_mse, "epoch_val_ranking_acc": epoch_val_ranking_acc, "epoch_val_brier": epoch_val_brier, "epoch_val_ownloss": epoch_val_ownloss, "epoch_val_margin_loss": epoch_val_margin_loss}
 
 
 def resume_path(version_name: str) -> Path:
@@ -1130,7 +1188,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           moon_target_source="label",
           file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0,
           resume=False, epoch_checkpoint=True, fast_loader=False,
-          overwrite_model=False, recipe_info=None):
+          overwrite_model=False, recipe_info=None,
+          margin_thresholds=False, margin_threshold_weight=1.0):
     # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
     # Zwischenstand wird VOR dem teuren Daten-Laden gelesen: fehlt er, soll
     # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
@@ -1195,6 +1254,28 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             f"❌ --moon-loss-weight {moon_loss_weight!r} ungueltig -- Abbruch, erlaubt ist >= 0. "
             f"1.0 = Bestandsverhalten, 0.0 = Moon-Term abgeschaltet."
         )
+    # E2-Arm (`--margin-thresholds`): harte Vorab-Validierung, VOR jedem teuren
+    # Daten-Laden (Muster der Pruefungen darueber).
+    #  * Der Term haengt am WDL-Logit; ohne WDL-Kopf gibt es kein z.
+    #  * Im Freeze-Modus ist der Wertkopf eingefroren, der Term waere wirkungslos.
+    #  * Gewicht > 0: 0 waere "AN ohne Wirkung", also ein stiller Fehlarm.
+    #  * Der Cache-Knopf MOSAIC_CACHE_FINAL_MARGIN muss zum Flag passen (setzt
+    #    der __main__-Block); sonst traefe der Lauf einen Monolithen ohne Marge
+    #    bzw. truege den E2-Schluessel ohne den E2-Verlust.
+    if margin_thresholds:
+        if value_head != "wdl":
+            sys.exit("❌ --margin-thresholds braucht --value-head wdl (der Term haengt am WDL-Logit).")
+        if freeze_trunk:
+            sys.exit("❌ --margin-thresholds und --freeze-trunk sind nicht kombinierbar "
+                     "(der Wertkopf waere eingefroren).")
+        if not (margin_threshold_weight > 0.0):
+            sys.exit(f"❌ --margin-threshold-weight {margin_threshold_weight!r} ungueltig -- "
+                     f"mit --margin-thresholds ist > 0 Pflicht.")
+    if bool(margin_thresholds) != _final_margin_key():
+        sys.exit("❌ --margin-thresholds und MOSAIC_CACHE_FINAL_MARGIN passen nicht zusammen "
+                 f"(Flag {bool(margin_thresholds)}, Umgebung {_final_margin_key()}). Der "
+                 "Cache-Knopf gehoert genau zum E2-Arm: Flag setzen (train.py setzt die "
+                 "Variable dann selbst) oder die Variable entfernen.")
     # PREREG_ownership_corpus.md §3.4: additiver Datei-Zugang, hart validiert
     # WIE die anderen CLI-Args oben -- ein Tippfehler im Pfad soll sofort
     # abbrechen, nicht still 0 zusaetzliche Dateien finden.
@@ -1444,6 +1525,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "epoch_checkpoint": bool(epoch_checkpoint),
         # Code-Review #23: ob der Lauf bestehende Checkpoints ersetzen durfte.
         "overwrite_model": bool(overwrite_model),
+        # E2-Arm (PREREG_v34_window.md par.3): Margen-Schwellen am WDL-Logit.
+        # Die Schwellen selbst sind fest (margin_thresholds.MARGIN_THRESHOLDS);
+        # der Cache-Knopf MOSAIC_CACHE_FINAL_MARGIN steht in `mosaic_env`.
+        "margin_thresholds": bool(margin_thresholds),
+        "margin_threshold_weight": margin_threshold_weight,
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -1557,6 +1643,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
+    # E2-Arm: das Feld MUSS da sein (der Lader bricht sonst schon ab); hier die
+    # Ansage, auf wie vielen Zustaenden der Term ueberhaupt greift.
+    if margin_thresholds:
+        if dataset.final_margin is None:
+            sys.exit("❌ --margin-thresholds: Trainings-Datensatz ohne Feld 'final_margin'.")
+        _fm_ok = (torch.isfinite(dataset.final_margin.reshape(-1))
+                  & (dataset.wdl_outcome.reshape(-1) >= 0.0))
+        print(f"🧪 E2 Margen-Schwellen {list(MARGIN_THRESHOLDS)} Punkte am WDL-Logit, Gewicht "
+              f"{margin_threshold_weight} x value_weight -- gueltige Endmarge auf "
+              f"{int(_fm_ok.sum())} von {len(dataset)} Trainings-Zustaenden.", flush=True)
     # λ-Misch-Value-Target-Experiment: mischt das TATSAECHLICH trainierte
     # Zielfeld IN-PLACE, direkt nach dem Laden, VOR dem DataLoader-Wrap
     # (siehe MosaicDataset.apply_value_target_lambda-Docstring). KORREKTHEITS-
@@ -1590,6 +1686,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                                     encoder=encoder, conjunction_head=conjunction_head,
                                     moon_target_source=moon_target_source)
         val_root_q_frac = val_dataset.apply_value_target_lambda(value_target_lambda, wdl=_lambda_mix_wdl)
+        if margin_thresholds and val_dataset.final_margin is None:
+            sys.exit("❌ --margin-thresholds: Val-Datensatz ohne Feld 'final_margin'.")
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
         if value_target_lambda < 1.0:
@@ -1811,7 +1909,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     ftz = TrunkFreeze.setup(model, freeze_trunk)
 
     # 4. Training Parameter
-    optimizer = optim.Adam(ftz.trainable_params(model), lr=effective_lr)
+    # E2-Arm: die fuenf Rundenskalen sind KEIN Modellteil (kein neuer Kopf,
+    # Checkpoint/Export unveraendert), sondern eine zweite Parametergruppe
+    # desselben Adam mit derselben LR (und damit demselben Scheduler). Ohne
+    # Knopf: exakt der bisherige Aufruf.
+    margin_log_scale = None
+    if margin_thresholds:
+        margin_log_scale = initial_log_scale(device)
+        optimizer = optim.Adam([{"params": list(ftz.trainable_params(model))},
+                                {"params": [margin_log_scale]}], lr=effective_lr)
+    else:
+        optimizer = optim.Adam(ftz.trainable_params(model), lr=effective_lr)
 
     # Epochen-Anzahl ---
     epochs = input_epoch
@@ -2019,6 +2127,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         surprise_alpha=surprise_alpha,
         surprise_confidence_min=surprise_confidence_min,
         mse_loss=mse_loss,
+        margin_log_scale=margin_log_scale,
+        margin_threshold_weight=(margin_threshold_weight if margin_thresholds else 0.0),
     )
     # ── Zwischenstand je Epoche und Wiederaufnahme (resume_path()) ──────────
     # Alles, was die Schleife von Epoche zu Epoche traegt, steht in diesen
@@ -2054,11 +2164,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "num_val_samples": len(val_dataset) if val_dataset is not None else 0,
         "input_size": dataset.input_size, "num_actions": NUM_ACTIONS, "batch_size": BATCH_SIZE,
     }
+    # E2-Arm: nur mit Knopf im Fingerabdruck -- ein Zwischenstand von vor dem
+    # Einbau bleibt fortsetzbar, ein E2-Zwischenstand passt nie zu einem Lauf ohne.
+    if margin_thresholds:
+        _resume_fingerprint["margin_thresholds"] = True
+        _resume_fingerprint["margin_threshold_weight"] = margin_threshold_weight
     start_epoch = 0
     if _resume is not None:
         check_resume_fingerprint(_resume["fingerprint"], _resume_fingerprint)
         model.load_state_dict({k: v.to(device) for k, v in _resume["model_state"].items()})
         optimizer.load_state_dict(_resume["optimizer_state"])
+        if margin_log_scale is not None:
+            # E2-Arm: Stand der Rundenskalen; der Fingerabdruck oben garantiert,
+            # dass der Zwischenstand aus einem E2-Lauf stammt.
+            with torch.no_grad():
+                margin_log_scale.copy_(_resume["margin_log_scale"].to(device))
         if lr_scheduler is not None and _resume.get("lr_scheduler_state") is not None:
             lr_scheduler.load_state_dict(_resume["lr_scheduler_state"])
         for _k, _lst in _resume_lists.items():
@@ -2104,6 +2224,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         t_opp_pointsloss = _t["t_opp_pointsloss"]
         t_endgameloss = _t["t_endgameloss"]
         t_rankingloss = _t["t_rankingloss"]
+        epoch_marginloss = _t["t_marginloss"] / n_batches  # E2-Arm, 0 ohne Knopf
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
@@ -2141,6 +2262,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         epoch_val_ranking_acc = _v["epoch_val_ranking_acc"]
         epoch_val_brier = _v["epoch_val_brier"]
         epoch_val_ownloss = _v["epoch_val_ownloss"]
+        epoch_val_margin_loss = _v["epoch_val_margin_loss"]  # E2-Arm, None ohne Knopf
         val_ploss_history.append(epoch_val_ploss)
         val_vloss_history.append(epoch_val_vloss)
         val_pointsloss_history.append(epoch_val_pointsloss)
@@ -2332,7 +2454,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Epochen-Verlauf fuers Manifest. Bisher blieb er nur in der Konsole stehen und
         # war mit zwei Nachkommastellen zu grob, um daraus z.B. Scheduler-Parameter
         # abzuschaetzen (Anlass: Plateau-Abschaetzung 2026-08-17).
-        epoch_history.append({
+        _epoch_entry = {
             "epoch": epoch + 1,
             "lr": optimizer.param_groups[0]["lr"],
             "policy_loss": epoch_ploss,
@@ -2344,9 +2466,22 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             "points_val_loss": epoch_val_pointsloss,
             "ownership_val_loss": epoch_val_ownloss,
             "val_combined": current_metric,
-        })
+        }
+        # E2-Arm: drei Zusatzfelder NUR mit Knopf (ohne bleibt der Eintrag der
+        # bisherige). `margin_scale_points` = exp(log_scale) je Runde 1..5, also
+        # Punkte je Logit-Einheit -- die Groesse, die der Vortest-Leser je Runde
+        # anpasste. Weder Teil von val_combined noch der Brier-Auswahl.
+        margin_str = ""
+        if margin_log_scale is not None:
+            _scales = [round(float(s), 4) for s in torch.exp(margin_log_scale.detach()).cpu()]
+            _epoch_entry["margin_threshold_loss"] = epoch_marginloss
+            _epoch_entry["margin_threshold_val_loss"] = epoch_val_margin_loss
+            _epoch_entry["margin_scale_points"] = _scales
+            _vm_s = f"{epoch_val_margin_loss:.4f}" if epoch_val_margin_loss is not None else "n/a"
+            margin_str = f" | Margen: {epoch_marginloss:.4f} / Val {_vm_s} / Skala {_scales}"
+        epoch_history.append(_epoch_entry)
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{own_str}{endgame_str}{ranking_str}{plateau_marker}{lr_str}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{own_str}{endgame_str}{ranking_str}{margin_str}{plateau_marker}{lr_str}")
 
         # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
@@ -2408,6 +2543,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 "segments": _prev_segments + [{
                     "start": _segment_started, "von_epoche": start_epoch + 1, "bis_epoche": epoch + 1}],
             }
+            if margin_log_scale is not None:
+                # E2-Arm: Rundenskalen gehoeren nicht zum Modell, also eigens sichern.
+                _rs["margin_log_scale"] = margin_log_scale.detach().cpu().clone()
             try:
                 _dt = save_resume_state(_resume_file, _rs)
                 print(f"💾 Zwischenstand Epoche {epoch + 1} gespeichert ({_resume_file.name}, {_dt:.1f} s)",
@@ -2666,6 +2804,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             round(val_ranking_acc_history[-1], 4)
             if val_ranking_acc_history and val_ranking_acc_history[-1] is not None else None),
     }
+    # E2-Arm: Dokumentationsfeld NUR mit Knopf (ohne bleibt der Checkpoint der
+    # bisherige). Die Skalen sind der Endstand; `_best`/`_brierbest` erben das
+    # Feld per dict(checkpoint) -- ihr Epochenstand steht im Manifest
+    # (epoch_history, margin_scale_points).
+    if margin_log_scale is not None:
+        checkpoint["margin_thresholds"] = {
+            "thresholds_points": list(MARGIN_THRESHOLDS),
+            "weight_times_value_weight": margin_threshold_weight,
+            "final_scale_points": [float(s) for s in torch.exp(margin_log_scale.detach()).cpu()],
+        }
     save_checkpoint_atomic(checkpoint, save_path)
     print(f"\n✅ Training beendet! Neues Model gespeichert unter:\n📂 {save_path}")
 
@@ -3250,6 +3398,22 @@ if __name__ == "__main__":
                              "nutzbar auf Zuegen mit `pol_w>0` UND geloggtem Geschwister-Set "
                              "(v19wdl/v19wdlann-Sockel-Partien; policy-maskierte Schwarm-Partien tragen "
                              "kein nutzbares Set, Maske dort 0).")
+    parser.add_argument("--margin-thresholds", action="store_true",
+                        help="E2-Arm (PREREG_evaluator_pretests.md par.4/par.8a, PREREG_v34_window.md "
+                             "par.3): Proportional-Odds-Zusatzverlust am WDL-Logit z = l1 - l0, "
+                             "P(Marge > t) = sigmoid(z - t/s_r) mit festen Schwellen t in "
+                             "{-10,-5,0,+5,+10} Punkten auf die Endmarge (scores_unclamped, Sicht des "
+                             "Ziehers) und fuenf lernbaren Rundenskalen s_r (kein neuer Kopf, nicht im "
+                             "Checkpoint-Modell). An t=0 ist das Ziel `winner` (Gleichstand entscheidet "
+                             "die Zusatzregel). Braucht --value-head wdl und Cache-Bloecke/Monolith mit "
+                             "MOSAIC_CACHE_FINAL_MARGIN=1 (Zusatzfeld final_margin, eigener Schluessel "
+                             "in BEIDEN Namensraeumen); train.py setzt die Variable selbst. STANDARD AUS "
+                             "= byte-identisches Bestandsverhalten.")
+    parser.add_argument("--margin-threshold-weight", type=float, default=1.0,
+                        help="E2-Arm: Gewicht des Margen-Schwellen-Terms RELATIV zum Wertverlust "
+                             "(Gesamtfaktor value_weight * dieser Wert). 1.0 = der Term (Mittel ueber "
+                             "fuenf BCEs, also dieselbe Einheit wie die eine BCE des Wertverlusts) wiegt "
+                             "so viel wie der bestehende Wertterm. Nur mit --margin-thresholds wirksam.")
 
     parser.add_argument("--cache-file", type=str, default=None,
                         help="Vorab gebauten Trainings-Cache BENUTZEN statt ihn hier seriell zu "
@@ -3310,6 +3474,12 @@ if __name__ == "__main__":
     # (file_cache_key._moon_target_source_key) -- ohne dieses Setzen wuerde ein
     # b04-Lauf die Bloecke von b03 mit den LABEL-Zielen wiederverwenden.
     os.environ["MOSAIC_MOON_TARGET_SOURCE"] = args.moon_target_source
+    # E2-Arm: der Cache-Knopf folgt dem Flag (Muster der Zeile darueber), damit
+    # Fenster- und Val-Schluessel `+finalmargin_v1` tragen. Ohne Flag wird NICHTS
+    # gesetzt -- der Umgebungs-Fingerabdruck des Bestands bleibt unveraendert;
+    # eine von aussen gesetzte Variable ohne Flag faengt train() mit Abbruch ab.
+    if args.margin_thresholds:
+        os.environ["MOSAIC_CACHE_FINAL_MARGIN"] = "1"
     train(points_dist_bins=args.points_dist_bins, reinit_points_head=args.reinit_points_head,
           version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
@@ -3337,4 +3507,6 @@ if __name__ == "__main__":
           surprise_confidence_min=args.surprise_confidence_min,
           resume=args.resume, epoch_checkpoint=not args.no_epoch_checkpoint,
           fast_loader=args.fast_loader, overwrite_model=args.overwrite_model,
-          recipe_info=_recipe_info)
+          recipe_info=_recipe_info,
+          margin_thresholds=args.margin_thresholds,
+          margin_threshold_weight=args.margin_threshold_weight)

@@ -21,6 +21,9 @@ from torch.utils.data import Dataset
 # Ratsche (tools/check_conventions.py Regel 1) ohnehin ueber der Schwelle.
 # Re-Export, damit Aufrufer weiter `neural_net.per_file_cache_key` sehen.
 from file_cache_key import per_file_cache_key  # noqa: F401
+# E4-Arm: gemeinsame Schaltstelle fuer beide Bauer (Rust und Zwilling), damit sie
+# nicht auseinanderlaufen. Die Regel selbst steckt in engine/src/supply_demand.rs.
+from supply_demand_features import append_supply_demand
 from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND, REACH_BUF_CAP,
                           reach_columns, reach_target_k1_active,
                           reach_buffer_mode, reach_buffer_columns)
@@ -142,6 +145,11 @@ def state_to_tensor_rust(data):
     """
     import mosaic_rust
     _v = mosaic_rust.state_features_from_json(json.dumps(data))
+    # E4-Arm: bei INPUT_SIZE 936 (MOSAIC_SUPPLY_DEMAND_FEATURES=1) die 48 Werte des
+    # Angebots-Bedarfs-Blocks anhaengen -- derselbe Export, den der Zwilling ruft,
+    # und bitgleich zu dem, was die Suche fuer ein 936er-Modell anhaengt
+    # (features.rs::features_for_layout). Bei 888 ein No-Op ohne Wheel-Aufruf.
+    _v = append_supply_demand(_v, data, INPUT_SIZE)
     # SCHARFSCHALTUNG, dieselbe Schaltstelle wie im Python-Zwilling: liefert
     # das Wheel mehr Werte als `config.INPUT_SIZE` deklariert, wird auf die
     # deklarierte Breite GEKUERZT -- nie aufgefuellt. Das ist genau, was
@@ -696,6 +704,12 @@ def state_to_tensor_python(data):
                     _ordered[_i] = float(int(_ids[_i])) / ORDERED_DESIGN_NORM
         break  # nur der OBERSTE eigene Block, wie features.rs
     features.extend(_ordered)
+
+    # E4-Arm (Angebots-Bedarfs-Block, 48 Werte ANS ENDE, Indizes 0..887 unveraendert):
+    # wie Abschnitt 17 KEIN Python-Nachbau -- die Zugfolge (Steinzahl, Reihe,
+    # Ueberlauf) ist eine Spielregel und kommt aus dem Wheel
+    # (`supply_demand_values_from_json`). Bei INPUT_SIZE 888 ein No-Op.
+    features = append_supply_demand(features, data, INPUT_SIZE)
 
     return torch.tensor(features, dtype=torch.float32)
 

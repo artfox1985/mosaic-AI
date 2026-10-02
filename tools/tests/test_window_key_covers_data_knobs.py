@@ -49,6 +49,8 @@ DATEN_KNOEPFE = {
     "policy_carrier_set": "welche Dateien Policy tragen -- anderer Traegersatz, andere Ziele",
     "LEGACY_STRETCHED_PREFIXES": "entstauchte gegen native Bootstrap-Ziele",
     "moon_target_source": "Ziel des moon-Kopfs: No-Op-Label gegen Suchverteilung (v29-b04)",
+    "_final_margin_key": "Zusatzfeld final_margin (Endmarge) fuer den E2-Arm (v34)",
+    "_supply_demand_key": "Angebots-Bedarfs-Block (48 Flachwerte) fuer den E4-Arm (v34)",
 }
 
 # Knoepfe, die in BEIDEN Schluesseln stehen muessen: der Wert steckt schon in den
@@ -58,6 +60,8 @@ DATEN_KNOEPFE = {
 BOTH_KEYS = {
     "_special_planes_off_key": "Planes-Kanaele 77/78 stecken je Datei im Block",
     "moon_target_source": "moon_order_targets stecken je Datei im Block (v29-b04)",
+    "_final_margin_key": "final_margin steckt je Datei im Block (E2-Arm, v34)",
+    "_supply_demand_key": "der Flachvektor steckt je Datei im Block (E4-Arm, v34)",
 }
 
 # Knoepfe, die BEWUSST nicht im Fenster-Schluessel stehen, mit Grund.
@@ -67,6 +71,8 @@ NOT_IN_KEY = {
     "MOSAIC_MOON_ORDER_SEARCH_SCALE": "wie oben (par.11, gestrichen)",
     "MOSAIC_RETURN_ORDER_MODE": "Such-/GUI-Knopf; veraendert Zuege, nicht die Kodierung",
     "moon_loss_weight": "GEWICHT im Loss, kein Datenfeld -- b05 laeuft bewusst auf b03s Monolith",
+    "margin_threshold_weight": "GEWICHT des E2-Terms im Loss, kein Datenfeld (das Feld haengt am "
+                               "Cache-Knopf _final_margin_key)",
 }
 
 
