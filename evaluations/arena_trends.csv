@@ -236,3 +236,4 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-10-02T20:25:30,paired_gating,v34-b03,v34-b01,400,400,0.52,57.475,56.35,8.125,8.117,0.0
 2026-10-02T20:58:26,paired_gating,gen-r5net400,gen-r5net200,100,400,0.525,59.845,58.39,6.907,7.478,0.0
 2026-10-02T21:42:51,paired_gating,gen-r5net400,gen-r5net200,100,400,0.5625,60.028,58.447,7.09,7.857,0.0
+2026-10-03T02:30:04,paired_gating,v34-b01,v32-b01,400,400,0.7125,62.407,54.083,6.268,8.877,0.0

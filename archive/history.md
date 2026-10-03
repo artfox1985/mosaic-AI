@@ -22843,3 +22843,26 @@ Kette), `PREREG_evaluator_pretests.md` (par.8a-8d), `PREREG_r5_net_vs_solver.md`
 Laufmarken `run:v33-b0x`); fuenf v33-Monolithe (4,49 GB, ohne restic-Beleg, `*.h5` ausgeschlossen);
 2.611 verwaiste Bloecke. `data/` von 9,5 auf 2,0 GB. `selfplay_v30-b02-policy_*` bleibt
 (R4/R4b-Substrat, 72 Zustaende aus dem ganzen Glob).
+
+
+# Promotion v34-b01 (2026-10-03)
+
+**`v34-b01_brierbest` ist Champion**, mit der Spec `models/v34-b01_brierbest.spec.json`
+(Startkuppel-Suche, Runde 5 per Netz). Elo **1595 [1546; 1646]** aus 960 Partien (Leitersegment 2,
+Anker `hv4_anchor` fix 1000); der Vorgaenger v32-b01 steht danach bei 1460. Vollstaendige
+Herleitung: `evaluations/PREREG_v34_window.md` **par.10e** (Kanten, Diagnostiken, Artefakt).
+
+* **Kanten:** Promotions-Seeds gegen v32-b01 141:79 und 98:42 (frueh gestoppt, par.2a), Replikation
+  bis zum Deckel 285:115 (Block-z +10,00); Anker @150 45:5 (n = 50); Champion-2 gegen v31-b01 108:42
+  (n = 150), trifft die transitive Erwartung (hergeleitet 71,8, gemessen 72,0 Prozent).
+* **Diagnostiken, gepaart gegen v32-b01:** R4/R4b unveraendert; R5-Daempfung 0,272 statt 0,177 (wieder
+  spielrelevant, weil der Champion Runde 5 per Netz spielt); Platt frozen_v3 A = +0,0059, B = 0,5804,
+  Brier 0,22806 (v32 reproduziert exakt, Brier-Regel haelt); sigma/Prior 1,54, unter 3.
+* **5b** Anzeige-Kalibrierung in `server.py`; **5d** Paritaets-Fixture `34cf8da5c17b04d3`, im frischen
+  Prozess gruen (der erste Versuch in der Erzeugungskette scheiterte an der PATH-Form in Git-Bash).
+* **Artefakt** `frozen_champions/v34-b01` mit Wheel `9449b63c...`, Golden Probe 10 Sonden, venv ohne
+  Netz, Referee-Selbsttest gruen. Zwei-Champion-Regel: `frozen_champions/v31-b01` ist Loeschkandidat
+  (Freigabe offen); Tages-Snapshot `b39f5a06`.
+* **Betrieb:** der Harness meldet Hintergrundaufgaben seit dem Neustart vom 2026-10-02 nach rund
+  30 min als gestoppt; beide Ketten liefen verwaist weiter und wurden per Monitor auf ihre
+  Ausgabedatei verfolgt. Die v35-Schwarm-Erzeugung startete danach von selbst (05:19-10:01).

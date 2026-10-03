@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: v34-b01 schlaegt den Champion v32-b01 als Paket mit Runde 5 per Netz 239:121, Block-z +7,37 (par.2a); die Arme E2 (z -0,36) und E4 (z +0,96) tragen nicht (par.10b/10c). Tor 2a gerissen als Self-Play-Effekt akzeptiert (par.9a). Nutzer 2026-10-02: v34-b01 wird promoviert (par.10d); offen nur der Promotions-Ablauf. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | Beleg: v34-b01 ist Champion seit 2026-10-03 (par.10e): Replikation gegen v32-b01 285:115, Block-z +10,00; Elo 1595 [1546; 1646]. Die Arme E2 (z -0,36) und E4 (z +0,96) tragen nicht (par.10b/10c). Rest: Paritaets-Fixture (5d) nach der v35-Erzeugung. -->
 
 # Vorregistrierung: das v34-Fenster
 
@@ -465,3 +465,59 @@ par.2a": *"ja er wird promoviert"*. Promoviert wird das PAKET der Kante par.2a: 
 `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json` (Startkuppel-Suche, Runde 5 per Netz).
 Ablauf `/mosaic-champion-promotion` (Checkliste `docs/promotion_checklist.md`) nach dem Neustart der
 Maschine (Nutzer: Neustart nach dem R5-A/B 400 gegen 200).
+
+### par.10e PROMOTION v34-b01 (2026-10-02 23:53 bis 2026-10-03 05:11, `tools/v34_promotion_chain.sh`, exklusiv)
+
+Ablauf `docs/promotion_checklist.md`. `models/champion.txt` = `v34-b01_brierbest`, Champion-Spec
+`models/v34-b01_brierbest.spec.json` (byte-gleich `v33_gating_r5net.spec.json`, sha256 `721e08f0...`:
+Startkuppel-Suche, Runde 5 per Netz). Wheel live `9449b63c...`.
+
+**Elo-Kanten** (Register `evaluations/elo_history.csv`, fuenf Zeilen 2026-10-02/03):
+
+| Kante | Ergebnis | Aufbau |
+| --- | --- | --- |
+| Gating gegen v32-b01, Seeds 20261600/01 (par.2a) | 141:79 und 98:42, frueh gestoppt nach 110/70 Paaren | paired_gating, SPRT 0,001 |
+| **Replikation bis zum Deckel**, Seed 20261603 | **285:115 = 71,3 %**, 200 Paare, Block-z **+10,00** | paired_gating, SPRT 1e-12, Champion mit eingefrorener Spec |
+| Anker `hv4_anchor` @150 | **45:5** (n = 50 fest) | frozen_referee_match, Worker 150 Sims / c_puct 0,3 ausdruecklich; Handshake ROT (Cross-Aera, vorgesehen), Golden GRUEN |
+| Champion-2 gegen das Artefakt `v31-b01` | **108:42 = 72,0 %** (n = 150) | frozen_referee_match, Handshake GRUEN, Golden GRUEN |
+
+**Elo nach dem Fit:** `v34-b01@400` **1595 [1546; 1646]** aus 960 Partien (2 von 5 Kanten frueh
+gestoppt); `v32-b01@400` 1460 [1416; 1507] (vorher 1472, die neuen Kanten verschieben die Leiter).
+**Transitive Pruefung, HERLEITUNG:** v34 gegen v32 rund +135 Elo (Fit-Differenz), v32 gegen v31 rund
++27; erwartet gegen v31 also rund +162 Elo = 71,8 %, gemessen 72,0 %.
+
+**Pflicht-Diagnostiken, gepaart gegen v32-b01:**
+
+| | v32-b01 | **v34-b01** | Paarungs-Beleg |
+| --- | --- | --- | --- |
+| R4: Value-Kopf Steigung / R2 | 0,456 / 0,408 | 0,457 / 0,419 | eingefrorenes Substrat (sha256 `f2e173d1...`, game_ids gegen die Referenz geprueft 2026-10-02); Eingabe-Sonde 0,087 / 0,034 beidseits identisch |
+| R4: Punkte-Kopf Steigung / R2 | 1,250 / 0,327 | 1,225 / 0,331 | dieselben |
+| R4: Vorzeichen-Anker | 50/70 | 50/70 | dieselben |
+| R4b: Trunk -> Marge / Siegwahrscheinlichkeit | 0,940 / 0,910 | 0,930 / 0,905 | Decke 0,983 / 0,914 |
+| R4b: Koepfe realisiert (Margenskala) | -2,28 | -2,08 | dieselben |
+| R5: Value-Daempfung (Steigung) / R2 | 0,177 / 0,328 | **0,272 / 0,392** | Kennlinie BITGLEICH (a = -0,78786, b = 0,39438), 24 Zustaende x 6 Kombinationen |
+| R5: Punkte-Kopf Steigung / R2 | 1,068 / 0,378 | 1,080 / 0,380 | dieselben |
+| Platt `frozen_v3`: A / B / Brier | -0,0127 / 0,5989 / 0,22864 | **+0,0059 / 0,5804 / 0,22806** | v32 reproduziert seine Werte EXAKT |
+| Platt `frozen_v1` (Trend): B / Brier | 0,5462 / 0,26181 | 0,5204 / 0,26848 | dieselben Laeufe |
+| sigma/Prior, Median (Runden 1-4) | 1,743 | **1,544** | 233 verwertbare von 300 Zustaenden |
+
+**Lesart, knapp:** R4/R4b unveraendert (Trunk traegt, Koepfe verlieren). Die R5-Daempfung ist
+deutlich kleiner geworden (Steigung 0,177 -> 0,272); fuer v34 ist das wieder spielrelevant, weil der
+Champion Runde 5 per Netz spielt (Checkliste 5, Wiedervorlage 2026-10-01). Ein Intervall traegt das
+Werkzeug nicht aus, 139 Paare aus 24 Zustaenden sind geklumpt: Richtung, kein Befund. Die
+**Brier-Regel haelt** (0,22806 gegen 0,22864); auf dem alten frozen_v1 ist v34 schlechter (Trend,
+aeltere Verteilung). sigma/Prior unter 3, die c_visit/c_scale-Familie oeffnet sich NICHT.
+**Laufzeiten** (Artefakte): Replikation 2 h 36 min, Anker rund 10 min, Champion-2 54 min, R4 46 min,
+R4b 14 s, R5 14,5 min, Platt je rund 15 s, sigma/Prior 11,8 min, Golden Probe 21 min.
+
+**5b Anzeige-Kalibrierung:** `server.py` `_DISPLAY_CAL_A/_B` auf 0,0059 / 0,5804 (wirkt nach
+Server-Neustart). **5d Netz-Paritaets-Fixture: OFFEN** -- der Lauf in `tools/night_v35_swarm.sh`
+scheiterte an `STATUS_DLL_NOT_FOUND` (0xc0000135): der Python-Pfad im Git-Bash-PATH war ein
+Windows-Pfad mit Doppelpunkt; von Hand nachziehen, sobald die v35-Erzeugung durch ist (cargo ist Last).
+**Punkt 7, Artefakt `models/frozen_champions/v34-b01/`:** `model.onnx`, `model.pth`, `spec.json`,
+Wheel `9449b63c...` (byte-gleich mit dem installierten, `direct_url.json`), Manifest, Golden Probe
+(10 Sonden, 21 min), venv ohne Netz, Referee-Selbsttest GRUEN (Handshake, 10/10, zwei Echtpartien
+1:1). Netze und Wheel per `.gitignore` NICHT im Repo.
+**Zwei-Champion-Regel:** `frozen_champions/v31-b01` faellt heraus (amtierend v34-b01, Vorgaenger
+v32-b01); Loeschung nur mit restic-Beleg und pfadgenauer Nutzer-Freigabe. `frozen_champions/v33-b01`
+(Generator v34) ebenfalls Kandidat. Tages-Snapshot dafuer: `b39f5a06` (2026-10-03 05:12, ohne VSS).
