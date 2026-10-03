@@ -3121,6 +3121,11 @@ pub(crate) struct ForcedDomeOutcome {
     /// Rueckgabe: "none" (kein Knoten, keine Wahl), "random" (Muenze gefallen),
     /// "search" (Knoten per Suche), "single" (Knoten mit einem Kandidaten).
     pub(crate) return_mode: &'static str,
+    /// par.3c: der Platzwahl-Record (Zustand unmittelbar vor der Platzwahl,
+    /// Ziel der Platzsuche, `dice_place`/`dice_place_ids`), `None`, wenn es nur
+    /// einen Platz gab (keine Suche, kein Entscheid). Die Schleife schiebt ihn
+    /// hinter den Ausloeser-Record und stempelt `forced_domes_before`.
+    pub(crate) place_record: Option<Map<String, Value>>,
 }
 
 impl ForcedDomeOutcome {
@@ -3190,22 +3195,28 @@ fn classify_drawn_positions(state: &GameState, player: usize, depth: usize) -> (
     (pre, own, foreign)
 }
 
-/// Eine Suche OHNE Record ueber `drafting_actions(state)` (schon vom Pin
-/// gefiltert), deterministisch und ohne Root-Noise (F6). Bei nur einer Aktion
-/// keine Suche.
+/// Ausgaben einer Suche des erzwungenen Zugs, die der Platzwahl-Record (par.3c)
+/// braucht: Policy-Ziel, Wurzel-Q, completed-Q je Kandidat, Rueckfall-Flagge.
+type DiceSearchTargets = (Vec<Value>, Option<f64>, Vec<f64>, bool);
+
+/// Eine Suche ueber `drafting_actions(state)` (schon vom Pin gefiltert),
+/// deterministisch und ohne Root-Noise (F6). Bei nur einer Aktion keine Suche
+/// (dritter Wert `None`). Sonst liefert sie die Ziele der Suche mit
+/// ([`DiceSearchTargets`]); ob daraus ein Record wird, entscheidet der Aufrufer
+/// (nur die Platzwahl schreibt einen, par.3c).
 fn dice_search_choice(
     game: &Game,
     cfg: &DomeDiceConfig<'_>,
     sims: u32,
     seed: u64,
     move_number: u64,
-) -> (Action, usize) {
+) -> (Action, usize, Option<DiceSearchTargets>) {
     let actions = drafting_actions(&game.state);
     if actions.len() == 1 {
-        return (actions[0].clone(), 1);
+        return (actions[0].clone(), 1, None);
     }
     let mut rng = StdRng::seed_from_u64(seed);
-    let (chosen, _policy, _rq, _cq, _fallback, _kl) = net_drafting_policy_with_fallback_flag(
+    let (chosen, policy, root_q, child_q, fallback, _kl) = net_drafting_policy_with_fallback_flag(
         cfg.net,
         &game.state,
         &actions,
@@ -3218,15 +3229,55 @@ fn dice_search_choice(
         None,
         &cfg.search_config,
     );
-    (chosen, actions.len())
+    (chosen, actions.len(), Some((policy, root_q, child_q, fallback)))
+}
+
+/// par.3c: der Platzwahl-Record der gewuerfelten Platte. `state` ist der
+/// Zustand unmittelbar VOR der Platzwahl (Ziehungen ausgefuehrt, Pin gesetzt;
+/// der Pin selbst steht nicht in `state_to_json`). `valid_actions` ist die
+/// vom Pin gefilterte Liste, `dice_place_ids` dieselben Aktionen als
+/// Policy-IDs (sortiert, eindeutig) -- die Maske im Training
+/// (`corpus_dataset.py`, `restrict_mask_to_dice_place_ids`) laesst den
+/// Policy-Verlust nur ueber diese IDs laufen. Felder sonst wie im
+/// Drafting-Record der Schleife (`root_q`, `root_child_q`, Rueckfall-Flagge);
+/// Wertziele stempelt die Schleife am Partieende wie bei jedem Record.
+fn dice_place_record(state: &GameState, targets: &DiceSearchTargets) -> Map<String, Value> {
+    let (policy, root_q, child_q, fallback) = targets;
+    let actions = drafting_actions(state);
+    let mut ids: Vec<usize> = actions.iter().map(|a| action_to_id_direct(state, a)).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let mut m = Map::new();
+    m.insert("state".into(), state_to_json(state, true));
+    m.insert("policy".into(), Value::Array(policy.clone()));
+    m.insert("valid_actions".into(), Value::Array(actions.iter().map(|a| action_to_env_dict(state, a)).collect()));
+    m.insert("moon_order_target".into(), Value::Null);
+    m.insert("player".into(), json!(state.current_player));
+    if let Some(rq) = root_q {
+        m.insert("root_q".into(), json!(rq));
+    }
+    if let Some(v) = root_child_q_field(child_q) {
+        m.insert("root_child_q".into(), v);
+    }
+    // Rueckfall wie in `NetSelfPlayAgent::decide`: Ziel ungueltig plus Flagge.
+    if *fallback {
+        m.insert("policy_target_valid".into(), json!(false));
+    }
+    if let Some(v) = fallback_random_action_field(*fallback) {
+        m.insert("fallback_random_action".into(), v);
+    }
+    m.insert("dice_place".into(), json!(true));
+    m.insert("dice_place_ids".into(), json!(ids));
+    m
 }
 
 /// Der erzwungene Plattenzug der Wuerfel-Seite (Bauplan 4.4), komplett
 /// innerhalb EINER Schleifeniteration. Alle Teilzuege direkt ueber
 /// `game.apply_drafting`, NICHT ueber `apply_chosen_action_with` (dessen
 /// Peek-Zweig koennte den Sammelaufloeser starten, self_play.rs
-/// `apply_chosen_action_with`). Schreibt keinen Record, beruehrt weder
-/// `move_number` noch den Partie-RNG; `move_number` geht nur an die Suche
+/// `apply_chosen_action_with`). Schreibt selbst keinen Record (seit par.3c
+/// liefert es den Platzwahl-Record in `ForcedDomeOutcome::place_record` an die
+/// Schleife), beruehrt weder `move_number` noch den Partie-RNG; `move_number` geht nur an die Suche
 /// (wirkungslos bei `deterministic = true`, siehe
 /// `net_drafting_policy_with_fallback_flag`).
 ///
@@ -3265,18 +3316,21 @@ pub(crate) fn apply_forced_dome_move(
     let search_seed = |ctr: u64| {
         crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEARCH_SEED_DISTINGUISHER, ctr)
     };
-    let (place, slots) =
+    let (place, slots, targets) =
         dice_search_choice(game, cfg, cfg.place_sims, search_seed(forced_index * 2), move_number);
     debug_assert!(matches!(place, Action::ChooseDomeSlot(_) | Action::ChooseDrawStackSlot(_)));
+    // par.3c: Platzwahl-Record aus dem Zustand VOR der Platzwahl, nur bei einer
+    // echten Suche (mehr als ein Platz).
+    let place_record = targets.as_ref().map(|t| dice_place_record(&game.state, t));
     game.apply_drafting(&place)?;
     // (6) Rueckgabeknoten, nur falls er sich oeffnet (game.rs `return_order_node_applies`).
     let return_mode = if game.state.pending_return_order.is_some() {
         if roll.return_first.is_some() {
-            let (a, _) = dice_search_choice(game, cfg, cfg.return_sims, 0, move_number);
+            let (a, _, _) = dice_search_choice(game, cfg, cfg.return_sims, 0, move_number);
             game.apply_drafting(&a)?;
             "random"
         } else {
-            let (a, n) =
+            let (a, n, _) =
                 dice_search_choice(game, cfg, cfg.return_sims, search_seed(forced_index * 2 + 1), move_number);
             game.apply_drafting(&a)?;
             if n == 1 { "single" } else { "search" }
@@ -3302,6 +3356,7 @@ pub(crate) fn apply_forced_dome_move(
         rotation: roll.rotation,
         slots,
         return_mode,
+        place_record,
     })
 }
 
@@ -3338,6 +3393,40 @@ pub(crate) fn apply_dice_roll(game: &mut Game, roll: &DiceRoll) -> Result<(), St
         return_order: roll.return_order.clone(),
     });
     Ok(())
+}
+
+/// Hoechstzahl erzwungener Schritte in [`apply_forced_pin_steps`]: ein
+/// W-Plattenzug hat nach der Platzwahl hoechstens Rueckgabekopf und Rotation
+/// (plus bei einem einzigen Platz die Platzwahl selbst), die Schranke ist reine
+/// Absicherung gegen eine Endlosschleife.
+const FORCED_PIN_STEPS_MAX: usize = 8;
+
+/// par.3b1 (Nutzer-Entscheid 2026-10-03): erzwungene Ein-Aktions-Schritte
+/// innerhalb eines festgenagelten W-Plattenzugs direkt anwenden. Solange der
+/// Pin dem Spieler am Zug gehoert und `drafting_actions` genau EINE Aktion
+/// anbietet (Platz bei einem einzigen freien Platz, gewuerfelter Rueckgabekopf,
+/// Rotation), wird sie ueber `apply_drafting` angewandt -- Kosten,
+/// Spielerwechsel und Pin-Loeschung passieren also genau dort, wo sie im
+/// echten Zug passieren. Mehr als eine Aktion (eine echte Platz- oder
+/// Rueckgabewahl) oder kein Pin: Halt. Rueckgabe: Zahl der angewandten Schritte.
+/// Verbraucher ist die Suche (`net_mcts::apply_tree_action`), die damit fuer
+/// diese Schritte weder Baumknoten noch Netzaufruf braucht.
+pub(crate) fn apply_forced_pin_steps(game: &mut Game) -> Result<usize, String> {
+    let mut applied = 0usize;
+    while applied < FORCED_PIN_STEPS_MAX {
+        let st = &game.state;
+        let pinned_mover = st.dome_dice_pin.as_ref().is_some_and(|p| p.player == st.current_player);
+        if !pinned_mover || st.phase != Phase::Drafting {
+            break;
+        }
+        let actions = drafting_actions(st);
+        if actions.len() != 1 {
+            break;
+        }
+        game.apply_drafting(&actions[0])?;
+        applied += 1;
+    }
+    Ok(applied)
 }
 
 /// Zustandsteil des Ausloesers (Bauplan 4.3): Runde 1..4, kein Teilzug offen,
@@ -5766,6 +5855,15 @@ fn unified_game_loop<R: Rng + ?Sized>(
                             }
                         }
                         records.push(m);
+                        // par.3c: der Platzwahl-Record gehoert zu DIESEM Halbzug
+                        // (kein eigener Halbzug, kein Zaehler bewegt sich), steht
+                        // hinter dem Ausloeser und traegt denselben
+                        // `forced_domes_before`. Die Kosten (F9) gehen weiter an
+                        // den ersten Record NACH dem Zug, darum hier `None`.
+                        if let Some(mut rec) = dice_outcome.as_ref().and_then(|o| o.place_record.clone()) {
+                            stamp_dome_dice_counters(&mut rec, forced_before_this, &mut None);
+                            records.push(rec);
+                        }
                     }
                     // F9: die Kosten des eben erzwungenen Zugs gehoeren an den
                     // ERSTEN Record NACH ihm (Zustand nach dem Zug), nicht an den
@@ -15140,6 +15238,12 @@ mod dome_dice_tests {
         let cfg = dice_cfg(&net, w);
         let out = apply_forced_dome_move(&mut game, &cfg, seed, 0, 1).expect("erzwungener Zug");
         assert_eq!((out.from_stack, out.depth, out.depth_max), (true, 13, 13));
+        // par.3c: Platzwahl-Record mit dem Zustand VOR der Platzwahl (13 Platten
+        // gezogen) und den Plaetzen der behaltenen Platte.
+        let rec = out.place_record.as_ref().expect("Platzwahl-Record");
+        assert_eq!(rec["state"]["pending_stack_draw"].as_array().map(|a| a.len()), Some(13));
+        assert_eq!(rec["dice_place_ids"].as_array().unwrap().len(), out.slots);
+        assert_eq!(rec["valid_actions"].as_array().unwrap().len(), out.slots);
         assert_eq!((out.from_prefix, out.from_own_block, out.from_foreign_block), (13, 0, 0));
         assert_eq!(out.paid, 5, "Zahlung auf den Stand gedeckelt (board.rs apply_paid_cost)");
         assert_eq!(game.state.players[w].score, 0);
@@ -15181,6 +15285,7 @@ mod dome_dice_tests {
         let seed = seed_where(&game.state, 0, |r| matches!(r.source, DiceRollSource::Display { .. }));
         let out = apply_forced_dome_move(&mut game, &dice_cfg(&net, w), seed, 0, 1).unwrap();
         assert_eq!(out.slots, 1, "ein Kandidat: Platz ohne Suche angewandt");
+        assert!(out.place_record.is_none(), "par.3c: ohne Wahl kein Platzwahl-Record");
         assert!(game.state.players[w].dome_grid.empty_slots().is_empty());
     }
 
@@ -15328,7 +15433,8 @@ mod dome_dice_tests {
                 assert!(c[1].as_i64().unwrap() <= c[0].as_i64().unwrap(), "bezahlt <= verlangt");
             }
             let st = &r["state"];
-            if r["player"] == json!(side) && r.get("valid_actions").is_some() {
+            // par.3c: der Platzwahl-Record steht MITTEN im Plattenzug (eigene Pruefung unten).
+            if r["player"] == json!(side) && r.get("valid_actions").is_some() && r.get("dice_place").is_none() {
                 for a in r["valid_actions"].as_array().unwrap() {
                     let t = a["type"].as_str().unwrap_or("");
                     assert!(
@@ -15338,6 +15444,37 @@ mod dome_dice_tests {
                 }
             }
         }
+        // par.3c: jeder Platzwahl-Record folgt direkt auf einen Ausloeser, gehoert
+        // zur Wuerfel-Seite, traegt dessen `forced_domes_before`, keine Kosten und
+        // `dice_place_ids` = die IDs seiner (vom Pin gefilterten) `valid_actions`.
+        let mut places = 0usize;
+        for (i, r) in records.iter().enumerate() {
+            if r.get("dice_place").is_none() {
+                continue;
+            }
+            places += 1;
+            assert_eq!(r["dice_place"], json!(true));
+            assert_eq!(r["player"], json!(side));
+            let prev = &records[i - 1];
+            assert_eq!(prev["dice_trigger"], json!(true), "Platzwahl-Record direkt hinter dem Ausloeser");
+            assert_eq!(r["forced_domes_before"], prev["forced_domes_before"]);
+            assert!(r.get("dome_dice_cost").is_none() && r.get("dice_trigger").is_none());
+            let mut ids: Vec<usize> =
+                r["valid_actions"].as_array().unwrap().iter().map(crate::features::action_to_id).collect();
+            ids.sort_unstable();
+            ids.dedup();
+            assert!(ids.len() > 1, "Record nur bei echter Platzwahl");
+            let got: Vec<usize> =
+                r["dice_place_ids"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap() as usize).collect();
+            assert_eq!(got, ids, "dice_place_ids = Plaetze der Wuerfel-Platte");
+            let mass: f64 = r["policy"].as_array().unwrap().iter().map(|e| e["prob"].as_f64().unwrap()).sum();
+            assert!((mass - 1.0).abs() < 1e-9);
+            for e in r["policy"].as_array().unwrap() {
+                assert!(ids.contains(&crate::features::action_to_id(&e["action"])), "Ziel nur ueber die Plaetze");
+            }
+            assert!(r.get("root_q").is_some(), "echte Suche");
+        }
+        assert!(places >= 4 && places <= triggers, "Platzwahl-Records {places} bei {triggers} Ausloesern");
         // Der letzte Record (Tiling Runde 5) steht nach allen erzwungenen Zuegen.
         assert_eq!(triggers as u64, last, "ein Ausloeser je erzwungener Platte");
         assert_eq!(triggers, costs, "je erzwungener Platte genau ein Kostenfeld (F9)");
@@ -15370,6 +15507,52 @@ mod dome_dice_tests {
     }
 
     // ── par.3b: Zufallsknoten im Suchbaum ──────────────────────────────────
+
+    /// par.3b1: erzwungene Schritte unter dem Pin laufen ueber `apply_drafting`
+    /// (Rotation loescht den Pin und wechselt den Spieler, genau wie der Einzelzug);
+    /// bei echter Wahl, fremdem Pin oder ohne Pin passiert nichts.
+    #[test]
+    fn forced_pin_steps_apply_exactly_like_apply_drafting() {
+        let game = round_one_game(23, true);
+        let w = game.state.current_player;
+        let tile = game.state.dome_display[0].tile_id;
+        let pin = |rot: u32| crate::moves::DomeDicePin {
+            player: w,
+            source: crate::moves::DomeDiceSource::Display { tile_id: tile },
+            rotation: rot,
+            return_first: None,
+            return_order: None,
+        };
+        // Viele Plaetze: echte Wahl, kein Schritt.
+        let mut g = Game { state: game.state.clone() };
+        g.state.dome_dice_pin = Some(pin(90));
+        assert_eq!(apply_forced_pin_steps(&mut g).unwrap(), 0);
+        // Nach der Platzwahl: Rotation erzwungen -> wie der Einzelzug.
+        let slot = drafting_actions(&g.state)[0].clone();
+        g.apply_drafting(&slot).unwrap();
+        let mut manual = Game { state: g.state.clone() };
+        manual.apply_drafting(&Action::ChooseDomeRotation(90)).unwrap();
+        assert_eq!(apply_forced_pin_steps(&mut g).unwrap(), 1);
+        assert_eq!(state_to_json(&g.state, true), state_to_json(&manual.state, true));
+        assert!(g.state.dome_dice_pin.is_none() && g.state.current_player == 1 - w);
+        // Einziger freier Platz: Platz UND Rotation, zwei Schritte.
+        let mut one = Game { state: game.state.clone() };
+        let filler = one.state.dome_tile_pool[0].clone();
+        let empty = one.state.players[w].dome_grid.empty_slots();
+        for &(r, c) in &empty[1..] {
+            one.state.players[w].dome_grid.dome_slots[r][c] = Some(filler.clone());
+        }
+        one.state.dome_dice_pin = Some(pin(180));
+        assert_eq!(apply_forced_pin_steps(&mut one).unwrap(), 2);
+        assert!(one.state.players[w].dome_grid.empty_slots().is_empty());
+        assert_eq!(one.state.current_player, 1 - w);
+        // Fremder Pin oder kein Pin: nichts.
+        let mut other = Game { state: game.state.clone() };
+        other.state.dome_dice_pin = Some(crate::moves::DomeDicePin { player: 1 - w, ..pin(0) });
+        assert_eq!(apply_forced_pin_steps(&mut other).unwrap(), 0);
+        let mut none = Game { state: game.state.clone() };
+        assert_eq!(apply_forced_pin_steps(&mut none).unwrap(), 0);
+    }
 
     fn is_plate_policy_entry(e: &Value) -> bool {
         matches!(e["action"]["type"].as_str(), Some("choose_dome_slot") | Some("dome_stack_peek"))
@@ -15464,52 +15647,77 @@ mod dome_dice_tests {
         assert_eq!(collapse_plate_actions_for_deviation(&stones, &stone), (stones.clone(), stone));
     }
 
-    /// Messbericht zu par.3b (kein Gate, nur auf Anweisung): an den
-    /// Plattenentscheiden der W-Seite einer Testpartie die Zahl der
-    /// Wurzelkanten und die Baumform einer W-Suche mit gleichen Sims und gleichem
-    /// Seed, ohne und mit Zufallsknoten.
+    /// Messbericht zu par.3b/par.3b1 (kein Gate, nur auf Anweisung): an den
+    /// Plattenentscheiden der W-Seite (`dice_trigger`-Records) einer Testpartie
+    /// die Zahl der Wurzelkanten und die Baumform einer W-Suche mit gleichen Sims
+    /// und gleichem Such-Seed 7, in drei Varianten: A ohne Zufallsknoten, B
+    /// Zufallsknoten wie in par.3b (ohne Widening, ohne erzwungene Schritte),
+    /// C mit beiden Massnahmen aus par.3b1. Grundmenge: die Partien werden mit
+    /// der par.3b-Baumregel erzeugt (Variante B im ganzen Thread), damit Seed 4711
+    /// genau die 8 Entscheide aus par.3b1 liefert; Seed 4712 ist die zweite
+    /// Testpartie.
     /// `cargo test --release --lib dice_tree_depth_report -- --ignored --nocapture`
     #[test]
-    #[ignore = "Messbericht par.3b, nur auf Anweisung"]
+    #[ignore = "Messbericht par.3b/par.3b1, nur auf Anweisung"]
     fn dice_tree_depth_report() {
+        use crate::net_mcts::{dice_tree_shape, set_dice_tree_features_for_test, DiceTreeFeatures, DiceTreeShape};
+        let legacy = DiceTreeFeatures { forced_steps: false, widening: false };
         let net = champion_net();
         let ext = crate::net_mcts::net_supports_extended_action_nodes(&net);
-        let records = play_dice_game(&net, 4711, Some(16));
+        set_dice_tree_features_for_test(Some(legacy));
+        let games: Vec<(u64, Vec<Value>)> =
+            [4711u64, 4712].iter().map(|&seed| (seed, play_dice_game(&net, seed, Some(16)))).collect();
+        set_dice_tree_features_for_test(None);
         for sims in [100u32, 400] {
-            let mut rng = StdRng::seed_from_u64(1);
-            let mut rows = Vec::new();
-            for r in records.iter().filter(|r| r.get("dice_trigger").is_some()) {
-                let mut st = crate::serialize::json_to_state(&r["state"], &mut rng).expect("Record-Zustand");
-                st.extended_action_nodes = [ext, ext];
-                let w = st.current_player;
-                let off = crate::net_mcts::dice_tree_shape(&net, &st, sims, 7, &SearchConfig::from_env());
-                let on_cfg = SearchConfig { dome_dice_side: Some(w), ..SearchConfig::from_env() };
-                let on = crate::net_mcts::dice_tree_shape(&net, &st, sims, 7, &on_cfg);
-                eprintln!(
-                    "[dice_tree] sims={sims} runde={} kanten {}->{} | knoten {}->{} zufall={} | tiefe max {}->{} mittel {:.2}->{:.2} \
-                     | halbzug max {}->{} mittel {:.2}->{:.2}",
-                    st.round_number, off.root_edges, on.root_edges, off.nodes, on.nodes, on.chance_nodes,
-                    off.max_depth, on.max_depth, off.mean_depth, on.mean_depth, off.max_ply, on.max_ply,
-                    off.mean_ply, on.mean_ply
-                );
-                rows.push((off, on));
+            let mut all: Vec<[DiceTreeShape; 3]> = Vec::new();
+            for (seed, records) in &games {
+                let mut rng = StdRng::seed_from_u64(1);
+                let mut rows: Vec<[DiceTreeShape; 3]> = Vec::new();
+                for r in records.iter().filter(|r| r.get("dice_trigger").is_some()) {
+                    let mut st = crate::serialize::json_to_state(&r["state"], &mut rng).expect("Record-Zustand");
+                    st.extended_action_nodes = [ext, ext];
+                    let w = st.current_player;
+                    let on_cfg = SearchConfig { dome_dice_side: Some(w), ..SearchConfig::from_env() };
+                    let a = dice_tree_shape(&net, &st, sims, 7, &SearchConfig::from_env());
+                    set_dice_tree_features_for_test(Some(legacy));
+                    let b = dice_tree_shape(&net, &st, sims, 7, &on_cfg);
+                    set_dice_tree_features_for_test(None);
+                    let c = dice_tree_shape(&net, &st, sims, 7, &on_cfg);
+                    eprintln!(
+                        "[dice_tree] partie={seed} sims={sims} runde={} kanten {}/{}/{} | knoten {}/{}/{} | \
+                         tiefe mittel {:.2}/{:.2}/{:.2} | halbzug max {}/{}/{} mittel {:.2}/{:.2}/{:.2}",
+                        st.round_number, a.root_edges, b.root_edges, c.root_edges, a.nodes, b.nodes, c.nodes,
+                        a.mean_depth, b.mean_depth, c.mean_depth, a.max_ply, b.max_ply, c.max_ply,
+                        a.mean_ply, b.mean_ply, c.mean_ply
+                    );
+                    rows.push([a, b, c]);
+                }
+                report_dice_tree_means(&format!("partie={seed}"), sims, &rows);
+                all.extend(rows);
             }
-            assert!(!rows.is_empty());
-            let n = rows.len() as f64;
-            let mean = |f: &dyn Fn(&crate::net_mcts::DiceTreeShape) -> f64| -> (f64, f64) {
-                (rows.iter().map(|(o, _)| f(o)).sum::<f64>() / n, rows.iter().map(|(_, x)| f(x)).sum::<f64>() / n)
-            };
-            let e = mean(&|s| s.root_edges as f64);
-            let md = mean(&|s| s.max_depth as f64);
-            let ad = mean(&|s| s.mean_depth);
-            let mp = mean(&|s| s.max_ply as f64);
-            let ap = mean(&|s| s.mean_ply);
-            eprintln!(
-                "[dice_tree] SUMME n={} Entscheide, {sims} Sims: Wurzelkanten {:.1}->{:.1}, max. Knotentiefe {:.2}->{:.2}, \
-                 mittl. Knotentiefe {:.2}->{:.2}, max. Halbzugtiefe {:.2}->{:.2}, mittl. Halbzugtiefe {:.2}->{:.2}",
-                rows.len(), e.0, e.1, md.0, md.1, ad.0, ad.1, mp.0, mp.1, ap.0, ap.1
-            );
+            report_dice_tree_means("beide Partien", sims, &all);
         }
+    }
+
+    /// Mittelwerte je Variante A/B/C fuer [`dice_tree_depth_report`].
+    fn report_dice_tree_means(label: &str, sims: u32, rows: &[[crate::net_mcts::DiceTreeShape; 3]]) {
+        assert!(!rows.is_empty());
+        let n = rows.len() as f64;
+        let m = |f: &dyn Fn(&crate::net_mcts::DiceTreeShape) -> f64| -> String {
+            (0..3).map(|k| format!("{:.2}", rows.iter().map(|r| f(&r[k])).sum::<f64>() / n)).collect::<Vec<_>>().join("/")
+        };
+        eprintln!(
+            "[dice_tree] SUMME {label} n={} Entscheide, {sims} Sims (A ohne / B par.3b / C par.3b1): \
+             Wurzelkanten {}, Knoten {}, max. Knotentiefe {}, mittl. Knotentiefe {}, max. Halbzugtiefe {}, \
+             mittl. Halbzugtiefe {}",
+            rows.len(),
+            m(&|s| s.root_edges as f64),
+            m(&|s| s.nodes as f64),
+            m(&|s| s.max_depth as f64),
+            m(&|s| s.mean_depth),
+            m(&|s| s.max_ply as f64),
+            m(&|s| s.mean_ply)
+        );
     }
 }
 

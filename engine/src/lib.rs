@@ -860,6 +860,9 @@ fn engine_config_json() -> String {
         // (Regelname, Muster `aggr_own_q_gap_n_min_rule`); trennt im Manifest
         // Laeufe vor und nach dem Zufallsknoten.
         "dome_dice_tree_rule": crate::net_mcts::DOME_DICE_TREE_RULE,
+        // par.3b1: Exponent des Progressive Widening am Zufallsknoten
+        // (hoechstens ceil(N^x) Ausgaenge bei N Durchgaengen).
+        "dome_dice_outcome_widening_exponent": crate::net_mcts::DICE_OUTCOME_WIDENING_EXPONENT,
         // Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a): Stoerer-Knopf,
         // sein w und lambda (null = ungueltig bzw. lambda ungesetzt; dann lehnt
         // run_net_self_play bei aggr_side=1 ab) und die N_min-Regel von

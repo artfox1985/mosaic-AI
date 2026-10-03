@@ -363,6 +363,36 @@ def moon_target_from_policy(step):
     return max(best_base, key=lambda ps: ps[0])[1]
 
 
+def restrict_mask_to_dice_place_ids(mask, step, policy_ids):
+    """Klasse W, Platzwahl-Record (`PREREG_asymmetric_selfplay.md` par.3c).
+
+    Ein Record mit `dice_place_ids` beschreibt die Platzwahl der GEWUERFELTEN
+    Platte. Der Pin, der die Wahl auf diese Platte einschraenkt, steht nicht in
+    `state_to_json`; ohne Zusatz saehe das Training alle legalen Plattenaktionen
+    des Zustands als Alternativen und lernte, die gewuerfelte Platte zu
+    bevorzugen. Darum laeuft der Policy-Verlust hier NUR ueber diese IDs: die
+    Legalitaetsmaske wird durch eine Maske aus genau `dice_place_ids` ersetzt
+    (plus die Policy-Aktionen, Selbstkonsistenz wie in der Bauschleife; sie
+    liegen per Konstruktion in der Teilmenge, self_play.rs `dice_place_record`).
+
+    Ohne das Feld kommt `mask` unveraendert zurueck (jeder Korpus ohne Klasse W,
+    byte-identisch). KEINE Cache-Schluessel-Komponente, Begruendung wie bei
+    `fallback_random_action`: kein Knopf, die Maske gilt immer, sobald das Feld
+    im Record steht, und kein vorhandener Korpus kann das Feld tragen (es
+    entsteht erst mit dem Bau par.3c, HERLEITUNG: kein Wheel aus diesem Stand
+    gebaut, also keine Erzeugung damit).
+    """
+    ids = step.get("dice_place_ids")
+    if ids is None:
+        return mask
+    out = np.zeros_like(mask)
+    for i in ids:
+        out[int(i)] = 1.0
+    for i in policy_ids:
+        out[int(i)] = 1.0
+    return out
+
+
 def asymmetric_policy_masked(step, own_q_eps, mask_dice_trigger) -> bool:
     """Klasse S/W (`PREREG_asymmetric_selfplay.md` par.3/par.3a): nimmt die
     Bauschleife diesem Record das Policy-Ziel weg?
@@ -1669,8 +1699,12 @@ class MosaicDataset(Dataset):
                         # sind per Definition legal — immer in die Maske aufnehmen.
                         # Verhindert Policy-Leaks (Target-Masse auf maskierter Aktion →
                         # explodierender Policy-Loss), falls valid_actions unvollständig ist.
-                        for pe in step["policy"]:
-                            mask[action_to_id(pe["action"])] = 1.0
+                        pol_ids = [action_to_id(pe["action"]) for pe in step["policy"]]
+                        for i in pol_ids:
+                            mask[i] = 1.0
+                        # Klasse W par.3c: Platzwahl-Record -> Maske nur ueber
+                        # `dice_place_ids` (ohne Feld unveraendert).
+                        mask = restrict_mask_to_dice_place_ids(mask, step, pol_ids)
                         masks_l.append(mask)
 
                         moon_target = np.full(5, -1.0, dtype=np.float32)

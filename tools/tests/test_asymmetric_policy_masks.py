@@ -136,6 +136,37 @@ class CacheKeys(unittest.TestCase):
         self.assertNotEqual(b0, b1, "Block-Schluessel ignoriert MOSAIC_MASK_DICE_TRIGGER")
 
 
+class DicePlaceMask(unittest.TestCase):
+    """par.3c: Platzwahl-Record -> Legalitaetsmaske nur ueber `dice_place_ids`."""
+
+    @classmethod
+    def setUpClass(cls):
+        import numpy as np
+        import corpus_dataset
+        cls.np = np
+        cls.f = staticmethod(corpus_dataset.restrict_mask_to_dice_place_ids)
+
+    def test_without_field_mask_is_unchanged(self):
+        mask = self.np.zeros(10, dtype=self.np.float32)
+        mask[[1, 2, 7]] = 1.0
+        out = self.f(mask, {"player": 0}, [1])
+        self.assertIs(out, mask, "ohne Feld dasselbe Objekt (byte-identisch)")
+
+    def test_field_restricts_the_mask_to_the_ids(self):
+        mask = self.np.zeros(10, dtype=self.np.float32)
+        mask[[1, 2, 3, 7, 9]] = 1.0  # alle legalen Plattenaktionen des Zustands
+        out = self.f(mask, {"dice_place": True, "dice_place_ids": [2, 3]}, [3])
+        self.assertEqual(out.nonzero()[0].tolist(), [2, 3], "Verlust nur ueber die Plaetze der Wuerfel-Platte")
+        self.assertEqual(mask.nonzero()[0].tolist(), [1, 2, 3, 7, 9], "Eingabe unveraendert")
+        out = self.f(mask, {"dice_place_ids": [2]}, [5])
+        self.assertEqual(out.nonzero()[0].tolist(), [2, 5], "Policy-Aktionen bleiben (Selbstkonsistenz)")
+
+    def test_build_loop_applies_it_before_append(self):
+        text = CORPUS_DATASET.read_text(encoding="utf-8")
+        call = "mask = restrict_mask_to_dice_place_ids(mask, step, pol_ids)"
+        self.assertLess(text.index(call), text.index("masks_l.append(mask)"))
+
+
 class BuildLoopWiring(unittest.TestCase):
     """Textnah: die Bauschleife wendet die Maske auf `pol_w` an, NACH den Bestandsmasken
     und VOR dem Anhaengen; die Knoepfe kommen aus denselben Lesern wie die Schluessel."""

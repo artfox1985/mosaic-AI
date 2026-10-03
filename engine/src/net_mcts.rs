@@ -3035,10 +3035,13 @@ struct Node {
 
 /// Klasse W, par.3b: Name der Baum-Regel fuer die W-Platten, im Lauf-Manifest
 /// gemeldet (`lib.rs::engine_config_json`, Feld `dome_dice_tree_rule`).
-/// Bedeutung: Sammelkante "Platte legen" mit Zufallsknoten, je Besuch neu
-/// gewuerfelt, gleiche Wuerfe teilen einen Ausgang; Policy-Ziel nach Prior
-/// auf die Plattenaktions-IDs verteilt.
-pub const DOME_DICE_TREE_RULE: &str = "chance_node_per_visit_policy_split_by_prior";
+/// Bedeutung: Sammelkante "Platte legen" mit Zufallsknoten; je Besuch wird
+/// neu gewuerfelt, solange der Knoten weniger als `ceil(N^0.5)` Ausgaenge hat
+/// (Progressive Widening, [`DICE_OUTCOME_WIDENING_EXPONENT`]), sonst ein
+/// vorhandener Ausgang nach Besuchen wiederbesucht; gleiche Wuerfe teilen einen
+/// Ausgang; erzwungene Ein-Aktions-Schritte unter dem Pin ohne eigenen Knoten
+/// (par.3b1); Policy-Ziel nach Prior auf die Plattenaktions-IDs verteilt.
+pub const DOME_DICE_TREE_RULE: &str = "chance_node_single_assigned_plate_forced_pin_steps_policy_split_by_prior";
 
 /// Klasse W, Zufallsknoten im Suchbaum (`PREREG_asymmetric_selfplay.md`
 /// par.3b). Interne Kanten-Art statt einer neuen oeffentlichen
@@ -5959,7 +5962,7 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
         // Kein `SHUFFLE_STACK_PEEK_IN_SEARCH`-Zweig hier -- die Aufrufstelle
         // schaltet den Batch-Pfad bei aktivem Toggle komplett ab (siehe
         // Funktionskommentar), diese Funktion wird dann nie erreicht.
-        if g.apply_drafting(act).is_ok() {
+        if apply_tree_action(&mut g, act, search_config) {
             let mut child_state = g.state;
             child_state.log.clear();
             let terminal = child_state.phase != Phase::Drafting;
@@ -6116,7 +6119,7 @@ fn descend_and_backprop<R: Rng + ?Sized>(
             // par.7 Variante A: aus Sicht des ziehenden Spielers (`mover`).
             crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
         }
-        if g.apply_drafting(&act).is_ok() {
+        if apply_tree_action(&mut g, &act, search_config) {
             let mut child_state = g.state;
             child_state.log.clear();
             let child = make_node(
@@ -6199,12 +6202,130 @@ fn push_dice_chance_node(nodes: &mut Vec<Node>, nid: usize, act: Action, prior: 
     cid
 }
 
-/// EIN Durchgang durch den Zufallsknoten `cid`: wuerfeln (Such-RNG), den
-/// Ausgang mit gleichem Wurf suchen oder neu anlegen (Ziehungen + Pin, dann
-/// EIN Netzaufruf ueber `make_node`). Rueckgabe `(Ausgang, neu angelegt)`,
-/// `None`, wenn Wurf oder Ausfuehrung scheitern (laut Bauplan bei offener
-/// Pflicht unerreichbar; der Durchgang wird dann wie eine fehlgeschlagene
-/// Expansion ohne Backprop verworfen).
+/// par.3d: Exponent des Widening am Zufallsknoten. Bei N Durchgaengen hat der
+/// Zufallsknoten hoechstens `ceil(N^e)` verschiedene Ausgaenge
+/// ([`dice_outcome_limit`]). Mit e = 0 ist das GENAU EIN Ausgang: wer im Baum
+/// "Platte legen" waehlt, bekommt einmal eine Platte samt Rotation zugewiesen
+/// und waehlt darunter nur noch die Position (Nutzer 2026-10-03: *"so als wuerd
+/// ich als spieler eine platte zugewiesen bekommen deren rotation fix ist. ich
+/// kann dann nur noch die position waehlen"*). Gemessen tiefer als ohne
+/// Wuerfel-Modell und als e = 0,5 (`PREREG_asymmetric_selfplay.md` par.3d).
+/// Im Manifest ueber [`DOME_DICE_TREE_RULE`] und
+/// `dome_dice_outcome_widening_exponent` gemeldet.
+pub const DICE_OUTCOME_WIDENING_EXPONENT: f64 = 0.0;
+
+/// Hoechstzahl verschiedener Ausgaenge bei `n` Durchgaengen (mindestens 1).
+pub(crate) fn dice_outcome_limit(n: u32) -> usize {
+    ((n.max(1) as f64).powf(DICE_OUTCOME_WIDENING_EXPONENT).ceil() as usize).max(1)
+}
+
+/// Welche der beiden par.3b1-Massnahmen im Baum wirken. Produktiv immer
+/// beide; nur Tests (Messbericht `dice_tree_depth_report`, Vergleich mit dem
+/// Stand von par.3b) schalten sie je Thread ab
+/// ([`set_dice_tree_features_for_test`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DiceTreeFeatures {
+    /// Erzwungene Ein-Aktions-Schritte unter dem Pin direkt anwenden.
+    pub(crate) forced_steps: bool,
+    /// Progressive Widening am Zufallsknoten.
+    pub(crate) widening: bool,
+}
+
+#[cfg(test)]
+thread_local! {
+    static DICE_TREE_FEATURES_OVERRIDE: std::cell::Cell<Option<DiceTreeFeatures>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Nur Tests: setzt (oder mit `None` loescht) die Massnahmen fuer DIESEN Thread.
+#[cfg(test)]
+pub(crate) fn set_dice_tree_features_for_test(f: Option<DiceTreeFeatures>) {
+    DICE_TREE_FEATURES_OVERRIDE.with(|c| c.set(f));
+}
+
+pub(crate) fn dice_tree_features() -> DiceTreeFeatures {
+    #[cfg(test)]
+    if let Some(f) = DICE_TREE_FEATURES_OVERRIDE.with(|c| c.get()) {
+        return f;
+    }
+    DiceTreeFeatures { forced_steps: true, widening: true }
+}
+
+/// Wendet eine Baumkante an: `apply_drafting`, dann in einer W-Partie
+/// (`dome_dice_side` gesetzt) die erzwungenen Ein-Aktions-Schritte unter dem
+/// Pin (`self_play::apply_forced_pin_steps`, par.3b1), damit ein W-Plattenzug im
+/// Baum nur noch Zufall -> Platz belegt und der Netzaufruf erst am naechsten
+/// echten Entscheid faellt. Ohne Wuerfel-Seite exakt `apply_drafting` (Bestand).
+fn apply_tree_action(g: &mut Game, act: &Action, search_config: &SearchConfig) -> bool {
+    if g.apply_drafting(act).is_err() {
+        return false;
+    }
+    if search_config.dome_dice_side.is_some() && dice_tree_features().forced_steps {
+        return crate::self_play::apply_forced_pin_steps(g).is_ok();
+    }
+    true
+}
+
+/// Wahl am Zufallsknoten: ein vorhandener Ausgang oder ein neuer Wurf.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DiceChoice {
+    Existing(usize),
+    New(crate::self_play::DiceRoll),
+}
+
+/// Kern von [`dice_chance_step`] ohne Netzaufruf. Mit Widening: hat der
+/// Zufallsknoten schon [`dice_outcome_limit`] (N = Besuche + 1) Ausgaenge, wird
+/// ein VORHANDENER Ausgang gewaehlt, proportional zu seinen bisherigen Besuchen
+/// (gleichverteilt, solange keiner besucht ist). Sonst (und ohne Widening)
+/// wird gewuerfelt; ein Wurf, den es schon gibt, fuehrt auf dessen Ausgang.
+/// `None`, wenn der Wuerfel nichts liefert (beide Quellen leer).
+fn dice_chance_choice<R: Rng + ?Sized>(
+    nodes: &[Node],
+    cid: usize,
+    rng: &mut R,
+    widening: bool,
+) -> Option<DiceChoice> {
+    let children = &nodes[cid].children;
+    if widening && !children.is_empty() && children.len() >= dice_outcome_limit(nodes[cid].visits + 1) {
+        let total: u64 = children.iter().map(|&o| u64::from(nodes[o].visits)).sum();
+        let pick = if total == 0 {
+            children[rng.random_range(0..children.len())]
+        } else {
+            let mut r = rng.random_range(0..total);
+            let mut chosen = children[children.len() - 1];
+            for &o in children {
+                let v = u64::from(nodes[o].visits);
+                if r < v {
+                    chosen = o;
+                    break;
+                }
+                r -= v;
+            }
+            chosen
+        };
+        return Some(DiceChoice::Existing(pick));
+    }
+    let state = &nodes[cid].state;
+    let player = state.current_player;
+    let roll = crate::self_play::roll_dome_dice(
+        state,
+        state.extended_action_nodes[player],
+        crate::self_play::return_order_random_p(),
+        rng,
+    )?;
+    match children.iter().find(|&&o| matches!(&nodes[o].dice, DiceNodeKind::Outcome(r) if *r == roll)) {
+        Some(&oid) => Some(DiceChoice::Existing(oid)),
+        None => Some(DiceChoice::New(roll)),
+    }
+}
+
+/// EIN Durchgang durch den Zufallsknoten `cid`: Wahl ueber
+/// [`dice_chance_choice`] (Widening, Such-RNG), bei neuem Wurf den Ausgang
+/// anlegen (Ziehungen + Pin, erzwungene Schritte, dann EIN Netzaufruf ueber
+/// `make_node`). Rueckgabe `(Ausgang, neu angelegt)`, `None`, wenn Wurf oder
+/// Ausfuehrung scheitern (laut Bauplan bei offener Pflicht unerreichbar; der
+/// Durchgang wird dann wie eine fehlgeschlagene Expansion ohne Backprop
+/// verworfen).
 fn dice_chance_step<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -6213,21 +6334,18 @@ fn dice_chance_step<R: Rng + ?Sized>(
     rng: &mut R,
     search_config: &SearchConfig,
 ) -> Option<(usize, bool)> {
+    let features = dice_tree_features();
+    let roll = match dice_chance_choice(nodes, cid, rng, features.widening)? {
+        DiceChoice::Existing(oid) => return Some((oid, false)),
+        DiceChoice::New(roll) => roll,
+    };
     let player = nodes[cid].state.current_player;
-    let roll = crate::self_play::roll_dome_dice(
-        &nodes[cid].state,
-        nodes[cid].state.extended_action_nodes[player],
-        crate::self_play::return_order_random_p(),
-        rng,
-    )?;
-    if let Some(&oid) =
-        nodes[cid].children.iter().find(|&&o| matches!(&nodes[o].dice, DiceNodeKind::Outcome(r) if *r == roll))
-    {
-        return Some((oid, false));
-    }
     crate::profiling::note_gamestate_clone();
     let mut g = Game { state: nodes[cid].state.clone() };
     crate::self_play::apply_dice_roll(&mut g, &roll).ok()?;
+    if features.forced_steps {
+        crate::self_play::apply_forced_pin_steps(&mut g).ok()?;
+    }
     let mut child_state = g.state;
     child_state.log.clear();
     let mut child = make_node(
@@ -6512,7 +6630,7 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
                         // par.7 Variante A: aus Sicht des ziehenden Spielers.
                         crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
                     }
-                    if g.apply_drafting(&act).is_ok() {
+                    if apply_tree_action(&mut g, &act, search_config) {
                         let mut child_state = g.state;
                         child_state.log.clear();
                         let child = make_node(
@@ -6890,7 +7008,7 @@ fn build_net_tree_for<R: Rng + ?Sized>(
                     // par.7 Variante A: aus Sicht des ziehenden Spielers.
                     crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
                 }
-                if g.apply_drafting(&act).is_ok() {
+                if apply_tree_action(&mut g, &act, search_config) {
                     let mut child_state = g.state;
                     child_state.log.clear();
                     let terminal = child_state.phase != Phase::Drafting;
@@ -16300,14 +16418,16 @@ mod dome_dice_chance_tests {
         assert!(chance > 0, "der G-Baum legt Zufallsknoten an ({w_open} offene W-Knoten)");
     }
 
-    /// Test (b): der Zufallsknoten wuerfelt je Besuch neu und passt in der
-    /// Verteilung zu `roll_dome_dice` (Runde 1, keine Obergrenze, Rueckgabe-
-    /// Streuung aus: Quelle 1/2, Platte 1/Auslage bzw. Tiefe 1/Stapel,
-    /// Rotation 1/4); gleiche Wuerfe teilen sich einen Ausgang, jeder Ausgang
-    /// traegt den Pin seines Wurfs.
+    /// Test (b), OHNE Widening (par.3b-Stand, je Thread abgeschaltet): der
+    /// Zufallsknoten wuerfelt je Besuch neu und passt in der Verteilung zu
+    /// `roll_dome_dice` (Runde 1, keine Obergrenze, Rueckgabe-Streuung aus:
+    /// Quelle 1/2, Platte 1/Auslage bzw. Tiefe 1/Stapel, Rotation 1/4); gleiche
+    /// Wuerfe teilen sich einen Ausgang, jeder Ausgang traegt den Pin seines
+    /// Wurfs.
     #[test]
     fn chance_node_rolls_per_visit_and_shares_equal_outcomes() {
         assert_eq!(crate::self_play::return_order_random_p(), 0.0, "Test laeuft ohne Rueckgabe-Streuung");
+        set_dice_tree_features_for_test(Some(DiceTreeFeatures { forced_steps: true, widening: false }));
         let net = champion();
         let st = w_state(13, Some(&net));
         let w = st.current_player;
@@ -16376,6 +16496,134 @@ mod dome_dice_chance_tests {
         for (i, k) in by_rot.iter().enumerate() {
             assert!((0.9..1.1).contains(&(*k as f64 / (n_draws as f64 / 4.0))), "Rotation {}: {k}", i * 90);
         }
+        set_dice_tree_features_for_test(None);
+    }
+
+    /// par.3b1, Widening: die ERSTEN Ausgaenge eines Zufallsknotens (frischer
+    /// Knoten, Widening an) sind reine Wuerfe und folgen den Wuerfelregeln.
+    #[test]
+    fn first_outcomes_under_widening_follow_the_dice_rules() {
+        assert_eq!(crate::self_play::return_order_random_p(), 0.0);
+        let st = w_state(17, None);
+        let w = st.current_player;
+        let mut rng = StdRng::seed_from_u64(8);
+        let root = Node { dice_members: Some(Vec::new()), ..gumbel_like_node(st.clone(), w) };
+        let mut nodes = vec![root];
+        let act = drafting_actions(&st).into_iter().find(|a| is_dome_plate_action(a)).unwrap();
+        let cid = push_dice_chance_node(&mut nodes, 0, act, 1.0);
+        let pool_n = st.dome_tile_pool.len();
+        let n = 6400usize;
+        let (mut display, mut by_depth, mut by_rot) = (0usize, vec![0usize; pool_n + 1], [0usize; 4]);
+        for _ in 0..n {
+            match dice_chance_choice(&nodes, cid, &mut rng, true).expect("Wurf") {
+                DiceChoice::New(r) => {
+                    by_rot[(r.rotation / 90) as usize] += 1;
+                    match r.source {
+                        DiceRollSource::Display { .. } => display += 1,
+                        DiceRollSource::Stack { depth, .. } => by_depth[depth] += 1,
+                    }
+                }
+                DiceChoice::Existing(_) => panic!("frischer Zufallsknoten hat keinen Ausgang"),
+            }
+        }
+        assert!((0.46..0.54).contains(&(display as f64 / n as f64)));
+        let e = (n - display) as f64 / pool_n as f64;
+        for (d, k) in by_depth.iter().enumerate().skip(1) {
+            assert!((0.7..1.3).contains(&(*k as f64 / e)), "Tiefe {d}: {k} gegen {e:.0}");
+        }
+        for k in by_rot {
+            assert!((0.9..1.1).contains(&(k as f64 / (n as f64 / 4.0))));
+        }
+    }
+
+    /// par.3b1, Widening: hoechstens `ceil(sqrt(N))` Ausgaenge nach N
+    /// Durchgaengen, zu jedem Zeitpunkt; Wiederbesuch proportional zu den
+    /// bisherigen Besuchen.
+    #[test]
+    fn assigned_plate_has_exactly_one_outcome() {
+        // par.3d: e = 0 -> genau ein Ausgang, egal wie viele Durchgaenge.
+        for n in [0u32, 1, 2, 4, 5, 150] {
+            assert_eq!(dice_outcome_limit(n), 1, "n = {n}");
+        }
+        let net = champion();
+        let st = w_state(18, Some(&net));
+        let w = st.current_player;
+        let c = cfg(Some(w));
+        let mut rng = StdRng::seed_from_u64(9);
+        let mut nodes = vec![make_node(&net, None, st, None, None, None, 0.0, w, &mut rng, &c)];
+        let pos = nodes[0].untried.iter().position(|(a, _)| is_dome_plate_action(a)).unwrap();
+        let (act, prior) = nodes[0].untried.remove(pos);
+        let cid = push_dice_chance_node(&mut nodes, 0, act, prior);
+        for _ in 0..200 {
+            descend_and_backprop(&net, None, &mut nodes, cid, &mut rng, &c);
+            assert_eq!(nodes[cid].children.len(), 1, "zugewiesene Platte: ein Ausgang");
+        }
+        let only = nodes[cid].children[0];
+        assert_eq!(nodes[only].visits, nodes[cid].visits, "alle Durchgaenge auf dem einen Ausgang");
+        // Wiederbesuch: mit einem vorhandenen Ausgang wird nie neu gewuerfelt.
+        for _ in 0..200 {
+            match dice_chance_choice(&nodes, cid, &mut rng, true).unwrap() {
+                DiceChoice::Existing(o) => assert_eq!(o, only),
+                DiceChoice::New(_) => panic!("Grenze 1 erreicht, kein neuer Wurf"),
+            }
+        }
+    }
+
+    /// par.3b1, erzwungene Schritte: im W-Baum gibt es keinen Knoten mehr, an
+    /// dem die W-Seite unter ihrem Pin genau EINE Aktion hat (Rotation,
+    /// gewuerfelter Rueckgabekopf, einziger Platz) -- diese Schritte laufen ohne
+    /// Knoten und ohne Netzaufruf. Ohne die Massnahme gibt es solche Knoten.
+    #[test]
+    fn forced_pin_steps_leave_no_single_action_nodes_in_the_tree() {
+        let net = champion();
+        let st = w_state(19, Some(&net));
+        let w = st.current_player;
+        let forced_single = |nodes: &[Node]| {
+            nodes
+                .iter()
+                .filter(|n| {
+                    !n.terminal
+                        && n.state.dome_dice_pin.as_ref().is_some_and(|p| p.player == n.state.current_player)
+                        && drafting_actions(&n.state).len() == 1
+                })
+                .count()
+        };
+        let mut rng = StdRng::seed_from_u64(10);
+        let on = build_gumbel_tree_inner(&net, None, &st, 200, false, &mut rng, None, false, &cfg(Some(w)));
+        assert_eq!(forced_single(&on), 0);
+        assert!(on.iter().any(|n| matches!(n.dice, DiceNodeKind::Outcome(_))), "Ausgaenge vorhanden");
+        set_dice_tree_features_for_test(Some(DiceTreeFeatures { forced_steps: false, widening: true }));
+        let mut rng = StdRng::seed_from_u64(10);
+        let off = build_gumbel_tree_inner(&net, None, &st, 200, false, &mut rng, None, false, &cfg(Some(w)));
+        set_dice_tree_features_for_test(None);
+        assert!(forced_single(&off) > 0, "ohne die Massnahme belegen Rotationsknoten eigene Knoten");
+    }
+
+    /// Minimaler Wurzelknoten ohne Netz (fuer reine Auswahltests).
+    fn gumbel_like_node(state: GameState, player: usize) -> Node {
+        Node {
+            parent: None,
+            children: Vec::new(),
+            untried: Vec::new(),
+            action: None,
+            player_who_acted: player,
+            visits: 0,
+            value: 0.0,
+            prior: 0.0,
+            state,
+            terminal: false,
+            leaf_value: [0.5, 0.5],
+            n_actions: 0,
+            points_forecast: None,
+            opp_points_forecast: None,
+            raw_value: None,
+            im_value: [0.5, 0.5],
+            own_leaf_value: [0.5, 0.5],
+            own_value_sum: 0.0,
+            halving_min_visits: 0,
+            dice: DiceNodeKind::Decision,
+            dice_members: None,
+        }
     }
 
     /// Test (b), Wert: ueber echte Durchgaenge (`descend_and_backprop` ab dem
@@ -16403,8 +16651,10 @@ mod dome_dice_chance_tests {
         assert!(ch.visits >= 140, "fast alle Durchgaenge gezaehlt: {}", ch.visits);
         assert!((ch.value - v_sum).abs() < 1e-9, "Wert = Summe der Ausgangswerte");
         assert!(
-            ch.children.len() > 10 && ch.children.iter().any(|&o| nodes[o].visits > 1),
-            "geteilte Ausgaenge"
+            ch.children.len() <= dice_outcome_limit(ch.visits) && !ch.children.is_empty(),
+            "Ausgaenge unter der Grenze: {} bei {} Besuchen",
+            ch.children.len(),
+            ch.visits
         );
         let mut im = [0.0f64; 2];
         for &o in &ch.children {

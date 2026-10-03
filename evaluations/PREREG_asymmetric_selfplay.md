@@ -201,6 +201,35 @@ Progressive Widening am Zufallsknoten (hoechstens ceil(sqrt(Besuche)) verschiede
 Wiederbesuch eines vorhandenen nach Besuchen) UND erzwungene Ein-Aktions-Schritte unter dem Pin ohne
 eigenen Knoten/Netzaufruf anwenden; danach dieselbe Messung, erst dann Wheel und Sonden.
 
+### par.3d ENTSCHIEDEN 2026-10-03: im Baum EINE zugewiesene Platte je Plattenentscheid (statt Widening)
+
+Nutzer, nachdem par.3b1 mit Widening ceil(sqrt(N)) gebaut war: *"mir kommt vor du machst es zu
+aufwendig/komplex. statt den ueblichen moeglichen kuppelplattenentscheidungen hab ich dann nur noch die
+positionswahl. eigentlich so als wuerd ich als spieler ein platte zugewiesen bekommen deren rotation fix
+ist. ich kann dann nur noch die position waehlen. im maximalfall (runde 1) hab ich 8
+aktionsmoeglichkeiten."* Umgesetzt als Widening-Exponent 0 (`DICE_OUTCOME_WIDENING_EXPONENT`,
+net_mcts.rs): der Zufallsknoten hat genau EINEN Ausgang (beim ersten Betreten gewuerfelt, danach immer
+derselbe), darunter nur noch die Positionen der zugewiesenen Platte; die erzwungenen Ein-Aktions-Schritte
+(Rotation, gewuerfelter Rueckgabekopf) laufen ohne Knoten. Manifest `dome_dice_tree_rule` =
+`chance_node_single_assigned_plate_forced_pin_steps_policy_split_by_prior`.
+
+**Messung** (`dice_tree_depth_report`, Koordinator, 2026-10-03). **Grundmenge** n = 16 Plattenentscheide der
+W-Seite aus zwei Testpartien (Champion, Seeds 4711 und 4712, je 8), je Entscheid eine W-Suche, Such-Seed 7,
+gleiche Sims. **Einheit** Halbzugtiefe = Spielerwechsel auf dem Pfad, gemittelt ueber alle Baumknoten bzw.
+Maximum, Mittel ueber die 16 Entscheide.
+
+| Variante | mittl. Halbzugtiefe 100 / 400 Sims | max. Halbzugtiefe 100 / 400 Sims | max. Knotentiefe 400 Sims |
+| --- | --- | --- | --- |
+| A ohne Wuerfel-Modell im Baum | 2,16 / 2,77 | 5,25 / 7,12 | 10,44 |
+| B Zufallsknoten je Besuch (par.3b) | 1,25 / 1,73 | 3,31 / 4,31 | 9,50 |
+| C Widening ceil(sqrt(N)) + Ein-Aktions-Schritte (par.3b1) | 2,05 / 2,60 | 4,75 / 6,12 | 10,94 |
+| **D eine zugewiesene Platte + Ein-Aktions-Schritte (par.3d)** | **2,58 / 3,36** | **5,75 / 6,94** | **12,00** |
+
+D ist die einzige Variante, die TIEFER als A sucht (mittlere Halbzugtiefe +0,42 bzw. +0,59), und die
+einfachste. Preis, benannt (HERLEITUNG): der Wert von "Platte legen" haengt in EINER Suche an EINEM Wurf
+(verrauscht); ueber viele Suchen mittelt er sich. Keine Signifikanz gerechnet (n = 16 aus zwei Partien);
+die Wirkung im Spiel zeigen die Sonden. Lib-Tests 827 gruen, `--no-run` gruen.
+
 ## par.3c ENTSCHIEDEN 2026-10-03: die Platzwahl der gewuerfelten Platte schreibt einen Record
 
 Nutzer auf die Frage, ob die Platzsuche @600 einen bedingten Policy-Record schreiben soll: *"Kannst sie
