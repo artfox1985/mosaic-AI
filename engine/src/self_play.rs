@@ -3249,32 +3249,18 @@ pub(crate) fn apply_forced_dome_move(
         StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEED_DISTINGUISHER, forced_index));
     let roll = roll_dome_dice(&game.state, gate_on, return_order_random_p(), &mut dice_rng)
         .ok_or_else(|| "Wuerfel: Auslage und Stapel leer bei offener Pflicht".to_string())?;
-    // (2) Quelle ausfuehren bzw. vormerken.
+    // (2)-(4) Quelle ausfuehren, Pin mit Rotation und (falls gefallen)
+    // Rueckgabe setzen -- derselbe Helfer wie im Zufallsknoten der Suche
+    // (par.3b), damit Baum und echter Zug dieselben Teilzuege machen.
     let score_before = game.state.players[player].score;
-    let (source, from_stack, depth, depth_max, (from_prefix, from_own_block, from_foreign_block)) =
-        match roll.source {
-            DiceRollSource::Display { tile_id } => {
-                (crate::moves::DomeDiceSource::Display { tile_id }, false, 0, 0, (0, 0, 0))
-            }
-            DiceRollSource::Stack { depth, depth_max } => {
-                let classes = classify_drawn_positions(&game.state, player, depth);
-                for _ in 0..depth {
-                    game.apply_drafting(&Action::DrawStackPeek)?;
-                }
-                // Die d-te gezogene Platte (push-Reihenfolge, game.rs:233).
-                let chosen_id = game.state.pending_stack_draw[depth - 1].tile_id;
-                (crate::moves::DomeDiceSource::Stack { chosen_id }, true, depth, depth_max, classes)
-            }
-        };
+    let (from_stack, depth, depth_max, (from_prefix, from_own_block, from_foreign_block)) = match roll.source {
+        DiceRollSource::Display { .. } => (false, 0, 0, (0, 0, 0)),
+        DiceRollSource::Stack { depth, depth_max } => {
+            (true, depth, depth_max, classify_drawn_positions(&game.state, player, depth))
+        }
+    };
+    apply_dice_roll(game, &roll)?;
     let paid = score_before - game.state.players[player].score;
-    // (3)+(4) Pin mit Rotation und (falls gefallen) Rueckgabe.
-    game.state.dome_dice_pin = Some(crate::moves::DomeDicePin {
-        player,
-        source,
-        rotation: roll.rotation,
-        return_first: roll.return_first,
-        return_order: roll.return_order.clone(),
-    });
     // (5) Platzsuche (eigener Strom, Zaehler 2k).
     let search_seed = |ctr: u64| {
         crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEARCH_SEED_DISTINGUISHER, ctr)
@@ -3319,17 +3305,91 @@ pub(crate) fn apply_forced_dome_move(
     })
 }
 
-/// Loest der Entscheid `chosen` der Spielerseite `player` den Wuerfel aus
-/// (Bauplan 4.3, F1/F7)? Reine Pruefung auf dem Zustand VOR dem Apply.
-pub(crate) fn dome_dice_triggers(state: &GameState, side: usize, player: usize, chosen: &Action) -> bool {
-    player == side
-        && (1..crate::state::NUM_ROUNDS).contains(&state.round_number)
-        && matches!(chosen, Action::ChooseDomeSlot(_) | Action::DrawStackPeek)
+/// Schritte (2)-(4) eines Wuerfelwurfs OHNE Suche (Bauplan 4.4): bei
+/// Stapelquelle `depth` Ziehungen ueber `apply_drafting` (Kosten -1 je Peek wie
+/// im echten Zug), dann den Pin mit Quelle, Rotation und (falls gefallen)
+/// Rueckgabe setzen. Gemeinsamer Kern von [`apply_forced_dome_move`] (echter
+/// Zug) und dem Zufallsknoten der Netz-Suche (`net_mcts::dice_chance_step`,
+/// `PREREG_asymmetric_selfplay.md` par.3b). Vorbedingung wie dort: die
+/// Wuerfel-Seite ist am Zug, kein Teilzug offen, kein Pin gesetzt.
+pub(crate) fn apply_dice_roll(game: &mut Game, roll: &DiceRoll) -> Result<(), String> {
+    let player = game.state.current_player;
+    let source = match roll.source {
+        DiceRollSource::Display { tile_id } => crate::moves::DomeDiceSource::Display { tile_id },
+        DiceRollSource::Stack { depth, .. } => {
+            for _ in 0..depth {
+                game.apply_drafting(&Action::DrawStackPeek)?;
+            }
+            // Die d-te gezogene Platte (push-Reihenfolge, game.rs:233).
+            let chosen_id = game
+                .state
+                .pending_stack_draw
+                .get(depth.wrapping_sub(1))
+                .ok_or_else(|| format!("Wuerfel: Tiefe {depth} ohne gezogene Platte"))?
+                .tile_id;
+            crate::moves::DomeDiceSource::Stack { chosen_id }
+        }
+    };
+    game.state.dome_dice_pin = Some(crate::moves::DomeDicePin {
+        player,
+        source,
+        rotation: roll.rotation,
+        return_first: roll.return_first,
+        return_order: roll.return_order.clone(),
+    });
+    Ok(())
+}
+
+/// Zustandsteil des Ausloesers (Bauplan 4.3): Runde 1..4, kein Teilzug offen,
+/// kein Pin. Gemeinsam fuer [`dome_dice_triggers`] (echte Partie) und die
+/// Zusammenfassung der Plattenaktionen im Suchbaum (`net_mcts`, par.3b), damit
+/// Baum und Schleife denselben Knoten als Wuerfel-Entscheid erkennen.
+pub(crate) fn dome_dice_open_state(state: &GameState) -> bool {
+    (1..crate::state::NUM_ROUNDS).contains(&state.round_number)
         && state.pending_stack_draw.is_empty()
         && state.pending_dome_choice.is_none()
         && state.pending_return_order.is_none()
         && state.pending_moon_order.is_none()
         && state.dome_dice_pin.is_none()
+}
+
+/// Plattenaktion im Sinne der Klasse W (F7: Auslage und Stapel gleich).
+pub(crate) fn is_dome_plate_action(a: &Action) -> bool {
+    matches!(a, Action::ChooseDomeSlot(_) | Action::DrawStackPeek)
+}
+
+/// Loest der Entscheid `chosen` der Spielerseite `player` den Wuerfel aus
+/// (Bauplan 4.3, F1/F7)? Reine Pruefung auf dem Zustand VOR dem Apply.
+/// par.3b: waehlt die Suche an der Wurzel die Sammelkante "Platte legen",
+/// liefert sie deren Stellvertreter-Aktion (eine echte Plattenaktion,
+/// `net_mcts::build_untried_actions_dice`); sie loest hier aus wie jede
+/// andere Plattenaktion.
+pub(crate) fn dome_dice_triggers(state: &GameState, side: usize, player: usize, chosen: &Action) -> bool {
+    player == side && is_dome_plate_action(chosen) && dome_dice_open_state(state)
+}
+
+/// Weg C unter Klasse W (par.3b Punkt 5): die Abweichung waehlt aus der
+/// Kandidatenliste der Wurzel, und dort sind an einem Wuerfel-Knoten alle
+/// Plattenaktionen EINE Kante. Liefert die zusammengefasste Liste (alle
+/// Plattenaktionen durch die ERSTE ersetzt, an deren Stelle) und den
+/// auszuschliessenden Suchzug in derselben Abbildung (war er eine Platte, faellt
+/// damit "Platte legen" als Ganzes heraus, sonst kaeme die Abweichung auf
+/// denselben Wuerfelzug hinaus). Ohne Plattenaktion: Liste und Suchzug
+/// unveraendert.
+fn collapse_plate_actions_for_deviation(actions: &[Action], search_action: &Action) -> (Vec<Action>, Action) {
+    let Some(rep) = actions.iter().find(|a| is_dome_plate_action(a)).cloned() else {
+        return (actions.to_vec(), search_action.clone());
+    };
+    let mut out: Vec<Action> = Vec::with_capacity(actions.len());
+    for a in actions {
+        if !is_dome_plate_action(a) {
+            out.push(a.clone());
+        } else if *a == rep {
+            out.push(rep.clone());
+        }
+    }
+    let exclude = if is_dome_plate_action(search_action) { rep } else { search_action.clone() };
+    (out, exclude)
 }
 
 // ── Klasse S: Stoerer-Seite (asymmetrisches Self-Play) ───────────────────────
@@ -3472,6 +3532,29 @@ pub(crate) fn aggr_side_for(game_seed: u64, dice_side: Option<usize>) -> usize {
 /// Seiten-Blend (FS1). Alle anderen Felder unveraendert.
 pub(crate) fn aggr_search_config(base: &SearchConfig, side: usize, p: AggrSideParams) -> SearchConfig {
     SearchConfig { aggr_w: Some(p.w), aggr_lambda: Some(p.lambda), aggr_player: Some(side), ..*base }
+}
+
+/// Die Such-Konfigurationen EINER Netz-Self-Play-Partie (Klassen W und S):
+/// erstens die Basis fuer alles ausser den Drafting-Agenten (Startsetzung,
+/// Platz- und Rueckgabesuchen des erzwungenen Zugs), zweitens je Spieler die
+/// des Drafting-Agenten. par.3b: mit Klasse W (`dice_side = Some(d)`) tragen
+/// ALLE `dome_dice_side = Some(d)`, auch der Stoerer-Agent (Kopie der Basis).
+/// Ohne W und S: Basis und beide Agenten sind `base` unveraendert (Bestand).
+pub(crate) fn side_search_configs(
+    base: SearchConfig,
+    dice_side: Option<usize>,
+    aggr: Option<AggrSideParams>,
+    aggr_side: Option<usize>,
+) -> (SearchConfig, [SearchConfig; 2]) {
+    let base = match dice_side {
+        Some(d) => SearchConfig { dome_dice_side: Some(d), ..base },
+        None => base,
+    };
+    let agent = |player: usize| match (aggr, aggr_side) {
+        (Some(p), Some(s)) if s == player => aggr_search_config(&base, s, p),
+        _ => base,
+    };
+    (base, [agent(0), agent(1)])
 }
 
 // ── Weg C: Abweichungsregel der Self-Play-Erzeugung ──────────────────────────
@@ -5370,15 +5453,29 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                 // durch sich selbst und die Partie ist trotz
                                 // `[deviate]`-Zeile unabgewichen.
                                 let search_action = d.chosen.clone();
+                                // Klasse W (par.3b Punkt 5): an einem Wuerfel-
+                                // Knoten waehlt die Abweichung aus der
+                                // ZUSAMMENGEFASSTEN Wurzelliste ("Platte legen"
+                                // als eine Kante). Sonst (Bestand, G-Seite,
+                                // Knopf aus) kein Klon, dieselbe Liste wie bisher.
+                                let dice_collapsed: Option<(Vec<Action>, Action)> = cfg
+                                    .dome_dice
+                                    .as_ref()
+                                    .filter(|dd| dd.side == player && dome_dice_open_state(&game.state))
+                                    .map(|_| collapse_plate_actions_for_deviation(&actions, &search_action));
+                                let (dev_actions, dev_exclude): (&[Action], &Action) = match &dice_collapsed {
+                                    Some((list, excl)) => (list.as_slice(), excl),
+                                    None => (actions.as_slice(), &search_action),
+                                };
                                 let pool_len =
-                                    actions.iter().filter(|a| **a != search_action).count();
+                                    dev_actions.iter().filter(|a| *a != dev_exclude).count();
                                 if let Some(a) = deviation_best_action(
                                     net,
                                     &game.state,
-                                    &actions,
+                                    dev_actions,
                                     player,
                                     want,
-                                    Some(&search_action),
+                                    Some(dev_exclude),
                                     &mut deviate_rng,
                                 ) {
                                     if quelle == "ausflug" {
@@ -7746,12 +7843,11 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     // Agenten bekommen `search_config` unveraendert (Bestand).
     let dice_side: Option<usize> = dome_dice_place_sims.map(|_| dome_dice_side(game_seed));
     let aggr_side: Option<usize> = aggr.map(|_| aggr_side_for(game_seed, dice_side));
-    let agent_config = |player: usize| -> crate::net_mcts::SearchConfig {
-        match (aggr, aggr_side) {
-            (Some(p), Some(s)) if s == player => aggr_search_config(&search_config, s, p),
-            _ => search_config,
-        }
-    };
+    // par.3b: ALLE Suchen dieser Partie kennen die Wuerfel-Seite (beide
+    // Agenten, Startsetzung, Platz- und Rueckgabesuche des erzwungenen Zugs).
+    // Ohne Klasse W ist `search_config` unveraendert (Feld bleibt `None`).
+    let (search_config, agent_configs) = side_search_configs(search_config, dice_side, aggr, aggr_side);
+    let agent_config = |player: usize| -> crate::net_mcts::SearchConfig { agent_configs[player] };
     let agent0 = NetSelfPlayAgent {
         net,
         base_sims,
@@ -15270,6 +15366,149 @@ mod dome_dice_tests {
             for f in DICE_FIELDS {
                 assert!(r.get(f).is_none(), "Feld {f} bei Knopf AUS");
             }
+        }
+    }
+
+    // ── par.3b: Zufallsknoten im Suchbaum ──────────────────────────────────
+
+    fn is_plate_policy_entry(e: &Value) -> bool {
+        matches!(e["action"]["type"].as_str(), Some("choose_dome_slot") | Some("dome_stack_peek"))
+    }
+
+    /// par.3b Test (c): waehlt die Wurzel einer W-Suche die Sammelkante
+    /// "Platte legen", kommt ihr Stellvertreter heraus (immer derselbe, die
+    /// Suche kennt nur EINE Plattenkante), das Policy-Ziel nennt trotzdem jede
+    /// Plattenaktion einzeln, und der Ausloeser der Schleife greift: der echte
+    /// Wuerfel (eigener Strom, `apply_forced_dome_move`) legt die Platte.
+    #[test]
+    fn root_choice_of_the_plate_edge_triggers_the_real_dice() {
+        let net = champion_net();
+        let game0 = round_one_game(21, crate::net_mcts::net_supports_extended_action_nodes(&net));
+        let st = &game0.state;
+        let w = st.current_player;
+        let sc = SearchConfig { dome_dice_side: Some(w), ..SearchConfig::from_env() };
+        let actions = drafting_actions(st);
+        let plate_valid = actions.iter().filter(|a| is_dome_plate_action(a)).count();
+        let mut chosen_plates: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut found: Option<Action> = None;
+        for s in 0u64..40 {
+            let mut rng = StdRng::seed_from_u64(s);
+            let (chosen, policy, _rq, _cq, fallback, _kl) = net_drafting_policy_with_fallback_flag(
+                &net, st, &actions, 32, crate::net_mcts::DEFAULT_C_PUCT, &mut rng, true, false, 1, None, &sc,
+            );
+            assert!(!fallback);
+            assert_eq!(
+                policy.iter().filter(|e| is_plate_policy_entry(e)).count(),
+                plate_valid,
+                "Policy-Ziel nennt jede Plattenaktion einzeln"
+            );
+            let total: f64 = policy.iter().map(|e| e["prob"].as_f64().unwrap()).sum();
+            assert!((total - 1.0).abs() < 1e-9);
+            if is_dome_plate_action(&chosen) {
+                chosen_plates.insert(format!("{chosen:?}"));
+                found.get_or_insert(chosen);
+            }
+        }
+        let chosen = found.expect("in 40 Suchen nie 'Platte legen' gewaehlt");
+        assert_eq!(chosen_plates.len(), 1, "nur EINE Plattenkante an der Wurzel: {chosen_plates:?}");
+        assert!(dome_dice_triggers(st, w, w, &chosen), "die Schleife erkennt den Plattenentscheid");
+        let mut game = Game { state: st.clone() };
+        let dc = DomeDiceConfig { search_config: sc, ..dice_cfg(&net, w) };
+        let placed_before = game.state.players[w].dome_tiles_placed_this_round;
+        apply_forced_dome_move(&mut game, &dc, 31, 0, 1).expect("echter Wuerfel");
+        assert_eq!(game.state.players[w].dome_tiles_placed_this_round, placed_before + 1);
+        assert_eq!(game.state.current_player, 1 - w);
+        assert!(game.state.dome_dice_pin.is_none());
+    }
+
+    /// par.3b Test (e): in einer W-Partie tragen ALLE Suchen die Wuerfel-Seite
+    /// (Basis fuer Startsetzung und erzwungenen Zug, beide Agenten, auch der
+    /// Stoerer); in einer G-Partie (auch G gegen S) keine. Sonst unveraendert.
+    #[test]
+    fn side_search_configs_give_every_search_of_a_w_game_the_dice_side() {
+        let base = SearchConfig::from_env();
+        assert_eq!(base.dome_dice_side, None);
+        assert_eq!(side_search_configs(base, None, None, None), (base, [base, base]), "G-Partie: Bestand");
+        let p = AggrSideParams { w: 0.1, lambda: 1.0 };
+        for d in 0..2usize {
+            let (b, a) = side_search_configs(base, Some(d), None, None);
+            assert_eq!((b.dome_dice_side, a[0].dome_dice_side, a[1].dome_dice_side), (Some(d), Some(d), Some(d)));
+            assert_eq!(SearchConfig { dome_dice_side: None, ..b }, base, "sonst unveraendert");
+            assert_eq!(a, [b, b]);
+            let (b, a) = side_search_configs(base, Some(d), Some(p), Some(1 - d));
+            assert_eq!((b.aggr_player, b.dome_dice_side), (None, Some(d)));
+            assert_eq!((a[1 - d].aggr_player, a[1 - d].dome_dice_side), (Some(1 - d), Some(d)), "Stoerer kennt W");
+            assert_eq!((a[d].aggr_player, a[d].dome_dice_side), (None, Some(d)));
+        }
+        let (b, a) = side_search_configs(base, None, Some(p), Some(0));
+        assert!(b.dome_dice_side.is_none() && a.iter().all(|c| c.dome_dice_side.is_none()), "G gegen S");
+        assert_eq!(a[0].aggr_player, Some(0));
+    }
+
+    /// par.3b Punkt 5 (Weg C): die Abweichung waehlt aus der zusammengefassten
+    /// Liste; war der Suchzug eine Platte, faellt "Platte legen" ganz heraus.
+    #[test]
+    fn deviation_pool_collapses_plate_actions() {
+        let game = round_one_game(22, true);
+        let actions = drafting_actions(&game.state);
+        let plates: Vec<&Action> = actions.iter().filter(|a| is_dome_plate_action(a)).collect();
+        let stone = actions.iter().find(|a| !is_dome_plate_action(a)).unwrap().clone();
+        assert!(plates.len() > 3);
+        let (list, excl) = collapse_plate_actions_for_deviation(&actions, plates[2]);
+        assert_eq!(list.iter().filter(|a| is_dome_plate_action(a)).count(), 1);
+        assert_eq!(list.len(), actions.len() - plates.len() + 1);
+        assert_eq!(&excl, plates[0], "Plattenzug der Suche -> die ganze Kante faellt heraus");
+        let (_, excl) = collapse_plate_actions_for_deviation(&actions, &stone);
+        assert_eq!(excl, stone);
+        let stones: Vec<Action> = actions.iter().filter(|a| !is_dome_plate_action(a)).cloned().collect();
+        assert_eq!(collapse_plate_actions_for_deviation(&stones, &stone), (stones.clone(), stone));
+    }
+
+    /// Messbericht zu par.3b (kein Gate, nur auf Anweisung): an den
+    /// Plattenentscheiden der W-Seite einer Testpartie die Zahl der
+    /// Wurzelkanten und die Baumform einer W-Suche mit gleichen Sims und gleichem
+    /// Seed, ohne und mit Zufallsknoten.
+    /// `cargo test --release --lib dice_tree_depth_report -- --ignored --nocapture`
+    #[test]
+    #[ignore = "Messbericht par.3b, nur auf Anweisung"]
+    fn dice_tree_depth_report() {
+        let net = champion_net();
+        let ext = crate::net_mcts::net_supports_extended_action_nodes(&net);
+        let records = play_dice_game(&net, 4711, Some(16));
+        for sims in [100u32, 400] {
+            let mut rng = StdRng::seed_from_u64(1);
+            let mut rows = Vec::new();
+            for r in records.iter().filter(|r| r.get("dice_trigger").is_some()) {
+                let mut st = crate::serialize::json_to_state(&r["state"], &mut rng).expect("Record-Zustand");
+                st.extended_action_nodes = [ext, ext];
+                let w = st.current_player;
+                let off = crate::net_mcts::dice_tree_shape(&net, &st, sims, 7, &SearchConfig::from_env());
+                let on_cfg = SearchConfig { dome_dice_side: Some(w), ..SearchConfig::from_env() };
+                let on = crate::net_mcts::dice_tree_shape(&net, &st, sims, 7, &on_cfg);
+                eprintln!(
+                    "[dice_tree] sims={sims} runde={} kanten {}->{} | knoten {}->{} zufall={} | tiefe max {}->{} mittel {:.2}->{:.2} \
+                     | halbzug max {}->{} mittel {:.2}->{:.2}",
+                    st.round_number, off.root_edges, on.root_edges, off.nodes, on.nodes, on.chance_nodes,
+                    off.max_depth, on.max_depth, off.mean_depth, on.mean_depth, off.max_ply, on.max_ply,
+                    off.mean_ply, on.mean_ply
+                );
+                rows.push((off, on));
+            }
+            assert!(!rows.is_empty());
+            let n = rows.len() as f64;
+            let mean = |f: &dyn Fn(&crate::net_mcts::DiceTreeShape) -> f64| -> (f64, f64) {
+                (rows.iter().map(|(o, _)| f(o)).sum::<f64>() / n, rows.iter().map(|(_, x)| f(x)).sum::<f64>() / n)
+            };
+            let e = mean(&|s| s.root_edges as f64);
+            let md = mean(&|s| s.max_depth as f64);
+            let ad = mean(&|s| s.mean_depth);
+            let mp = mean(&|s| s.max_ply as f64);
+            let ap = mean(&|s| s.mean_ply);
+            eprintln!(
+                "[dice_tree] SUMME n={} Entscheide, {sims} Sims: Wurzelkanten {:.1}->{:.1}, max. Knotentiefe {:.2}->{:.2}, \
+                 mittl. Knotentiefe {:.2}->{:.2}, max. Halbzugtiefe {:.2}->{:.2}, mittl. Halbzugtiefe {:.2}->{:.2}",
+                rows.len(), e.0, e.1, md.0, md.1, ad.0, ad.1, mp.0, mp.1, ap.0, ap.1
+            );
         }
     }
 }

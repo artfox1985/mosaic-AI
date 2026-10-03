@@ -169,8 +169,10 @@ pub enum DomeDiceSource {
 /// Platte, Rotation und (falls vorab gewuerfelt) Rueckgabe passen; die Suche
 /// baut ihre Kandidaten an JEDEM Knoten daraus (net_mcts.rs:2906,
 /// `build_untried_actions`), der Pin wirkt also an der Wurzel UND im Baum.
-/// Gesetzt NUR von `self_play::apply_forced_dome_move`, geloescht beim
-/// erfolgreichen `ChooseDomeRotation` und vorsorglich beim Rundenwechsel.
+/// Gesetzt NUR von `self_play::apply_dice_roll` (echter Zug ueber
+/// `apply_forced_dome_move`, im Suchbaum ueber den Zufallsknoten
+/// `net_mcts::dice_chance_step`, par.3b), geloescht beim erfolgreichen
+/// `ChooseDomeRotation` und vorsorglich beim Rundenwechsel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomeDicePin {
     /// Spieler, dessen Zug festgenagelt ist (die Wuerfel-Seite).

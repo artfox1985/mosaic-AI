@@ -966,7 +966,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "excursion_kl_weight": excursion_kl_weight,
         # Klasse W (PREREG_asymmetric_selfplay.md par.2): Erzeugungs-Knoepfe wie die
         # Zeilen darueber; die engine_config des Chunk-Prozesses meldet dazu
-        # `dome_dice`, `dome_dice_sims` und `dome_dice_caps`.
+        # `dome_dice`, `dome_dice_sims`, `dome_dice_caps` und (par.3b) die
+        # Baum-Regel `dome_dice_tree_rule`.
         "dome_dice": dome_dice,
         "dome_dice_sims": dome_dice_sims,
         # Klasse S (PREREG_asymmetric_selfplay.md par.3): die engine_config des

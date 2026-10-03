@@ -1304,6 +1304,17 @@ pub struct SearchConfig {
     /// Mondstapel-Nachsuche ihre Wurzel beim Gegner hat
     /// ([`moon_order_post_search`]) und trotzdem fuer den Stoerer sucht.
     pub aggr_player: Option<usize>,
+    /// Klasse W, Zufallsknoten im Baum (`PREREG_asymmetric_selfplay.md`
+    /// par.3b): Spielerindex der Wuerfel-Seite dieser Partie. `Some(d)`: an
+    /// JEDEM Knoten (auch der Wurzel), an dem `d` zieht und
+    /// `self_play::dome_dice_open_state` gilt, fallen alle Plattenaktionen zu
+    /// EINER Kante "Platte legen" zusammen ([`build_untried_actions_dice`]),
+    /// darunter ein Zufallsknoten, der je Besuch neu wuerfelt
+    /// ([`dice_chance_step`]). `None` = Bestand, Zeile fuer Zeile. Gesetzt NUR
+    /// von der Self-Play-Erzeugung (`self_play::side_search_configs`) fuer
+    /// ALLE Suchen einer W-Partie; kein Spec-Feld, kein eigener Env-Knopf (der
+    /// Erzeugungsknopf heisst `MOSAIC_DOME_DICE`).
+    pub dome_dice_side: Option<usize>,
 }
 
 /// Wie der Blattwert einer Suche gemischt wird (Klasse S, FS1). Aus der
@@ -1429,6 +1440,9 @@ impl SearchConfig {
             aggr_w: None,
             aggr_lambda: None,
             aggr_player: None,
+
+            // Klasse W (par.3b): ebenso nur von der Erzeugung gesetzt.
+            dome_dice_side: None,
         }
     }
 
@@ -2035,6 +2049,8 @@ impl SearchConfig {
             aggr_w: None,
             aggr_lambda: None,
             aggr_player: None,
+            // Klasse W (par.3b): ebenso kein Spec-Feld.
+            dome_dice_side: None,
         })
     }
 }
@@ -3003,6 +3019,47 @@ struct Node {
     /// Besuche. Regel [`AGGR_OWN_Q_GAP_N_MIN_RULE`]. 0 an allen anderen
     /// Knoten und im PUCT-Legacy-Pfad (dann zaehlt jedes besuchte Kind).
     halving_min_visits: u32,
+    /// Klasse W, par.3b: Rolle im Zufallsknoten-Modell ([`DiceNodeKind`]).
+    /// `Decision` an jedem Knoten, solange `SearchConfig::dome_dice_side`
+    /// `None` ist (Bestand).
+    dice: DiceNodeKind,
+    /// Klasse W, par.3b: `Some` genau an einem Knoten, dessen Plattenaktionen
+    /// zur Sammelkante "Platte legen" zusammengefasst sind -- die ersetzten
+    /// Aktionen mit ihren EINZELNEN Priors (maskierte Softmax), in
+    /// `drafting_actions`-Reihenfolge. Daraus teilt die Wurzel ihr Policy-Ziel
+    /// auf ([`push_dice_split`]); die Sammelkante selbst steht in `untried`
+    /// bzw. `children` unter ihrem Stellvertreter (der Plattenaktion mit dem
+    /// hoechsten Prior). `None` im Bestand.
+    dice_members: Option<Vec<(Action, f32)>>,
+}
+
+/// Klasse W, par.3b: Name der Baum-Regel fuer die W-Platten, im Lauf-Manifest
+/// gemeldet (`lib.rs::engine_config_json`, Feld `dome_dice_tree_rule`).
+/// Bedeutung: Sammelkante "Platte legen" mit Zufallsknoten, je Besuch neu
+/// gewuerfelt, gleiche Wuerfe teilen einen Ausgang; Policy-Ziel nach Prior
+/// auf die Plattenaktions-IDs verteilt.
+pub const DOME_DICE_TREE_RULE: &str = "chance_node_per_visit_policy_split_by_prior";
+
+/// Klasse W, Zufallsknoten im Suchbaum (`PREREG_asymmetric_selfplay.md`
+/// par.3b). Interne Kanten-Art statt einer neuen oeffentlichen
+/// `Action`-Variante: die Sammelkante lebt nur im Baum, nach aussen (Zugwahl,
+/// Policy-Ziel, Records, `action_to_id`, Serialisierung) erscheinen weiter
+/// nur echte Aktionen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DiceNodeKind {
+    /// Gewoehnlicher Entscheidungsknoten (Bestand).
+    Decision,
+    /// Der Knoten hinter der Sammelkante "Platte legen": Zustand = Zustand des
+    /// Elternknotens (noch nichts ausgefuehrt), KEIN Netzaufruf, keine
+    /// `untried`. Seine Kinder sind die Ausgaenge des Wuerfels; jeder Besuch
+    /// wuerfelt neu ([`dice_chance_step`]), sein Wert ist damit der
+    /// Besuchsmittelwert ueber die Ausgaenge (Erwartungswert).
+    Chance,
+    /// Ein Ausgang des Wuerfels: Ziehungen ausgefuehrt, Pin gesetzt, die
+    /// Wuerfel-Seite waehlt darunter nur noch den Platz. Schluessel ist der
+    /// Wurf selbst (Quelle mit Platte bzw. Tiefe, Rotation, Rueckgabekopf bzw.
+    /// -reihenfolge); gleiche Wuerfe teilen sich diesen Knoten.
+    Outcome(crate::self_play::DiceRoll),
 }
 
 /// FS3: Name der N_min-Regel fuer `own_q_gap`, im Lauf-Manifest gemeldet
@@ -3040,6 +3097,40 @@ fn build_untried_actions(
     skip_cutoff: bool,
     moon_order_variants: u8,
 ) -> (Vec<(Action, f32)>, usize) {
+    let (acts, n, _members) =
+        build_untried_actions_dice(state, logits, moon_scores, skip_cutoff, moon_order_variants, None);
+    (acts, n)
+}
+
+/// Gilt an diesem Zustand die Zusammenfassung der Plattenaktionen zu EINER
+/// Kante (Klasse W, `PREREG_asymmetric_selfplay.md` par.3b)? Die Wuerfel-Seite
+/// zieht, Drafting, und `self_play::dome_dice_open_state` (Runde 1..4, kein
+/// Teilzug offen, kein Pin) -- derselbe Zustandsteil wie beim Ausloeser der
+/// echten Partie (`self_play::dome_dice_triggers`).
+pub(crate) fn dome_dice_chance_applies(state: &GameState, dice_side: Option<usize>) -> bool {
+    dice_side == Some(state.current_player)
+        && state.phase == Phase::Drafting
+        && crate::self_play::dome_dice_open_state(state)
+}
+
+/// [`build_untried_actions`] mit Klasse W (par.3b): bei
+/// [`dome_dice_chance_applies`] werden alle `ChooseDomeSlot`- und
+/// `DrawStackPeek`-Kandidaten VOR Sortierung und Cutoff durch EINEN Eintrag
+/// ersetzt -- Stellvertreter ist die Plattenaktion mit dem hoechsten Prior
+/// (erste bei Gleichstand), Prior = Summe der ersetzten Priors nach der
+/// maskierten Softmax (fuer Gumbel an der Wurzel ist `ln` davon genau der
+/// logsumexp der ersetzten Logits minus derselben Normierung). Der dritte Wert
+/// sind die ersetzten Aktionen mit ihren Einzelpriors (`Node::dice_members`),
+/// `None` ohne Zusammenfassung. Bei `dice_side = None` ist der Ablauf
+/// unveraendert der Bestand.
+fn build_untried_actions_dice(
+    state: &GameState,
+    logits: &[f32],
+    moon_scores: &[f32; 5],
+    skip_cutoff: bool,
+    moon_order_variants: u8,
+    dice_side: Option<usize>,
+) -> (Vec<(Action, f32)>, usize, Option<Vec<(Action, f32)>>) {
     let base_actions = drafting_actions(state);
     let n = base_actions.len();
     // Direkter Action→ID-Match statt JSON-Umweg (Performance, externer
@@ -3112,6 +3203,30 @@ fn build_untried_actions(
         }
         acts.push((act, base_p));
     }
+    // Klasse W (par.3b): Sammelkante "Platte legen" an der Stelle der ersten
+    // Plattenaktion. Nur bei gesetzter Wuerfel-Seite ueberhaupt geprueft.
+    let dice_members: Option<Vec<(Action, f32)>> = if dome_dice_chance_applies(state, dice_side) {
+        let members: Vec<(Action, f32)> =
+            acts.iter().filter(|(a, _)| crate::self_play::is_dome_plate_action(a)).cloned().collect();
+        match acts.iter().position(|(a, _)| crate::self_play::is_dome_plate_action(a)) {
+            None => None,
+            Some(first_pos) => {
+                let sum = members.iter().map(|(_, p)| *p as f64).sum::<f64>() as f32;
+                let mut rep = &members[0];
+                for m in &members[1..] {
+                    if m.1 > rep.1 {
+                        rep = m;
+                    }
+                }
+                let rep_action = rep.0.clone();
+                acts.retain(|(a, _)| !crate::self_play::is_dome_plate_action(a));
+                acts.insert(first_pos.min(acts.len()), (rep_action, sum));
+                Some(members)
+            }
+        }
+    } else {
+        None
+    };
     acts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
     // Policy-Masse-Cutoff: nur den minimalen Präfix behalten, dessen kumulierte
@@ -3130,7 +3245,7 @@ fn build_untried_actions(
     // `build_net_tree`) verhindert weiterhin, dass der Long Tail tatsächlich
     // durchgehend expandiert wird, auch ohne den harten Cutoff hier.
     if skip_cutoff {
-        return (acts, n);
+        return (acts, n, dice_members);
     }
     let mut cum = 0.0f64;
     let mut keep = acts.len();
@@ -3142,7 +3257,7 @@ fn build_untried_actions(
         }
     }
     acts.truncate(keep.max(1));
-    (acts, n)
+    (acts, n, dice_members)
 }
 
 /// Netz-Value (Tanh, ±1) → Win-Prob [0,1] fuer die perspektivische Blattwert-
@@ -3987,10 +4102,10 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     // unverändert nur an der Wurzel ausgesetzt (sein eigener Widening-Cap in
     // `build_net_tree` bremst dort weiterhin, wie bisher).
     let skip_cutoff = parent.is_none() || USE_GUMBEL_SEARCH;
-    let (untried, n_actions) = if terminal {
-        (Vec::new(), 0)
+    let (untried, n_actions, dice_members) = if terminal {
+        (Vec::new(), 0, None)
     } else {
-        build_untried_actions(
+        build_untried_actions_dice(
             &state,
             &logits,
             &moon_scores,
@@ -3998,6 +4113,8 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // `PREREG_moon_stack_order.md` par.4: der Wirkort des Knopfs.
             // Default 1 = Fan-out wie bisher, bitidentisch.
             search_config.moon_order_variants,
+            // Klasse W (par.3b): `None` = Bestand, keine Zusammenfassung.
+            search_config.dome_dice_side,
         )
     };
 
@@ -4346,6 +4463,8 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         own_leaf_value,
         own_value_sum: 0.0,
         halving_min_visits: 0,
+        dice: DiceNodeKind::Decision,
+        dice_members,
     }
 }
 
@@ -4766,6 +4885,24 @@ pub(crate) fn mix_q_with_implicit_minimax(q_mc: f64, v_im: f64, alpha: f64) -> f
 /// Arithmetik, kein Netz-/RNG-Zugriff -- wird daher IMMER mitgefuehrt,
 /// unabhaengig vom `MOSAIC_IMPLICIT_MINIMAX_A`-Knopf (siehe `backprop_path`).
 fn update_im_value_backup(nodes: &mut [Node], nid: usize) {
+    // Klasse W (par.3b): am Zufallsknoten waehlt niemand -- dort ist der
+    // implizite Wert der besuchsgewichtete Mittelwert der Ausgaenge
+    // (Erwartungswert), nicht das Maximum.
+    if nodes[nid].dice == DiceNodeKind::Chance {
+        let (mut sum, mut n) = ([0.0f64; 2], 0.0f64);
+        for &c in &nodes[nid].children {
+            let w = nodes[c].visits as f64;
+            if w > 0.0 {
+                sum[0] += w * nodes[c].im_value[0];
+                sum[1] += w * nodes[c].im_value[1];
+                n += w;
+            }
+        }
+        if n > 0.0 {
+            nodes[nid].im_value = [sum[0] / n, sum[1] / n];
+        }
+        return;
+    }
     let mover = nodes[nid].state.current_player;
     let mut best: Option<[f64; 2]> = None;
     let mut best_score = f64::NEG_INFINITY;
@@ -5812,6 +5949,11 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     }
     let mut pending: Vec<Pending> = Vec::with_capacity(candidates.len());
     for (ci, (act, prior, _g)) in candidates.iter().enumerate() {
+        // Klasse W (par.3b): die Sammelkante ist kein anwendbarer Zug; sie
+        // bleibt `None` und wird im unbatchten Zweig als Zufallsknoten angelegt.
+        if is_dice_chance_edge(nodes, 0, act) {
+            continue;
+        }
         crate::profiling::note_gamestate_clone();
         let mut g = Game { state: root_state.clone() };
         // Kein `SHUFFLE_STACK_PEEK_IN_SEARCH`-Zweig hier -- die Aufrufstelle
@@ -5925,6 +6067,25 @@ fn descend_and_backprop<R: Rng + ?Sized>(
     let mut nid = start_nid;
     let mut expansion_failed = false;
     loop {
+        // Klasse W (par.3b): am Zufallsknoten wird gewuerfelt, nicht gewaehlt.
+        // Neuer Ausgang = Expansion (ein Netzaufruf, dann Backprop), bekannter
+        // Ausgang = weiter absteigen.
+        if nodes[nid].dice == DiceNodeKind::Chance {
+            match dice_chance_step(net_policy, net_value, nodes, nid, rng, search_config) {
+                Some((oid, true)) => {
+                    nid = oid;
+                    break;
+                }
+                Some((oid, false)) => {
+                    nid = oid;
+                    continue;
+                }
+                None => {
+                    expansion_failed = true;
+                    break;
+                }
+            }
+        }
         if nodes[nid].terminal {
             break;
         }
@@ -5941,6 +6102,13 @@ fn descend_and_backprop<R: Rng + ?Sized>(
         // on demand expandieren (kein Zwang mehr auf `untried[0]`).
         let untried_idx = idx - n_children;
         let (act, prior) = nodes[nid].untried.remove(untried_idx);
+        // Klasse W (par.3b): die Sammelkante "Platte legen" bekommt einen
+        // Zufallsknoten ohne Netzaufruf; der naechste Schleifendurchgang
+        // wuerfelt dort sofort den ersten Ausgang.
+        if is_dice_chance_edge(nodes, nid, &act) {
+            nid = push_dice_chance_node(nodes, nid, act, prior);
+            continue;
+        }
         let mover = nodes[nid].state.current_player;
         crate::profiling::note_gamestate_clone();
         let mut g = Game { state: nodes[nid].state.clone() };
@@ -5968,6 +6136,150 @@ fn descend_and_backprop<R: Rng + ?Sized>(
         return;
     }
     backprop_path(nodes, nid);
+}
+
+// ── Klasse W: Zufallsknoten "Platte legen" (PREREG_asymmetric_selfplay.md
+// par.3b) ────────────────────────────────────────────────────────────────────
+//
+// An einem Knoten, an dem die Wuerfel-Seite zieht ([`dome_dice_chance_applies`]),
+// stehen alle Plattenaktionen als EINE Kante unter ihrem Stellvertreter
+// (`build_untried_actions_dice`, `Node::dice_members`). Die Kante fuehrt auf
+// einen Zufallsknoten ([`DiceNodeKind::Chance`]): Zustand des Elternknotens,
+// kein Netzaufruf. Jeder Durchgang wuerfelt mit dem Such-RNG des Durchgangs
+// ueber `self_play::roll_dome_dice` auf DIESEM Zustand (der determinisierten
+// Welt der Suche), fuehrt die Ziehungen aus und setzt den Pin
+// (`self_play::apply_dice_roll`, dieselben Teilzuege wie der echte Zug, ohne
+// Suche). Gleiche Wuerfe teilen sich einen Ausgangsknoten
+// ([`DiceNodeKind::Outcome`]); unter ihm laeuft der normale Baum weiter (der
+// Pin laesst nur die Plaetze der Wuerfel-Platte zu, dann die festgenagelte
+// Rotation). Der Wert des Zufallsknotens ist `value / visits` ueber alle
+// Durchgaenge, also der Besuchsmittelwert ueber die Ausgaenge.
+
+/// Ist `act` an Knoten `nid` die Sammelkante? An einem zusammengefassten
+/// Knoten steht genau EINE Plattenaktion in `untried`/`children` -- ihr
+/// Stellvertreter.
+fn is_dice_chance_edge(nodes: &[Node], nid: usize, act: &Action) -> bool {
+    nodes[nid].dice_members.is_some() && crate::self_play::is_dome_plate_action(act)
+}
+
+/// Haengt den Zufallsknoten der Sammelkante `act` (Prior `prior`) unter
+/// `nid` an und gibt seinen Index zurueck. Kein Netzaufruf: Blattwert und
+/// Koepfe sind die des Elternknotens (gleicher Zustand); sie werden nie als
+/// Backprop-Quelle benutzt (jeder Durchgang endet an einem Ausgang oder
+/// darunter), `im_value` ueberschreibt der erste Backprop.
+fn push_dice_chance_node(nodes: &mut Vec<Node>, nid: usize, act: Action, prior: f32) -> usize {
+    crate::profiling::note_gamestate_clone();
+    let p = &nodes[nid];
+    let node = Node {
+        parent: Some(nid),
+        children: Vec::new(),
+        untried: Vec::new(),
+        action: Some(act),
+        player_who_acted: p.state.current_player,
+        visits: 0,
+        value: 0.0,
+        prior,
+        state: p.state.clone(),
+        terminal: false,
+        leaf_value: p.leaf_value,
+        n_actions: 0,
+        points_forecast: p.points_forecast,
+        opp_points_forecast: p.opp_points_forecast,
+        raw_value: p.raw_value,
+        im_value: p.leaf_value,
+        own_leaf_value: p.own_leaf_value,
+        own_value_sum: 0.0,
+        halving_min_visits: 0,
+        dice: DiceNodeKind::Chance,
+        dice_members: None,
+    };
+    let cid = nodes.len();
+    nodes.push(node);
+    nodes[nid].children.push(cid);
+    cid
+}
+
+/// EIN Durchgang durch den Zufallsknoten `cid`: wuerfeln (Such-RNG), den
+/// Ausgang mit gleichem Wurf suchen oder neu anlegen (Ziehungen + Pin, dann
+/// EIN Netzaufruf ueber `make_node`). Rueckgabe `(Ausgang, neu angelegt)`,
+/// `None`, wenn Wurf oder Ausfuehrung scheitern (laut Bauplan bei offener
+/// Pflicht unerreichbar; der Durchgang wird dann wie eine fehlgeschlagene
+/// Expansion ohne Backprop verworfen).
+fn dice_chance_step<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    nodes: &mut Vec<Node>,
+    cid: usize,
+    rng: &mut R,
+    search_config: &SearchConfig,
+) -> Option<(usize, bool)> {
+    let player = nodes[cid].state.current_player;
+    let roll = crate::self_play::roll_dome_dice(
+        &nodes[cid].state,
+        nodes[cid].state.extended_action_nodes[player],
+        crate::self_play::return_order_random_p(),
+        rng,
+    )?;
+    if let Some(&oid) =
+        nodes[cid].children.iter().find(|&&o| matches!(&nodes[o].dice, DiceNodeKind::Outcome(r) if *r == roll))
+    {
+        return Some((oid, false));
+    }
+    crate::profiling::note_gamestate_clone();
+    let mut g = Game { state: nodes[cid].state.clone() };
+    crate::self_play::apply_dice_roll(&mut g, &roll).ok()?;
+    let mut child_state = g.state;
+    child_state.log.clear();
+    let mut child = make_node(
+        net_policy, net_value, child_state, Some(cid), Some(&nodes[cid].state), None, 0.0, player, rng, search_config,
+    );
+    child.dice = DiceNodeKind::Outcome(roll);
+    let oid = nodes.len();
+    nodes.push(child);
+    nodes[cid].children.push(oid);
+    Some((oid, true))
+}
+
+/// Wie ein Wurzel-Eintrag in die nach aussen gegebenen Listen geht (par.3b
+/// Punkt 4). Nur die Sammelkante wird aufgeteilt, jeder andere Eintrag bleibt
+/// eine Zeile.
+#[derive(Clone, Copy)]
+enum DiceSplit {
+    /// Masse (Policy-Ziel): Anteil je ersetzter Aktion = Prior der Aktion /
+    /// Summe der Plattenpriors; die Teile summieren zur Masse der Kante.
+    ByPrior,
+    /// Wert (completed-Q): jede ersetzte Aktion traegt den Wert der Kante.
+    Copy,
+    /// Prior: jede ersetzte Aktion traegt ihren eigenen Einzelprior.
+    OwnPrior,
+}
+
+/// Schreibt den Wurzel-Eintrag `(act, value)` nach `out` -- als EINE Zeile,
+/// oder, wenn `act` die Sammelkante eines zusammengefassten Knotens ist
+/// (`members = Some`), aufgeteilt auf die ersetzten Plattenaktionen nach
+/// `split`. Reihenfolge der Teile = `drafting_actions`-Reihenfolge.
+fn push_dice_split(
+    out: &mut Vec<(Action, f64)>,
+    members: Option<&[(Action, f32)]>,
+    act: &Action,
+    value: f64,
+    split: DiceSplit,
+) {
+    match members {
+        Some(m) if !m.is_empty() && crate::self_play::is_dome_plate_action(act) => {
+            let total: f64 = m.iter().map(|(_, p)| *p as f64).sum();
+            for (a, p) in m {
+                let v = match split {
+                    DiceSplit::ByPrior if total > 0.0 => value * (*p as f64) / total,
+                    DiceSplit::ByPrior => value / m.len() as f64,
+                    DiceSplit::Copy => value,
+                    DiceSplit::OwnPrior => *p as f64,
+                };
+                out.push((a.clone(), v));
+            }
+        }
+        _ => out.push((act.clone(), value)),
+    }
 }
 
 /// Gumbel-Baum mit optionalem BETRACHTER der Wurzel-Determinisierung (siehe
@@ -6166,7 +6478,10 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
         ($ci:expr) => {{
             let ci = $ci;
             match candidate_node[ci] {
-                Some(cid) if nodes[cid].visits > 0 => {
+                // Klasse W (par.3b): ein Zufallsknoten wird IMMER ueber
+                // `descend_and_backprop` besucht (er wuerfelt dort), auch mit
+                // 0 Besuchen -- sein eigener Blattwert ist keine Backprop-Quelle.
+                Some(cid) if nodes[cid].visits > 0 || nodes[cid].dice == DiceNodeKind::Chance => {
                     descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng, search_config)
                 }
                 Some(cid) => {
@@ -6179,6 +6494,14 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
                     // `None`-Zweig unten, ohne die dortige vorangehende
                     // Netz-/Expansionsarbeit, die schon erledigt ist).
                     backprop_path(&mut nodes, cid);
+                }
+                None if is_dice_chance_edge(&nodes, 0, &candidates[ci].0) => {
+                    // Klasse W (par.3b): Wurzelkandidat "Platte legen" ->
+                    // Zufallsknoten, erster Durchgang wuerfelt sofort.
+                    let (act, prior, _g) = candidates[ci].clone();
+                    let cid = push_dice_chance_node(&mut nodes, 0, act, prior);
+                    candidate_node[ci] = Some(cid);
+                    descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng, search_config);
                 }
                 None => {
                     let (act, prior, _g) = candidates[ci].clone();
@@ -6384,6 +6707,12 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
 /// Kurzlabel eines Knotens fürs Log (Aktionsbeschreibung bzw. „Wurzel"). Mit
 /// Eltern-Zustand (VOR dem Zug) für Steinanzahl/Füllstand/Strafleisten-Hinweis.
 fn log_label(nodes: &[Node], nid: usize) -> String {
+    // Klasse W (par.3b): Zufallsknoten und Ausgaenge eigens benennen.
+    match &nodes[nid].dice {
+        DiceNodeKind::Chance => return "Platte legen (Wuerfel)".to_string(),
+        DiceNodeKind::Outcome(r) => return format!("Wuerfel {:?} rot={}", r.source, r.rotation),
+        DiceNodeKind::Decision => {}
+    }
     match &nodes[nid].action {
         None => "Wurzel".to_string(),
         Some(a) => {
@@ -6495,6 +6824,24 @@ fn build_net_tree_for<R: Rng + ?Sized>(
         // Eval/Backprop), statt den Parent nochmal zu zählen.
         let mut expansion_failed = false;
         loop {
+            // Klasse W (par.3b), gleiche Regel wie in `descend_and_backprop`:
+            // am Zufallsknoten wuerfeln statt waehlen.
+            if nodes[nid].dice == DiceNodeKind::Chance {
+                match dice_chance_step(net_policy, net_value, &mut nodes, nid, rng, search_config) {
+                    Some((oid, true)) => {
+                        nid = oid;
+                        break;
+                    }
+                    Some((oid, false)) => {
+                        nid = oid;
+                        continue;
+                    }
+                    None => {
+                        expansion_failed = true;
+                        break;
+                    }
+                }
+            }
             if nodes[nid].terminal {
                 logln!("  SELECT #{nid} [{}] terminal", log_label(&nodes, nid));
                 break;
@@ -6516,6 +6863,10 @@ fn build_net_tree_for<R: Rng + ?Sized>(
                 + (crate::mcts::WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
             if !nodes[nid].untried.is_empty() && nodes[nid].children.len() < widen_allowed {
                 let (act, prior) = nodes[nid].untried.remove(0); // höchster Prior zuerst
+                if is_dice_chance_edge(&nodes, nid, &act) {
+                    nid = push_dice_chance_node(&mut nodes, nid, act, prior);
+                    continue;
+                }
                 let mover = nodes[nid].state.current_player;
                 crate::profiling::note_gamestate_clone();
                 let mut g = Game { state: nodes[nid].state.clone() };
@@ -7403,15 +7754,18 @@ pub(crate) fn net_root_child_stats_policy_prior_and_own<R: Rng + ?Sized>(
 /// gespeicherten Prior) -- 1:1 per Index mit dem Policy-Ziel zippbar. Reines
 /// Auslesen, kein Netz-/RNG-Zugriff.
 fn root_prior_raw(nodes: &[Node]) -> Vec<(Action, f64)> {
+    // Klasse W (par.3b): die Sammelkante traegt hier die Einzelpriors der
+    // ersetzten Plattenaktionen, gleiche Aufteilung wie das Policy-Ziel.
+    let members = nodes[0].dice_members.as_deref();
     let mut out: Vec<(Action, f64)> =
         Vec::with_capacity(nodes[0].children.len() + nodes[0].untried.len());
     for &cid in &nodes[0].children {
-        if let Some(a) = nodes[cid].action.clone() {
-            out.push((a, nodes[cid].prior as f64));
+        if let Some(a) = nodes[cid].action.as_ref() {
+            push_dice_split(&mut out, members, a, nodes[cid].prior as f64, DiceSplit::OwnPrior);
         }
     }
     for (act, prior) in &nodes[0].untried {
-        out.push((act.clone(), *prior as f64));
+        push_dice_split(&mut out, members, act, *prior as f64, DiceSplit::OwnPrior);
     }
     out
 }
@@ -7445,15 +7799,19 @@ fn average_root_prior(forest: &[Vec<Node>]) -> Vec<(Action, f64)> {
 /// Netz/Suche (siehe Testmodul, hand-gebauter `Node`-Vektor).
 fn root_completed_q_policy(nodes: &[Node]) -> Vec<(Action, f64)> {
     let improved = improved_policy(nodes, 0);
+    // Klasse W (par.3b Punkt 4): die Masse der Sammelkante "Platte legen" geht
+    // NACH DEM PRIOR auf die einzelnen Plattenaktions-IDs (Anteil = Prior der
+    // ID / Summe der Plattenpriors); die Teile summieren zur Masse der Kante.
+    let members = nodes[0].dice_members.as_deref();
     let mut policy: Vec<(Action, f64)> = Vec::with_capacity(improved.len());
     for (i, &cid) in nodes[0].children.iter().enumerate() {
-        if let Some(a) = nodes[cid].action.clone() {
-            policy.push((a, improved[i]));
+        if let Some(a) = nodes[cid].action.as_ref() {
+            push_dice_split(&mut policy, members, a, improved[i], DiceSplit::ByPrior);
         }
     }
     let n_children = nodes[0].children.len();
     for (i, (act, _prior)) in nodes[0].untried.iter().enumerate() {
-        policy.push((act.clone(), improved[n_children + i]));
+        push_dice_split(&mut policy, members, act, improved[n_children + i], DiceSplit::ByPrior);
     }
     policy
 }
@@ -7475,15 +7833,19 @@ fn root_completed_q_policy(nodes: &[Node]) -> Vec<(Action, f64)> {
 /// preisgeben.
 fn root_completed_q_raw(nodes: &[Node]) -> Vec<(Action, f64)> {
     let cq = completed_q_per_candidate(nodes, 0);
+    // Klasse W (par.3b Punkt 4): jede ersetzte Plattenaktion traegt das
+    // completed-Q der Sammelkante (ein Wert, keine Masse), damit `root_child_q`
+    // 1:1 zum aufgeteilten Policy-Ziel zippbar bleibt.
+    let members = nodes[0].dice_members.as_deref();
     let mut out: Vec<(Action, f64)> = Vec::with_capacity(cq.len());
     for (i, &cid) in nodes[0].children.iter().enumerate() {
-        if let Some(a) = nodes[cid].action.clone() {
-            out.push((a, cq[i].1));
+        if let Some(a) = nodes[cid].action.as_ref() {
+            push_dice_split(&mut out, members, a, cq[i].1, DiceSplit::Copy);
         }
     }
     let n_children = nodes[0].children.len();
     for (i, (act, _prior)) in nodes[0].untried.iter().enumerate() {
-        out.push((act.clone(), cq[n_children + i].1));
+        push_dice_split(&mut out, members, act, cq[n_children + i].1, DiceSplit::Copy);
     }
     out
 }
@@ -8346,6 +8708,8 @@ pub fn search_start_placement<R: Rng + ?Sized>(
         own_leaf_value: [0.5, 0.5],
         own_value_sum: 0.0,
         halving_min_visits: 0,
+        dice: DiceNodeKind::Decision,
+        dice_members: None,
     }];
     let mut candidate_node: Vec<Option<usize>> = vec![None; candidates.len()];
 
@@ -9001,6 +9365,8 @@ mod tests {
             own_leaf_value: [0.0, 0.0],
             own_value_sum: value,
             halving_min_visits: 0,
+            dice: DiceNodeKind::Decision,
+            dice_members: None,
         }
     }
 
@@ -9745,6 +10111,8 @@ mod tests {
             aggr_w: None,
             aggr_lambda: None,
             aggr_player: None,
+            // Klasse W: Bestand (kein Zufallsknoten).
+            dome_dice_side: None,
         }
     }
 
@@ -15690,5 +16058,439 @@ mod tests {
         let mut r2 = StdRng::seed_from_u64(1);
         let y = search_start_placement(&net, &game.state, pi, 32, false, &mut r2, &on).expect("Startsuche");
         assert_eq!(format!("{x:?}"), format!("{y:?}"));
+    }
+}
+
+/// Form eines Suchbaums fuer den Messbericht zu par.3b (nur Tests): Zahl der
+/// Wurzelkanten (`children` + `untried`), Knotentiefe und Halbzugtiefe (Zahl
+/// der Spielerwechsel auf dem Pfad, also vollendete Halbzuege) je Knoten,
+/// jeweils Maximum und Mittel ueber ALLE Knoten, dazu die Zahl der
+/// Zufallsknoten. Die Knotentiefe zaehlt Zufallsknoten und Ausgaenge als
+/// eigene Ebenen mit; die Halbzugtiefe ist davon unabhaengig.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct DiceTreeShape {
+    pub(crate) root_edges: usize,
+    pub(crate) nodes: usize,
+    pub(crate) chance_nodes: usize,
+    pub(crate) max_depth: u32,
+    pub(crate) mean_depth: f64,
+    pub(crate) max_ply: u32,
+    pub(crate) mean_ply: f64,
+}
+
+/// Baut einen Gumbel-Baum wie die Self-Play-Suche (ohne Wurzelrauschen) und
+/// misst seine Form ([`DiceTreeShape`]). Nur fuer Tests.
+#[cfg(test)]
+pub(crate) fn dice_tree_shape(net: &Net, state: &GameState, sims: u32, seed: u64, cfg: &SearchConfig) -> DiceTreeShape {
+    use rand::SeedableRng;
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+    let nodes = build_gumbel_tree_inner(net, None, state, sims, false, &mut rng, None, false, cfg);
+    let n = nodes.len();
+    let mut depth = vec![0u32; n];
+    let mut ply = vec![0u32; n];
+    for i in 1..n {
+        let p = nodes[i].parent.expect("Nicht-Wurzel hat Eltern");
+        debug_assert!(p < i, "Eltern vor Kind angelegt");
+        depth[i] = depth[p] + 1;
+        ply[i] = ply[p] + u32::from(nodes[i].state.current_player != nodes[p].state.current_player);
+    }
+    DiceTreeShape {
+        root_edges: nodes[0].children.len() + nodes[0].untried.len(),
+        nodes: n,
+        chance_nodes: nodes.iter().filter(|x| x.dice == DiceNodeKind::Chance).count(),
+        max_depth: depth.iter().copied().max().unwrap_or(0),
+        mean_depth: depth.iter().map(|&d| d as f64).sum::<f64>() / n as f64,
+        max_ply: ply.iter().copied().max().unwrap_or(0),
+        mean_ply: ply.iter().map(|&d| d as f64).sum::<f64>() / n as f64,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Klasse W: Zufallsknoten "Platte legen" im Suchbaum
+// (PREREG_asymmetric_selfplay.md par.3b)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod dome_dice_chance_tests {
+    use super::*;
+    use crate::self_play::{is_dome_plate_action, DiceRollSource};
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn champion() -> Net {
+        let path = crate::net::test_champion_model_path();
+        Net::load_auto(path.to_str().unwrap())
+            .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
+    }
+
+    /// Runde 1 nach beiden Startsetzungen, Startspieler 0 am Zug.
+    fn w_state(seed: u64, net: Option<&Net>) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = crate::scoring::sample_valid_scoring_ids(3, &mut rng);
+        let mut game = Game::start(["W".into(), "G".into()], 0, ids, &mut rng);
+        for pi in [1, 0] {
+            let (t, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+            crate::game::apply_start_placement(&mut game.state, pi, t, r, c, rot).unwrap();
+        }
+        let ext = net.is_some_and(net_supports_extended_action_nodes);
+        game.state.extended_action_nodes = [ext, ext];
+        game.state.log.clear();
+        assert_eq!(game.state.phase, Phase::Drafting);
+        assert_eq!(game.state.round_number, 1);
+        game.state
+    }
+
+    fn cfg(side: Option<usize>) -> SearchConfig {
+        SearchConfig { dome_dice_side: side, ..SearchConfig::from_env() }
+    }
+
+    fn synthetic_logits(seed: u64) -> Vec<f32> {
+        let mut r = StdRng::seed_from_u64(seed);
+        (0..NUM_ACTIONS).map(|_| r.random_range(-2.0f32..2.0)).collect()
+    }
+
+    fn sorted_debug<T: std::fmt::Debug>(v: impl Iterator<Item = T>) -> Vec<String> {
+        let mut out: Vec<String> = v.map(|e| format!("{e:?}")).collect();
+        out.sort();
+        out
+    }
+
+    fn lse(xs: &[f64]) -> f64 {
+        let m = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        m + xs.iter().map(|x| (x - m).exp()).sum::<f64>().ln()
+    }
+
+    /// Test (a), Teil 1 (reine Funktion): am W-Knoten genau EINE Plattenkante
+    /// plus die unveraenderten Steinzuege; Prior = Summe der Einzelpriors, ihr
+    /// Logarithmus = logsumexp der ersetzten Logits minus Normierung;
+    /// Stellvertreter = hoechster Einzelprior. G-Seite, gesetzter Pin, offener
+    /// Teilzug und `None` bleiben Bestand.
+    #[test]
+    fn collapse_replaces_plate_actions_by_one_edge_with_summed_prior() {
+        let st = w_state(11, None);
+        let w = st.current_player;
+        let logits = synthetic_logits(5);
+        let moon = [0f32; 5];
+        let run = |s: &GameState, side: Option<usize>| {
+            build_untried_actions_dice(s, &logits, &moon, true, MOON_ORDER_VARIANTS_DEFAULT, side)
+        };
+        let (plain, n_plain, m_plain) = run(&st, None);
+        assert!(m_plain.is_none());
+        let plate_plain: Vec<(Action, f32)> =
+            plain.iter().filter(|(a, _)| is_dome_plate_action(a)).cloned().collect();
+        assert!(plate_plain.len() > 3, "Runde 1: Auslage x Plaetze plus Stapel, waren {}", plate_plain.len());
+        let (dice, n_dice, members) = run(&st, Some(w));
+        assert_eq!(n_plain, n_dice, "Basis-Aktionszahl unveraendert");
+        let members = members.expect("W-Knoten fasst zusammen");
+        let plate_dice: Vec<&(Action, f32)> = dice.iter().filter(|(a, _)| is_dome_plate_action(a)).collect();
+        assert_eq!(plate_dice.len(), 1, "genau eine Plattenkante");
+        assert_eq!(dice.len(), plain.len() - plate_plain.len() + 1);
+        let sum: f64 = plate_plain.iter().map(|(_, p)| *p as f64).sum();
+        assert!((plate_dice[0].1 as f64 - sum).abs() < 1e-6, "Prior {} gegen Summe {sum}", plate_dice[0].1);
+        assert_eq!(
+            sorted_debug(plain.iter().filter(|(a, _)| !is_dome_plate_action(a))),
+            sorted_debug(dice.iter().filter(|(a, _)| !is_dome_plate_action(a))),
+            "Steinzuege unveraendert"
+        );
+        assert_eq!(sorted_debug(members.iter()), sorted_debug(plate_plain.iter()), "ersetzte Aktionen mit Einzelpriors");
+        let best = plate_plain.iter().map(|(_, p)| *p).fold(f32::MIN, f32::max);
+        assert_eq!(
+            members.iter().find(|(a, _)| *a == plate_dice[0].0).unwrap().1,
+            best,
+            "Stellvertreter = hoechster Prior"
+        );
+        // Gumbel an der Wurzel: ln(Prior) = logsumexp(ersetzte Logits) - logsumexp(alle legalen IDs).
+        let mut all_ids: Vec<usize> =
+            drafting_actions(&st).iter().map(|a| crate::self_play::action_to_id_direct(&st, a)).collect();
+        all_ids.sort_unstable();
+        all_ids.dedup();
+        let plate_logits: Vec<f64> = plate_plain
+            .iter()
+            .map(|(a, _)| logits[crate::self_play::action_to_id_direct(&st, a)] as f64)
+            .collect();
+        let all_logits: Vec<f64> = all_ids.iter().map(|&i| logits[i] as f64).collect();
+        let expect = lse(&plate_logits) - lse(&all_logits);
+        assert!(((plate_dice[0].1 as f64).ln() - expect).abs() < 1e-4, "Logit = logsumexp der ersetzten Logits");
+
+        // Bestand an allen Nicht-W-Knoten.
+        let mut pinned = st.clone();
+        pinned.dome_dice_pin = Some(crate::moves::DomeDicePin {
+            player: w,
+            source: crate::moves::DomeDiceSource::Display { tile_id: st.dome_display[0].tile_id },
+            rotation: 0,
+            return_first: None,
+            return_order: None,
+        });
+        let mut g = Game { state: st.clone() };
+        g.apply_drafting(&Action::DrawStackPeek).unwrap();
+        let peeking = g.state;
+        for (label, s, side) in [
+            ("G-Seite", st.clone(), Some(1 - w)),
+            ("Pin gesetzt", pinned, Some(w)),
+            ("Stapelzug offen", peeking, Some(w)),
+        ] {
+            let (x, _, m) = run(&s, side);
+            let (y, _, _) = run(&s, None);
+            assert!(m.is_none(), "{label}: keine Zusammenfassung");
+            assert_eq!(format!("{x:?}"), format!("{y:?}"), "{label}: Kandidaten wie im Bestand");
+        }
+    }
+
+    /// Test (a), Teil 2 (echtes Netz): die Wurzel einer W-Suche hat genau eine
+    /// Plattenkante; die Wurzel der G-Seite ist unveraendert, und in ihrem Baum
+    /// fasst jeder W-Knoten zusammen (die G-Suche kennt die Regel auch).
+    #[test]
+    fn w_root_has_one_plate_edge_and_g_root_is_unchanged() {
+        let net = champion();
+        let st = w_state(12, Some(&net));
+        let w = st.current_player;
+        let mut rng = StdRng::seed_from_u64(1);
+        let nodes = build_gumbel_tree_inner(&net, None, &st, 64, false, &mut rng, None, false, &cfg(Some(w)));
+        let root_actions: Vec<Action> = nodes[0]
+            .children
+            .iter()
+            .filter_map(|&c| nodes[c].action.clone())
+            .chain(nodes[0].untried.iter().map(|(a, _)| a.clone()))
+            .collect();
+        assert_eq!(root_actions.iter().filter(|a| is_dome_plate_action(a)).count(), 1);
+        let members = nodes[0].dice_members.as_ref().expect("Wurzel fasst zusammen");
+        assert!(members.len() > 3);
+        for &c in &nodes[0].children {
+            if nodes[c].action.as_ref().is_some_and(is_dome_plate_action) {
+                assert_eq!(nodes[c].dice, DiceNodeKind::Chance);
+                let sum: f64 = members.iter().map(|(_, p)| *p as f64).sum();
+                assert!((nodes[c].prior as f64 - sum).abs() < 1e-6);
+            }
+        }
+
+        // G am Zug (gleiche Stellung, anderer Spieler): Wurzelkandidaten wie im Bestand.
+        let mut st_g = st.clone();
+        st_g.current_player = 1 - w;
+        let mk = |c: &SearchConfig| {
+            let mut r = StdRng::seed_from_u64(2);
+            make_node(&net, None, st_g.clone(), None, None, None, 0.0, 1 - w, &mut r, c)
+        };
+        let (on, off) = (mk(&cfg(Some(w))), mk(&cfg(None)));
+        assert!(on.dice_members.is_none());
+        assert_eq!(format!("{:?}", on.untried), format!("{:?}", off.untried), "G-Wurzel unveraendert");
+
+        // Im G-Baum: jeder offene W-Knoten fasst zusammen, Zufallsknoten entstehen.
+        let mut rng = StdRng::seed_from_u64(3);
+        let g_nodes = build_gumbel_tree_inner(&net, None, &st_g, 400, false, &mut rng, None, false, &cfg(Some(w)));
+        let mut w_open = 0usize;
+        for n in &g_nodes {
+            if n.dice == DiceNodeKind::Decision && !n.terminal && dome_dice_chance_applies(&n.state, Some(w)) {
+                let plates = n
+                    .children
+                    .iter()
+                    .filter_map(|&c| g_nodes[c].action.as_ref())
+                    .chain(n.untried.iter().map(|(a, _)| a))
+                    .filter(|a| is_dome_plate_action(a))
+                    .count();
+                if n.dice_members.is_some() {
+                    w_open += 1;
+                    assert!(plates <= 1, "W-Knoten mit {plates} Plattenkanten");
+                } else {
+                    assert_eq!(plates, 0, "W-Knoten ohne Zusammenfassung, aber mit Platten");
+                }
+            }
+        }
+        let chance = g_nodes.iter().filter(|n| n.dice == DiceNodeKind::Chance).count();
+        assert!(w_open > 0, "der G-Baum erreicht W-Knoten");
+        assert!(chance > 0, "der G-Baum legt Zufallsknoten an ({w_open} offene W-Knoten)");
+    }
+
+    /// Test (b): der Zufallsknoten wuerfelt je Besuch neu und passt in der
+    /// Verteilung zu `roll_dome_dice` (Runde 1, keine Obergrenze, Rueckgabe-
+    /// Streuung aus: Quelle 1/2, Platte 1/Auslage bzw. Tiefe 1/Stapel,
+    /// Rotation 1/4); gleiche Wuerfe teilen sich einen Ausgang, jeder Ausgang
+    /// traegt den Pin seines Wurfs.
+    #[test]
+    fn chance_node_rolls_per_visit_and_shares_equal_outcomes() {
+        assert_eq!(crate::self_play::return_order_random_p(), 0.0, "Test laeuft ohne Rueckgabe-Streuung");
+        let net = champion();
+        let st = w_state(13, Some(&net));
+        let w = st.current_player;
+        let c = cfg(Some(w));
+        let mut rng = StdRng::seed_from_u64(4);
+        let mut nodes = vec![make_node(&net, None, st.clone(), None, None, None, 0.0, w, &mut rng, &c)];
+        let pos = nodes[0].untried.iter().position(|(a, _)| is_dome_plate_action(a)).unwrap();
+        let (act, prior) = nodes[0].untried.remove(pos);
+        let cid = push_dice_chance_node(&mut nodes, 0, act, prior);
+        let (display_n, pool_n) = (st.dome_display.len(), st.dome_tile_pool.len());
+        let n_draws = 6400usize;
+        let mut per_outcome: HashMap<usize, usize> = HashMap::new();
+        for _ in 0..n_draws {
+            let (oid, _) = dice_chance_step(&net, None, &mut nodes, cid, &mut rng, &c).expect("Wurf");
+            *per_outcome.entry(oid).or_default() += 1;
+        }
+        // Gleiche Wuerfe teilen Kinder: jeder Ausgang hat einen eigenen Wurf.
+        let keys: Vec<String> = nodes[cid]
+            .children
+            .iter()
+            .map(|&o| match &nodes[o].dice {
+                DiceNodeKind::Outcome(r) => format!("{r:?}"),
+                other => panic!("Kind des Zufallsknotens ist {other:?}"),
+            })
+            .collect();
+        let distinct: std::collections::HashSet<&String> = keys.iter().collect();
+        assert_eq!(distinct.len(), keys.len(), "kein Wurf doppelt angelegt");
+        let all = 4 * (display_n + pool_n);
+        assert!(keys.len() <= all && keys.len() + 4 >= all, "fast alle {all} Ausgaenge gesehen: {}", keys.len());
+        // Randverteilungen gegen die Regeln des Wuerfels.
+        let mut display = 0usize;
+        let mut by_depth = vec![0usize; pool_n + 1];
+        let mut by_tile: HashMap<usize, usize> = HashMap::new();
+        let mut by_rot = [0usize; 4];
+        for &o in &nodes[cid].children {
+            let DiceNodeKind::Outcome(r) = &nodes[o].dice else { unreachable!() };
+            let k = per_outcome.get(&o).copied().unwrap_or(0);
+            by_rot[(r.rotation / 90) as usize] += k;
+            match r.source {
+                DiceRollSource::Display { tile_id } => {
+                    display += k;
+                    *by_tile.entry(tile_id).or_default() += k;
+                }
+                DiceRollSource::Stack { depth, depth_max } => {
+                    assert_eq!(depth_max, pool_n, "Runde 1 ohne Obergrenze");
+                    by_depth[depth] += k;
+                }
+            }
+            // Ausgang = Zustand nach dem Wurf: Pin gesetzt, W weiter am Zug.
+            let pin = nodes[o].state.dome_dice_pin.as_ref().expect("Pin am Ausgang");
+            assert_eq!((pin.player, pin.rotation), (w, r.rotation));
+            assert_eq!(nodes[o].state.current_player, w);
+            assert_eq!(nodes[o].player_who_acted, w);
+        }
+        let frac = display as f64 / n_draws as f64;
+        assert!((0.46..0.54).contains(&frac), "Quelle Auslage {frac:.3}");
+        for (t, k) in &by_tile {
+            let e = display as f64 / display_n as f64;
+            assert!((0.8..1.2).contains(&(*k as f64 / e)), "Platte {t}: {k} gegen {e:.0}");
+        }
+        let stack = n_draws - display;
+        for (d, k) in by_depth.iter().enumerate().skip(1) {
+            let e = stack as f64 / pool_n as f64;
+            assert!((0.7..1.3).contains(&(*k as f64 / e)), "Tiefe {d}: {k} gegen {e:.0}");
+        }
+        for (i, k) in by_rot.iter().enumerate() {
+            assert!((0.9..1.1).contains(&(*k as f64 / (n_draws as f64 / 4.0))), "Rotation {}: {k}", i * 90);
+        }
+    }
+
+    /// Test (b), Wert: ueber echte Durchgaenge (`descend_and_backprop` ab dem
+    /// Zufallsknoten) ist sein Wert der Besuchsmittelwert seiner Ausgaenge, und
+    /// sein impliziter Minimax-Wert der besuchsgewichtete Mittelwert.
+    #[test]
+    fn chance_node_value_is_the_visit_mean_over_outcomes() {
+        let net = champion();
+        let st = w_state(14, Some(&net));
+        let w = st.current_player;
+        let c = cfg(Some(w));
+        let mut rng = StdRng::seed_from_u64(5);
+        let mut nodes = vec![make_node(&net, None, st, None, None, None, 0.0, w, &mut rng, &c)];
+        let pos = nodes[0].untried.iter().position(|(a, _)| is_dome_plate_action(a)).unwrap();
+        let (act, prior) = nodes[0].untried.remove(pos);
+        let cid = push_dice_chance_node(&mut nodes, 0, act, prior);
+        for _ in 0..150 {
+            descend_and_backprop(&net, None, &mut nodes, cid, &mut rng, &c);
+        }
+        let ch = &nodes[cid];
+        assert_eq!(ch.player_who_acted, w);
+        let n_sum: u32 = ch.children.iter().map(|&o| nodes[o].visits).sum();
+        let v_sum: f64 = ch.children.iter().map(|&o| nodes[o].value).sum();
+        assert_eq!(ch.visits, n_sum, "jeder Durchgang endet an genau einem Ausgang");
+        assert!(ch.visits >= 140, "fast alle Durchgaenge gezaehlt: {}", ch.visits);
+        assert!((ch.value - v_sum).abs() < 1e-9, "Wert = Summe der Ausgangswerte");
+        assert!(
+            ch.children.len() > 10 && ch.children.iter().any(|&o| nodes[o].visits > 1),
+            "geteilte Ausgaenge"
+        );
+        let mut im = [0.0f64; 2];
+        for &o in &ch.children {
+            for (p, slot) in im.iter_mut().enumerate() {
+                *slot += nodes[o].visits as f64 * nodes[o].im_value[p];
+            }
+        }
+        for p in 0..2 {
+            assert!((ch.im_value[p] - im[p] / n_sum as f64).abs() < 1e-9, "im_value = Erwartungswert");
+        }
+        // Der Wurzel kommt jeder Durchgang ueber den Zufallsknoten zugute.
+        assert_eq!(nodes[0].visits, ch.visits);
+    }
+
+    /// Test (d): Policy-Ziel der Wurzel. Die Masse der Sammelkante geht nach
+    /// dem Prior auf die einzelnen Plattenaktions-IDs und summiert zu ihr;
+    /// completed-Q traegt je ID den Wert der Kante, der Prior je ID den
+    /// Einzelprior. Die drei Listen bleiben 1:1 zippbar, das Ziel summiert zu 1.
+    #[test]
+    fn root_policy_target_splits_plate_mass_by_prior() {
+        let net = champion();
+        let st = w_state(15, Some(&net));
+        let w = st.current_player;
+        let mut rng = StdRng::seed_from_u64(6);
+        let nodes = build_gumbel_tree_inner(&net, None, &st, 64, false, &mut rng, None, false, &cfg(Some(w)));
+        let members = nodes[0].dice_members.clone().expect("Wurzel fasst zusammen");
+        let policy = root_completed_q_policy(&nodes);
+        let prior = root_prior_raw(&nodes);
+        let cq = root_completed_q_raw(&nodes);
+        assert_eq!(policy.len(), prior.len());
+        assert_eq!(policy.len(), cq.len());
+        for i in 0..policy.len() {
+            assert_eq!(policy[i].0, prior[i].0);
+            assert_eq!(policy[i].0, cq[i].0);
+        }
+        let n_entries = nodes[0].children.len() + nodes[0].untried.len();
+        assert_eq!(policy.len(), n_entries - 1 + members.len());
+        assert!((policy.iter().map(|(_, p)| p).sum::<f64>() - 1.0).abs() < 1e-9);
+        // Index der Kante in `children` + `untried`.
+        let edge_idx = nodes[0]
+            .children
+            .iter()
+            .map(|&c| nodes[c].action.clone().unwrap())
+            .chain(nodes[0].untried.iter().map(|(a, _)| a.clone()))
+            .position(|a| is_dome_plate_action(&a))
+            .unwrap();
+        let mass = improved_policy(&nodes, 0)[edge_idx];
+        let edge_q = completed_q_per_candidate(&nodes, 0)[edge_idx].1;
+        let total_prior: f64 = members.iter().map(|(_, p)| *p as f64).sum();
+        let plate: Vec<usize> = (0..policy.len()).filter(|&i| is_dome_plate_action(&policy[i].0)).collect();
+        assert_eq!(sorted_debug(plate.iter().map(|&i| &policy[i].0)), sorted_debug(members.iter().map(|(a, _)| a)));
+        let split_sum: f64 = plate.iter().map(|&i| policy[i].1).sum();
+        assert!((split_sum - mass).abs() < 1e-12, "Teile {split_sum} summieren zur Masse {mass}");
+        for &i in &plate {
+            let own = members.iter().find(|(a, _)| *a == policy[i].0).unwrap().1 as f64;
+            assert!((policy[i].1 - mass * own / total_prior).abs() < 1e-12, "Anteil nach Prior");
+            assert_eq!(prior[i].1, own, "Einzelprior");
+            assert_eq!(cq[i].1, edge_q, "completed-Q der Kante");
+        }
+        // Die Zugwahl-Statistik behaelt EINE Zeile fuer die Kante.
+        let stats = root_child_stats_from_nodes(&nodes);
+        assert!(stats.iter().filter(|(a, _, _)| is_dome_plate_action(a)).count() <= 1);
+    }
+
+    /// `push_dice_split` als reine Funktion, mit Nicht-Platte und ohne Mitglieder.
+    #[test]
+    fn push_dice_split_by_prior_copy_and_own_prior() {
+        let st = w_state(16, None);
+        let plates: Vec<Action> = drafting_actions(&st).into_iter().filter(is_dome_plate_action).take(3).collect();
+        let stone = drafting_actions(&st).into_iter().find(|a| !is_dome_plate_action(a)).unwrap();
+        let members: Vec<(Action, f32)> = plates.iter().cloned().zip([0.1f32, 0.3, 0.6]).collect();
+        let mut out = Vec::new();
+        push_dice_split(&mut out, Some(&members), &plates[1], 0.5, DiceSplit::ByPrior);
+        let got: Vec<f64> = out.iter().map(|(_, v)| *v).collect();
+        for (g, want) in got.iter().zip([0.05, 0.15, 0.3]) {
+            assert!((g - want).abs() < 1e-6, "{got:?}");
+        }
+        out.clear();
+        push_dice_split(&mut out, Some(&members), &plates[0], 0.7, DiceSplit::Copy);
+        assert!(out.len() == 3 && out.iter().all(|(_, v)| *v == 0.7));
+        out.clear();
+        push_dice_split(&mut out, Some(&members), &plates[0], 1.0, DiceSplit::OwnPrior);
+        assert_eq!(out.iter().map(|(_, v)| *v as f32).collect::<Vec<_>>(), vec![0.1f32, 0.3, 0.6]);
+        out.clear();
+        push_dice_split(&mut out, Some(&members), &stone, 0.2, DiceSplit::ByPrior);
+        push_dice_split(&mut out, None, &plates[0], 0.4, DiceSplit::ByPrior);
+        assert_eq!(out, vec![(stone, 0.2), (plates[0].clone(), 0.4)], "nur die Sammelkante wird aufgeteilt");
     }
 }

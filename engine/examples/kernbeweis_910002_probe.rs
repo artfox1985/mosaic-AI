@@ -157,6 +157,8 @@ fn main() {
         aggr_w: None,
         aggr_lambda: None,
         aggr_player: None,
+        // Klasse W: Bestand (kein Zufallsknoten).
+        dome_dice_side: None,
     };
     let actions = drafting_actions(&state1);
     println!(

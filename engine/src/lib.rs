@@ -856,6 +856,10 @@ fn engine_config_json() -> String {
         "dome_dice": u8::from(crate::self_play::dome_dice_enabled()),
         "dome_dice_sims": crate::self_play::dome_dice_sims(),
         "dome_dice_caps": crate::self_play::DOME_DICE_DEPTH_CAPS.to_vec(),
+        // par.3b: wie die Suchen einer W-Partie die W-Platten modellieren
+        // (Regelname, Muster `aggr_own_q_gap_n_min_rule`); trennt im Manifest
+        // Laeufe vor und nach dem Zufallsknoten.
+        "dome_dice_tree_rule": crate::net_mcts::DOME_DICE_TREE_RULE,
         // Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a): Stoerer-Knopf,
         // sein w und lambda (null = ungueltig bzw. lambda ungesetzt; dann lehnt
         // run_net_self_play bei aggr_side=1 ab) und die N_min-Regel von

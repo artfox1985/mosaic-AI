@@ -156,6 +156,68 @@ Empfehlung; gewaehlt:
 Damit ist der Bau der Klassen W und S vollstaendig spezifiziert; offen bleiben nur die Werte aus den
 Sonden (lambda und eps aus S4, Zusammensetzung nach S1-S4).
 
+## par.3b ENTSCHIEDEN 2026-10-03: der Suchbaum kennt die Wuerfel-Regel (Zufallsknoten)
+
+Nutzer, nachdem der Koordinator gemeldet hatte, dass der kleinere Aktionsraum nur in der Platzsuche @600
+wirkt (die keinen Record schreibt), waehrend alle anderen Suchen kuenftige W-Platten frei waehlen
+(Bauplan 4.5): *"Der suchbaum sollte aber wissen dass die zukuenftigen w Platten auch gewuerfelt sind.
+Sonst ist die gesamte Idee mit der suchtiefe nur schwach umgesetzt."* Grundidee der Klasse W laut
+Nutzer: *"durch die Vorauswahl der kuppelplatten den aktionsraum klein zu machen und dann tiefer in
+den suchbaum einzutauchen."* Auf die Vorlage gewaehlt (je Empfehlung):
+
+* **Im Baum** fallen an jedem Knoten, an dem die W-Seite zieht (Runde 1-4, kein Teilzug offen, kein
+  Pin), alle Plattenaktionen (`ChooseDomeSlot` jeder Auslage-Platte und Platz, `DrawStackPeek`) zu EINER
+  Aktion "Platte legen" zusammen (Prior = Summe der Einzelpriors). Darunter ein **Zufallsknoten, der je
+  Besuch neu wuerfelt** (dieselben Regeln wie der echte Wuerfel, `roll_dome_dice`, auf der
+  determinisierten Welt der Suche); gleiche Ausgaenge teilen sich einen Kind-Knoten, der Wert ist der
+  Mittelwert ueber die Besuche. Unter dem Ausgang setzt der Pin den Zustand fest, der Baum waehlt nur
+  noch den Platz.
+* **Beide Seiten** kennen die Regel: auch die Suchen von G modellieren die Platten von W als Zufall.
+* **Policy-Ziel der W-Seite:** die Besuche auf "Platte legen" werden auf die einzelnen Plattenaktionen
+  nach dem Prior des Netzes verteilt (keine Vorliebe fuer eine bestimmte Platte, nur die Haeufigkeit).
+* Die echte Partie bleibt wie gebaut: waehlt die Suche "Platte legen", wuerfelt der echte Wuerfel aus
+  seinem eigenen Strom (den der Baum nicht kennt), Platzsuche @600 deterministisch.
+* Knopf AUS (und Partien ohne W) byte-gleich. Aufwand HERLEITUNG rund 1,5 Tage Code.
+
+### par.3b1 BEFUND nach dem Bau: der Zufallsknoten macht den Baum zunaechst FLACHER (2026-10-03)
+
+`#[ignore]`-Test `dice_tree_depth_report` (self_play.rs, Agent-Bau, vom Koordinator nachgefahren, Zahlen
+identisch). **Grundmenge** n = 8 Plattenentscheide der W-Seite EINER Testpartie (Champion, Seed 4711),
+je Entscheid eine W-Suche ohne und mit Zufallsknoten, gleiche Sims, Such-Seed 7. **Einheiten**
+Wurzelkanten je Entscheid; Knotentiefe ueber alle Baumknoten; Halbzugtiefe = Spielerwechsel auf dem Pfad.
+
+| Mittel ueber 8 Entscheide | 100 Sims | 400 Sims |
+| --- | --- | --- |
+| Wurzelkanten | 30,4 -> 21,0 | 30,4 -> 21,0 |
+| mittlere Knotentiefe | 3,78 -> 3,68 | 4,50 -> 4,66 |
+| mittlere Halbzugtiefe | 1,98 -> 1,19 | 2,51 -> 1,55 |
+| max. Halbzugtiefe | 4,62 -> 3,12 | 6,88 -> 4,25 |
+
+HERLEITUNG: je Besuch neu gewuerfelt erzeugt fast jeder Besuch einen neuen Ausgang (R1 bis 13 Tiefen x 4
+Rotationen plus Auslage; bei 400 Sims in R1 24-28 Ausgaenge), jeder mit Netzaufruf; dazu belegt ein
+W-Plattenzug drei Baumebenen (Zufall, Platz, Rotation) fuer einen Halbzug. In R4 (wenige Ausgaenge)
+waechst die mittlere Knotentiefe dagegen (4,23 -> 7,07 bei 400 Sims). **Nutzer-Entscheid 2026-10-03:**
+Progressive Widening am Zufallsknoten (hoechstens ceil(sqrt(Besuche)) verschiedene Ausgaenge, sonst
+Wiederbesuch eines vorhandenen nach Besuchen) UND erzwungene Ein-Aktions-Schritte unter dem Pin ohne
+eigenen Knoten/Netzaufruf anwenden; danach dieselbe Messung, erst dann Wheel und Sonden.
+
+## par.3c ENTSCHIEDEN 2026-10-03: die Platzwahl der gewuerfelten Platte schreibt einen Record
+
+Nutzer auf die Frage, ob die Platzsuche @600 einen bedingten Policy-Record schreiben soll: *"Kannst sie
+mitschreiben. Ist ja eine vorgegebene Platte und das Netz entscheidet wohin."* Das aendert par.2
+("der erzwungene Plattenzug schreibt KEINEN Record") fuer genau EINEN Teilschritt: die Platzwahl.
+Quelle, Platte bzw. Tiefe, Rotation und Rueckgabe bleiben ohne Record.
+
+* **Record:** Zustand unmittelbar vor der Platzwahl (Ziehungen schon ausgefuehrt, Pin gesetzt), Policy-Ziel
+  = Ergebnis der Platzsuche @600 (Besuche bzw. das Ziel, das die Erzeugung sonst schreibt) ueber die
+  Plaetze der Wuerfel-Platte, Wertziel wie jeder andere Record. Markiert mit `dice_place: true`.
+* **Pflicht-Maske:** der Pin steht NICHT in `state_to_json`; ohne Zusatz saehe das Training alle legalen
+  Plattenaktionen als Alternativen und lernte, die gewuerfelte Platte zu bevorzugen. Der Record traegt
+  darum die erlaubten Aktions-IDs (`dice_place_ids`), und der Policy-Verlust laeuft im Training NUR ueber
+  diese IDs (Maske in `engine/py/corpus_dataset.py`, im Cache-Schluessel, wenn sie das Ergebnis aendert).
+* Record-Feld-Regel: gebaut VOR der Erzeugung; Knopf AUS byte-gleich. Bau direkt nach dem Zufallsknoten
+  (par.3b), beides beruehrt `self_play.rs`.
+
 ## par.4 ZUSAMMENSETZUNG DES FENSTERS (Nutzer-Plan, endgueltig nach den Sonden)
 
 **Nutzer 2026-10-01:** *"ich denk da an 4000 spiele im sockel sowie 2000 'normale' spiele im sockel.
