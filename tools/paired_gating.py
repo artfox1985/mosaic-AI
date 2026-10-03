@@ -348,6 +348,23 @@ def play_pair_block(mr, model_a: str, model_b: str, sims_a: int, sims_b: int,
     return json.loads(raw1), json.loads(raw2)
 
 
+def validate_gating_params(block_size: int, max_pairs: int, sprt_p1: float,
+                           sprt_alpha: float, sprt_beta: float) -> None:
+    """Code-Review 2 (2026-10-02) Befund 4: die Parameter gingen ungeprueft in die Schleife.
+    `--block-size 0` lief endlos (kein Block kommt je voran), `--h1 1.0` endete erst nach Stunden in
+    `log(0)`, und `--h1 <= 0.5` drehte das LLR-Vorzeichen still um (der SPRT haette dann fuer B
+    "entschieden", wenn A gewinnt). Wirft ValueError mit der Ursache."""
+    if not isinstance(block_size, int) or block_size < 1:
+        raise ValueError(f"block_size muss >= 1 sein (war {block_size!r})")
+    if not isinstance(max_pairs, int) or max_pairs < 1:
+        raise ValueError(f"max_pairs muss >= 1 sein (war {max_pairs!r})")
+    if not (SPRT_P0 < sprt_p1 < 1.0):
+        raise ValueError(f"--h1 muss zwischen {SPRT_P0} und 1 liegen, beide ausgeschlossen (war {sprt_p1!r})")
+    for name, v in (("sprt_alpha", sprt_alpha), ("sprt_beta", sprt_beta)):
+        if not (0.0 < v < 1.0):
+            raise ValueError(f"{name} muss zwischen 0 und 1 liegen, beide ausgeschlossen (war {v!r})")
+
+
 def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        name_b: str | None = None, sims_a: int = DEFAULT_SIMS,
                        sims_b: int = DEFAULT_SIMS, c_puct_a: float = DEFAULT_C_PUCT,
@@ -393,6 +410,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     ersten Block gegen `mosaic_rust.engine_config_json()` geprueft; hier ist
     der Elternprozess der spielende Prozess, die Pruefung sieht also genau,
     was spielt. Abweichung -> Abbruch mit Liste."""
+    validate_gating_params(block_size, max_pairs, sprt_p1, sprt_alpha, sprt_beta)
     import mosaic_rust as mr
 
     engine_config_check = None
@@ -766,6 +784,10 @@ def main(argv=None, recipe_pre=None) -> None:
     sims_b = args.sims if args.sims is not None else args.sims_b
     c_puct_a = args.c_puct if args.c_puct is not None else args.c_puct_a
     c_puct_b = args.c_puct if args.c_puct is not None else args.c_puct_b
+    try:
+        validate_gating_params(args.block_size, args.max_pairs, args.sprt_p1, args.sprt_alpha, args.sprt_beta)
+    except ValueError as e:
+        p.error(str(e))
 
     try:
         result = run_paired_gating(

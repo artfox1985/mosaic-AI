@@ -138,6 +138,11 @@ def _reject_duplicate_keys(pairs):
     return result
 
 
+def _reject_nonfinite(token):
+    """`parse_constant` fuer json.loads: `NaN`, `Infinity` und `-Infinity` sind kein JSON."""
+    raise RecipeError(f"{token} ist kein gueltiger Wert (kein JSON, als Knopfwert ein Tippfehler)")
+
+
 def _env_section_problems(env, where: str) -> list[str]:
     if not isinstance(env, dict):
         return [f"{where} muss ein Objekt sein, ist {type(env).__name__}"]
@@ -230,7 +235,10 @@ def load_recipe(path) -> Recipe:
     except OSError as e:
         raise RecipeError(f"Rezept {path_text} nicht lesbar: {e}") from e
     try:
-        content = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_reject_duplicate_keys)
+        # Code-Review 2 (2026-10-02) Befund 7: Pythons json nimmt `NaN`/`Infinity` an, beides ist
+        # kein JSON und als Knopfwert immer ein Tippfehler -- hart abweisen.
+        content = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_reject_duplicate_keys,
+                             parse_constant=_reject_nonfinite)
     except RecipeError as e:
         raise RecipeError(f"Rezept {path_text}: {e}") from e
     except (UnicodeDecodeError, json.JSONDecodeError) as e:

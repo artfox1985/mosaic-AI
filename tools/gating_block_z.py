@@ -46,10 +46,26 @@ def block_shares(path: str) -> list[float]:
 
 
 def block_z(shares: list[float]) -> dict:
+    """Code-Review 2 (2026-10-02) Befund 3: zwei Randfaelle teilten durch null, ausgerechnet beim
+    deutlichsten Ergebnis. Ein Block allein hat keine Streuung (z = None, nicht berechenbar); sind alle
+    Bloecke gleich (sd = 0), ist z unendlich mit dem Vorzeichen der Abweichung von 0,5 (bzw. 0, wenn
+    alle Bloecke genau 0,5 sind). `json.dumps` schreibt das als `Infinity`, das `json.loads` liest."""
     n = len(shares)
+    if n == 0:
+        return {"blocks": 0, "mean": None, "sd": None, "z": None}
     mean = sum(shares) / n
+    if n < 2:
+        return {"blocks": n, "mean": mean, "sd": None, "z": None}
     sd = math.sqrt(sum((s - mean) ** 2 for s in shares) / (n - 1))
-    return {"blocks": n, "mean": mean, "sd": sd, "z": (mean - 0.5) / (sd / math.sqrt(n))}
+    if sd == 0:
+        z = 0.0 if mean == 0.5 else math.copysign(math.inf, mean - 0.5)
+    else:
+        z = (mean - 0.5) / (sd / math.sqrt(n))
+    return {"blocks": n, "mean": mean, "sd": sd, "z": z}
+
+
+def _fmt(v, spec: str) -> str:
+    return "n/b" if v is None else format(v, spec)
 
 
 def main() -> int:
@@ -89,9 +105,11 @@ def main() -> int:
         print(json.dumps(result))
     else:
         for r in per:
-            print(f"{r['artifact']}: Bloecke {r['blocks']}, Mittel {r['mean']:.4f}, sd {r['sd']:.4f}, z {r['z']:+.2f}")
+            print(f"{r['artifact']}: Bloecke {r['blocks']}, Mittel {_fmt(r['mean'], '.4f')}, "
+                  f"sd {_fmt(r['sd'], '.4f')}, z {_fmt(r['z'], '+.2f')}")
         q = result["pooled"]
-        print(f"gepoolt: Bloecke {q['blocks']}, Mittel {q['mean']:.4f}, sd {q['sd']:.4f}, z {q['z']:+.2f}")
+        print(f"gepoolt: Bloecke {q['blocks']}, Mittel {_fmt(q['mean'], '.4f')}, sd {_fmt(q['sd'], '.4f')}, "
+              f"z {_fmt(q['z'], '+.2f')}")
     return 0
 
 

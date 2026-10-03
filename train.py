@@ -1979,6 +1979,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # 5. DIE SCHLEIFE
     mse_loss = nn.MSELoss()
     n_batches = len(dataloader)
+    if n_batches == 0:
+        # Code-Review 2 (2026-10-02) Befund 5: mit drop_last=True ergibt ein Datensatz unter einer
+        # Batchgroesse KEINE Batch; die Epochen-Mittel teilten danach durch null. Der Waechter oben
+        # faengt nur 0 Zustaende.
+        print(f"❌ Fehler: {len(dataset)} Trainings-Zustaende ergeben bei Batchgroesse {BATCH_SIZE} "
+              f"und drop_last keine einzige Batch -- mehr Daten oder kleinere Batchgroesse.")
+        return
     policy_history  = []
     epoch_history   = []   # je Epoche ein Datensatz -> Manifest (Nutzer 2026-08-17)
     value_history   = []
@@ -2169,6 +2176,27 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if margin_thresholds:
         _resume_fingerprint["margin_thresholds"] = True
         _resume_fingerprint["margin_threshold_weight"] = margin_threshold_weight
+    # Code-Review 2 (2026-10-02) Befund 6: diese Knoepfe aendern Verlust oder Kopfform, standen aber
+    # nicht im Fingerabdruck -- ein Resume mit geaenderten Verlust-Knoepfen blieb unbemerkt. Nach dem
+    # E2-Muster nur, wenn sie vom Default abweichen: Zwischenstaende von Laeufen mit Defaults bleiben
+    # fortsetzbar, jede Abweichung muss beim Resume uebereinstimmen.
+    for _knob, _value, _default in (
+            ("wdl_hard_only", bool(wdl_hard_only), False),
+            ("wdl_label_smooth", wdl_label_smooth, 0.0),
+            ("wdl_bootstrap_destretch", bool(wdl_bootstrap_destretch), False),
+            ("destretch_a", destretch_a, 0.0051), ("destretch_b", destretch_b, 1.9269),
+            ("exclude_round5", bool(exclude_round5), False),
+            ("points_dist_bins", points_dist_bins, None),
+            ("reinit_points_head", bool(reinit_points_head), False),
+            ("opp_points_head", bool(opp_points_head), False),
+            ("endgame_head", bool(endgame_head), False),
+            ("ranking_loss_weight", ranking_loss_weight, 0.0),
+            ("conjunction_head", bool(conjunction_head), False),
+            ("ownership_head_2d", bool(ownership_head_2d), False),
+            ("head_warmstart", bool(head_warmstart), True),
+            ("moon_target_source", moon_target_source, "label")):
+        if _value != _default:
+            _resume_fingerprint[_knob] = _value
     start_epoch = 0
     if _resume is not None:
         check_resume_fingerprint(_resume["fingerprint"], _resume_fingerprint)

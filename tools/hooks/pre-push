@@ -136,10 +136,12 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     # `< /dev/null` an den Kommandosubstitutionen: die erben sonst den stdin
     # der Schleife und koennten die noch ungelesenen Ref-Zeilen fressen.
     if [ -n "$FULL_CHECK" ]; then
-        PRIVACY_FILES=$(git ls-tree -r --name-only "$local_sha" \
+        # Code-Review 2 (2026-10-02) Befund 7: ohne core.quotePath=false kommen Nicht-ASCII-
+        # Dateinamen oktal gequotet ("aÃ¤.md") und `git grep` findet sie nicht -- still ungeprueft.
+        PRIVACY_FILES=$(git -c core.quotePath=false ls-tree -r --name-only "$local_sha" \
                             2>/dev/null < /dev/null)
     else
-        PRIVACY_FILES=$(git diff --name-only --diff-filter=ACMR \
+        PRIVACY_FILES=$(git -c core.quotePath=false diff --name-only --diff-filter=ACMR \
                             "$remote_sha" "$local_sha" 2>/dev/null < /dev/null)
     fi
     PRIVACY_FILES=$(printf '%s\n' "$PRIVACY_FILES" | grep -vE "$PRIVACY_SKIP")
@@ -158,8 +160,19 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 "
     fi
 
+    # Code-Review 2 (2026-10-02) Befund 7: `cargo test --release` kompiliert auch examples/, benches/
+    # und tests/ und haengt an Cargo.toml/Cargo.lock -- Aenderungen NUR dort liefen bisher ungeprueft
+    # durch (CLAUDE.md "Push scheitert am pre-push-Hook: examples/ und benches/"). Sie erzwingen den
+    # vollen Test; die Logtext-Herabstufung gilt nur fuer engine/src/.
+    ENGINE_OTHER_CHANGED=""
+    if [ -z "$FULL_CHECK" ] && [ -n "$(git diff --name-only "$RANGE" -- engine/Cargo.toml engine/Cargo.lock             engine/build.rs engine/examples/ engine/benches/ engine/tests/ 2>/dev/null < /dev/null)" ]; then
+        ENGINE_OTHER_CHANGED="yes"
+    fi
     if [ -n "$FULL_CHECK" ]; then
         ENGINE_SRC_CHANGED="yes"
+    elif [ -n "$ENGINE_OTHER_CHANGED" ]; then
+        ENGINE_SRC_CHANGED="yes"
+        NON_LOGTEXT_REFS="$NON_LOGTEXT_REFS $local_ref"
     elif [ -n "$(git diff --name-only "$RANGE" -- engine/src/ 2>/dev/null)" ]; then
         ENGINE_SRC_CHANGED="yes"
         # Nutzer-Wunsch 2026-08-11: "bei aenderungen im logtext brauch ich keinen

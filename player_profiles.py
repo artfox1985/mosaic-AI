@@ -39,10 +39,12 @@ from datetime import datetime as _dt
 from pathlib import Path
 
 from tools.elo_tracker import (
+    ANCHOR_KEY,
     LN10_OVER_400,
     fit_all,
     load_rows,
     node_key as _anchor_node_key,
+    unbeaten_label,
 )
 
 # Isolation (Vorfall 2026-08-02): eine Testserver-Instanz hat versehentlich
@@ -130,7 +132,18 @@ def refresh_anchor_table() -> dict:
     aendert), ist aber sonst nicht noetig."""
     global _anchor_cache
     rows = load_rows()
-    fitted, *_ = fit_all(rows)
+    fitted, nodes, wins, games = fit_all(rows)
+    # Code-Review 2 (2026-10-02) Befund 7: `report()` zeigt fuer einen Knoten mit NUR Siegen oder
+    # NUR Niederlagen keine Elo-Zahl (die MLE existiert nicht, die Zahl misst die Iterationszahl;
+    # `elo_tracker.unbeaten_label`, Code-Review #20). Das GUI-Badge las den Fit aber direkt und zeigte
+    # den Scheinwert. Hier dieselbe Regel: solche Knoten bekommen elo=None (Anker ausgenommen).
+    for node in list(fitted):
+        if node == ANCHOR_KEY:
+            continue
+        total_games = sum(games[node][j] for j in nodes if j != node)
+        total_wins = sum(wins[node][j] for j in nodes if j != node)
+        if unbeaten_label(total_wins, total_games) is not None:
+            fitted[node] = (None, fitted[node][1])
     _anchor_cache = fitted  # {node_key: (elo|None, connected_to_anchor: bool)}
     return _anchor_cache
 
