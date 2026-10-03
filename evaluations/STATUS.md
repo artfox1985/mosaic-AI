@@ -18,6 +18,22 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
+**LAEUFT: NICHTS.** **FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
+`PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
+Partien in 400 Dateien (`data/selfplay_v34-b01-value-*`), beide Exit 0, keine Watchdog-, Deadline- oder
+Haenger-Zeile. Smoke vorher gruen (Waechter 6 Knoepfe, Manifest traegt `r5_net_sims` 400), Tages-Snapshot
+`b39f5a06`. Abnahmen par.8 stehen aus.
+
+**FERTIG 2026-10-03 05:11: Promotion v34-b01** (`PREREG_v34_window.md` par.10e): Replikation 285:115
+(z +10,00), Anker 45:5, Champion-2 gegen v31-b01 108:42; Elo 1595 [1546; 1646]; Diagnostiken gepaart
+gegen v32 (R5-Daempfung 0,177 -> 0,272, Brier-Regel haelt, sigma/Prior 1,54); Artefakt mit Golden
+Probe und Selbsttest gruen. 5d Paritaets-Fixture nach der Erzeugung von Hand nachgezogen
+(`34cf8da5c17b04d3`, frischer Prozess gruen; der Kettenlauf war an der PATH-Form in Git-Bash
+gescheitert). **Offen fuer den Nutzer:** Server-Neustart (Champion, Spec, Anzeige-Kalibrierung). **Nebenlast-Vermerk:** die drei Register-Eintraege
+(`elo_tracker.py add`, je rund 2-3 min Fit) liefen rund 05:12-05:21 parallel zu Smoke und den ersten
+Minuten der Erzeugung (gemeldet; Erzeugung ist kein Messlauf mit Stoppregel, Wirkung hoechstens
+einzelne Chunk-Zeitlimits; geprueft: keine Watchdog-, Deadline- oder Haenger-Zeile in der Ausgabe).
+
 **UEBERGABE-STAND 2026-10-02 21:50 (Nutzer startet die Maschine neu; NICHTS laeuft).** Letzter Lauf:
 R5-A/B 400 gegen 200 am Erzeugungspunkt, vollstaendig (800 von 800 Partien), registriert
 (`PREREG_r5_net_vs_solver.md` par.6h, 435:365, z +3,90): **v35 faehrt Runde 5 per Netz mit 400 R5-Sims**;
@@ -28,9 +44,8 @@ par.10b/par.10c). **NUTZER-ENTSCHEID 2026-10-02: `v34-b01` wird promoviert** (pa
 Kante par.2a: `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json`, Kante gegen v32-b01
 239:121, Block-z +7,37.
 
-**Nach dem Neustart, in dieser Reihenfolge:**
-1. **`/mosaic-champion-promotion` fuer v34-b01** (Checkliste `docs/promotion_checklist.md`; Champion-Spec
-   ist `models/v33_gating_r5net.spec.json`, R5-Kalibrierung gilt dann als Pflicht laut Checkliste pruefen).
+**Nach der v35-Erzeugung, in dieser Reihenfolge (alles CPU, darum erst dann):**
+1. Abnahmen der Erzeugung (`PREREG_v35_window.md` par.8).
 2. **Offline-Pruefung par.7a** (`PREREG_targeted_branching.md`, E = DiD(v34) - DiD(v33); Kontrolle
    par.7b liegt vor), danach die Prereg schliessen.
 3. Sechs Kennzahlen fuer die A/Bs E2 und E4 aus den Artefakten (`ab_v34-b0{2,3}_vs_v34-b01_*`), in
@@ -155,20 +170,21 @@ alternative Ansaetze statt einer v35 im selben Rahmen (der erste: asymmetrisches
 
 ## 2. CHAMPION UND LEITER
 
-**Champion laut `models/champion.txt`: `v32-b01_brierbest`** (Promotion 2026-09-25), nach aussen
-**Tessa** (der Anzeigename steht fest in `static/js/app.js`). **Elo 1480 [1431; 1529]** aus 1.000
-Partien im Leitersegment 2, Anker `hv4_anchor` fix 1000. Herleitung: `PREREG_v32_window.md` par.11.
+**Champion laut `models/champion.txt`: `v34-b01_brierbest`** (Promotion 2026-10-03), Spec
+`models/v34-b01_brierbest.spec.json` (Startkuppel-Suche, Runde 5 per Netz), nach aussen **Tessa**
+(Anzeigename in `static/js/app.js`). **Elo 1595 [1546; 1646]** aus 960 Partien im Leitersegment 2,
+Anker `hv4_anchor` fix 1000. Herleitung: `PREREG_v34_window.md` par.10e. Der Server zieht Champion,
+Spec und Anzeige-Kalibrierung erst nach einem Neustart.
 
 | Modell | Elo | KI95 | Partien |
 | --- | --- | --- | --- |
-| **v32-b01@400 (Champion, Tessa)** | **1480** | **[1431; 1529]** | **1.000** |
-| v31-b01@400 | 1450 | [1406; 1496] | 1.800 |
-| v30-b02@400 | 1411 | [1371; 1453] | 1.890 |
-| Heuristik_hv4_anchor@150 (Anker) | 1000 | fix | 1.700 |
+| **v34-b01@400 (Champion, Tessa)** | **1595** | **[1546; 1646]** | **960** |
+| v32-b01@400 (Vorgaenger) | 1460 | [1416; 1507] | 4.960 |
+| v31-b01@400 | 1433 | [1392; 1476] | 1.950 |
+| Heuristik_hv4_anchor@150 (Anker) | 1000 | fix | |
 
-Stand 2026-09-25; seither im Register (`evaluations/elo_history.csv`) nur A/B- und Tor-Zeilen vom
-2026-09-27 (`v33-b02`, `v32-b01-e1`, `v32-b01-r5net`), keine Promotion. Die Tabelle ist darum nicht
-neu gerechnet; aktueller Bericht: `python tools/elo_tracker.py report`.
+Stand 2026-10-03 05:2x (`python tools/elo_tracker.py report`, 87 Zeilen). Zwei der fuenf Kanten von
+v34-b01 sind frueh gestoppt (die Promotions-Seeds); die Replikation bis zum Deckel traegt (Block-z +10,00).
 
 **Engine-Stand:** Paketversion **1.1.0**, Vertragshash `6ef829e564c58bd5`, 888/414. Live ist seit
 2026-10-01 das Wheel `1a9e4bac...` (Wheel-Runde `8005dc51`: KL-Abzweig-Knopf, iterativer R5-Loeser);

@@ -1,0 +1,53 @@
+{
+  "recipe_version": 1,
+  "tool": "self_play",
+  "description": "v35-Erzeugung, ZUERST NUR DER SCHWARM (evaluations/PREREG_v35_window.md par.6; Nutzer 2026-10-02: Self-Play nach der Promotion selbst starten, 'zumindest die schwarm daten'). Aufruf: python -X utf8 -u self_play.py --recipe models/v35.recipe.json --class <value-deviate|value-excursion>. Generator v34-b01 (Champion seit 2026-10-02, PREREG_v34_window.md par.10d), eingefroren unter models/frozen_champions/v34-b01. Spec models/v35_generation.spec.json = byte-gleiche Kopie von v34_gen_r5net_sims400.spec.json (sha256 475530fd...) = v33_generation.spec.json plus r5_net_solver 0 und r5_net_sims 400 (PREREG_r5_net_vs_solver.md par.6f/par.6h: Runde 5 per Netz mit 400 R5-Sims, sonst 100). Seeds 20260951/52 (Vierer-Block 50-53 nach v34 46-49; 50 fuer den Sockel reserviert, 53 frei). value-deviate ist value-wegc unter dem vom Nutzer freigegebenen Namen (2026-10-01), Flags identisch. Sockel-Klassen (policy und die asymmetrischen W/S) folgen nach dem Bau (PREREG_asymmetric_selfplay.md). E1 und R5-Netz wie v34 ueber env (Label-Pfade); die Spec setzt r5_net_solver 0 zusaetzlich, Env und Spec stimmen ueberein.",
+  "common": {
+    "mode": "network",
+    "model": "models/alphazero_v34-b01_brierbest.onnx",
+    "spec": "models/v35_generation.spec.json",
+    "games": 4000,
+    "sims": 100,
+    "threads": 11,
+    "chunk": 10,
+    "per_file": 10,
+    "return_order_random_p": 0.81,
+    "tau_argmax_from_move": 1,
+    "start_slot_random_p": 0.15,
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true
+  },
+  "env": {
+    "MOSAIC_STACK_DRAW_RESEARCH": "1",
+    "MOSAIC_SINGLE_PASS_OTHER_VAL": "1",
+    "MOSAIC_R5_NET_SOLVER": "0"
+  },
+  "classes": {
+    "value-deviate": {
+      "description": "Schwarm, value-only, Weg C, Huellenknopf AN (Spec wie common). Bis v34 'value-wegc' (Rezept v34: Seed 20260947); Name vom Nutzer freigegeben 2026-10-01.",
+      "version": "v34-b01-value-deviate",
+      "seed": 20260951,
+      "value_only": true,
+      "deviate_prob": 1.0,
+      "expect_engine_config": {"excursion_kl_weight": 0}
+    },
+    "value-excursion": {
+      "description": "Schwarm, value-only, Ausflug (Weg B), KL-Abzweig an (PREREG_targeted_branching.md par.7). Flags wie v34 (Seed dort 20260948).",
+      "version": "v34-b01-value-excursion",
+      "seed": 20260952,
+      "value_only": true,
+      "excursion_prob": 1.0,
+      "no_root_noise": true,
+      "excursion_kl_weight": true,
+      "expect_engine_config": {"excursion_kl_weight": 1}
+    }
+  },
+  "expect_engine_config": {
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true,
+    "single_pass_other_val": true,
+    "r5_net_solver": false
+  }
+}

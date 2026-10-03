@@ -77,7 +77,7 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 132 Dateien = 5 OFFEN + 113 ENTSCHIEDEN + 14 UEBERHOLT.**
+**Stand (automatisch generiert): 133 Dateien = 5 OFFEN + 114 ENTSCHIEDEN + 14 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
@@ -90,9 +90,9 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
 | `PREREG_evaluator_pretests.md` | Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Vortests (par.8a/8c): E2 und E4 bestehen, E3 TOT. E1-Arm (par.8d): gleich stark (415:385, z +1,04) und 39,4 % billiger je Partie -> v34-Erzeugung mit Knopf (Nutzer 2026-10-01). E2/E4 als Arme in v34 (PREREG_v34_window.md par.3). |
 | `PREREG_targeted_branching.md` | Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Stufe 1 (par.6a) roh TOT, Policy-KL A +0,029. Stufe 2 (par.7) KL-Abzweig in v34, Abnahme GREIFT (Median 1,095 gegen q75 0,804, par.7c). Offen: Offline-Pruefung nach dem v34-Training (par.7a, Kontrolle par.7b). |
-| `PREREG_v34_window.md` | Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | v34-b01 schlaegt den Champion v32-b01 als Paket mit Runde 5 per Netz 239:121, Block-z +7,37 (par.2a); die Arme E2 (z -0,36) und E4 (z +0,96) tragen nicht (par.10b/10c). Tor 2a gerissen als Self-Play-Effekt akzeptiert (par.9a). Nutzer 2026-10-02: v34-b01 wird promoviert (par.10d); offen nur der Promotions-Ablauf. |
+| `PREREG_v35_window.md` | Wie wird das v35-Fenster erzeugt und zugeschnitten (Schwarm sofort, Sockel nach dem asymmetrischen Bau), und traegt ein Arm? | angelegt 2026-10-02 nach der Promotion von v34-b01. Generator v34-b01, Runde 5 per Netz mit 400 R5-Sims, Spiegelknopf an (par.5). Schwarm (value-deviate, value-excursion je 4.000) startet von selbst nach der Promotionskette (par.6/par.7, Nutzer-Freigabe 2026-10-02); Sockel offen bis PREREG_asymmetric_selfplay.md. |
 
-## ENTSCHIEDEN (113)
+## ENTSCHIEDEN (114)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -207,6 +207,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_v31_window.md` | Wie wird das v31-Fenster zugeschnitten, und traegt die erstmals durchgehende Belegung der acht neuen Suchknoten? | par.6 -- Erzeugung 14,66 h, Tor 2a HAELT (sp_voll 0,955 gegen 0,901), Fenster 2.947 Dateien, Training `v31-b01` warm in 58 min mit 0 unerwarteten Rezept-Abweichungen. **TOR 1 TRAEGT: 461:339 aus 800 = 57,62 %, Block-z +4,24 auf differenzierten Werten, beide Seeds einzeln signifikant.** Tor 2b erstmals wieder verwendbar, 800/800 ohne Replay. Promotion am 2026-09-20 VOLLZOGEN: `v31-b01` ist Champion (Elo 1458 [1414; 1510], vier Kanten, keine frueh gestoppt). Generator der v32-Erzeugung. |
 | `PREREG_v32_window.md` | Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Fenster 2.947 Dateien, Training `v32-b01` warm in 63 min (par.10). TOR 1 TRAEGT nach Vorregistrierung: 434:366 = 54,25 Prozent, Block-z +2,37 -- aber nur ein Seed einzeln (+3,26 gegen +0,10). PROMOVIERT 2026-09-25 (par.11): Elo 1480 [1431; 1529] gegen 1450 des Vorgaengers, Champion-2 94:56 trifft die transitive Erwartung, alle Pflicht-Diagnostiken gepaart gegen v31 und unauffaellig; Spec unveraendert, Startkuppel-Suche erst ab v33. |
 | `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Tor 1 auf der Kante getragen (420:380, Block-z +1,41, par.10); Fenster-Arme b02-b04 ohne messbaren Unterschied (par.6a/par.6d); v33-b02 verfehlt die Champion-Kante (405:395, z +0,37, par.6e), keine Promotion. v33-b01 war Generator der v34-Erzeugung; v34-Fenster im b04-Zuschnitt. Geschlossen 2026-10-02 (Nutzer). |
+| `PREREG_v34_window.md` | Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | v34-b01 ist Champion seit 2026-10-03 (par.10e): Replikation gegen v32-b01 285:115, Block-z +10,00; Elo 1595 [1546; 1646]. Die Arme E2 (z -0,36) und E4 (z +0,96) tragen nicht (par.10b/10c). Rest: Paritaets-Fixture (5d) nach der v35-Erzeugung. |
 | `PREREG_value_rank_metric.md` | Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 |
 | `PREREG_value_scale_correction.md` | Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 |
 
