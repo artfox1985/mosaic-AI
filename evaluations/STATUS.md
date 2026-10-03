@@ -18,12 +18,14 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**LAEUFT seit 2026-10-03 nachmittags: Bau des asymmetrischen Self-Plays** (Nutzer: *"ja, fang mit dem Bau an. die
-sonden werden uns dann zeigen ob es in die richtige richtung geht"*). Reihenfolge: Agent W (Bauschritte 1-4 aus
-`asymmetric_selfplay_build_plan.md` Abschnitt 10, Entscheide `PREREG_asymmetric_selfplay.md` par.3a), danach
-Agent S (Schritt 5), dann Schritt 6 (corpus_dataset-Masken) und die Engine-Befunde aus Code-Review 2 (#16, #20-22);
-Wheel-Bau, Anker-Invarianz und Abnahmen 8.4 durch den Koordinator. Agenten committen nicht, bauen kein Wheel und
-fahren keine Messlaeufe. Bis dahin keine Engine-Dateien von Hand anfassen.
+**NICHTS LAEUFT. FERTIG 2026-10-03 abends: asymmetrisches Self-Play gebaut und besondet**
+(`PREREG_asymmetric_selfplay.md` par.3d, par.5a; Wheel `59f32a16`, Anker-Invarianz gruen). W bekommt je
+Plattenentscheid eine zugewiesene Platte, der Baum kennt die Regel. Sonden S1-S4 (je 100 Partien, Artefakt
+`evaluations/artifacts/asym_probes_s1_s4.json`): W kostet +7,2 %, gewinnt 25 % [16; 35], zahlt 8,15
+Wuerfelpunkte je Partie; Wertziele beider Seiten verzerrt (Versatz W +0,109, G -0,136, schrumpft mit
+`forced_domes_before`); W-Stellungen nicht ueberraschender (KL -0,082); Stoerer schwach (Regel waehlt
+lambda 0,5, eps 0; G verliert nur 0,7 Punkte). **Wartet auf Nutzer-Entscheid:** Wertziel-Maske fuer W-Partien,
+Nachjustieren von W/S, danach Sockel-Rezept und Erzeugung.
 
 **FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
 `PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
