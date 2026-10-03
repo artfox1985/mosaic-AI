@@ -622,3 +622,13 @@ die Streuung in 4 von 20 Partien (20 Prozent), passend zur gemessenen Obergrenze
 Prozent. Die 45 Dateien des Fehlanlaufs liegen unter
 `data/_verworfen_v31_ohne_streuung/` -- nicht geloescht, weil sie denselben Namensstamm
 tragen wie die Neuerzeugung und den Korpus sonst still verunreinigt haetten.
+
+## Welches Netz gatet eine Kette? `_brierbest` gibt es nicht immer (2026-10-02)
+
+`train.py` schreibt `_brierbest` nur, wenn die Brier-beste Epoche weder die letzte noch `best_epoch`
+(val_combined) ist. Faellt sie mit `best_epoch` zusammen, ist `_best` das Brier-beste Netz, faellt sie auf
+die letzte Epoche, der finale Stand. Bei `v34-b02` (E2) lag das Brier-Minimum in Epoche 1 = `best_epoch`;
+eine Kette, die nach `_brierbest.onnx` sucht und sonst das finale Netz nimmt, haette Epoche 12 gegatet
+(Code-Review 2, Befund 1). **Handgriff:** das Netz nie aus dem Dateinamen raten, sondern
+`python tools/brier_best_checkpoint.py <name> --ext onnx` (liest `epoch_history` aus dem Trainings-Manifest,
+dieselbe Regel wie train.py, Exit 2 wenn die Datei fehlt).

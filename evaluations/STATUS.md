@@ -50,7 +50,7 @@ Kante par.2a: `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json`, Kante
    [-0,00014; +0,00270], kein zuordenbarer Lerneffekt, Prereg geschlossen.
 3. ~~Sechs Kennzahlen E2/E4~~ ERLEDIGT 2026-10-03 (`PREREG_v34_window.md` par.10f);
    `PREREG_evaluator_pretests.md` geschlossen (par.8e).
-4. Code-Review 2, Paket Messkette (#1-#7), Python.
+4. ~~Code-Review 2, Paket Messkette~~ ERLEDIGT 2026-10-03.
 
 **Erledigt 2026-10-02** (Belege in den Preregs): Promotions-Kante v34-b01 (par.2a); Wheel-Runde A
 (Schrittlimit statt Wanduhr, `completed` in der Arena, `r5_net_sims`); E2/E4 gebaut, trainiert, gesund,
@@ -111,11 +111,14 @@ Agenten-Befund). #1 am Code nachgelesen (`train.py:2879-2881`: `_brierbest` nur,
 Brier-beste Epoche weder die letzte noch `best_epoch` ist). Reihenfolge:
 * **Sofort, ohne Bau:** bei den A/Bs von E2/E4 das gegatete Netz aus den Logzeilen ("Value-optimales
   Modell", "Bestes Modell (Epoche ...)") bestimmen, nie aus dem Dateinamen raten (#1).
-* **Paket Messkette (#1 bis #5), Python, NACH der R5-Reihe** (die ruft `paired_gating.py` in 2E/2E-b;
-  laufende Laeufe lesen ihre Dateien neu): Kette waehlt das Netz aus dem Log statt aus dem
-  Dateinamen, `set -e` bzw. harte Stopps, `gating_block_z.py` ohne Division durch null,
-  `paired_gating.py` prueft `--block-size`/`--h1`, `train.py` faengt `n_batches == 0` ab; dazu #6
-  (Resume-Fingerabdruck) und #7 nach Pruefung.
+* **Paket Messkette (#1 bis #7) ERLEDIGT 2026-10-03** (Commit `f6b19328`): `tools/brier_best_checkpoint.py`
+  bestimmt das Brier-beste Netz aus dem Trainings-Manifest (#1; trifft v34-b01/b02/b03 und v33-b01);
+  #2 ist durch die Bauform der neuen Ketten (Exit-Pruefungen) erledigt, `night_v34_chain.sh` ist
+  v34-gebunden und Loeschkandidat; Block-z ohne Division durch null (#3), `validate_gating_params` (#4),
+  `train.py` bricht bei `n_batches == 0` ab (#5), Resume-Fingerabdruck um 15 Verlust-/Kopf-Knoepfe (#6,
+  nur bei Abweichung vom Default), #7: Rezept lehnt NaN/Infinity ab, pre-push mit `core.quotePath=false`
+  und vollem Test bei Aenderungen an `engine/Cargo.*`/`examples`/`benches`/`tests`, GUI-Badge ohne
+  Scheinwert fuer ungeschlagene Knoten. Tests `tools/tests/test_review2_measurement_chain.py` (8).
 * **Paket Server (#8 bis #15) ERLEDIGT 2026-10-02** (Nutzer: *"ja, mach das Server-Paket"*; Tests
   `tools/tests/test_server_edge_cases.py` 11 gruen, nach der Arm-Kette gelaufen): `server.py` baut neue
   Partie und Replay erst lokal und stellt die Globalen in einem Zug um (#8, #13), `_json_body`
