@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: ENTWURF 2026-10-01, nichts gebaut. Wuerfel-Klasse W festgelegt (par.2), Stoerer-Klasse S skizziert, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem eigenem Wert (par.3); Zusammensetzung des Fensters nach den Sonden (par.5), Ziel-Zusammensetzung (Nutzer): Sockel 4 x 2.000 (G-G, G-W, W-S, G-S), Schwarm 4.000 Weg C plus 4.000 Ausflug, ohne G-1/G-2 (par.4). Zeitpunkt: nach dem v34-Training. -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: Klasse W festgelegt (par.2), alle Bau-Fragen F1-F9/FS1-FS4 entschieden 2026-10-03 (par.3a; F6 Platzsuche deterministisch). Nichts gebaut. Ziel-Zusammensetzung par.4; Sonden S1-S4 nach dem Bau (par.5). Schwarm der v35-Erzeugung liegt schon (PREREG_v35_window.md par.9). -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -62,7 +62,8 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
   4. **Den Platz waehlt die Suche mit 600 Sims**, unter festgehaltener Platte UND Rotation: an der
      Wurzel nur Plaetze fuer die gewuerfelte Platte, im Baum ist die Rotationsstufe auf den
      Wuerfelwert festgenagelt. So bewertet jede Simulation den Platz unter der Rotation, die
-     tatsaechlich kommt. Alle anderen Zuege beider Seiten mit den Sockel-Sims (100).
+     tatsaechlich kommt. **Deterministisch: ohne Root-Noise, argmax** (par.3a F6). Alle anderen Zuege
+     beider Seiten mit den Sockel-Sims (100).
 * **Startplatte:** normal wie im Sockel (Nutzer: *"Nein, Start normal"*).
 * **Records:** der erzwungene Plattenzug (alle seine Teilschritte) schreibt KEINEN Record. Alle
   anderen Zuege beider Seiten schreiben Records wie im Sockel, mit Policy- UND Wertziel. **Alle
@@ -73,8 +74,8 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
   Platten der Wuerfel-Seite) auf jedem Record. Damit bleibt eine spaetere Maskierung oder Gewichtung
   moeglich, ohne neu zu erzeugen. Additiv, Bestand byte-gleich.
 * **Uebrige Sockel-Einstellung** wie die `policy`-Klasse des v34-Rezepts (`deviate_prob` 1,0,
-  Root-Noise, `tie_mirror_p` 0,5, `start_slot_random_p` 0,15, E1, Runde 5 per Netz). VORSCHLAG,
-  insbesondere ob die Weg-C-Abweichung (`deviate_prob` 1,0) in W bleibt.
+  Root-Noise, `tie_mirror_p` 0,5, `start_slot_random_p` 0,15, E1, Runde 5 per Netz, seit v35 mit
+  400 R5-Sims). ENTSCHIEDEN: die Weg-C-Abweichung bleibt in W (par.3a F5).
 
 **Folgen, als HERLEITUNG vorab benannt (ungemessen):**
 * Stapel zu Rundenbeginn (aus `engine_manual.md` 2/3/4A: 18 Platten, 2 Startplatten, Auslage zu
@@ -96,7 +97,7 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
   Und es sind **hoechstens 7** Platzsuchen @600 je Partie, nicht 8: die letzte Platte hat nur noch
   einen freien Platz (HERLEITUNG aus 9 Plaetzen = Startplatte plus 8).
   **Bauplan:** `evaluations/asymmetric_selfplay_build_plan.md` (2026-10-01, 26 Edge Cases mit
-  Pruefstellen, offene Fragen F1-F8, FS1-FS4). Bei 0 Punkten sind weitere Stapelzuege frei (`PREREG_score_clamp_incentive.md`
+  Pruefstellen, Fragen F1-F9, FS1-FS4, entschieden in par.3a). Bei 0 Punkten sind weitere Stapelzuege frei (`PREREG_score_clamp_incentive.md`
   par.11); die Verschiebung der Siegquote misst S3.
 * Kosten je Partie: rund 8 Platzsuchen @600 auf einer Seite gegen rund 200 Entscheidungen je Partie
   (3.953 Zuege auf 20 Partien im Smoke, `PREREG_v34_window.md` par.7a): rund +20 % je Partie,
@@ -130,6 +131,30 @@ keine; Punktestand faellt nie unter 0. In der Engine ist ein Plattenzug mehrstuf
     `own_q_gap` auf jedem Record der Stoerer-Seite. Die eps-Schwelle wirkt dann im Training
     (`corpus_dataset.py`), nicht in der Erzeugung: eps bleibt ohne Neuerzeugung verschiebbar.
 * Offen: lambda (Pilot S4), eps, Anteil im Fenster.
+
+## par.3a ENTSCHIEDEN 2026-10-03: die offenen Fragen F1-F9 und FS1-FS4 (Nutzer, einzeln abgefragt)
+
+Fragen und Varianten: `evaluations/asymmetric_selfplay_build_plan.md` Abschnitt 12. Vorgelegt mit je einer
+Empfehlung; gewaehlt:
+
+| Frage | Entscheid |
+| --- | --- |
+| F1 Zeitpunkt des Plattenzugs | die normale Suche (100 Sims) entscheidet WANN; waehlt sie eine Plattenaktion, uebernimmt der Wuerfel WELCHE (Empfehlung) |
+| F2 Ausloeser-Record | behalten mit Policy- und Wertziel, markiert als `dice_trigger` (wie Weg C) (Empfehlung) |
+| F3 Stapeltiefe | ueber den ganzen Stapel, d in 1..max mit Deckel 7 (R2) / 3 (R3); Zuege in eigene bekannte Bloecke zulassen und in S3 zaehlen (Empfehlung) |
+| F4 Rueckgabe-Reihenfolge im Wuerfelzug | Streumuenze p = 0,81 wie im Sockel VOR der Platzsuche werfen und festnageln, sonst Suche (Empfehlung) |
+| F5 Weg C in den W-Klassen | behalten (`deviate_prob` 1,0), damit `policy` und `policy-dice` sich nur in der Behinderung unterscheiden (Empfehlung) |
+| **F6 Platzsuche @600** | **deterministisch: ohne Root-Noise, argmax (staerkster Platz)** -- ABWEICHEND von der Empfehlung (Noise wie im Sockel) |
+| F7 Quelle Wuerfel gegen Suche | jeder Plattenzug der Suche (Auslage oder Stapel) loest aus und gilt als `dice_trigger` (Empfehlung) |
+| F8 Ausflug plus Wuerfel | Kombination verbieten; Ausfluege bleiben in der G-G-Klasse `value-excursion` (Empfehlung) |
+| F9 Kosten der Wuerfelzuege | Record-Feld `dome_dice_cost` = [verlangte Tiefe, bezahlte Punkte] am ersten Record nach jedem erzwungenen Zug, VOR der Erzeugung gebaut (Empfehlung) |
+| FS1 Gegnermodell des Stoerers | G spielt normal: nur der Stoerer bewertet gemischt, G-Knoten bleiben beim reinen Siegwert, kein Nullsummen-Baum (Empfehlung) |
+| FS2 w fuer die lambda-Reihe | fest w = 0,1; Pilot S4 variiert nur lambda (z. B. 0 / 0,5 / 1 / 2) (Empfehlung) |
+| FS3 bester eigener Zug fuer `own_q_gap` | nur Wurzelkinder mit mindestens so vielen Besuchen wie die letzte Halving-Stufe; Schwelle beim Bau festlegen und mitschreiben (Empfehlung) |
+| FS4 Wirkort des Stoerers | nur Drafting; Startsetzung und Tiling unvermischt (Startsetzung braucht beim Bau eine Ausnahme) (Empfehlung) |
+
+Damit ist der Bau der Klassen W und S vollstaendig spezifiziert; offen bleiben nur die Werte aus den
+Sonden (lambda und eps aus S4, Zusammensetzung nach S1-S4).
 
 ## par.4 ZUSAMMENSETZUNG DES FENSTERS (Nutzer-Plan, endgueltig nach den Sonden)
 

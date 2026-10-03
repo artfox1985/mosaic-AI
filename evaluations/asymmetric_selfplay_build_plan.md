@@ -860,7 +860,7 @@ Auf Nutzer-Wunsch die Belege hinter F2, F8, FS2, FS4 selbst gelesen:
   3431) und bedient Label-Pfade und `round_transition_deep.rs:593/709/742`: wer lambda prozessweit
   setzt statt je Seite, vermischt auch diese Labels.
 
-## 12. Offene Nutzerfragen
+## 12. Nutzerfragen (ENTSCHIEDEN 2026-10-03, Tabelle in `PREREG_asymmetric_selfplay.md` par.3a; F6 abweichend: Platzsuche deterministisch ohne Noise)
 
 **F1 WANN legt die W-Seite eine Platte?** VORSCHLAG T1: die normale Suche (100 Sims) entscheidet
 den Zeitpunkt; waehlt sie eine Plattenaktion, uebernimmt der Wuerfel. Alternative T2: der Wuerfel
