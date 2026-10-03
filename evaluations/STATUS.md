@@ -259,9 +259,9 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
    je Gruppe Trefferzahl = Dateizahl in restic `4c985a1f` (2026-10-03 11:15), keine Links.
 3. **Code-Review 2, nur nach Entscheid:** #17 (Loeser-Prognose ohne Untergrenze 0), #18, #19
    (Anker- bzw. Regelpfad, danach Anker-Invarianz).
-4. **Asymmetrisches Self-Play, offene Punkte im Entwurf** (`PREREG_asymmetric_selfplay.md`):
-   Muenze Auslage/Stapel 50:50, Wuerfel-Seite je Partie 50:50, Weg-C-Abweichung in W (Vorschlaege);
-   lambda und eps des Stoerers nach Pilot S4; Zusammensetzung nach den Sonden; Fragen F1-F9, FS1-FS4.
+4. ~~Asymmetrisches Self-Play, offene Fragen~~ ENTSCHIEDEN 2026-10-03 (`PREREG_asymmetric_selfplay.md`
+   par.3a, F6 abweichend: Platzsuche deterministisch). Naechster Schritt: Bau (Bauplan
+   `asymmetric_selfplay_build_plan.md`), dann Sonden S1-S4.
 5. **Aeltere, weiterhin offene Punkte** (Wortlaut im Archivkapitel vom 2026-10-01, Abschnitt 6):
    Budget-Knopf fuer die Hilfsknoten (Wirkung ungemessen); Gruppe B des Aufraeumens (Wrapper
    `resolve_and_apply_stack_draw`, drei Spec-Felder in `KNOWN_FIELDS`); R5/R4b-Sonden der
