@@ -521,3 +521,35 @@ Wheel `9449b63c...` (byte-gleich mit dem installierten, `direct_url.json`), Mani
 **Zwei-Champion-Regel:** `frozen_champions/v31-b01` faellt heraus (amtierend v34-b01, Vorgaenger
 v32-b01); Loeschung nur mit restic-Beleg und pfadgenauer Nutzer-Freigabe. `frozen_champions/v33-b01`
 (Generator v34) ebenfalls Kandidat. Tages-Snapshot dafuer: `b39f5a06` (2026-10-03 05:12, ohne VSS).
+
+### par.10f Sechs Standard-Kennzahlen der A/Bs E2 und E4 (nachgetragen 2026-10-03, aus den Artefakten)
+
+Quelle `ab_v34-b0{2,3}_vs_v34-b01_s2026168{4,5,6,7}.json` (`games[]`, `score_geo`, `total_floor`,
+`long_rows_completed`) und die `_plate_points.json` dazu. **Grundmenge:** Bretter je Modell, beide Seeds
+gepoolt, n = 800 je Seite und Arm; Einheit je Brett (eine Seite einer Partie). Plattenpunkte: je Partie
+mit aktivem Kriterium, Mittel der zwei Seed-Mittel. Signifikanz NICHT gerechnet; das Verdikt steht auf
+dem Block-z (par.10b/par.10c), diese Tabelle ist Bericht, keine Entscheidungsgroesse.
+
+| Kennzahl (je Brett) | E2 v34-b02 / v34-b01 | Diff | E4 v34-b03 / v34-b01 | Diff |
+| --- | --- | --- | --- | --- |
+| Eigene Punkte | 57,30 / 57,54 | -0,24 | 57,59 / 56,70 | +0,89 |
+| Marge zum Gegner | -0,24 | | +0,89 | |
+| Strafleiste (`total_floor`) | 7,59 / 8,01 | -0,42 | 8,11 / 8,04 | +0,08 |
+| Volle Spalten | 1,014 / 1,116 | -0,103 | 1,074 / 1,075 | -0,001 |
+| Spalten >= 4 | 2,280 / 2,355 | -0,075 | 2,331 / 2,321 | +0,010 |
+| Volle Reihen | 0,086 / 0,076 | +0,010 | 0,113 / 0,077 | +0,035 |
+| Reihen >= 4 | 2,041 / 2,096 | -0,055 | 2,029 / 1,992 | +0,036 |
+| Lange Musterreihen vollendet | 3,159 / 3,230 | -0,071 | 3,194 / 3,171 | +0,022 |
+| Plattenpunkte gesamt | 8,07 / 8,33 | -0,27 | 8,49 / 8,32 | +0,17 |
+
+**Plattenpunkte je Kriterium** (Arm / v34-b01): E2 Vertikale Reihen 7,07 / 8,63 (-1,56), Mehrfarbige
+Felder 4,33 / 3,80 (+0,53), Eckplatten 9,36 / 9,13, Aeussere Felder 10,27 / 10,28, Spezialfelder
+-9,49 / -9,59, Diagonale 0,33 / 0,46, Horizontale 0,26 / 0,26, Farbenreiche 0,22 / 0,18. E4 Vertikale
+Reihen 7,96 / 8,12, Mehrfarbige Felder 4,08 / 3,65 (+0,43), Eckplatten 9,68 / 9,51, Aeussere Felder
+10,31 / 10,23, Spezialfelder -9,55 / -9,51, Horizontale 0,38 / 0,29, Diagonale 0,19 / 0,18,
+Farbenreiche 0,14 / 0,18.
+
+**Lesart, knapp:** E2 baut weniger volle Spalten (-0,10 je Brett) und verliert vor allem auf "Vertikale
+Reihen" (-1,56 Punkte, wo aktiv), bei weniger Strafleiste; E4 liegt in allen Groessen nahe am
+Grundarm, leicht vorne bei Punkten und vollen Reihen. Beides passt zu den Verdikten (E2 z -0,36, E4
+z +0,96), keine Groesse kehrt sie um.

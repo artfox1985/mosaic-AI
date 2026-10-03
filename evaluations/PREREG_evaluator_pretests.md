@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: Vortests (par.8a/8c): E2 und E4 bestehen, E3 TOT. E1-Arm (par.8d): gleich stark (415:385, z +1,04) und 39,4 % billiger je Partie -> v34-Erzeugung mit Knopf (Nutzer 2026-10-01). E2/E4 als Arme in v34 (PREREG_v34_window.md par.3). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Welche Bewerter-Vorschlaege aus der Architektur-Recherche vom 2026-09-25 (E1 Einpass-Konsum, E2 Margen-Schwellen, E3 Rundenschicht, E4 Angebots-Bedarfs-Sicht) ueberleben einen billigen Vortest, bevor Self-Play-Zeit faellt? | Beleg: E1 an (gleich stark, 39,4 % billiger, par.8d); E3 im Vortest tot (par.8a); E2 (z -0,36) und E4 (z +0,96) bestehen den Vortest, tragen aber als v34-Arme nicht (par.8e); E4b entfaellt. -->
 
 # Vorregistrierung: Vortests fuer den Bewerter (E1-E4)
 
@@ -297,3 +297,14 @@ untere CI-Grenze liegt bei 0,4 Verdopplungs-Aequivalenten, der Punktwert bei 1,8
 (0 von 4 Runden bestanden). Plausibler Grund (Herleitung): ein Fuenftel der Daten je Leser kostet
 mehr, als die Phasen-Anpassung bringt. Ein Rundenumbau der letzten Schicht im Netz teilt den
 Trunk und waere nicht ganz dasselbe; der Vortest traegt ihn trotzdem nicht.
+
+### par.8e Arme E2 und E4 in v34, ENTSCHIEDEN 2026-10-03 (Belege in `PREREG_v34_window.md` par.10-10f)
+
+Beide Vortest-Ueberlebenden liefen als Trainings-Arme gegen den Grundarm `v34-b01` (gleiches Fenster,
+gleicher Split, gleicher Seed; je 2 x 200 Paare, Blockgroesse 5, 400 Sims, R5-Netz-Spec beidseits):
+**E2** (Margen-Schwellen t in {-10,-5,+5,+10}, `v34-b02_best`) 395:405, Block-z -0,36; **E4**
+(Angebots-Bedarfs-Abschnitt, 48 Werte, Eingabe 936, `v34-b03_brierbest`) 413:387, Block-z +0,96.
+Keiner traegt nach der Leseregel (z >= +1,96 oder >= 52,5 %). Die Vortest-Signale haben sich also in
+keine messbare Staerke uebersetzt. **E4b** (Quellen getrennt, 96 Werte) war an "nur wenn E4 traegt"
+gebunden und entfaellt. **Gesamtstand:** E1 an (Kostengewinn bei gleicher Staerke, par.8d), E2 und E4
+ohne Wirkung, E3 im Vortest tot (par.8a). Die Prereg ist geschlossen.

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Stufe 1 (par.6a) roh TOT, Policy-KL A +0,029. Stufe 2 (par.7) KL-Abzweig in v34, Abnahme GREIFT (Median 1,095 gegen q75 0,804, par.7c). Offen: Offline-Pruefung nach dem v34-Training (par.7a, Kontrolle par.7b). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Zeigt die Diskrepanz zwischen Value-Kopf und Wurzel-Q (bzw. zwischen Prior und Suche) auf die Stellungen, an denen der Kopf gegen den Ausgang falsch liegt -- und lohnt es deshalb, den Schwarm dort statt zufaellig abzweigen zu lassen? | Beleg: Der KL-Abzweig greift (par.7c), aber der Kopf lernt dort nicht zuordenbar mehr: E = +0,00124 [-0,00014; +0,00270] (par.7d). Linie fuer diese Architektur abgeschlossen; Knopf bleibt nur per Nutzer-Entscheid. -->
 
 # Vorregistrierung: gezielt abzweigen statt zufaellig
 
@@ -274,3 +274,31 @@ die `root_q`/`winner`-Bedingung.
 83,3-%-Quantil der Referenz). `branch_kl` (Engine) Median 1,156, Spearman gegen die Werkzeug-KL
 derselben Records **+0,899**. Referenz-Median je Klasse: policy 0,331, value-wegc 0,342,
 value-excursion 0,376. Artefakt `excursion_kl_acceptance_v34.json`.
+
+### par.7d ERGEBNIS der Offline-Pruefung par.7a (2026-10-03, 163,6 s, exklusiv)
+
+`python -X utf8 -u tools/probes/targeted_branching_pretest.py --model models/alphazero_v33-b01_brierbest.pth
+--model-new models/alphazero_v34-b01_brierbest.pth --val-list data/window_v34_val.txt --out
+evaluations/artifacts/targeted_branching_did_v34.json`, danach `--combine` mit der Kontrolle par.7b.
+Generator der v34-Erzeugung `v33-b01`, neu der v34-Arm `v34-b01` (mit Knopf); Val-Menge der v34-Arme
+(147 Dateien `selfplay_v33-b01-*`, davon 60 nach par.2 gewaehlt, je Klasse 20). **Grundmenge:**
+Drafting-Records Runde 1-4 mit `root_q` (completed), n = 66.025 Zustaende, Einheit Zustand, Block Datei,
+2.000 Bootstrap-Ziehungen (cpu 1.198,8 s, 11 Threads). Substrat-Pruefung: die Policy-KL-Zeile besteht
+wie in par.6a (A +0,02717 [+0,0196; +0,0343]).
+
+| Menge | n Dezil / Haelfte | Brier Dezil Generator / neu | Brier Haelfte Generator / neu | DiD(v34) | DiD(v33), par.7b | **E = DiD(v34) - DiD(v33)** |
+| --- | --- | --- | --- | --- | --- | --- |
+| gesamt | 6.603 / 33.013 | 0,23060 / 0,23125 | 0,20343 / 0,20354 | +0,00053 | -0,00071 | **+0,00124 [-0,00014; +0,00270]** |
+| Ausflug-Dateien | 1.960 / 9.360 | 0,22001 / 0,22030 | 0,19310 / 0,19290 | +0,00048 | -0,00057 | +0,00104 [-0,00096; +0,00309] |
+| uebrige Klassen | 4.643 / 23.653 | 0,23507 / 0,23587 | 0,20752 / 0,20776 | +0,00057 | -0,00088 | +0,00145 [-0,00048; +0,00339] |
+
+**Verdikt nach der Leseregel par.7a: das CI von E ueberdeckt 0 -> kein zuordenbarer Lerneffekt.** Das
+Abzweigen nach KL erzeugt nachweisbar andere Stellungen (Abnahme par.7c GREIFT), aber keine
+nachweisbar lehrreicheren; die Linie gilt fuer diese Architektur als abgeschlossen (kein eigener Arm).
+Die Punktschaetzer zeigen in allen drei Mengen in die Gegenrichtung (der neue Kopf holt im obersten
+Dezil WENIGER auf als im Rest), das CI schliesst es aber nicht aus; nach der Leseregel waere erst E > 0
+mit Untergrenze > 0 ein Grund, v35 ohne Knopf zu fahren. **Nebenbefund, berichtet:** der v34-Kopf ist
+auf dieser Val-Menge in beiden Gruppen nicht besser als sein Generator (Brier 0,23125 gegen 0,23060
+bzw. 0,20354 gegen 0,20343), passend zur flachen Brier-Kurve der Arme (`PREREG_v34_window.md` par.10).
+**Folge fuer v35:** der Knopf steckt im v35-Rezept (`value-excursion`, schon erzeugt); ihn fuer die
+naechste Erzeugung abzuschalten waere ein Nutzer-Entscheid, die Leseregel verlangt es nicht.

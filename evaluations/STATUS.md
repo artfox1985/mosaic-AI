@@ -46,10 +46,10 @@ Kante par.2a: `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json`, Kante
 
 **Nach der v35-Erzeugung, in dieser Reihenfolge (alles CPU, darum erst dann):**
 1. Abnahmen der Erzeugung (`PREREG_v35_window.md` par.8).
-2. **Offline-Pruefung par.7a** (`PREREG_targeted_branching.md`, E = DiD(v34) - DiD(v33); Kontrolle
-   par.7b liegt vor), danach die Prereg schliessen.
-3. Sechs Kennzahlen fuer die A/Bs E2 und E4 aus den Artefakten (`ab_v34-b0{2,3}_vs_v34-b01_*`), in
-   par.10b/par.10c nachtragen; `PREREG_evaluator_pretests.md` schliessen (E4b entfaellt).
+2. ~~Offline-Pruefung par.7a~~ ERLEDIGT 2026-10-03 (`PREREG_targeted_branching.md` par.7d): E = +0,00124
+   [-0,00014; +0,00270], kein zuordenbarer Lerneffekt, Prereg geschlossen.
+3. ~~Sechs Kennzahlen E2/E4~~ ERLEDIGT 2026-10-03 (`PREREG_v34_window.md` par.10f);
+   `PREREG_evaluator_pretests.md` geschlossen (par.8e).
 4. Code-Review 2, Paket Messkette (#1-#7), Python.
 
 **Erledigt 2026-10-02** (Belege in den Preregs): Promotions-Kante v34-b01 (par.2a); Wheel-Runde A
@@ -236,16 +236,14 @@ Generator, 12 Epochen, lr 5e-5 cosine mit `--lr-t-max 12`, WDL, nortv, lambda 0,
 Val-Dateien der Wert-Klassen aus `window_v32_val.txt` / `window_v33_val.txt` (registrierte
 Offline-Messungen laufen darauf).
 
-## 5. PREREG-BESTAND (Stand 2026-10-02 abends: 5 OFFEN; Ziel rund 7)
+## 5. PREREG-BESTAND (Stand 2026-10-03: 3 OFFEN; Ziel rund 7)
 
 `v33_window`, `tie_mirror` und `r5_net_vs_solver` am 2026-10-02 geschlossen (Nutzer; Spiegelknopf bleibt fuer v35 an,
-als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b).
+als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted_branching` und `evaluator_pretests` am 2026-10-03.
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v34_window` | Promotion v34-b01 durchfuehren (entschieden, par.10d), dann schliessen |
-| `evaluator_pretests` | schliessbar: E1 an, E2 und E4 tragen nicht (par.10b/10c der v34-Prereg), E3 tot, E4b entfaellt; Kennzahlen nachtragen |
-| `targeted_branching` | Offline-Pruefung par.7a nach dem v34-Training (E = DiD(v34) - DiD(v33)) |
+| `v35_window` | Abnahmen des Schwarms (par.8); Sockel nach dem asymmetrischen Bau; Fenster, Arme, Tore |
 | `asymmetric_selfplay` | v35: Bau, Sonden S1-S4, Zusammensetzung |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
