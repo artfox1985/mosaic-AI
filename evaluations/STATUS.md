@@ -22,7 +22,7 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 `PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
 Partien in 400 Dateien (`data/selfplay_v34-b01-value-*`), beide Exit 0, keine Watchdog-, Deadline- oder
 Haenger-Zeile. Smoke vorher gruen (Waechter 6 Knoepfe, Manifest traegt `r5_net_sims` 400), Tages-Snapshot
-`b39f5a06`. Abnahmen par.8 stehen aus.
+`b39f5a06`. Abnahmen alle GRUEN (par.9).
 
 **FERTIG 2026-10-03 05:11: Promotion v34-b01** (`PREREG_v34_window.md` par.10e): Replikation 285:115
 (z +10,00), Anker 45:5, Champion-2 gegen v31-b01 108:42; Elo 1595 [1546; 1646]; Diagnostiken gepaart
@@ -45,7 +45,7 @@ Kante par.2a: `v34-b01_brierbest` mit `models/v33_gating_r5net.spec.json`, Kante
 239:121, Block-z +7,37.
 
 **Nach der v35-Erzeugung, in dieser Reihenfolge (alles CPU, darum erst dann):**
-1. Abnahmen der Erzeugung (`PREREG_v35_window.md` par.8).
+1. ~~Abnahmen der Erzeugung~~ ERLEDIGT 2026-10-03, alle GRUEN (`PREREG_v35_window.md` par.9).
 2. ~~Offline-Pruefung par.7a~~ ERLEDIGT 2026-10-03 (`PREREG_targeted_branching.md` par.7d): E = +0,00124
    [-0,00014; +0,00270], kein zuordenbarer Lerneffekt, Prereg geschlossen.
 3. ~~Sechs Kennzahlen E2/E4~~ ERLEDIGT 2026-10-03 (`PREREG_v34_window.md` par.10f);
@@ -243,7 +243,7 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v35_window` | Abnahmen des Schwarms (par.8); Sockel nach dem asymmetrischen Bau; Fenster, Arme, Tore |
+| `v35_window` | Schwarm erzeugt und abgenommen (par.9); Sockel nach dem asymmetrischen Bau; Fenster, Arme, Tore |
 | `asymmetric_selfplay` | v35: Bau, Sonden S1-S4, Zusammensetzung |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 

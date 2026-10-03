@@ -78,6 +78,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=20261001)
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--classes", nargs="+", default=list(CLASSES),
+                    help="Klassen der Erzeugung (v35: value-deviate statt value-wegc, ohne policy)")
     args = ap.parse_args()
     t_start, c_start = time.monotonic(), time.process_time()
 
@@ -125,7 +127,7 @@ def main() -> None:
     # --- Referenz: alle Drafting-Records einer Datei-Stichprobe je Klasse -----------------------
     rng = random.Random(args.seed)
     ref_files = []
-    for c in CLASSES:
+    for c in args.classes:
         fs = sorted(glob.glob(str(data / f"selfplay_{args.prefix}-{c}_*.pkl")))
         ref_files += sorted(rng.sample(fs, min(args.files_per_class, len(fs))))
     ref, ref_class = [], []

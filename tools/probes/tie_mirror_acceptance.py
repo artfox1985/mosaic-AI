@@ -37,11 +37,13 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--prefix", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--classes", nargs="+", default=list(CLASSES),
+                    help="Klassen der Erzeugung (v35: value-deviate statt value-wegc, ohne policy)")
     args = ap.parse_args()
     t_start, c_start = time.monotonic(), time.process_time()
     out = {"prereg": "evaluations/PREREG_tie_mirror.md par.3", "prefix": args.prefix, "klassen": {}}
     n_total = 0
-    for cls in CLASSES:
+    for cls in args.classes:
         files = sorted(glob.glob(str(BASE_DIR / "data" / f"selfplay_{args.prefix}-{cls}_*.pkl")))
         mirrored: dict[str, set] = {}
         last: dict[str, dict] = {}
