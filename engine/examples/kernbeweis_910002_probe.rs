@@ -157,8 +157,10 @@ fn main() {
         aggr_w: None,
         aggr_lambda: None,
         aggr_player: None,
+        aggr_eps: None,
         // Klasse W: Bestand (kein Zufallsknoten).
         dome_dice_side: None,
+        dome_dice_last_round: None,
     };
     let actions = drafting_actions(&state1);
     println!(

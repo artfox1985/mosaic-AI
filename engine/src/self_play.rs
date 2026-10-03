@@ -2887,15 +2887,21 @@ pub(crate) const DOME_DICE_SEED_DISTINGUISHER: u64 = 0xD1CE_D1CE_5EED_C0DE;
 /// Strom der Platz- und Rueckgabesuchen des erzwungenen Zugs.
 pub(crate) const DOME_DICE_SEARCH_SEED_DISTINGUISHER: u64 = 0xD1CE_5EA2_5EED_C0DE;
 
-/// Obergrenzen der Stapeltiefe je Runde 1..4 (Nutzer 2026-10-01, Prereg par.2:
-/// *"Setz mir das maximum in runde 2 auf 7 und runde 3 auf 3. Runde 4 hat
-/// sowieso nur noch 1 im stapel"*). `None` = keine Obergrenze, die Tiefe ist
-/// nur durch den Stapel begrenzt (F3). Kein Knopf, aber im Lauf-Manifest
-/// gemeldet (`engine_config_json` -> `dome_dice_caps`).
-pub(crate) const DOME_DICE_DEPTH_CAPS: [Option<usize>; 4] = [None, Some(7), Some(3), None];
+/// Quellenregel des Wuerfels (Nutzer 2026-10-03 nach den Sonden, Prereg par.5b:
+/// *"mach die muenze fuer die platten wahl von [0-3] mit auslage 1, 2, 3 und
+/// stapel"*): gleichverteilt ueber die belegten Auslageplaetze und die oberste
+/// Stapelplatte (Tiefe 1, 1 Punkt). Tiefe Stapelziehungen streut bereits ein
+/// anderer Knopf. Ersetzt die Muenze plus Tiefen-Obergrenzen R2 7 / R3 3
+/// (par.2). Im Lauf-Manifest gemeldet (`engine_config_json` ->
+/// `dome_dice_source_rule`).
+pub(crate) const DOME_DICE_SOURCE_RULE: &str = "uniform_over_display_slots_and_stack_top";
 
 /// Default von `MOSAIC_DOME_DICE_SIMS` (Prereg par.2 Punkt 4: 600 Sims).
 pub(crate) const DOME_DICE_SIMS_DEFAULT: u32 = 600;
+
+/// Default von `MOSAIC_DOME_DICE_LAST_ROUND` (Prereg par.5d): die letzte
+/// Plattenrunde, also wuerfeln in ALLEN Plattenrunden 1..4 wie vor par.5d.
+pub(crate) const DOME_DICE_LAST_ROUND_DEFAULT: u32 = crate::state::NUM_ROUNDS - 1;
 
 /// Einheitliche Auswertung eines 0/1-Knopfs (Code-Review 2026-10-02 Befund
 /// 21): getrimmt; `"1"` an, `"0"` aus, leer = `default`; alles andere ist
@@ -2974,6 +2980,44 @@ pub(crate) fn dome_dice_sims() -> u32 {
     })
 }
 
+/// `MOSAIC_DOME_DICE_LAST_ROUND` als reine Pruefung: ganze Zahl 1..4 (die
+/// Plattenrunden), sonst `None`.
+fn parse_dome_dice_last_round(raw: &str) -> Option<u32> {
+    raw.trim().parse::<u32>().ok().filter(|n| (1..=DOME_DICE_LAST_ROUND_DEFAULT).contains(n))
+}
+
+/// Eroeffnungs-Wuerfel (Prereg par.5d): letzte Runde, in der die Wuerfel-Seite
+/// wuerfelt (Default 4 = alle Plattenrunden, Bestand). Ungueltig -> Default mit
+/// EINMALIGER Warnung (Muster [`dome_dice_sims`]). Gelesen nur bei
+/// `MOSAIC_DOME_DICE=1` (`play_net_self_play_game`); die Wirkung traegt danach
+/// `SearchConfig::dome_dice_last_round`, Regel in [`in_dome_dice_phase`].
+pub(crate) fn dome_dice_last_round() -> u32 {
+    static CELL: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_DOME_DICE_LAST_ROUND") {
+        Err(_) => DOME_DICE_LAST_ROUND_DEFAULT,
+        Ok(raw) => parse_dome_dice_last_round(&raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_DOME_DICE_LAST_ROUND={raw:?} ist keine ganze Zahl 1..{DOME_DICE_LAST_ROUND_DEFAULT} \
+                 -- Default {DOME_DICE_LAST_ROUND_DEFAULT}."
+            );
+            DOME_DICE_LAST_ROUND_DEFAULT
+        }),
+    })
+}
+
+/// DIE Rundengrenze der Wuerfelphase (Prereg par.5d, Eroeffnungs-Wuerfel): liegt
+/// Runde `round_number` in der Wuerfelphase einer W-Partie mit Grenze
+/// `last_round`? `None` = keine Grenze (Default, alle Runden bis
+/// [`DOME_DICE_LAST_ROUND_DEFAULT`]). Einzige Stelle der Regel; Verbraucher:
+/// [`dome_dice_open_state`] (Ausloeser der echten Partie, Weg-C-Zusammenfassung
+/// und ueber `net_mcts::dome_dice_chance_applies` die Plattenkante im Baum) und
+/// das Record-Feld `dice_phase` ([`stamp_dome_dice_counters`]). Runde 5 hat keine
+/// Plattenzuege; ob dort gewuerfelt werden kann, entscheidet zusaetzlich
+/// `dome_dice_open_state`.
+pub(crate) fn in_dome_dice_phase(round_number: u32, last_round: Option<u32>) -> bool {
+    round_number <= last_round.unwrap_or(DOME_DICE_LAST_ROUND_DEFAULT)
+}
+
 /// Welche Seite (0/1) ist in DIESER Partie die Wuerfel-Seite (Bauplan 4.7):
 /// Hash aus `game_seed ^ DOME_DICE_SIDE_DISTINGUISHER` ueber den bereits
 /// genutzten SplitMix64-Finalizer (shaping.rs:344), Muster
@@ -2983,15 +3027,6 @@ pub(crate) fn dome_dice_sims() -> u32 {
 pub(crate) fn dome_dice_side(game_seed: u64) -> usize {
     let w = crate::net_mcts::game_weight_from_seed(game_seed ^ DOME_DICE_SIDE_DISTINGUISHER, 1.0);
     usize::from(w >= 0.5)
-}
-
-/// Obergrenze der Stapeltiefe in Runde `round` (1-basiert); ausserhalb 1..4
-/// `None` (dort gibt es ohnehin keinen Plattenzug, game.rs:190-192).
-pub(crate) fn dice_depth_cap(round: u32) -> Option<usize> {
-    match round {
-        1..=4 => DOME_DICE_DEPTH_CAPS[(round - 1) as usize],
-        _ => None,
-    }
 }
 
 /// Gewuerfelte Quelle.
@@ -3017,18 +3052,15 @@ pub(crate) struct DiceRoll {
 }
 
 /// Der Wuerfel als REINE Funktion von Zustand und Strom (Bauplan 4.2). Feste
-/// Ziehreihenfolge: (1) Muenze Quelle (`random::<bool>()`, `true` = Stapel),
-/// faellt IMMER, auch wenn eine Quelle leer ist; (2) Platte
-/// (`random_range(0..auslage)`) bzw. Tiefe (`random_range(1..=max)`, max =
-/// min(Obergrenze der Runde, Stapel), F3: ueber den GANZEN Stapel); (3)
-/// Rotation (`random_range(0..4)`); (4) nur bei Stapelquelle, mindestens
-/// [`RETURN_ORDER_MIN_REST`] Restplatten, Runde 1..4 und `return_p > 0`: die
-/// Rueckgabe-Muenze (F4, dieselben Bedingungen wie der Knotenweg in
-/// `unified_game_loop`). Der vierte Schritt ist der letzte Zug aus dem Strom,
-/// sein Ausfallen verschiebt also nichts.
+/// Ziehreihenfolge: (1) Quelle (`random_range(0..optionen)`) gleichverteilt
+/// ueber die belegten Auslageplaetze und, wenn der Stapel nicht leer ist, die
+/// oberste Stapelplatte ([`DOME_DICE_SOURCE_RULE`]); ein leerer Auslageplatz
+/// faellt weg, als wuerde ein Vierer-Wuerfel dort neu geworfen; (2) Rotation
+/// (`random_range(0..4)`). Die Rueckgabe-Muenze (F4) faellt nur bei mindestens
+/// [`RETURN_ORDER_MIN_REST`] Restplatten, mit Tiefe 1 also nie; sie bleibt fuer
+/// den allgemeinen Stapelfall stehen.
 ///
-/// Rueckfaelle (Prereg par.2 Punkt 1): Auslage leer -> Stapel, Stapel leer ->
-/// Auslage. Beide leer -> `None`; laut Bauplan Abschnitt 2 (HERLEITUNG) bei
+/// Beide Quellen leer -> `None`; laut Bauplan Abschnitt 2 (HERLEITUNG) bei
 /// offener Pflicht unerreichbar, [`apply_forced_dome_move`] macht daraus einen
 /// Fehler (die Schleife bricht dann mit `panic!` ab, kein stiller Rueckfall).
 ///
@@ -3041,25 +3073,16 @@ pub(crate) fn roll_dome_dice<R: Rng + ?Sized>(
     return_p: f64,
     rng: &mut R,
 ) -> Option<DiceRoll> {
-    let coin_stack: bool = rng.random::<bool>();
     let display_n = state.dome_display.len();
-    let pool_n = state.dome_tile_pool.len();
-    let use_stack = match (display_n > 0, pool_n > 0) {
-        (true, true) => coin_stack,
-        (false, true) => true,
-        (true, false) => false,
-        // Laut Bauplan Abschnitt 2 bei offener Pflicht unerreichbar (HERLEITUNG);
-        // der Aufrufer macht daraus einen harten Fehler (E8), die reine Funktion
-        // meldet es nur.
-        (false, false) => return None,
-    };
-    let source = if use_stack {
-        let depth_max = dice_depth_cap(state.round_number).unwrap_or(usize::MAX).min(pool_n);
-        let depth = rng.random_range(1..=depth_max);
-        DiceRollSource::Stack { depth, depth_max }
+    let options = display_n + usize::from(!state.dome_tile_pool.is_empty());
+    if options == 0 {
+        return None;
+    }
+    let pick = rng.random_range(0..options);
+    let source = if pick < display_n {
+        DiceRollSource::Display { tile_id: state.dome_display[pick].tile_id }
     } else {
-        let idx = rng.random_range(0..display_n);
-        DiceRollSource::Display { tile_id: state.dome_display[idx].tile_id }
+        DiceRollSource::Stack { depth: 1, depth_max: 1 }
     };
     let rotation = [0u32, 90, 180, 270][rng.random_range(0..4usize)];
     let mut return_first = None;
@@ -3095,7 +3118,18 @@ pub(crate) struct DomeDiceConfig<'a> {
     /// Sockel-Sims der Partie (Bauplan 4.4 Schritt 6).
     pub(crate) return_sims: u32,
     pub(crate) c_puct: f64,
+    /// Traegt auch die Rundengrenze der Wuerfelphase
+    /// (`SearchConfig::dome_dice_last_round`, par.5d), siehe [`Self::last_round`].
     pub(crate) search_config: SearchConfig,
+}
+
+impl DomeDiceConfig<'_> {
+    /// Rundengrenze der Wuerfelphase dieser Partie (par.5d). Bewusst aus der
+    /// `SearchConfig` gelesen statt als eigenes Feld: Schleife und Baum sehen so
+    /// dieselbe Zahl.
+    pub(crate) fn last_round(&self) -> Option<u32> {
+        self.search_config.dome_dice_last_round
+    }
 }
 
 /// Ergebnis eines erzwungenen Plattenzugs (Diagnose und Record-Feld F9).
@@ -3161,8 +3195,18 @@ impl ForcedDomeOutcome {
 /// `forced_domes_before` immer, `dome_dice_cost` nur am ersten Record nach
 /// einem erzwungenen Zug (`pending` wird dabei verbraucht). Aufgerufen nur bei
 /// aktivem Knopf; `dome_dice_side` stempelt die Schleife am Partieende.
-fn stamp_dome_dice_counters(m: &mut Map<String, Value>, forced_before: u32, pending: &mut Option<Value>) {
+/// par.5d: `dice_phase` immer, `true` genau dann, wenn die Runde des
+/// Record-Zustands `round_number` in der Wuerfelphase liegt
+/// ([`in_dome_dice_phase`] mit der Grenze `last_round`).
+fn stamp_dome_dice_counters(
+    m: &mut Map<String, Value>,
+    forced_before: u32,
+    pending: &mut Option<Value>,
+    round_number: u32,
+    last_round: Option<u32>,
+) {
     m.insert("forced_domes_before".into(), json!(forced_before));
+    m.insert("dice_phase".into(), json!(in_dome_dice_phase(round_number, last_round)));
     if let Some(cost) = pending.take() {
         m.insert("dome_dice_cost".into(), cost);
     }
@@ -3429,12 +3473,15 @@ pub(crate) fn apply_forced_pin_steps(game: &mut Game) -> Result<usize, String> {
     Ok(applied)
 }
 
-/// Zustandsteil des Ausloesers (Bauplan 4.3): Runde 1..4, kein Teilzug offen,
-/// kein Pin. Gemeinsam fuer [`dome_dice_triggers`] (echte Partie) und die
+/// Zustandsteil des Ausloesers (Bauplan 4.3): Runde 1..4 und in der
+/// Wuerfelphase ([`in_dome_dice_phase`], par.5d), kein Teilzug offen, kein
+/// Pin. Gemeinsam fuer [`dome_dice_triggers`] (echte Partie) und die
 /// Zusammenfassung der Plattenaktionen im Suchbaum (`net_mcts`, par.3b), damit
 /// Baum und Schleife denselben Knoten als Wuerfel-Entscheid erkennen.
-pub(crate) fn dome_dice_open_state(state: &GameState) -> bool {
+/// `last_round = None` oder `Some(4)`: Bestand (alle Plattenrunden).
+pub(crate) fn dome_dice_open_state(state: &GameState, last_round: Option<u32>) -> bool {
     (1..crate::state::NUM_ROUNDS).contains(&state.round_number)
+        && in_dome_dice_phase(state.round_number, last_round)
         && state.pending_stack_draw.is_empty()
         && state.pending_dome_choice.is_none()
         && state.pending_return_order.is_none()
@@ -3452,9 +3499,16 @@ pub(crate) fn is_dome_plate_action(a: &Action) -> bool {
 /// par.3b: waehlt die Suche an der Wurzel die Sammelkante "Platte legen",
 /// liefert sie deren Stellvertreter-Aktion (eine echte Plattenaktion,
 /// `net_mcts::build_untried_actions_dice`); sie loest hier aus wie jede
-/// andere Plattenaktion.
-pub(crate) fn dome_dice_triggers(state: &GameState, side: usize, player: usize, chosen: &Action) -> bool {
-    player == side && is_dome_plate_action(chosen) && dome_dice_open_state(state)
+/// andere Plattenaktion. par.5d: nach der Wuerfelphase (`last_round`) loest
+/// nichts mehr aus, der Plattenzug der W-Seite ist dann ein normaler Zug.
+pub(crate) fn dome_dice_triggers(
+    state: &GameState,
+    side: usize,
+    player: usize,
+    chosen: &Action,
+    last_round: Option<u32>,
+) -> bool {
+    player == side && is_dome_plate_action(chosen) && dome_dice_open_state(state, last_round)
 }
 
 /// Weg C unter Klasse W (par.3b Punkt 5): die Abweichung waehlt aus der
@@ -3499,6 +3553,12 @@ fn collapse_plate_actions_for_deviation(actions: &[Action], search_action: &Acti
 //   `aggr_side`, jeder Drafting-Record der S-Seite mit echter Suche
 //   `own_q_gap` (FS3). Die eps-Schwelle wirkt erst im Training
 //   (`engine/py/corpus_dataset.py`, `MOSAIC_AGGR_OWN_Q_EPS`).
+// * Modus B (par.5c, `MOSAIC_AGGR_SIDE_EPS`): KEIN Blend am Blatt; die Suche
+//   fuehrt Gegnerpunkte je Knoten mit, und an der Wurzel waehlt der Stoerer
+//   unter den Halving-Ueberlebenden mit `Q_own >= Q_best - eps` den Zug mit den
+//   wenigsten prognostizierten Gegnerpunkten
+//   (`net_mcts::RootOwnStats::disruptor_pick`). Zusaetzliche Record-Felder
+//   `aggr_opp_drop_pts` und `aggr_switched`.
 // * Knopf AUS (Default): keine Seitenwahl, keine Config-Kopie, kein Feld.
 
 /// Strom der Stoerer-Seitenwahl (Bauplan 4.7). Eigener Wert, Pruefung in
@@ -3581,25 +3641,109 @@ pub(crate) fn aggr_side_lambda() -> Option<f64> {
     })
 }
 
-/// Werte des Stoerers einer Partie (aus den drei Knoepfen).
+/// `MOSAIC_AGGR_SIDE_EPS` als reine Pruefung: endliche Zahl in [0, 1] (ein
+/// Budget an Siegwahrscheinlichkeit, `PREREG_asymmetric_selfplay.md` par.5c),
+/// sonst `None`.
+fn parse_aggr_side_eps(raw: &str) -> Option<f64> {
+    raw.trim().parse::<f64>().ok().filter(|e| e.is_finite() && (0.0..=1.0).contains(e))
+}
+
+/// Budget `eps` des Stoerers in Modus B ("lexikografischer Stoerer an der
+/// Wurzel", par.5c). BEWUSST OHNE Default (Laufvariable der Sonde S4b).
+/// Ungesetzt -> `None` (dann Blend-Modus); ungueltig -> `None` mit EINMALIGER
+/// Warnung, `aggr_side_params` lehnt dann ab (die Variable ist gesetzt).
+pub(crate) fn aggr_side_eps() -> Option<f64> {
+    static CELL: std::sync::OnceLock<Option<f64>> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_AGGR_SIDE_EPS") {
+        Err(_) => None,
+        Ok(raw) => {
+            let v = parse_aggr_side_eps(&raw);
+            if v.is_none() {
+                eprintln!("⚠️  MOSAIC_AGGR_SIDE_EPS={raw:?} ist keine Zahl in [0, 1].");
+            }
+            v
+        }
+    })
+}
+
+/// Welcher Stoerer-Modus gilt laut Umgebung? `None` = Klasse S aus;
+/// `"lexicographic_root"` = Modus B (`MOSAIC_AGGR_SIDE_EPS` gesetzt, par.5c);
+/// `"leaf_blend"` = Blend am Blatt (par.3a). Fuers Lauf-Manifest
+/// (`lib.rs::engine_config_json`, Feld `aggr_side_mode`); ob die Werte
+/// gueltig sind, sagt [`aggr_side_params`].
+pub(crate) fn aggr_side_mode() -> Option<&'static str> {
+    if !aggr_side_enabled() {
+        return None;
+    }
+    Some(if std::env::var_os("MOSAIC_AGGR_SIDE_EPS").is_some() { "lexicographic_root" } else { "leaf_blend" })
+}
+
+/// Werte des Stoerers einer Partie (aus den Knoepfen). `eps: Some` = Modus B
+/// (par.5c, dann `w = lambda = 0`, am Blatt wird nicht gemischt); `None` =
+/// Blend am Blatt (par.3a).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct AggrSideParams {
     pub(crate) w: f64,
     pub(crate) lambda: f64,
+    pub(crate) eps: Option<f64>,
+}
+
+/// Ein Knopf, wie ihn [`resolve_aggr_side_params`] sieht: `set` = die
+/// Variable steht in der Umgebung, `value` = ihr geprueftes Ergebnis (bei
+/// `MOSAIC_AGGR_SIDE_W` ungesetzt der Default).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct AggrKnob {
+    pub(crate) set: bool,
+    pub(crate) value: Option<f64>,
+}
+
+/// Reiner Kern von [`aggr_side_params`] (ohne Umgebung, direkt testbar).
+/// Ist `eps` gesetzt: Modus B; dann ist `lambda` VERBOTEN (par.5c: kein
+/// lambda, kein w) und ein ausdruecklich gesetztes `w` ebenso; ein
+/// ungueltiges `eps` ist ein Fehler. Ohne `eps`: Bestand (Blend, `lambda`
+/// Pflicht).
+pub(crate) fn resolve_aggr_side_params(
+    enabled: bool,
+    w: AggrKnob,
+    lambda: AggrKnob,
+    eps: AggrKnob,
+) -> Result<Option<AggrSideParams>, String> {
+    if !enabled {
+        return Ok(None);
+    }
+    if eps.set {
+        let e = eps.value.ok_or("MOSAIC_AGGR_SIDE_EPS ist ungueltig (erlaubt [0, 1], PREREG_asymmetric_selfplay.md par.5c)")?;
+        if lambda.set {
+            return Err("MOSAIC_AGGR_SIDE_EPS (Modus B, lexikografisch an der Wurzel) und MOSAIC_AGGR_SIDE_LAMBDA \
+                        (Blend am Blatt) schliessen sich aus -- LAMBDA entfernen (par.5c)"
+                .into());
+        }
+        if w.set {
+            return Err("MOSAIC_AGGR_SIDE_EPS (Modus B) mischt nicht am Blatt -- ein gesetztes MOSAIC_AGGR_SIDE_W \
+                        waere wirkungslos und ist darum verboten; W entfernen (par.5c)"
+                .into());
+        }
+        return Ok(Some(AggrSideParams { w: 0.0, lambda: 0.0, eps: Some(e) }));
+    }
+    let w = w.value.ok_or("MOSAIC_AGGR_SIDE=1, aber MOSAIC_AGGR_SIDE_W ist ungueltig (erlaubt [0, 1])")?;
+    let lambda = lambda.value.ok_or(
+        "MOSAIC_AGGR_SIDE=1 verlangt MOSAIC_AGGR_SIDE_LAMBDA in [0, 5] (kein Default, Pilot S4 / FS2) \
+         oder MOSAIC_AGGR_SIDE_EPS (Modus B, par.5c)",
+    )?;
+    Ok(Some(AggrSideParams { w, lambda, eps: None }))
 }
 
 /// Die Knoepfe zusammen gelesen: `Ok(None)` = Klasse S aus (Bestand),
-/// `Ok(Some)` = an mit gueltigen Werten, `Err` = an, aber `w` oder `lambda`
-/// fehlt oder ist ungueltig.
+/// `Ok(Some)` = an mit gueltigen Werten, `Err` = an, aber ein Wert fehlt, ist
+/// ungueltig oder die Kombination ist verboten ([`resolve_aggr_side_params`]).
 pub(crate) fn aggr_side_params() -> Result<Option<AggrSideParams>, String> {
-    if !aggr_side_enabled() {
-        return Ok(None);
-    }
-    let w = aggr_side_w().ok_or("MOSAIC_AGGR_SIDE=1, aber MOSAIC_AGGR_SIDE_W ist ungueltig (erlaubt [0, 1])")?;
-    let lambda = aggr_side_lambda().ok_or(
-        "MOSAIC_AGGR_SIDE=1 verlangt MOSAIC_AGGR_SIDE_LAMBDA in [0, 5] (kein Default, Pilot S4 / FS2)",
-    )?;
-    Ok(Some(AggrSideParams { w, lambda }))
+    let knob = |name: &str, value: Option<f64>| AggrKnob { set: std::env::var_os(name).is_some(), value };
+    resolve_aggr_side_params(
+        aggr_side_enabled(),
+        knob("MOSAIC_AGGR_SIDE_W", aggr_side_w()),
+        knob("MOSAIC_AGGR_SIDE_LAMBDA", aggr_side_lambda()),
+        knob("MOSAIC_AGGR_SIDE_EPS", aggr_side_eps()),
+    )
 }
 
 /// Welche Seite (0/1) ist in DIESER Partie der Stoerer (Bauplan 4.7/4.9)?
@@ -3618,9 +3762,26 @@ pub(crate) fn aggr_side_for(game_seed: u64, dice_side: Option<usize>) -> usize {
 }
 
 /// Die `SearchConfig` der Stoerer-Seite: Kopie der Basis mit gesetztem
-/// Seiten-Blend (FS1). Alle anderen Felder unveraendert.
+/// Seiten-Blend (FS1). Alle anderen Felder unveraendert. Modus B (par.5c,
+/// `p.eps = Some`): `w = lambda = 0` (am Blatt kein Blend, die Suche ist die
+/// normale Suche des Stoerers) plus `aggr_eps` fuer die Zugwahl an der Wurzel.
 pub(crate) fn aggr_search_config(base: &SearchConfig, side: usize, p: AggrSideParams) -> SearchConfig {
-    SearchConfig { aggr_w: Some(p.w), aggr_lambda: Some(p.lambda), aggr_player: Some(side), ..*base }
+    match p.eps {
+        Some(eps) => SearchConfig {
+            aggr_w: Some(0.0),
+            aggr_lambda: Some(0.0),
+            aggr_player: Some(side),
+            aggr_eps: Some(eps),
+            ..*base
+        },
+        None => SearchConfig {
+            aggr_w: Some(p.w),
+            aggr_lambda: Some(p.lambda),
+            aggr_player: Some(side),
+            aggr_eps: None,
+            ..*base
+        },
+    }
 }
 
 /// Die Such-Konfigurationen EINER Netz-Self-Play-Partie (Klassen W und S):
@@ -3628,15 +3789,18 @@ pub(crate) fn aggr_search_config(base: &SearchConfig, side: usize, p: AggrSidePa
 /// Platz- und Rueckgabesuchen des erzwungenen Zugs), zweitens je Spieler die
 /// des Drafting-Agenten. par.3b: mit Klasse W (`dice_side = Some(d)`) tragen
 /// ALLE `dome_dice_side = Some(d)`, auch der Stoerer-Agent (Kopie der Basis).
+/// par.5d: dazu ALLE `dome_dice_last_round = Some(dice_last_round)`, damit Baum
+/// und Schleife dieselbe Rundengrenze sehen.
 /// Ohne W und S: Basis und beide Agenten sind `base` unveraendert (Bestand).
 pub(crate) fn side_search_configs(
     base: SearchConfig,
     dice_side: Option<usize>,
+    dice_last_round: u32,
     aggr: Option<AggrSideParams>,
     aggr_side: Option<usize>,
 ) -> (SearchConfig, [SearchConfig; 2]) {
     let base = match dice_side {
-        Some(d) => SearchConfig { dome_dice_side: Some(d), ..base },
+        Some(d) => SearchConfig { dome_dice_side: Some(d), dome_dice_last_round: Some(dice_last_round), ..base },
         None => base,
     };
     let agent = |player: usize| match (aggr, aggr_side) {
@@ -4516,6 +4680,12 @@ struct DraftingDecision {
     /// SUCHE (vor einer Weg-C-Abweichung), weil das Policy-Ziel des Records aus
     /// dieser Suche stammt.
     own_q_gap: Option<f64>,
+    /// Klasse S, Modus B (`PREREG_asymmetric_selfplay.md` par.5c):
+    /// `(aggr_opp_drop_pts, aggr_switched)` der lexikografischen Wurzelwahl
+    /// (`net_mcts::DisruptorPick`). `Some` NUR in Modus B bei echter Suche mit
+    /// Einzelbaum und belegten Gegnerpunkten; dann als Record-Felder
+    /// `aggr_opp_drop_pts` und `aggr_switched` geschrieben.
+    aggr_disruptor: Option<(f64, bool)>,
 }
 
 impl DraftingDecision {
@@ -4531,6 +4701,7 @@ impl DraftingDecision {
             fallback_random_action: false,
             policy_kl: None,
             own_q_gap: None,
+            aggr_disruptor: None,
         }
     }
 }
@@ -4828,13 +4999,14 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
         // Sechster Wert (PREREG_targeted_branching.md par.7): Policy-Diskrepanz,
         // nur aus einer echten Suche und nur bei aktivem Knopf `Some`.
         // Siebter Wert (Klasse S): `own_q_gap`, nur bei Seiten-Blend und echter Suche.
-        let (chosen, policy, root_q, root_child_q, fallback, policy_kl, own_q_gap) = if actions.len() == 1 {
+        // Achter Wert (Klasse S, Modus B, par.5c): die lexikografische Wurzelwahl.
+        let (chosen, policy, root_q, root_child_q, fallback, policy_kl, own_q_gap, disruptor) = if actions.len() == 1 {
             let a = actions[0].clone();
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new(), false, None, None)
+            (a, vec![e], None, Vec::new(), false, None, None, None)
         } else if let Some(a) = vorzug_kandidat.clone() {
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new(), false, None, None)
+            (a, vec![e], None, Vec::new(), false, None, None, None)
         } else {
             // Task #80/#81: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
             // tatsaechlich gespielten Zuege; `timed()` ist ohne
@@ -4862,6 +5034,7 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             fallback_random_action: fallback,
             policy_kl,
             own_q_gap,
+            aggr_disruptor: disruptor.map(|p| (p.opp_drop_pts, p.switched)),
         }
     }
 }
@@ -5339,10 +5512,18 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // Self-Play-Pfade: Startplatzierung MIT Trainings-Record.
                         // Klasse W: Startplatte normal (Nutzer "Start normal"),
                         // nur das Zaehlerfeld kommt dazu.
+                        // par.5d: Runde des Record-Zustands (vor dem Schritt).
+                        let record_round = game.state.round_number;
                         match start_placement_step(&mut game, rng, start_search) {
                             Some(mut rec) => {
-                                if cfg.dome_dice.is_some() {
-                                    stamp_dome_dice_counters(&mut rec, forced_domes, &mut pending_dice_cost);
+                                if let Some(dd) = &cfg.dome_dice {
+                                    stamp_dome_dice_counters(
+                                        &mut rec,
+                                        forced_domes,
+                                        &mut pending_dice_cost,
+                                        record_round,
+                                        dd.last_round(),
+                                    );
                                 }
                                 records.push(rec)
                             }
@@ -5550,7 +5731,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                 let dice_collapsed: Option<(Vec<Action>, Action)> = cfg
                                     .dome_dice
                                     .as_ref()
-                                    .filter(|dd| dd.side == player && dome_dice_open_state(&game.state))
+                                    .filter(|dd| dd.side == player && dome_dice_open_state(&game.state, dd.last_round()))
                                     .map(|_| collapse_plate_actions_for_deviation(&actions, &search_action));
                                 let (dev_actions, dev_exclude): (&[Action], &Action) = match &dice_collapsed {
                                     Some((list, excl)) => (list.as_slice(), excl),
@@ -5715,7 +5896,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // ist der VOR dem Zug.
                     let forced_before_this = forced_domes;
                     let dice_outcome: Option<ForcedDomeOutcome> = match &cfg.dome_dice {
-                        Some(dd) if dome_dice_triggers(&game.state, dd.side, player, &d.chosen) => {
+                        Some(dd) if dome_dice_triggers(&game.state, dd.side, player, &d.chosen, dd.last_round()) => {
                             let outcome = apply_forced_dome_move(
                                 &mut game,
                                 dd,
@@ -5847,9 +6028,23 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         if let Some(gap) = d.own_q_gap {
                             m.insert("own_q_gap".into(), json!(gap));
                         }
+                        // Klasse S, Modus B (par.5c): nur wo die lexikografische
+                        // Wurzelwahl gegriffen hat (sonst Bestand ohne Feld).
+                        if let Some((drop, switched)) = d.aggr_disruptor {
+                            m.insert("aggr_opp_drop_pts".into(), json!(drop));
+                            m.insert("aggr_switched".into(), json!(switched));
+                        }
                         // Klasse W (Bauplan 4.6, F2/F9): nur bei aktivem Knopf.
-                        if cfg.dome_dice.is_some() {
-                            stamp_dome_dice_counters(&mut m, forced_before_this, &mut pending_dice_cost);
+                        // par.5d: `round_before` ist die Runde des Record-Zustands
+                        // (Vor-Apply-Stand, auch fuer den Platzwahl-Record).
+                        if let Some(dd) = &cfg.dome_dice {
+                            stamp_dome_dice_counters(
+                                &mut m,
+                                forced_before_this,
+                                &mut pending_dice_cost,
+                                round_before,
+                                dd.last_round(),
+                            );
                             if dice_outcome.is_some() {
                                 m.insert("dice_trigger".into(), json!(true));
                             }
@@ -5861,7 +6056,8 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // `forced_domes_before`. Die Kosten (F9) gehen weiter an
                         // den ersten Record NACH dem Zug, darum hier `None`.
                         if let Some(mut rec) = dice_outcome.as_ref().and_then(|o| o.place_record.clone()) {
-                            stamp_dome_dice_counters(&mut rec, forced_before_this, &mut None);
+                            let last_round = cfg.dome_dice.as_ref().and_then(|dd| dd.last_round());
+                            stamp_dome_dice_counters(&mut rec, forced_before_this, &mut None, round_before, last_round);
                             records.push(rec);
                         }
                     }
@@ -5886,6 +6082,9 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 if recording {
                     // Self-Play-Pfade: Tiling MIT Trainings-Record; `tiling_net`
                     // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
+                    // par.5d: Runde VOR dem Schritt (ein `EndTiling` kann die
+                    // Runde wechseln, der Record-Zustand ist der davor).
+                    let record_round = game.state.round_number;
                     let mut rec = tiling_step_with_variant(
                         &mut game, pcfg.tiling_net, rng, &pcfg.envelope_params(),
                         pcfg.heuristic_variant, pcfg.net_tiling_tiebreak,
@@ -5893,8 +6092,14 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // Klasse W: Zaehler und ggf. die Kosten des letzten
                     // erzwungenen Zugs (er kann der letzte Drafting-Zug der
                     // Runde gewesen sein, dann ist dies der erste Record danach).
-                    if cfg.dome_dice.is_some() {
-                        stamp_dome_dice_counters(&mut rec, forced_domes, &mut pending_dice_cost);
+                    if let Some(dd) = &cfg.dome_dice {
+                        stamp_dome_dice_counters(
+                            &mut rec,
+                            forced_domes,
+                            &mut pending_dice_cost,
+                            record_round,
+                            dd.last_round(),
+                        );
                     }
                     records.push(rec);
                 } else {
@@ -7431,8 +7636,9 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     search_config: &crate::net_mcts::SearchConfig,
 ) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool, Option<f64>) {
     // Duenner Wrapper (Klasse S): derselbe Rumpf, derselbe RNG-Verbrauch, der
-    // siebte Wert (`own_q_gap`) wird verworfen.
-    let (chosen, policy, root_q, child_q, fallback, policy_kl, _own_q_gap) = net_drafting_policy_with_own_gap(
+    // siebte Wert (`own_q_gap`) und der achte (Modus-B-Wurzelwahl) werden
+    // verworfen.
+    let (chosen, policy, root_q, child_q, fallback, policy_kl, _own_q_gap, _disruptor) = net_drafting_policy_with_own_gap(
         net, state, actions, base_sims, c_puct, rng, add_root_noise, deterministic, move_number,
         tau_argmax_override, search_config,
     );
@@ -7447,6 +7653,14 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
 /// Rueckfall-Zweig und wo die Suche keinen Einzelbaum liefert (Runde-5-
 /// Loeser, Mehrwelten-Wald). Reines Auslesen, Zugwahl und Policy-Ziel
 /// unberuehrt.
+///
+/// Klasse S, Modus B (`PREREG_asymmetric_selfplay.md` par.5c, nur bei
+/// `search_config.aggr_eps = Some`): NACH der unveraenderten Zugwahl
+/// (gleicher RNG-Verbrauch) ersetzt die lexikografische Wurzelwahl
+/// (`net_mcts::RootOwnStats::disruptor_pick`) den Index; `own_q_gap` gilt dann
+/// dem TATSAECHLICH gewaehlten Zug. Achter Rueckgabewert: die Wahl selbst
+/// (`None` ausserhalb von Modus B und wo sie nicht greift -- dann bleibt die
+/// Bestandswahl). Das Policy-Ziel bleibt die Suche.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     net: &Net,
@@ -7466,7 +7680,16 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     // dieselbe globale Env-Var-Abfrage wie vor diesem Parameter.
     tau_argmax_override: Option<usize>,
     search_config: &crate::net_mcts::SearchConfig,
-) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool, Option<f64>, Option<f64>) {
+) -> (
+    Action,
+    Vec<Value>,
+    Option<f64>,
+    Vec<f64>,
+    bool,
+    Option<f64>,
+    Option<f64>,
+    Option<crate::net_mcts::DisruptorPick>,
+) {
     let sims = net_effective_sims(base_sims, actions.len());
     // PREREG_targeted_branching.md par.7: dieselbe Suche wie ueber
     // `net_root_child_stats_and_policy` (dessen Rumpf das IST), zusaetzlich die
@@ -7522,6 +7745,8 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
             // par.7: keine brauchbare Suche -> keine Diskrepanz (Gewicht 0).
             None,
             // Klasse S: kein Suchzug -> kein `own_q_gap`.
+            None,
+            // Modus B: keine Wurzelwahl.
             None,
         );
     }
@@ -7609,6 +7834,21 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     } else {
         weighted_index(&weights, total, rng)
     };
+    // Klasse S, Modus B (par.5c, repariert par.5c2): die lexikografische
+    // Wurzelwahl ersetzt den oben gezogenen Index -- NACH der Zugwahl, damit der
+    // Zufallsstrom derselbe bleibt, und GEGEN diesen Index als Bezugszug (nur
+    // Abweichungen nach unten). Greift nur mit Einzelbaum-Statistik (`root_own`)
+    // und wenn die gewaehlte Aktion in `stats` steht; sonst bleibt der Bestandsindex.
+    let disruptor = match (search_config.aggr_eps, root_own.as_ref()) {
+        (Some(eps), Some(own)) => own
+            .disruptor_pick(eps, &stats[idx].0)
+            .and_then(|p| stats.iter().position(|(a, _, _)| *a == p.action).map(|i| (i, p))),
+        _ => None,
+    };
+    let (idx, disruptor) = match disruptor {
+        Some((i, p)) => (i, Some(p)),
+        None => (idx, None),
+    };
     // `PREREG_moon_stack_order.md` par.9 (Stufe 3): die Mondstapel-Reihenfolge
     // ist bei `moon_order_variants == 2` kein Alternativzug mehr, sondern ein
     // FOLGESCHRITT der Zugwahl -- sie wird hier, nach dem Sampling,
@@ -7618,7 +7858,8 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     // `policy` kommt aus `completed_q_policy`, und die Aktions-ID kodiert die
     // Reihenfolge ohnehin nicht (par.6; der Aktionsraum blieb damals 406 -- seit Weg A,
     // par.12.6, hat die Reihenfolge eigene IDs, dann laeuft dieser Zweig aber gar nicht).
-    // Klasse S: `own_q_gap` des Suchzugs, bevor die Nachsuche ihn verschiebt.
+    // Klasse S: `own_q_gap` des Suchzugs, bevor die Nachsuche ihn verschiebt
+    // (in Modus B der Zug der Wurzelwahl, also der tatsaechlich gespielte).
     let own_q_gap = root_own.as_ref().and_then(|o| o.own_q_gap(&stats[idx].0));
     let chosen = crate::net_mcts::moon_order_post_search(
         net,
@@ -7638,7 +7879,7 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     } else {
         None
     };
-    (chosen, policy, root_q, child_q, false, policy_kl, own_q_gap)
+    (chosen, policy, root_q, child_q, false, policy_kl, own_q_gap, disruptor)
 }
 
 /// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive
@@ -7872,6 +8113,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // Kombination ist verboten, `run_net_self_play` lehnt sie ab; der Ausflug
     // erbte die Wuerfel-Seite ohnehin nicht, Bauplan 11a F8).
     let dome_dice_place_sims = (dome_dice_enabled() && !excursion_run).then(dome_dice_sims);
+    // par.5d: die Rundengrenze nur lesen, wenn Klasse W in dieser Partie an ist.
+    let dome_dice_last_round_value =
+        if dome_dice_place_sims.is_some() { dome_dice_last_round() } else { DOME_DICE_LAST_ROUND_DEFAULT };
     // Klasse S (par.3/par.3a): ebenso hier gelesen, nie im Ausflug (Ablehnung
     // der Kombination in `run_net_self_play`, Begruendung dort). Ungueltige
     // Werte lehnt `run_net_self_play` VOR dem Lauf ab; hier bleibt dann nur
@@ -7880,13 +8124,15 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     play_net_self_play_game_with_dice(
         net, base_sims, c_puct, scoring_ids, names, first_player, game_id, rng, add_root_noise,
         deterministic, record_rtv, move_heartbeat, pcr_full_prob, pcr_cheap_sims, game_seed,
-        start_state, search_config, excursion_run, dome_dice_place_sims, aggr,
+        start_state, search_config, excursion_run, dome_dice_place_sims, dome_dice_last_round_value, aggr,
     )
 }
 
 /// Rumpf von [`play_net_self_play_game`] mit dem Wuerfel-Parameter explizit
 /// (Tests setzen ihn ohne Umgebungsvariable). `dome_dice_place_sims`: `None` =
-/// Klasse W aus (Bestand), `Some(n)` = an, Platzsuche mit `n` Sims. `aggr`:
+/// Klasse W aus (Bestand), `Some(n)` = an, Platzsuche mit `n` Sims.
+/// `dome_dice_last_round` (par.5d): letzte Wuerfelrunde, nur bei W an
+/// wirksam ([`DOME_DICE_LAST_ROUND_DEFAULT`] = Bestand). `aggr`:
 /// `None` = Klasse S aus (Bestand), `Some` = Stoerer mit diesen Werten.
 #[allow(clippy::too_many_arguments)]
 fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
@@ -7909,6 +8155,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     search_config: crate::net_mcts::SearchConfig,
     excursion_run: bool,
     dome_dice_place_sims: Option<u32>,
+    dome_dice_last_round: u32,
     aggr: Option<AggrSideParams>,
 ) -> (Vec<Value>, Option<ExcursionBranch>, bool) {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
@@ -7944,7 +8191,8 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     // par.3b: ALLE Suchen dieser Partie kennen die Wuerfel-Seite (beide
     // Agenten, Startsetzung, Platz- und Rueckgabesuche des erzwungenen Zugs).
     // Ohne Klasse W ist `search_config` unveraendert (Feld bleibt `None`).
-    let (search_config, agent_configs) = side_search_configs(search_config, dice_side, aggr, aggr_side);
+    let (search_config, agent_configs) =
+        side_search_configs(search_config, dice_side, dome_dice_last_round, aggr, aggr_side);
     let agent_config = |player: usize| -> crate::net_mcts::SearchConfig { agent_configs[player] };
     let agent0 = NetSelfPlayAgent {
         net,
@@ -15080,7 +15328,7 @@ mod review_2026_09_26_tests {
 #[cfg(test)]
 mod dome_dice_tests {
     use super::*;
-    use crate::state::{dome_pool_knowledge_is_consistent, KnownPoolBlock};
+    use crate::state::dome_pool_knowledge_is_consistent;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -15146,38 +15394,66 @@ mod dome_dice_tests {
         assert_eq!(parse_dome_dice_sims("0"), None);
         assert_eq!(parse_dome_dice_sims("-5"), None);
         assert_eq!(parse_dome_dice_sims("x"), None);
-        assert_eq!(dice_depth_cap(1), None);
-        assert_eq!(dice_depth_cap(2), Some(7));
-        assert_eq!(dice_depth_cap(3), Some(3));
-        assert_eq!(dice_depth_cap(4), None);
-        assert_eq!(dice_depth_cap(5), None);
+        // par.5d: ganze Zahl 1..4.
+        assert_eq!(parse_dome_dice_last_round("1"), Some(1));
+        assert_eq!(parse_dome_dice_last_round(" 2 "), Some(2));
+        assert_eq!(parse_dome_dice_last_round("4"), Some(4));
+        assert_eq!(DOME_DICE_LAST_ROUND_DEFAULT, 4);
+        for bad in ["0", "5", "-1", "1.5", "", "x"] {
+            assert_eq!(parse_dome_dice_last_round(bad), None, "{bad:?}");
+        }
     }
 
-    /// Test 6: Tiefe in 1..=min(Obergrenze, Stapel), jeder Wert kommt vor,
-    /// grob gleichverteilt (Probe ueber viele Stroeme der reinen Funktion).
+    /// par.5d: die EINE Rundengrenze. `None` und `Some(4)` decken die
+    /// Plattenrunden 1..4 ab (Bestand); `dome_dice_open_state` verlangt
+    /// zusaetzlich Runde >= 1 und < 5.
     #[test]
-    fn dice_depth_respects_round_caps_and_pool() {
+    fn dice_phase_round_rule() {
+        for r in 0..=5u32 {
+            assert_eq!(in_dome_dice_phase(r, None), r <= 4);
+            assert_eq!(in_dome_dice_phase(r, Some(4)), r <= 4);
+            assert_eq!(in_dome_dice_phase(r, Some(1)), r <= 1);
+            assert_eq!(in_dome_dice_phase(r, Some(2)), r <= 2);
+        }
+        let st = round_one_game(9, true).state;
+        let mut r2 = st.clone();
+        r2.round_number = 2;
+        for (s, last, want) in
+            [(&st, Some(1), true), (&r2, Some(1), false), (&r2, Some(2), true), (&r2, None, true), (&r2, Some(4), true)]
+        {
+            assert_eq!(dome_dice_open_state(s, last), want, "Runde {} Grenze {last:?}", s.round_number);
+        }
+        let w = st.current_player;
+        let slot = drafting_actions(&r2).into_iter().find(|a| matches!(a, Action::ChooseDomeSlot(_))).unwrap();
+        assert!(!dome_dice_triggers(&r2, w, w, &slot, Some(1)), "nach der Wuerfelphase kein Ausloeser");
+        assert!(dome_dice_triggers(&r2, w, w, &slot, Some(2)));
+    }
+
+    /// Test 6 (par.5b): Quelle gleichverteilt ueber die belegten Auslageplaetze
+    /// und die oberste Stapelplatte; ein leerer Auslageplatz faellt weg.
+    #[test]
+    fn dice_source_is_uniform_over_display_slots_and_stack_top() {
         let base = round_one_game(3, true);
-        for (round, pool_len, want_max) in [(1u32, 13usize, 13usize), (2, 9, 7), (2, 5, 5), (3, 5, 3), (3, 2, 2), (4, 1, 1)] {
+        for display_n in [3usize, 2, 1] {
             let mut st = base.state.clone();
-            st.round_number = round;
-            st.dome_tile_pool.truncate(pool_len);
-            st.dome_pool_known_blocks.clear();
-            let mut counts = vec![0usize; want_max + 1];
-            let mut stack_rolls = 0usize;
-            for s in 0u64..6000 {
-                if let Some(DiceRoll { source: DiceRollSource::Stack { depth, depth_max }, .. }) = roll_for(&st, s, 0) {
-                    assert_eq!(depth_max, want_max, "Runde {round}, Stapel {pool_len}");
-                    assert!((1..=want_max).contains(&depth), "Tiefe {depth} ausserhalb 1..={want_max}");
-                    counts[depth] += 1;
-                    stack_rolls += 1;
+            st.dome_display.truncate(display_n);
+            assert!(!st.dome_tile_pool.is_empty());
+            let mut by_tile: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+            let mut stack = 0usize;
+            let n = 8000u64;
+            for s in 0..n {
+                match roll_for(&st, s, 0).unwrap().source {
+                    DiceRollSource::Display { tile_id } => *by_tile.entry(tile_id).or_default() += 1,
+                    DiceRollSource::Stack { depth, depth_max } => {
+                        assert_eq!((depth, depth_max), (1, 1), "Stapel heisst oberste Platte");
+                        stack += 1;
+                    }
                 }
             }
-            assert!(stack_rolls > 2500, "Muenze 50:50: {stack_rolls} von 6000 Stapelwuerfe");
-            let expected = stack_rolls as f64 / want_max as f64;
-            for d in 1..=want_max {
-                let ratio = counts[d] as f64 / expected;
-                assert!((0.75..1.25).contains(&ratio), "Runde {round}: d={d} {} mal, erwartet {expected:.0}", counts[d]);
+            assert_eq!(by_tile.len(), display_n);
+            let e = n as f64 / (display_n + 1) as f64;
+            for k in by_tile.values().copied().chain([stack]) {
+                assert!((0.9..1.1).contains(&(k as f64 / e)), "Auslage {display_n}: {k} gegen {e:.0}");
             }
         }
     }
@@ -15221,53 +15497,36 @@ mod dome_dice_tests {
         }
     }
 
-    /// Test 8 (Beispiel des Nutzers, E3/E9/E10): R1, ganzer Stapel. Stand 5 -> 0,
-    /// Pool 12 als EIN Block der Wuerfel-Seite, Praefix 0, konsistent; die
-    /// behaltene Platte ist die unterste des urspruenglichen Stapels.
-    /// Test 9 (E1) auf demselben Zustand: zweite Ziehung in den eigenen Block,
-    /// d = 12, gratis, neuer Block {11, W}.
+    /// Test 8 (par.5b): Stapelquelle = oberste Platte. R1, Stand 5 -> 4 (eine
+    /// Ziehung, 1 Punkt), Stapel 13 -> 12, keine Rueckgabe, die gelegte Platte
+    /// ist die vormals oberste; Platzwahl-Record mit dem Zustand VOR der
+    /// Platzwahl (eine Platte gezogen).
     #[test]
-    fn dice_full_stack_draw_round_one_and_second_draw_into_own_block() {
+    fn dice_stack_draw_takes_the_top_plate_for_one_point() {
         let net = champion_net();
         let mut game = round_one_game(7, crate::net_mcts::net_supports_extended_action_nodes(&net));
         let w = game.state.current_player;
         assert_eq!(game.state.dome_tile_pool.len(), 13);
         assert_eq!(game.state.players[w].score, 5, "Startstand 5 (board.rs)");
-        let bottom_id = game.state.dome_tile_pool[12].tile_id;
-        let seed = seed_where(&game.state, 0, |r| r.source == DiceRollSource::Stack { depth: 13, depth_max: 13 });
+        let top_id = game.state.dome_tile_pool[0].tile_id;
+        let seed = seed_where(&game.state, 0, |r| matches!(r.source, DiceRollSource::Stack { .. }));
         let cfg = dice_cfg(&net, w);
         let out = apply_forced_dome_move(&mut game, &cfg, seed, 0, 1).expect("erzwungener Zug");
-        assert_eq!((out.from_stack, out.depth, out.depth_max), (true, 13, 13));
-        // par.3c: Platzwahl-Record mit dem Zustand VOR der Platzwahl (13 Platten
-        // gezogen) und den Plaetzen der behaltenen Platte.
+        assert_eq!((out.from_stack, out.depth, out.depth_max), (true, 1, 1));
         let rec = out.place_record.as_ref().expect("Platzwahl-Record");
-        assert_eq!(rec["state"]["pending_stack_draw"].as_array().map(|a| a.len()), Some(13));
+        assert_eq!(rec["state"]["pending_stack_draw"].as_array().map(|a| a.len()), Some(1));
         assert_eq!(rec["dice_place_ids"].as_array().unwrap().len(), out.slots);
-        assert_eq!(rec["valid_actions"].as_array().unwrap().len(), out.slots);
-        assert_eq!((out.from_prefix, out.from_own_block, out.from_foreign_block), (13, 0, 0));
-        assert_eq!(out.paid, 5, "Zahlung auf den Stand gedeckelt (board.rs apply_paid_cost)");
-        assert_eq!(game.state.players[w].score, 0);
+        assert_eq!(out.from_prefix + out.from_own_block + out.from_foreign_block, 1);
+        assert_eq!(out.paid, 1);
+        assert_eq!(game.state.players[w].score, 4);
         assert_eq!(game.state.dome_tile_pool.len(), 12);
-        assert_eq!(game.state.dome_pool_known_blocks, vec![KnownPoolBlock { len: 12, returner: w }]);
-        assert_eq!(game.state.dome_pool_unknown_prefix_len(), 0);
         assert!(dome_pool_knowledge_is_consistent(&game.state));
         assert!(game.state.dome_dice_pin.is_none());
         assert!(game.state.pending_stack_draw.is_empty());
         assert_eq!(game.state.current_player, 1 - w, "Zug beendet");
         let placed: Vec<usize> =
             game.state.players[w].dome_grid.dome_slots.iter().flatten().flatten().map(|t| t.tile_id).collect();
-        assert!(placed.contains(&bottom_id), "die d-te (unterste) Platte liegt");
-
-        // Test 9: dieselbe Seite zieht erneut, jetzt aus dem EIGENEN Block.
-        game.state.current_player = w;
-        let seed = seed_where(&game.state, 1, |r| matches!(r.source, DiceRollSource::Stack { depth: 12, .. }));
-        let out = apply_forced_dome_move(&mut game, &cfg, seed, 1, 3).expect("zweiter Zug");
-        assert_eq!((out.from_prefix, out.from_own_block, out.from_foreign_block), (0, 12, 0));
-        assert_eq!(out.paid, 0, "bei Stand 0 gratis (E9)");
-        assert_eq!(game.state.dome_tile_pool.len(), 11);
-        assert_eq!(game.state.dome_pool_known_blocks, vec![KnownPoolBlock { len: 11, returner: w }]);
-        assert!(dome_pool_knowledge_is_consistent(&game.state));
-        assert_eq!(game.state.players[w].dome_tiles_placed_this_round, 2);
+        assert!(placed.contains(&top_id), "die oberste Platte liegt");
     }
 
     /// Test 13 (E12): letzte Platte, ein einziger Platz -> keine Suche.
@@ -15299,16 +15558,16 @@ mod dome_dice_tests {
         let actions = drafting_actions(st);
         let slot = actions.iter().find(|a| matches!(a, Action::ChooseDomeSlot(_))).unwrap().clone();
         let stone = actions.iter().find(|a| matches!(a, Action::Stone(_))).unwrap().clone();
-        assert!(dome_dice_triggers(st, w, w, &slot));
-        assert!(dome_dice_triggers(st, w, w, &Action::DrawStackPeek), "F7: Stapel wie Auslage");
-        assert!(!dome_dice_triggers(st, w, w, &stone));
-        assert!(!dome_dice_triggers(st, 1 - w, w, &slot), "nur die Wuerfel-Seite");
+        assert!(dome_dice_triggers(st, w, w, &slot, None));
+        assert!(dome_dice_triggers(st, w, w, &Action::DrawStackPeek, None), "F7: Stapel wie Auslage");
+        assert!(!dome_dice_triggers(st, w, w, &stone, None));
+        assert!(!dome_dice_triggers(st, 1 - w, w, &slot, None), "nur die Wuerfel-Seite");
         let mut mid = st.clone();
         mid.pending_stack_draw.push(mid.dome_tile_pool[0].clone());
-        assert!(!dome_dice_triggers(&mid, w, w, &Action::DrawStackPeek), "offener Teilzug loest nicht aus");
+        assert!(!dome_dice_triggers(&mid, w, w, &Action::DrawStackPeek, None), "offener Teilzug loest nicht aus");
         let mut r5 = st.clone();
         r5.round_number = 5;
-        assert!(!dome_dice_triggers(&r5, w, w, &slot));
+        assert!(!dome_dice_triggers(&r5, w, w, &slot, None));
     }
 
     /// Test 16: Seitenwahl 50:50 und die 2x2-Tafel mit dem Startspieler, der
@@ -15374,6 +15633,11 @@ mod dome_dice_tests {
     }
 
     fn play_dice_game(net: &Net, seed: u64, place_sims: Option<u32>) -> Vec<Value> {
+        play_dice_game_until(net, seed, place_sims, DOME_DICE_LAST_ROUND_DEFAULT)
+    }
+
+    /// Wie [`play_dice_game`] mit Rundengrenze der Wuerfelphase (par.5d).
+    fn play_dice_game_until(net: &Net, seed: u64, place_sims: Option<u32>, last_round: u32) -> Vec<Value> {
         let mut rng = StdRng::seed_from_u64(seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let (records, _x, _d) = play_net_self_play_game_with_dice(
@@ -15396,12 +15660,20 @@ mod dome_dice_tests {
             SearchConfig::from_env(),
             false,
             place_sims,
+            last_round,
             None,
         );
         records
     }
 
-    const DICE_FIELDS: [&str; 4] = ["dome_dice_side", "forced_domes_before", "dice_trigger", "dome_dice_cost"];
+    const DICE_FIELDS: [&str; 5] =
+        ["dome_dice_side", "forced_domes_before", "dice_trigger", "dome_dice_cost", "dice_phase"];
+
+    /// Runde des Record-Zustands (`state.round`, dieselbe Quelle wie die
+    /// Label-Stempel am Partieende).
+    fn record_round(r: &Value) -> u64 {
+        r["state"]["round"].as_u64().expect("state.round")
+    }
 
     /// Test 14 (4.6) und Test 15 (Teil 3): eine ganze W-Partie. Keine Records
     /// fuer Teilschritte (kein W-Record mit offenem Stapelzug oder offener
@@ -15420,6 +15692,8 @@ mod dome_dice_tests {
         let (mut triggers, mut costs) = (0usize, 0usize);
         for r in &records {
             assert_eq!(r["dome_dice_side"], json!(side));
+            // par.5d: Default-Grenze 4 -- Wuerfelphase genau in den Runden 1..4.
+            assert_eq!(r["dice_phase"], json!(record_round(r) <= 4), "dice_phase ueberall, Grenze 4");
             let f = r["forced_domes_before"].as_u64().expect("forced_domes_before ueberall");
             assert!(f >= last && f <= 8, "monoton, <= 8: {last} -> {f}");
             last = f;
@@ -15504,6 +15778,69 @@ mod dome_dice_tests {
                 assert!(r.get(f).is_none(), "Feld {f} bei Knopf AUS");
             }
         }
+    }
+
+    /// par.5d (Eroeffnungs-Wuerfel), ganze Partie mit Grenze 1: erzwungene
+    /// Platten, Platzwahl-Records und Ausloeser NUR in Runde 1; danach legt die
+    /// W-Seite ihre Platten normal (eigene Teilzug-Records, kein Pin, kein
+    /// weiterer Zaehlerschritt). `dice_phase` auf jedem Record = Runde <= 1. Die
+    /// Records der Runde 1 sind in den Zug-Feldern dieselben wie mit Grenze 4
+    /// (gleicher Seed); Grenze 4 ist byte-gleich zum Aufruf ohne Grenze
+    /// (`forced_dome_move_writes_no_records_and_stamps_fields` vergleicht diesen
+    /// Weg mit sich selbst, `dice_off_is_byte_identical` den Knopf AUS).
+    #[test]
+    fn opening_dice_only_in_round_one() {
+        let net = champion_net();
+        let seed = 4711u64;
+        let side = dome_dice_side(seed);
+        let limited = play_dice_game_until(&net, seed, Some(16), 1);
+        let full = play_dice_game(&net, seed, Some(16));
+        assert_eq!(limited.last().unwrap()["completed"], json!(true));
+        let (mut triggers, mut places, mut w_plate_steps_late) = (0u64, 0u64, 0u64);
+        for r in &limited {
+            let round = record_round(r);
+            assert_eq!(r["dome_dice_side"], json!(side));
+            assert_eq!(r["dice_phase"], json!(round <= 1), "dice_phase je Runde");
+            if r.get("dice_trigger").is_some() {
+                assert_eq!(round, 1, "Ausloeser nur in Runde 1");
+                triggers += 1;
+            }
+            if r.get("dice_place").is_some() {
+                assert_eq!(round, 1, "Platzwahl-Record nur in Runde 1");
+                places += 1;
+            }
+            if round >= 2 {
+                assert_eq!(r["forced_domes_before"], json!(triggers), "nach Runde 1 kein erzwungener Zug");
+                // Normaler Plattenzug der W-Seite: ihre Teilzuege (Platz,
+                // Rotation) sind eigene Entscheide mit eigenem Record.
+                if r["player"] == json!(side) && r.get("valid_actions").is_some() {
+                    let partial_step = r["valid_actions"].as_array().unwrap().iter().any(|a| {
+                        let t = a["type"].as_str().unwrap_or("");
+                        t.contains("rotation") || t.contains("draw_stack_slot")
+                    });
+                    w_plate_steps_late += u64::from(partial_step);
+                }
+            }
+        }
+        assert!(triggers >= 1, "Runde 1 wuerfelt (waren {triggers})");
+        assert!(places <= triggers);
+        assert!(w_plate_steps_late > 0, "ab Runde 2 legt W Platten als normale Teilzuege");
+        // Runde 1 wie bisher: dieselben Zug-Felder wie mit Grenze 4.
+        let moves = |recs: &[Value]| -> Vec<String> {
+            recs.iter()
+                .filter(|r| record_round(r) == 1)
+                .map(|r| {
+                    ["state", "policy", "valid_actions", "player", "dice_trigger", "dice_place", "forced_domes_before"]
+                        .iter()
+                        .map(|k| r.get(*k).map(|v| v.to_string()).unwrap_or_default())
+                        .collect::<Vec<_>>()
+                        .join("|")
+                })
+                .collect()
+        };
+        assert_eq!(moves(&limited), moves(&full), "Runde 1 identisch zur Grenze 4");
+        let full_triggers = full.iter().filter(|r| r.get("dice_trigger").is_some()).count() as u64;
+        assert!(full_triggers > triggers, "Grenze 4 wuerfelt auch spaeter ({full_triggers} gegen {triggers})");
     }
 
     // ── par.3b: Zufallsknoten im Suchbaum ──────────────────────────────────
@@ -15594,7 +15931,7 @@ mod dome_dice_tests {
         }
         let chosen = found.expect("in 40 Suchen nie 'Platte legen' gewaehlt");
         assert_eq!(chosen_plates.len(), 1, "nur EINE Plattenkante an der Wurzel: {chosen_plates:?}");
-        assert!(dome_dice_triggers(st, w, w, &chosen), "die Schleife erkennt den Plattenentscheid");
+        assert!(dome_dice_triggers(st, w, w, &chosen, None), "die Schleife erkennt den Plattenentscheid");
         let mut game = Game { state: st.clone() };
         let dc = DomeDiceConfig { search_config: sc, ..dice_cfg(&net, w) };
         let placed_before = game.state.players[w].dome_tiles_placed_this_round;
@@ -15611,20 +15948,27 @@ mod dome_dice_tests {
     fn side_search_configs_give_every_search_of_a_w_game_the_dice_side() {
         let base = SearchConfig::from_env();
         assert_eq!(base.dome_dice_side, None);
-        assert_eq!(side_search_configs(base, None, None, None), (base, [base, base]), "G-Partie: Bestand");
-        let p = AggrSideParams { w: 0.1, lambda: 1.0 };
+        assert_eq!(side_search_configs(base, None, DOME_DICE_LAST_ROUND_DEFAULT, None, None), (base, [base, base]), "G-Partie: Bestand");
+        let p = AggrSideParams { w: 0.1, lambda: 1.0, eps: None };
         for d in 0..2usize {
-            let (b, a) = side_search_configs(base, Some(d), None, None);
+            let (b, a) = side_search_configs(base, Some(d), DOME_DICE_LAST_ROUND_DEFAULT, None, None);
             assert_eq!((b.dome_dice_side, a[0].dome_dice_side, a[1].dome_dice_side), (Some(d), Some(d), Some(d)));
-            assert_eq!(SearchConfig { dome_dice_side: None, ..b }, base, "sonst unveraendert");
+            let lr = Some(DOME_DICE_LAST_ROUND_DEFAULT);
+            assert_eq!(
+                (b.dome_dice_last_round, a[0].dome_dice_last_round, a[1].dome_dice_last_round),
+                (lr, lr, lr),
+                "par.5d: Grenze in allen Suchen"
+            );
+            assert_eq!(SearchConfig { dome_dice_side: None, dome_dice_last_round: None, ..b }, base, "sonst unveraendert");
             assert_eq!(a, [b, b]);
-            let (b, a) = side_search_configs(base, Some(d), Some(p), Some(1 - d));
+            let (b, a) = side_search_configs(base, Some(d), DOME_DICE_LAST_ROUND_DEFAULT, Some(p), Some(1 - d));
             assert_eq!((b.aggr_player, b.dome_dice_side), (None, Some(d)));
             assert_eq!((a[1 - d].aggr_player, a[1 - d].dome_dice_side), (Some(1 - d), Some(d)), "Stoerer kennt W");
             assert_eq!((a[d].aggr_player, a[d].dome_dice_side), (None, Some(d)));
         }
-        let (b, a) = side_search_configs(base, None, Some(p), Some(0));
+        let (b, a) = side_search_configs(base, None, DOME_DICE_LAST_ROUND_DEFAULT, Some(p), Some(0));
         assert!(b.dome_dice_side.is_none() && a.iter().all(|c| c.dome_dice_side.is_none()), "G gegen S");
+        assert!(b.dome_dice_last_round.is_none() && a.iter().all(|c| c.dome_dice_last_round.is_none()));
         assert_eq!(a[0].aggr_player, Some(0));
     }
 
@@ -15737,7 +16081,7 @@ mod aggr_side_tests {
             .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
     }
 
-    const PARAMS: AggrSideParams = AggrSideParams { w: 0.1, lambda: 1.0 };
+    const PARAMS: AggrSideParams = AggrSideParams { w: 0.1, lambda: 1.0, eps: None };
 
     fn play(net: &Net, seed: u64, place_sims: Option<u32>, aggr: Option<AggrSideParams>) -> Vec<Value> {
         let mut rng = StdRng::seed_from_u64(seed);
@@ -15745,7 +16089,7 @@ mod aggr_side_tests {
         let (records, _x, _d) = play_net_self_play_game_with_dice(
             net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
             (seed % 2) as usize, "aggr_test", &mut rng, false, true, false, None, None, 0, seed, None,
-            SearchConfig::from_env(), false, place_sims, aggr,
+            SearchConfig::from_env(), false, place_sims, DOME_DICE_LAST_ROUND_DEFAULT, aggr,
         );
         records
     }
@@ -15835,6 +16179,193 @@ mod aggr_side_tests {
         assert_eq!(
             serde_json::to_string(&records).unwrap(),
             serde_json::to_string(&play(&net, seed, None, Some(PARAMS))).unwrap(),
+            "reproduzierbar"
+        );
+    }
+
+    // ── Modus B: lexikografischer Stoerer an der Wurzel (par.5c) ─────────────
+
+    const PARAMS_B: AggrSideParams = AggrSideParams { w: 0.0, lambda: 0.0, eps: Some(0.02) };
+
+    #[test]
+    fn aggr_side_eps_parser() {
+        assert_eq!(parse_aggr_side_eps("0.02"), Some(0.02));
+        assert_eq!(parse_aggr_side_eps(" 0 "), Some(0.0));
+        assert_eq!(parse_aggr_side_eps("1"), Some(1.0));
+        assert_eq!(parse_aggr_side_eps("1.01"), None);
+        assert_eq!(parse_aggr_side_eps("-0.01"), None);
+        assert_eq!(parse_aggr_side_eps("nan"), None);
+        assert_eq!(parse_aggr_side_eps("inf"), None);
+        assert_eq!(parse_aggr_side_eps(""), None);
+        // Testprozess ohne Knopf.
+        assert_eq!(aggr_side_eps(), None);
+        assert_eq!(aggr_side_mode(), None, "Klasse S aus");
+    }
+
+    /// Kombinationen der Knoepfe: EPS -> Modus B; EPS mit LAMBDA oder mit
+    /// gesetztem W -> Fehler; ungueltiges EPS -> Fehler; ohne EPS Bestand.
+    #[test]
+    fn aggr_side_params_combinations() {
+        let unset = AggrKnob { set: false, value: None };
+        let w_default = AggrKnob { set: false, value: Some(AGGR_SIDE_W_DEFAULT) };
+        let set = |v: f64| AggrKnob { set: true, value: Some(v) };
+        let bad = AggrKnob { set: true, value: None };
+        // Aus: alles egal.
+        assert_eq!(resolve_aggr_side_params(false, set(0.5), set(1.0), set(0.02)), Ok(None));
+        // Modus B.
+        assert_eq!(
+            resolve_aggr_side_params(true, w_default, unset, set(0.02)),
+            Ok(Some(AggrSideParams { w: 0.0, lambda: 0.0, eps: Some(0.02) }))
+        );
+        assert!(resolve_aggr_side_params(true, w_default, set(1.0), set(0.02)).unwrap_err().contains("LAMBDA"));
+        assert!(resolve_aggr_side_params(true, w_default, bad, set(0.02)).is_err(), "auch ein ungueltiges LAMBDA ist gesetzt");
+        assert!(resolve_aggr_side_params(true, set(0.1), unset, set(0.02)).unwrap_err().contains("_W"));
+        assert!(resolve_aggr_side_params(true, w_default, unset, bad).unwrap_err().contains("EPS"));
+        // Bestand (Blend).
+        assert_eq!(
+            resolve_aggr_side_params(true, w_default, set(1.0), unset),
+            Ok(Some(AggrSideParams { w: AGGR_SIDE_W_DEFAULT, lambda: 1.0, eps: None }))
+        );
+        assert_eq!(
+            resolve_aggr_side_params(true, set(0.3), set(2.0), unset),
+            Ok(Some(AggrSideParams { w: 0.3, lambda: 2.0, eps: None }))
+        );
+        assert!(resolve_aggr_side_params(true, w_default, unset, unset).is_err(), "Blend ohne lambda");
+        assert!(resolve_aggr_side_params(true, bad, set(1.0), unset).is_err(), "ungueltiges W");
+        // Config der Stoerer-Seite: Modus B mischt nicht, traegt eps.
+        let base = SearchConfig::from_env();
+        let b = aggr_search_config(&base, 1, PARAMS_B);
+        assert_eq!((b.aggr_w, b.aggr_lambda, b.aggr_player, b.aggr_eps), (Some(0.0), Some(0.0), Some(1), Some(0.02)));
+        let blend = aggr_search_config(&base, 0, PARAMS);
+        assert_eq!((blend.aggr_w, blend.aggr_lambda, blend.aggr_player, blend.aggr_eps), (Some(0.1), Some(1.0), Some(0), None));
+        // Auch ein von Hand gebautes Modus-B-Paar mit w != 0 mischt nicht.
+        let odd = aggr_search_config(&base, 0, AggrSideParams { w: 0.5, lambda: 2.0, eps: Some(0.1) });
+        assert_eq!((odd.aggr_w, odd.aggr_lambda), (Some(0.0), Some(0.0)));
+    }
+
+    /// Zugwahl in Modus B (Champion-Netz): der gespielte Zug ist die
+    /// lexikografische Wahl aus derselben Suche (gleicher Seed, gleicher
+    /// Baum); mit eps = 0 der eigene Bestzug, mit eps = 1 der Ueberlebende mit
+    /// den wenigsten Gegnerpunkten; `own_q_gap` gilt dem gespielten Zug und
+    /// liegt <= eps. Ohne `aggr_eps` kein achter Wert.
+    #[test]
+    fn disruptor_move_choice_on_champion() {
+        let net = champion_net();
+        let ext = crate::net_mcts::net_supports_extended_action_nodes(&net);
+        let mut rng = StdRng::seed_from_u64(31);
+        let mut checked = 0usize;
+        for gi in 0..10u64 {
+            // Startsetzung wie `dome_dice_tests::round_one_game`, dann ein paar
+            // Zufallszuege bis zu einem spaeteren Entscheid.
+            let mut r = StdRng::seed_from_u64(100 + gi);
+            let mut game = Game::start(["A".into(), "B".into()], 0, sample_valid_scoring_ids(3, &mut r), &mut r);
+            for pi in [1, 0] {
+                let (t, row, col, rot) = choose_start_placement(&game.state, pi).unwrap();
+                apply_start_placement(&mut game.state, pi, t, row, col, rot).unwrap();
+            }
+            game.state.extended_action_nodes = [ext, ext];
+            for _ in 0..(gi % 4) {
+                if game.state.phase != Phase::Drafting {
+                    break;
+                }
+                let acts = drafting_actions(&game.state);
+                let a = acts[rng.random_range(0..acts.len())].clone();
+                game.apply_drafting(&a).expect("legaler Zug");
+            }
+            if game.state.phase != Phase::Drafting {
+                continue;
+            }
+            let state = game.state.clone();
+            let actions = drafting_actions(&state);
+            if actions.len() < 3 {
+                continue;
+            }
+            let s = state.current_player;
+            let base = SearchConfig { moon_order_variants: 1, ..SearchConfig::from_env() };
+            for eps in [0.0, 1.0] {
+                let cfg = SearchConfig { aggr_w: Some(0.0), aggr_lambda: Some(0.0), aggr_player: Some(s), aggr_eps: Some(eps), ..base };
+                let sims = net_effective_sims(64, actions.len());
+                let mut r1 = StdRng::seed_from_u64(gi);
+                let (_, _, _, _, _, own) = crate::net_mcts::net_root_child_stats_policy_prior_and_own(
+                    &net, &state, sims, crate::net_mcts::DEFAULT_C_PUCT, false, &mut r1, &cfg,
+                );
+                let Some(own) = own else { continue };
+                let mut r2 = StdRng::seed_from_u64(gi);
+                let (chosen, _, _, _, fallback, _, gap, pick) = net_drafting_policy_with_own_gap(
+                    // tau-argmax ab Halbzug 0 wie in der Erzeugung (v35-Rezept 1): der
+                    // Bezugszug ist der Besuchs-argmax und damit ein Ueberlebender.
+                    &net, &state, &actions, 64, crate::net_mcts::DEFAULT_C_PUCT, &mut r2, false, false, 0, Some(0), &cfg,
+                );
+                assert!(!fallback);
+                let pick = pick.expect("Modus B mit Einzelbaum und Kopf: Wahl vorhanden");
+                assert_eq!(
+                    Some(&pick),
+                    own.disruptor_pick(eps, &pick.base_action).as_ref(),
+                    "Spiel {gi}: derselbe Baum, Bezugszug = Bestands-Wahl"
+                );
+                assert_eq!(chosen, pick.action, "Spiel {gi}: gespielt wird die Wurzelwahl");
+                assert_eq!(gap, own.own_q_gap(&chosen), "own_q_gap des gespielten Zugs");
+                let surv: Vec<&(Action, u32, f64, Option<f64>)> =
+                    own.children.iter().filter(|c| c.1 > 0 && c.1 >= own.n_min).collect();
+                let c = surv.iter().find(|c| c.0 == chosen).expect("Ueberlebender");
+                let b = surv.iter().find(|c| c.0 == pick.base_action).expect("Bezugszug ueberlebt");
+                // par.5c2: nie eigen-besser als der Bezugszug, hoechstens eps schlechter.
+                assert!(c.2 <= b.2 && c.2 >= b.2 - eps - 1e-12, "Spiel {gi}: Q im Band");
+                if eps == 0.0 {
+                    assert_eq!(c.2, b.2);
+                } else {
+                    let min_opp = surv.iter().filter(|x| x.2 <= b.2).filter_map(|x| x.3).fold(f64::INFINITY, f64::min);
+                    assert_eq!(c.3, Some(min_opp), "Spiel {gi}: wenigste Gegnerpunkte");
+                }
+                checked += 1;
+            }
+            // Ohne aggr_eps (Blend-Modus mit w = 0): keine Wurzelwahl.
+            let blend = SearchConfig { aggr_w: Some(0.0), aggr_lambda: Some(0.0), aggr_player: Some(s), aggr_eps: None, ..base };
+            let mut r3 = StdRng::seed_from_u64(gi);
+            let out = net_drafting_policy_with_own_gap(
+                &net, &state, &actions, 64, crate::net_mcts::DEFAULT_C_PUCT, &mut r3, false, false, 0, None, &blend,
+            );
+            assert!(out.7.is_none());
+        }
+        assert!(checked >= 6, "zu wenige Stichproben ({checked})");
+    }
+
+    /// Modus B in der Partie: `aggr_opp_drop_pts`/`aggr_switched` nur auf
+    /// Drafting-Records der Stoerer-Seite mit echter Suche, `own_q_gap <= eps`
+    /// dort per Konstruktion, `aggr_side` auf jedem Record; reproduzierbar.
+    #[test]
+    fn disruptor_fields_only_on_aggressor_records() {
+        let net = champion_net();
+        let seed = 2027u64;
+        let side = aggr_side_for(seed, None);
+        let records = play(&net, seed, None, Some(PARAMS_B));
+        assert_eq!(records.last().unwrap()["completed"], json!(true));
+        let (mut picks, mut switched) = (0usize, 0usize);
+        for r in &records {
+            assert_eq!(r["aggr_side"], json!(side));
+            if let Some(d) = r.get("aggr_opp_drop_pts") {
+                picks += 1;
+                assert_eq!(r["player"], json!(side), "nur die Stoerer-Seite");
+                assert!(r.get("root_q").is_some(), "nur bei echter Suche");
+                assert!(d.as_f64().unwrap() >= 0.0);
+                let sw = r["aggr_switched"].as_bool().expect("aggr_switched neben aggr_opp_drop_pts");
+                switched += usize::from(sw);
+                if !sw {
+                    assert_eq!(d.as_f64().unwrap(), 0.0, "ohne Wechsel kein Abstand");
+                }
+                // par.5c2: `own_q_gap` misst gegen den Q-Bestzug, die Wahl aber gegen den
+                // Bezugszug der Bestands-Wahl -- `<= eps` gilt deshalb NICHT mehr per
+                // Konstruktion; geprueft wird nur, dass das Feld neben der Wahl steht.
+                assert!(r["own_q_gap"].as_f64().is_some(), "own_q_gap neben der Wurzelwahl");
+            } else {
+                assert!(r.get("aggr_switched").is_none());
+            }
+        }
+        assert!(picks >= 10, "eine Partie hat viele echte Stoerer-Suchen, gefunden {picks}");
+        eprintln!("[disruptor] Partie {seed}: {picks} Wurzelwahlen, davon {switched} gewechselt");
+        assert_eq!(
+            serde_json::to_string(&records).unwrap(),
+            serde_json::to_string(&play(&net, seed, None, Some(PARAMS_B))).unwrap(),
             "reproduzierbar"
         );
     }

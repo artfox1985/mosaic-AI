@@ -92,6 +92,14 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--seed", type=int, default=20261003)
     ap.add_argument("--out", default="evaluations/artifacts/asym_probes_s1_s4.json")
+    ap.add_argument("--dice-class", default="policy-dice",
+                    help="W-Klasse fuer S1-S3 (par.5b: policy-dice-src4 nach der neuen Quellenregel)")
+    ap.add_argument("--skip-s4", action="store_true", help="S4 (Stoerer-Stufen) auslassen")
+    ap.add_argument("--aggr-classes", default=None,
+                    help="S4-Klassen als 'klasse:stufe,...' (par.5c: policy-aggr-e01:0.01,...); Default die lambda-Arme")
+    ap.add_argument("--skip-s2", action="store_true", help="W-Klasse und S1-S3 auslassen (nur S4)")
+    ap.add_argument("--post-dice-phase", action="store_true",
+                    help="par.5d (S5): S2/S3 der W-Klasse nur ueber Records NACH der Wuerfelphase (dice_phase false)")
     args = ap.parse_args()
     t_start, c_start = time.monotonic(), time.process_time()
     rng = np.random.default_rng(args.seed)
@@ -119,14 +127,15 @@ def main() -> None:
         Partie Endstand, Sieger, Sonderseite und gezahlte Wuerfel-Punkte; own_q_gap der Sonderseite."""
         files = class_files(data, cls)
         rec, games, ogap = defaultdict(list), [], []
+        disrupt = {"switched": [], "drop": []}
         buf = []
 
         def flush():
             if not buf:
                 return
             logits, ph = net_eval([b[0] for b in buf])
-            for i, (_st, fi, side, rnd, fdb, win, targ) in enumerate(buf):
-                rec["file"].append(fi); rec["side"].append(side); rec["round"].append(rnd)
+            for i, (_st, fi, side, rnd, fdb, win, targ, dph) in enumerate(buf):
+                rec["file"].append(fi); rec["side"].append(side); rec["round"].append(rnd); rec["dphase"].append(dph)
                 rec["fdb"].append(fdb); rec["win"].append(win)
                 rec["kl"].append(policy_kl(logits[i], targ)); rec["p"].append(float(ph[i]))
             buf.clear()
@@ -171,14 +180,18 @@ def main() -> None:
                     side = -1 if special is None else (0 if p == special else 1)
                     if special is not None and p == special and r.get("own_q_gap") is not None:
                         ogap.append(float(r["own_q_gap"]))
+                    if special is not None and p == special and r.get("aggr_switched") is not None:
+                        disrupt["switched"].append(1.0 if r["aggr_switched"] else 0.0)
+                        disrupt["drop"].append(float(r.get("aggr_opp_drop_pts") or 0.0))
                     buf.append((st, fi, side, rnd, int(r.get("forced_domes_before", 0) or 0),
-                                1.0 if int(r["winner"]) == p else 0.0, targ))
+                                1.0 if int(r["winner"]) == p else 0.0, targ, 1 if r.get("dice_phase") is True else 0))
                     if len(buf) >= args.batch:
                         flush()
             flush()
             print(f"[asym] {cls} {fi + 1}/{len(files)} Dateien, {len(rec['file'])} Zustaende, "
                   f"{time.monotonic() - t_start:.0f} s", flush=True)
         arr = {k: np.array(v) for k, v in rec.items()}
+        read_class.disrupt = disrupt
         return files, arr, games, np.array(ogap)
 
     def by_file(arr, mask, field, nfiles):
@@ -198,8 +211,10 @@ def main() -> None:
                          "punkte": float(pts.mean()) if gs else None, "marge": float(mar.mean()) if gs else None}
         return out
 
-    def calibration(arr, nfiles, side):
+    def calibration(arr, nfiles, side, extra=None):
         m = arr["side"] == side
+        if extra is not None:
+            m = m & extra
         if not m.any():
             return None
         off = arr["p"] - arr["win"]
@@ -216,56 +231,61 @@ def main() -> None:
 
     # --- Sockel (Bezug) und W ------------------------------------------------------------------
     pf, pa, pg, _ = read_class("policy", None)
-    wf, wa, wg, _ = read_class("policy-dice", "dome_dice_side")
-    lz_p, lz_w = manifest_runtime(data, "policy"), manifest_runtime(data, "policy-dice")
-    s1 = {"grundmenge": "Partien je Klasse (100), Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
-          "policy": lz_p, "policy_dice": lz_w}
-    if lz_p and lz_w and lz_p.get("s_je_partie") and lz_w.get("s_je_partie"):
-        s1["mehrkosten_w"] = lz_w["s_je_partie"] / lz_p["s_je_partie"] - 1.0
-        s1["leseregel"] = "haelt (<= +25 %)" if s1["mehrkosten_w"] <= 0.25 else "Nutzer-Entscheid (> +25 %)"
-    s1["erzwungene_platten_je_partie"] = float(np.mean([g["forced"] for g in wg])) if wg else None
-    s1["platzwahl_records_je_partie"] = float(np.mean([g["places"] for g in wg])) if wg else None
-    out["S1"] = s1
+    wa = {"kl": np.array([])}
+    if not args.skip_s2:
+        wf, wa, wg, _ = read_class(args.dice_class, "dome_dice_side")
+        lz_p, lz_w = manifest_runtime(data, "policy"), manifest_runtime(data, args.dice_class)
+        out["dice_class"] = args.dice_class
+        s1 = {"grundmenge": "Partien je Klasse (100), Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
+              "policy": lz_p, "policy_dice": lz_w}
+        if lz_p and lz_w and lz_p.get("s_je_partie") and lz_w.get("s_je_partie"):
+            s1["mehrkosten_w"] = lz_w["s_je_partie"] / lz_p["s_je_partie"] - 1.0
+            s1["leseregel"] = "haelt (<= +25 %)" if s1["mehrkosten_w"] <= 0.25 else "Nutzer-Entscheid (> +25 %)"
+        s1["erzwungene_platten_je_partie"] = float(np.mean([g["forced"] for g in wg])) if wg else None
+        s1["platzwahl_records_je_partie"] = float(np.mean([g["places"] for g in wg])) if wg else None
+        out["S1"] = s1
 
-    s2 = {"grundmenge": ("Drafting-Records R1-4 (Ziel >= 2 IDs, ohne Platzwahl-Records); W-Klasse nur NACH der ersten "
-                         "erzwungenen Platte (forced_domes_before >= 1); Bezug alle Sockel-Records derselben Runden"),
-          "einheit": "KL(Ziel || Prior des Generators) je Record, Median; CI Block-Bootstrap ueber Dateien"}
-    base_bf = by_file(pa, np.ones(len(pa["kl"]), bool), "kl", len(pf))
-    s2["sockel"] = {"n": int(len(pa["kl"])), "median": float(np.median(pa["kl"]))}
-    for sname, side in (("W", 0), ("G", 1)):
-        m = (wa["side"] == side) & (wa["fdb"] >= 1)
-        bf = by_file(wa, m, "kl", len(wf))
-        ci = boot_diff_ci(bf, base_bf, np.median, rng)
-        s2[sname] = {"n": int(m.sum()), "median": float(np.median(wa["kl"][m])) if m.any() else None,
-                     "median_diff_gegen_sockel": (float(np.median(wa["kl"][m]) - np.median(pa["kl"])) if m.any() else None),
-                     "ci95": ci, "lesart": ("andere Stellungen (hoeher)" if ci and ci[0] > 0
-                                else "niedriger" if ci and ci[1] < 0 else "nicht nachweisbar anders")}
-        s2[sname]["je_runde"] = {str(r): float(np.median(wa["kl"][m & (wa["round"] == r)]))
-                                 for r in ROUNDS if (m & (wa["round"] == r)).any()}
-    out["S2"] = s2
+        s2 = {"grundmenge": ("Drafting-Records R1-4 (Ziel >= 2 IDs, ohne Platzwahl-Records); W-Klasse nur NACH der ersten "
+                             "erzwungenen Platte (forced_domes_before >= 1); Bezug alle Sockel-Records derselben Runden"),
+              "einheit": "KL(Ziel || Prior des Generators) je Record, Median; CI Block-Bootstrap ueber Dateien"}
+        base_bf = by_file(pa, np.ones(len(pa["kl"]), bool), "kl", len(pf))
+        s2["sockel"] = {"n": int(len(pa["kl"])), "median": float(np.median(pa["kl"]))}
+        for sname, side in (("W", 0), ("G", 1)):
+            m = (wa["side"] == side) & ((wa["dphase"] == 0) if args.post_dice_phase else (wa["fdb"] >= 1))
+            bf = by_file(wa, m, "kl", len(wf))
+            ci = boot_diff_ci(bf, base_bf, np.median, rng)
+            s2[sname] = {"n": int(m.sum()), "median": float(np.median(wa["kl"][m])) if m.any() else None,
+                         "median_diff_gegen_sockel": (float(np.median(wa["kl"][m]) - np.median(pa["kl"])) if m.any() else None),
+                         "ci95": ci, "lesart": ("andere Stellungen (hoeher)" if ci and ci[0] > 0
+                                    else "niedriger" if ci and ci[1] < 0 else "nicht nachweisbar anders")}
+            s2[sname]["je_runde"] = {str(r): float(np.median(wa["kl"][m & (wa["round"] == r)]))
+                                     for r in ROUNDS if (m & (wa["round"] == r)).any()}
+        out["S2"] = s2
 
-    s3 = {"grundmenge": "Partien (Siegquote/Punkte/Marge) bzw. Drafting-Records (Brier, Versatz) der Klasse policy-dice",
-          "partien": side_game_stats(wg, len(wf)),
-          "W": calibration(wa, len(wf), 0), "G": calibration(wa, len(wf), 1),
-          "sockel_brier": float(((pa["p"] - pa["win"]) ** 2).mean()),
-          "gezahlte_wuerfelpunkte_je_partie": float(np.mean([g["paid"] for g in wg])) if wg else None}
-    flags = []
-    for sname in ("W", "G"):
-        c = s3[sname]
-        if c is None:
-            continue
-        if c["brier"] - s3["sockel_brier"] > 0.01:
-            flags.append(f"{sname}: Brier {c['brier']:.4f} > Sockel + 0,01")
-        ci = c["versatz_ci95"]
-        if ci and (ci[0] > 0 or ci[1] < 0) and abs(c["versatz"]) > 0.03:
-            flags.append(f"{sname}: Versatz {c['versatz']:+.4f} (CI ohne 0, |x| > 0,03)")
-    s3["leseregel"] = flags or ["keine Verzerrung nach den Leseregeln, alle Wertziele bleiben"]
-    out["S3"] = s3
+        post = (wa["dphase"] == 0) if args.post_dice_phase else None
+        s3 = {"grundmenge": "Partien (Siegquote/Punkte/Marge) bzw. Drafting-Records (Brier, Versatz) der Klasse policy-dice",
+              "partien": side_game_stats(wg, len(wf)),
+              "W": calibration(wa, len(wf), 0, post), "G": calibration(wa, len(wf), 1, post),
+              "nur_nach_wuerfelphase": bool(args.post_dice_phase),
+              "sockel_brier": float(((pa["p"] - pa["win"]) ** 2).mean()),
+              "gezahlte_wuerfelpunkte_je_partie": float(np.mean([g["paid"] for g in wg])) if wg else None}
+        flags = []
+        for sname in ("W", "G"):
+            c = s3[sname]
+            if c is None:
+                continue
+            if c["brier"] - s3["sockel_brier"] > 0.01:
+                flags.append(f"{sname}: Brier {c['brier']:.4f} > Sockel + 0,01")
+            ci = c["versatz_ci95"]
+            if ci and (ci[0] > 0 or ci[1] < 0) and abs(c["versatz"]) > 0.03:
+                flags.append(f"{sname}: Versatz {c['versatz']:+.4f} (CI ohne 0, |x| > 0,03)")
+        s3["leseregel"] = flags or ["keine Verzerrung nach den Leseregeln, alle Wertziele bleiben"]
+        out["S3"] = s3
 
     # --- S4 ------------------------------------------------------------------------------------
     s4 = {"grundmenge": "je lambda 100 Partien policy-aggr (w = 0,1); own_q_gap ueber Drafting-Records der S-Seite",
           "stufen": {}}
-    for cls, lam in AGGR_CLASSES:
+    for cls, lam in (() if args.skip_s4 else AGGR_CLASSES):
         af, aa, agm, og = read_class(cls, "aggr_side")
         st = side_game_stats(agm, len(af))
         s4["stufen"][str(lam)] = {
@@ -274,7 +294,7 @@ def main() -> None:
                            "q75": float(np.percentile(og, 75)), "anteil_le_0": float((og <= 0).mean())}
                           if og.size else None),
             "laufzeit": manifest_runtime(data, cls)}
-    base = s4["stufen"].get("0.0")
+    base = s4["stufen"].get("0.0") if not args.skip_s4 else None
     chosen = None
     if base:
         for _cls, lam in AGGR_CLASSES:
@@ -289,12 +309,44 @@ def main() -> None:
     s4["leseregel"] = ("groesstes lambda mit Stoerer-Siegquote >= lambda-0-Wert - 5 Prozentpunkte UND weniger G-Punkten; "
                        "eps = Median own_q_gap bei diesem lambda" + ("" if chosen is not None else
                        " -- KEINE Stufe senkt die G-Punkte: Stoerer in dieser Form wirkungslos, Nutzer-Entscheid"))
-    out["S4"] = s4
+    if not args.skip_s4:
+        out["S4"] = s4
+    # --- S4b (par.5c): lexikografischer Stoerer, eps-Stufen ----------------------------------------
+    if args.aggr_classes:
+        sock_pts = float(np.mean([x for g in pg for x in g["scores"]])) if pg else None
+        s4b = {"grundmenge": "je eps 100 Partien policy-aggr-eXX; aggr_switched/aggr_opp_drop_pts ueber Drafting-Records "
+                             "der S-Seite mit echter Suche; Bezug Punkte je Seite in `policy` (G gegen G)",
+               "policy_punkte_je_seite": sock_pts, "policy_laufzeit": manifest_runtime(data, "policy"), "stufen": {}}
+        levels = []
+        for item in args.aggr_classes.split(","):
+            cls, lvl = item.split(":")
+            af, aa, agm, og = read_class(cls, "aggr_side")
+            dis = read_class.disrupt
+            st = side_game_stats(agm, len(af))
+            s4b["stufen"][lvl] = {
+                "klasse": cls, "partien": st, "S": calibration(aa, len(af), 0), "G": calibration(aa, len(af), 1),
+                "anteil_switched": float(np.mean(dis["switched"])) if dis["switched"] else None,
+                "opp_drop_pts_mittel": float(np.mean(dis["drop"])) if dis["drop"] else None,
+                "n_s_records": len(dis["switched"]),
+                "own_q_gap": ({"n": int(og.size), "median": float(np.median(og)), "q75": float(np.percentile(og, 75)),
+                               "max": float(og.max())} if og.size else None),
+                "laufzeit": manifest_runtime(data, cls)}
+            levels.append(lvl)
+        chosen_eps = None
+        for lvl in sorted(levels, key=float):
+            stg = s4b["stufen"][lvl]["partien"]
+            if (sock_pts is not None and stg["sonderseite"]["siegquote"] >= 0.45
+                    and stg["G"]["punkte"] < sock_pts - 2.0):
+                chosen_eps = lvl
+        s4b["gewaehltes_eps"] = chosen_eps
+        s4b["leseregel"] = ("groesstes eps mit S-Siegquote >= 0,45 UND G-Punkten mindestens 2 unter dem Mittel je Seite in "
+                            "`policy`" + ("" if chosen_eps else " -- KEINE Stufe erfuellt das: Nutzer-Entscheid"))
+        out["S4b"] = s4b
     out["laufzeit"] = laufzeit_block(t_start, cpu_start=c_start, threads=torch.get_num_threads(),
                                      n_units=len(pa["kl"]) + len(wa["kl"]), unit="zustand")
     Path(BASE_DIR / args.out).parent.mkdir(parents=True, exist_ok=True)
     json.dump(out, open(BASE_DIR / args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(json.dumps({k: out[k] for k in ("S1",)}, ensure_ascii=False, indent=1), flush=True)
+    print(json.dumps({k: out[k] for k in ("S1", "S4b") if k in out}, ensure_ascii=False, indent=1)[:4000], flush=True)
     print(f"Ergebnis: {args.out} ({time.monotonic() - t_start:.1f} s)", flush=True)
 
 

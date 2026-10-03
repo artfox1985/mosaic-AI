@@ -163,6 +163,21 @@ def _mask_dice_trigger_key() -> bool:
     return os.environ.get("MOSAIC_MASK_DICE_TRIGGER") == "1"
 
 
+def _mask_dice_phase_value_key() -> bool:
+    """Liest `MOSAIC_MASK_DICE_PHASE_VALUE` fuer BEIDE Cache-Schluessel (Klasse W).
+
+    `PREREG_asymmetric_selfplay.md` par.5d (Eroeffnungs-Wuerfel): Records aus der
+    Wuerfelphase (`dice_phase: true`, beide Seiten) bekommen KEIN Wertziel. Mit
+    Knopf schreibt die Bauschleife das Zusatzfeld `value_weights` (0 auf diesen
+    Records, sonst 1), train.py nimmt es in den Gewichtsweg der Wertverluste. Das
+    aendert den BLOCK-Inhalt, also beide Schluessel
+    (`feedback_feature_knob_belongs_in_both_cache_keys`). Exakt "1", nichts sonst;
+    nur dann ein Marker, ohne Knopf bleibt jeder vorhandene Schluessel.
+    """
+    import os
+    return os.environ.get("MOSAIC_MASK_DICE_PHASE_VALUE") == "1"
+
+
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
                        conjunction_head: bool, bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
@@ -317,4 +332,7 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
         material += "|aggrownq_eps" + _aggr_eps + "_v1"
     if _mask_dice_trigger_key():
         material += "|maskdicetrigger_v1"
+    # par.5d: Wertmaske der Wuerfelphase (Zusatzfeld `value_weights` im Block).
+    if _mask_dice_phase_value_key():
+        material += "|maskdicephasevalue_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

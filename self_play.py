@@ -69,10 +69,14 @@ RECIPE_RESERVED_ENV = {
     # Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a).
     "MOSAIC_DOME_DICE": "dome_dice",
     "MOSAIC_DOME_DICE_SIMS": "dome_dice_sims",
+    # Eroeffnungs-Wuerfel (PREREG_asymmetric_selfplay.md par.5d).
+    "MOSAIC_DOME_DICE_LAST_ROUND": "dome_dice_last_round",
     # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a).
     "MOSAIC_AGGR_SIDE": "aggr_side",
     "MOSAIC_AGGR_SIDE_W": "aggr_side_w",
     "MOSAIC_AGGR_SIDE_LAMBDA": "aggr_side_lambda",
+    # Klasse S, Modus B (PREREG_asymmetric_selfplay.md par.5c).
+    "MOSAIC_AGGR_SIDE_EPS": "aggr_side_eps",
 }
 
 _RECIPE_PRE = None
@@ -220,9 +224,9 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       start_slot_random_p=0.0, return_order_random_p=0.0,
                       tie_mirror_p=None, label_rng_split=False,
                       excursion_reshuffle=False, excursion_kl_weight=False,
-                      dome_dice=False, dome_dice_sims=600,
+                      dome_dice=False, dome_dice_sims=600, dome_dice_last_round=4,
                       aggr_side=False, aggr_side_w=0.1, aggr_side_lambda=None,
-                      engine_config_only=False):
+                      aggr_side_eps=None, engine_config_only=False):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -303,6 +307,11 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     Partie. `MOSAIC_AGGR_SIDE` und `MOSAIC_AGGR_SIDE_W` IMMER gesetzt,
     `MOSAIC_AGGR_SIDE_LAMBDA` nur bei gegebenem Wert (Rust kennt bewusst keinen
     lambda-Default); Doppelquellen faengt `generate_data` vorher ab.
+    `aggr_side_eps` (Klasse S, Modus B, par.5c): mit Wert wird
+    `MOSAIC_AGGR_SIDE_EPS` gesetzt und `MOSAIC_AGGR_SIDE_W` ENTFERNT (Rust
+    lehnt ein gesetztes W in Modus B ab, `self_play.rs
+    resolve_aggr_side_params`); lambda kommt dann nicht vor (generate_data
+    lehnt die Kombination ab).
     `engine_config_only` (Rezept-Waechter, `check_engine_config`): nach dem
     Setzen der Umgebung und dem Import NUR `engine_config_json()` melden und
     ohne Partie enden -- so sieht der Waechter genau die Konfiguration, die ein
@@ -332,11 +341,17 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     # Klasse W: immer gesetzt (siehe Docstring), Rust liest per OnceLock.
     os.environ["MOSAIC_DOME_DICE"] = "1" if dome_dice else "0"
     os.environ["MOSAIC_DOME_DICE_SIMS"] = str(dome_dice_sims)
-    # Klasse S: wie Klasse W immer gesetzt, lambda nur mit Wert.
+    # par.5d: ebenso immer gesetzt; Rust liest sie nur bei MOSAIC_DOME_DICE=1.
+    os.environ["MOSAIC_DOME_DICE_LAST_ROUND"] = str(dome_dice_last_round)
+    # Klasse S: wie Klasse W immer gesetzt, lambda nur mit Wert. Modus B
+    # (par.5c): eps gesetzt, W entfernt (dort verboten), lambda nie.
     os.environ["MOSAIC_AGGR_SIDE"] = "1" if aggr_side else "0"
     os.environ["MOSAIC_AGGR_SIDE_W"] = repr(float(aggr_side_w))
     if aggr_side_lambda is not None:
         os.environ["MOSAIC_AGGR_SIDE_LAMBDA"] = repr(float(aggr_side_lambda))
+    if aggr_side_eps is not None:
+        os.environ["MOSAIC_AGGR_SIDE_EPS"] = repr(float(aggr_side_eps))
+        os.environ.pop("MOSAIC_AGGR_SIDE_W", None)
     try:
         import mosaic_rust as mr
         if engine_config_only:
@@ -449,9 +464,9 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           tie_mirror_p=None, label_rng_split=False,
                           excursion_reshuffle=False,
                           excursion_kl_weight=False,
-                          dome_dice=False, dome_dice_sims=600,
+                          dome_dice=False, dome_dice_sims=600, dome_dice_last_round=4,
                           aggr_side=False, aggr_side_w=0.1,
-                          aggr_side_lambda=None) -> str | None:
+                          aggr_side_lambda=None, aggr_side_eps=None) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -472,7 +487,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               excursion_prob, excursion_profile, start_slot_random_p,
               return_order_random_p, tie_mirror_p, label_rng_split,
               excursion_reshuffle, excursion_kl_weight, dome_dice, dome_dice_sims,
-              aggr_side, aggr_side_w, aggr_side_lambda),
+              dome_dice_last_round, aggr_side, aggr_side_w, aggr_side_lambda, aggr_side_eps),
     )
     proc.start()
     t_start = time.time()
@@ -586,9 +601,11 @@ def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
             "excursion_kl_weight": knobs.get("excursion_kl_weight", False),
             "dome_dice": knobs.get("dome_dice", False),
             "dome_dice_sims": knobs.get("dome_dice_sims", 600),
+            "dome_dice_last_round": knobs.get("dome_dice_last_round", 4),
             "aggr_side": knobs.get("aggr_side", False),
             "aggr_side_w": knobs.get("aggr_side_w", 0.1),
             "aggr_side_lambda": knobs.get("aggr_side_lambda"),
+            "aggr_side_eps": knobs.get("aggr_side_eps"),
             "engine_config_only": True,
         },
     )
@@ -671,9 +688,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   excursion_kl_weight: bool = False,
                   dome_dice: bool = False,
                   dome_dice_sims: int = 600,
+                  dome_dice_last_round: int = 4,
                   aggr_side: bool = False,
                   aggr_side_w: float = 0.1,
                   aggr_side_lambda: float | None = None,
+                  aggr_side_eps: float | None = None,
                   recipe_info: dict | None = None):
     # `recipe_info` (Rezeptdatei, docs/working_rules.md): None ohne Rezept,
     # sonst {"recipe": Recipe, "class": str|None, "overrides": dict} aus
@@ -790,6 +809,13 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # still als G-G laeuft, waere ein falsch etikettierter Korpus.
     if dome_dice_sims < 1:
         raise SystemExit(f"❌ --dome-dice-sims muss >= 1 sein, ist {dome_dice_sims}.")
+    # par.5d (Eroeffnungs-Wuerfel): Bereich wie Rust (self_play.rs
+    # parse_dome_dice_last_round), 4 = alle Plattenrunden (Bestand).
+    if not (1 <= dome_dice_last_round <= 4):
+        raise SystemExit(f"❌ --dome-dice-last-round muss 1..4 sein, ist {dome_dice_last_round}.")
+    if dome_dice_last_round != 4 and not dome_dice:
+        raise SystemExit(f"❌ --dome-dice-last-round={dome_dice_last_round} wirkt nur mit --dome-dice "
+                         "(ohne Klasse W waere der Knopf still wirkungslos).")
     if dome_dice and mode != "network":
         raise SystemExit("❌ --dome-dice wirkt nur bei --mode network (die Platzsuche braucht das Netz).")
     # F8 (par.3a): Ausflug und Wuerfel nie zusammen -- ein Ausflug erbte die
@@ -802,7 +828,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # Doppelquelle wie oben: der Worker setzt beide Variablen immer; eine
     # abweichende geerbte Variable wuerde still ueberschrieben.
     for _env, _want in (("MOSAIC_DOME_DICE", "1" if dome_dice else "0"),
-                        ("MOSAIC_DOME_DICE_SIMS", str(dome_dice_sims))):
+                        ("MOSAIC_DOME_DICE_SIMS", str(dome_dice_sims)),
+                        ("MOSAIC_DOME_DICE_LAST_ROUND", str(dome_dice_last_round))):
         _have = os.environ.get(_env)
         if _have is not None and _have != _want:
             raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
@@ -814,8 +841,19 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         raise SystemExit(f"❌ --aggr-side-w muss in [0, 1] liegen, ist {aggr_side_w}.")
     if aggr_side_lambda is not None and not (0.0 <= aggr_side_lambda <= 5.0):
         raise SystemExit(f"❌ --aggr-side-lambda muss in [0, 5] liegen, ist {aggr_side_lambda}.")
-    if aggr_side and aggr_side_lambda is None:
-        raise SystemExit("❌ --aggr-side verlangt --aggr-side-lambda (kein Default: lambda ist die "
+    # Modus B (PREREG_asymmetric_selfplay.md par.5c): eps statt lambda/w. Bereich und
+    # Ausschluss wie Rust (self_play.rs parse_aggr_side_eps, resolve_aggr_side_params).
+    if aggr_side_eps is not None and not (0.0 <= aggr_side_eps <= 1.0):
+        raise SystemExit(f"❌ --aggr-side-eps muss in [0, 1] liegen, ist {aggr_side_eps}.")
+    if aggr_side_eps is not None and aggr_side_lambda is not None:
+        raise SystemExit("❌ --aggr-side-eps (Modus B, lexikografisch an der Wurzel) und "
+                         "--aggr-side-lambda (Blend am Blatt) schliessen sich aus (par.5c).")
+    if aggr_side_eps is not None and aggr_side_w != 0.1:
+        raise SystemExit(f"❌ --aggr-side-eps mischt nicht am Blatt; --aggr-side-w={aggr_side_w} "
+                         "waere wirkungslos und ist verboten (par.5c).")
+    if aggr_side and aggr_side_lambda is None and aggr_side_eps is None:
+        raise SystemExit("❌ --aggr-side verlangt --aggr-side-lambda oder --aggr-side-eps (kein "
+                         "Default: lambda ist die "
                          "Laufvariable des Pilots S4, PREREG_asymmetric_selfplay.md par.3a FS2).")
     if aggr_side and mode != "network":
         raise SystemExit("❌ --aggr-side wirkt nur bei --mode network (der Blend sitzt in der Netzsuche).")
@@ -826,14 +864,19 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                          "(wie F8, PREREG_asymmetric_selfplay.md par.3a): Ausfluege bleiben in der "
                          "G-G-Klasse value-excursion.")
     _aggr_lambda_want = None if aggr_side_lambda is None else repr(float(aggr_side_lambda))
+    _aggr_eps_want = None if aggr_side_eps is None else repr(float(aggr_side_eps))
+    # Modus B: der Worker entfernt W, eine geerbte Variable waere also eine
+    # Doppelquelle (Rust lehnt ein gesetztes W in Modus B ab).
+    _aggr_w_want = None if aggr_side_eps is not None else repr(float(aggr_side_w))
     for _env, _want in (("MOSAIC_AGGR_SIDE", "1" if aggr_side else "0"),
-                        ("MOSAIC_AGGR_SIDE_W", repr(float(aggr_side_w))),
-                        ("MOSAIC_AGGR_SIDE_LAMBDA", _aggr_lambda_want)):
+                        ("MOSAIC_AGGR_SIDE_W", _aggr_w_want),
+                        ("MOSAIC_AGGR_SIDE_LAMBDA", _aggr_lambda_want),
+                        ("MOSAIC_AGGR_SIDE_EPS", _aggr_eps_want)):
         _have = os.environ.get(_env)
         if _have is not None and _have != _want:
             raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
-                             f"(--aggr-side/--aggr-side-w/--aggr-side-lambda -> {_want!r}); "
-                             "Variable entfernen.")
+                             f"(--aggr-side/--aggr-side-w/--aggr-side-lambda/--aggr-side-eps "
+                             f"-> {_want!r}); Variable entfernen.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -896,8 +939,10 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                 "excursion_reshuffle": excursion_reshuffle,
                 "excursion_kl_weight": excursion_kl_weight,
                 "dome_dice": dome_dice, "dome_dice_sims": dome_dice_sims,
+                "dome_dice_last_round": dome_dice_last_round,
                 "aggr_side": aggr_side, "aggr_side_w": aggr_side_w,
                 "aggr_side_lambda": aggr_side_lambda,
+                "aggr_side_eps": aggr_side_eps,
             })
     if recipe_info is not None:
         if _expected:
@@ -966,16 +1011,21 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "excursion_kl_weight": excursion_kl_weight,
         # Klasse W (PREREG_asymmetric_selfplay.md par.2): Erzeugungs-Knoepfe wie die
         # Zeilen darueber; die engine_config des Chunk-Prozesses meldet dazu
-        # `dome_dice`, `dome_dice_sims`, `dome_dice_caps` und (par.3b) die
+        # `dome_dice`, `dome_dice_sims`, `dome_dice_source_rule` und (par.3b) die
         # Baum-Regel `dome_dice_tree_rule`.
         "dome_dice": dome_dice,
         "dome_dice_sims": dome_dice_sims,
+        # par.5d: letzte Wuerfelrunde (engine_config meldet `dome_dice_last_round`,
+        # null ohne Klasse W).
+        "dome_dice_last_round": dome_dice_last_round,
         # Klasse S (PREREG_asymmetric_selfplay.md par.3): die engine_config des
         # Chunk-Prozesses meldet dazu `aggr_side`, `aggr_side_w`,
-        # `aggr_side_lambda` und `aggr_own_q_gap_n_min_rule`.
+        # `aggr_side_lambda` und `aggr_own_q_gap_n_min_rule`; Modus B (par.5c)
+        # dazu `aggr_side_eps` und `aggr_side_mode`.
         "aggr_side": aggr_side,
         "aggr_side_w": aggr_side_w,
         "aggr_side_lambda": aggr_side_lambda,
+        "aggr_side_eps": aggr_side_eps,
     }, recipe=_recipe_block, engine_config=_worker_cfg)
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -1036,10 +1086,17 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     else:
         start_slot_status = "AUS (Standard)"
     dome_dice_status = (f"AN: eine Seite je Partie wuerfelt Platte/Tiefe/Rotation, Platzsuche "
-                        f"{dome_dice_sims} Sims deterministisch (Klasse W)" if dome_dice
+                        f"{dome_dice_sims} Sims deterministisch, bis Runde {dome_dice_last_round} "
+                        f"(Klasse W)" if dome_dice
                         else "AUS (Standard)")
-    aggr_side_status = (f"AN: eine Seite je Partie stoert, w {aggr_side_w}, lambda {aggr_side_lambda} "
-                        f"(Klasse S)" if aggr_side else "AUS (Standard)")
+    if not aggr_side:
+        aggr_side_status = "AUS (Standard)"
+    elif aggr_side_eps is not None:
+        aggr_side_status = (f"AN: eine Seite je Partie stoert, Modus B lexikografisch an der Wurzel, "
+                            f"eps {aggr_side_eps} (Klasse S, par.5c)")
+    else:
+        aggr_side_status = (f"AN: eine Seite je Partie stoert, w {aggr_side_w}, lambda {aggr_side_lambda} "
+                            f"(Klasse S)")
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
@@ -1100,7 +1157,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             excursion_reshuffle=excursion_reshuffle,
             excursion_kl_weight=excursion_kl_weight,
             dome_dice=dome_dice, dome_dice_sims=dome_dice_sims,
+            dome_dice_last_round=dome_dice_last_round,
             aggr_side=aggr_side, aggr_side_w=aggr_side_w, aggr_side_lambda=aggr_side_lambda,
+            aggr_side_eps=aggr_side_eps,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1487,6 +1546,13 @@ if __name__ == "__main__":
                         help="Klasse W: Sim-Budget der Platzsuche des erzwungenen Plattenzugs "
                              "(Prereg par.2: 600). Setzt MOSAIC_DOME_DICE_SIMS; wirkt nur mit "
                              "--dome-dice.")
+    parser.add_argument("--dome-dice-last-round", dest="dome_dice_last_round", type=int, default=4,
+                        help="PREREG_asymmetric_selfplay.md par.5d (Eroeffnungs-Wuerfel): letzte "
+                             "Runde 1..4, in der die Wuerfel-Seite wuerfelt; danach legt sie Platten "
+                             "normal, auch im Suchbaum. Default 4 = alle Plattenrunden (Bestand). "
+                             "Record-Feld dice_phase (Runde <= Grenze) auf jedem Record einer "
+                             "W-Partie. Setzt MOSAIC_DOME_DICE_LAST_ROUND; nur mit --dome-dice "
+                             "von 4 verschieden.")
     parser.add_argument("--aggr-side", dest="aggr_side", action="store_true",
                         help="PREREG_asymmetric_selfplay.md par.3/par.3a, Klasse S (Stoerer): je "
                              "Partie ist EINE Seite der Stoerer (Hash aus dem Partie-Seed; mit "
@@ -1496,7 +1562,8 @@ if __name__ == "__main__":
                              "Siegwert; Startsetzung und Tiling unvermischt. Record-Felder "
                              "aggr_side (jeder Record) und own_q_gap (Drafting-Records der "
                              "Stoerer-Seite). Setzt MOSAIC_AGGR_SIDE=1 (ohne Flag 0). Nur --mode "
-                             "network, verlangt --aggr-side-lambda, nicht mit --excursion-prob > 0.")
+                             "network, verlangt --aggr-side-lambda oder --aggr-side-eps, nicht mit "
+                             "--excursion-prob > 0.")
     parser.add_argument("--aggr-side-w", dest="aggr_side_w", type=float, default=0.1,
                         help="Klasse S: Mischgewicht w des Stoerers in [0, 1] (FS2: fest 0,1). "
                              "Setzt MOSAIC_AGGR_SIDE_W; wirkt nur mit --aggr-side.")
@@ -1504,6 +1571,15 @@ if __name__ == "__main__":
                         help="Klasse S: Gegnerpunkte-Abzug lambda in [0, 5], PFLICHT mit "
                              "--aggr-side (kein Default, Pilot S4). Setzt "
                              "MOSAIC_AGGR_SIDE_LAMBDA; wirkt nur bei w > 0.")
+    parser.add_argument("--aggr-side-eps", dest="aggr_side_eps", type=float, default=None,
+                        help="Klasse S, Modus B (PREREG_asymmetric_selfplay.md par.5c): "
+                             "lexikografischer Stoerer an der Wurzel. Budget eps in [0, 1] an "
+                             "eigenem Siegwert; unter den Halving-Ueberlebenden mit Q_own >= "
+                             "Q_best - eps spielt der Stoerer den Zug mit den wenigsten "
+                             "prognostizierten Gegnerpunkten, ohne Blend am Blatt. Statt "
+                             "--aggr-side-lambda (nicht zusammen; --aggr-side-w bleibt auf dem "
+                             "Default). Setzt MOSAIC_AGGR_SIDE_EPS und entfernt "
+                             "MOSAIC_AGGR_SIDE_W im Worker; wirkt nur mit --aggr-side.")
     # Rezeptdatei: EIN zusaetzlicher Schritt statt `parser.parse_args()`. Ohne
     # --recipe ist `apply_to_parser` ein normaler parse_args (plus die zwei
     # Flags --recipe/--class), `_recipe_overrides` bleibt leer.
@@ -1584,9 +1660,11 @@ if __name__ == "__main__":
         excursion_kl_weight=args.excursion_kl_weight,
         dome_dice=args.dome_dice,
         dome_dice_sims=args.dome_dice_sims,
+        dome_dice_last_round=args.dome_dice_last_round,
         aggr_side=args.aggr_side,
         aggr_side_w=args.aggr_side_w,
         aggr_side_lambda=args.aggr_side_lambda,
+        aggr_side_eps=args.aggr_side_eps,
         recipe_info=(None if _RECIPE_PRE is None else
                      {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
                       "overrides": _recipe_overrides}),

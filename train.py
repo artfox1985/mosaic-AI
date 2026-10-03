@@ -458,6 +458,12 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
         # E2-Arm: mit aktivem Knopf haengt das Dataset die Endmarge als LETZTES
         # Element an (corpus_dataset.py, `final_margin`); hier abgetrennt, damit
         # das Entpacken darunter unveraendert bleibt. Ohne Knopf: kein Zugriff.
+        # par.5d (PREREG_asymmetric_selfplay.md, MOSAIC_MASK_DICE_PHASE_VALUE):
+        # das Wertgewicht steht HINTER der Endmarge, wird also zuerst abgetrennt.
+        s_value_w = None
+        if getattr(dataset, "value_weights", None) is not None:
+            s_value_w = _batch[-1]
+            _batch = _batch[:-1]
         s_final_margin = None
         if loss_setup.margin_log_scale is not None:
             s_final_margin = _batch[-1]
@@ -591,6 +597,14 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
             # statt Lernen.
             w = w * w_surp
         p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
+        # par.5d: Wertmaske der Wuerfelphase. Faltet das Wertgewicht in `rw`,
+        # NACHDEM das Policy-Gewicht `w` gebildet ist -- ab hier wirkt `rw` nur
+        # noch auf die Wert-artigen Verluste (Wert/WDL, Margen-Schwellen, Punkte,
+        # Gegnerpunkte), genau der Weg von --exclude-round5. Ohne Feld `None`,
+        # `rw` bleibt unberuehrt (Bestand byte-identisch).
+        if s_value_w is not None:
+            _vw = s_value_w.to(device).float().view(-1)
+            rw = _vw if rw is None else rw * _vw
 
         # Moon-Order Loss direkt zu Policy-Loss, seit --moon-loss-weight mit
         # EINEM Hyperparameter (Default 1.0 = Bestandsverhalten).
@@ -845,6 +859,11 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
                 # E2-Arm: Endmarge als letztes Element abtrennen (wie im
                 # Trainingsdurchgang); der Val-Cache traegt sie unter demselben
                 # Knopf (Fenster-Schluessel `+finalmargin_v1`).
+                # par.5d: Wertgewicht steht dahinter, also zuerst abtrennen.
+                v_value_w = None
+                if getattr(val_dataset, "value_weights", None) is not None:
+                    v_value_w = _v_batch[-1]
+                    _v_batch = _v_batch[:-1]
                 v_final_margin = None
                 if loss_setup.margin_log_scale is not None:
                     v_final_margin = _v_batch[-1]
@@ -910,6 +929,11 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
                 v_rw = (v_rounds.to(device) != 5).float() if loss_setup.exclude_round5 else None
                 v_w = v_pol_w if v_rw is None else v_pol_w * v_rw
                 v_p_loss = (v_per_sample_ce * v_w).sum() / v_w.sum().clamp(min=1e-6)
+                # par.5d: wie im Trainingsdurchgang -- Wertgewicht NACH dem
+                # Policy-Gewicht in `v_rw` falten (nur Wert-artige Verluste).
+                if v_value_w is not None:
+                    _v_vw = v_value_w.to(device).float().view(-1)
+                    v_rw = _v_vw if v_rw is None else v_rw * _v_vw
                 # Task #12, WICHTIG: der VALIDIERUNGS-Punkteverlust bleibt
                 # auch bei aktivem Verteilungs-Kopf MSE auf dem
                 # ERWARTUNGSWERT -- absichtlich NICHT die Kreuzentropie des

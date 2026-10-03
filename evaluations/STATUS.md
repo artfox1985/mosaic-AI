@@ -18,14 +18,45 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**NICHTS LAEUFT. FERTIG 2026-10-03 abends: asymmetrisches Self-Play gebaut und besondet**
-(`PREREG_asymmetric_selfplay.md` par.3d, par.5a; Wheel `59f32a16`, Anker-Invarianz gruen). W bekommt je
-Plattenentscheid eine zugewiesene Platte, der Baum kennt die Regel. Sonden S1-S4 (je 100 Partien, Artefakt
-`evaluations/artifacts/asym_probes_s1_s4.json`): W kostet +7,2 %, gewinnt 25 % [16; 35], zahlt 8,15
-Wuerfelpunkte je Partie; Wertziele beider Seiten verzerrt (Versatz W +0,109, G -0,136, schrumpft mit
-`forced_domes_before`); W-Stellungen nicht ueberraschender (KL -0,082); Stoerer schwach (Regel waehlt
-lambda 0,5, eps 0; G verliert nur 0,7 Punkte). **Wartet auf Nutzer-Entscheid:** Wertziel-Maske fuer W-Partien,
-Nachjustieren von W/S, danach Sockel-Rezept und Erzeugung.
+**UEBERGABE 2026-10-03 kurz vor Mitternacht (Nutzer: *"mach mir dann ein update in status.md, ich mach in
+einer anderen sitzung weiter"*). NICHTS LAEUFT.** Baum committet, nicht gepusht (Ahead-Stand im Commit-Log).
+Installiertes Wheel = S4b-Kette (23:05, Stand VOR Eroeffnungs-Wuerfel und VOR B-Reparatur); der Quelltext ist
+weiter, das naechste Wheel baut die Kette in Schritt 1.
+
+**Stand asymmetrisches Self-Play** (`PREREG_asymmetric_selfplay.md`, Kopf und par.5a-5e):
+* W in Vollform (alle Plattenrunden): verliert 75-77 %, Wertziele beider Seiten verzerrt (verborgene
+  kuenftige Wuerfelplatten, par.5a/5b1); neue Quellenregel (Auslage 1/2/3 oder Stapel oben, par.5b) aendert
+  daran nichts, kostet sauber gemessen +32,1 % je Partie.
+* **Gebaut, NICHT gemessen:** Eroeffnungs-Wuerfel (par.5d, Nutzer: nur EINE Seite wuerfelt, nur Runde 1
+  bzw. 1-2): Knopf `MOSAIC_DOME_DICE_LAST_ROUND`, zentrale Regel `in_dome_dice_phase` (self_play.rs), Record-
+  Feld `dice_phase`, Wertmaske `MOSAIC_MASK_DICE_PHASE_VALUE` (corpus_dataset.py + train.py, beide
+  Cache-Schluessel). Agenten-Tests: Lib 840 gruen, Python 110 OK.
+* Stoerer: Blend-Form (lambda) = bekannter Nullbefund aus Task #28; Form B (lexikografisch an der Wurzel)
+  war in S4b KONFUNDIERT (S spielte Q-gierig, 77-81 % Siege, par.5c1). **Repariert, NICHT gemessen** (par.5c2:
+  Bezugszug = Bestands-Wahl, Abweichung nur nach unten).
+* **Nebenbefund OFFEN (par.5e):** die Erzeugung waehlt ab `tau_argmax_from_move` per Besuchs-argmax mit
+  Gleichstand = erster Eintrag, ohne Q-Stichentscheid; Q-gierige Wahl gewann 77-81 %. Nichts gemessen.
+
+**ERSTE AUFGABE DER NEUEN SITZUNG**
+1. `bash tools/asym_s5_s4b2_chain.sh` als Hintergrundaufgabe (KEINE Pipe; Monitor auf die Ausgabedatei,
+   alle 30 min neu setzen). Inhalt: Lib-Suite, --no-run, Wheel, Anker-Drift/-Konservierung, dann je 100
+   Partien `policy-dice-r1`, `policy-dice-r2`, `policy-aggrb-e01/e02/e04` (Rezept
+   `models/v35_probes.recipe.json`), dann drei Auswertungen nach `evaluations/artifacts/asym_probe_s5_r1.json`,
+   `asym_probe_s5_r2.json`, `asym_probe_s4b2.json`. Kosten geschaetzt rund 45 min (5 x 5-7 min Partien, Build
+   und Tests rund 7 min, Auswertungen rund 5 min). Anker ROT = anhalten, Nutzer-Entscheid.
+2. Ergebnisse gegen die VORAB registrierten Leseregeln: S5 par.5d (|Versatz| nach der Wuerfelphase <= 0,03;
+   G-KL ueber Sockel), S4b neu par.5c2/par.5c (Siegquote S jetzt <= ~0,50; eps-Wahl). Registrieren (Prereg-
+   Kopf + Index), STATUS nachziehen, dem Nutzer berichten.
+3. Danach Nutzer-Entscheide: Zusammensetzung des Sockels (policy / Eroeffnungs-W / B) und Sockel-Rezept fuer
+   die v35-Erzeugung; ob par.5e (Zugwahl-Stichentscheid) zuerst untersucht wird (Vorschlag: Gleichstands-
+   Haeufigkeit zaehlen, dann ein A/B-Arm).
+
+**Freigaben und Verbote (woertlich bzw. stehend):** "Kein Push ohne Anweisung." "Jede Loeschung braucht
+restic-Beleg UND neue pfadgenaue Freigabe." Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
+Messungen exklusiv, ein Build ist Last, kein Commit waehrend eines Wanduhr-Laufs. "Mehrkosten sind kritisch
+abzuwaegen." "Stelle sicher dass du nichts faehrst was nicht schon bereits getestet wurde." Im Projektordner
+arbeiten, kein Worktree. Subagenten Opus medium, ihre Befunde nachpruefen. Offen beim Nutzer ausserdem:
+Server-Neustart fuer v34-b01 in der GUI; Review 2 #17-#19 nur auf Entscheid.
 
 **FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
 `PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
@@ -256,7 +287,7 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
 | Prereg | Was noch aussteht |
 | --- | --- |
 | `v35_window` | Schwarm erzeugt und abgenommen (par.9); Sockel nach dem asymmetrischen Bau; Fenster, Arme, Tore |
-| `asymmetric_selfplay` | v35: Bau, Sonden S1-S4, Zusammensetzung |
+| `asymmetric_selfplay` | S1-S4 und S4b registriert (par.5a-5c1); Eroeffnungs-W (par.5d) und B repariert (par.5c2) gebaut, Sonden S5/S4b neu offen; Nebenbefund Zugwahl par.5e |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
@@ -271,6 +302,8 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
 4. ~~Asymmetrisches Self-Play, offene Fragen~~ ENTSCHIEDEN 2026-10-03 (`PREREG_asymmetric_selfplay.md`
    par.3a, F6 abweichend: Platzsuche deterministisch). Naechster Schritt: Bau (Bauplan
    `asymmetric_selfplay_build_plan.md`), dann Sonden S1-S4.
+6. **Asym, nach S5/S4b neu:** Zusammensetzung des Sockels (policy / Eroeffnungs-W / Stoerer B) und
+   Sockel-Rezept der v35-Erzeugung; Zugwahl-Stichentscheid der Erzeugung untersuchen? (par.5e).
 5. **Aeltere, weiterhin offene Punkte** (Wortlaut im Archivkapitel vom 2026-10-01, Abschnitt 6):
    Budget-Knopf fuer die Hilfsknoten (Wirkung ungemessen); Gruppe B des Aufraeumens (Wrapper
    `resolve_and_apply_stack_draw`, drei Spec-Felder in `KNOWN_FIELDS`); R5/R4b-Sonden der

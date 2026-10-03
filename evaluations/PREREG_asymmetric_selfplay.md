@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: Gebaut (W mit zugewiesener Platte im Baum, par.3d; S). Sonden (par.5a): W kostet +7,2 %, W gewinnt 25 %, Wertziele verzerrt (Versatz W +0,109, G -0,136, Regel b); S schwach (lambda 0,5 nach Regel, G -0,7 Punkte). Masken- und Zusammensetzungs-Entscheid beim Nutzer. -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W in Vollform verliert 75-77 % mit verzerrten Wertzielen (par.5a/5b1); jetzt Eroeffnungs-Wuerfel R1/R1-2 mit Wertmaske gebaut, Sonde S5 offen (par.5d). Stoerer B war konfundiert (S Q-gierig, 77-81 %, par.5c1), repariert, S4b neu offen (par.5c2). Nebenbefund Zugwahl der Erzeugung offen (par.5e). -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -389,6 +389,161 @@ G-Punkte fallen bei lambda 0,5 nur um 0,69 gegen lambda 0, ohne CI; bei einer St
 Partie (HERLEITUNG) ist das Rauschen. Der Stoerer kostet sich selbst mehr als G (lambda 2: S -4,1, G -1,6).
 In dieser Form ist er schwach.
 Laufzeit der Auswertung 125,9 s.
+
+### par.5b NUTZER-ENTSCHEID 2026-10-03 nach den Sonden: neue Quellenregel fuer W (REGISTRIERT vor dem Lauf)
+
+Nutzer zu W (25 % Siege, par.5a): *"die kuppelplatten vom stapel werden eigentlich bereits ueber einen
+anderen knopf gestreut und bedient. mach die muenze fuer die platten wahl von [0-3] mit auslage 1, 2, 3 und
+stapel."* Umgesetzt (`self_play.rs` `roll_dome_dice`, `DOME_DICE_SOURCE_RULE`): die Quelle ist
+gleichverteilt ueber die belegten Auslageplaetze und die OBERSTE Stapelplatte (Tiefe 1, 1 Punkt). Ein leerer
+Auslageplatz (die Auslage wird erst zur naechsten Runde aufgefuellt, game.rs:1469) faellt weg, als wuerde
+der Vierer-Wuerfel dort neu geworfen (Koordinator-Lesart, dem Nutzer gemeldet). Die Tiefen-Obergrenzen
+R2 7 / R3 3 aus par.2 und die Muenze entfallen; die Rueckgabe-Muenze (F4) faellt mit Tiefe 1 nie. Der Baum
+nutzt dieselbe Funktion (par.3d), er kennt die neue Regel also ohne eigene Aenderung.
+
+**Sonde (vor dem Lauf registriert):** Klasse `policy-dice-src4` in `models/v35_probes.recipe.json`, 100
+Partien, gleicher Seed 20261720 wie `policy-dice` (par.5a), Auswertung
+`tools/probes/asym_probe_report.py --dice-class policy-dice-src4 --skip-s4`. Berichtet werden S1 (Kosten,
+gegen denselben `policy`-Lauf), S2 und S3 (Siegquote, Punkte, Marge, gezahlte Wuerfelpunkte, Versatz je
+Seite und je `forced_domes_before`) im Vergleich zu par.5a. Es gibt KEINE Schwelle: der Lauf beschreibt, der
+Nutzer entscheidet ueber Maske und Zusammensetzung. Vorher Anker-Invarianz auf dem neuen Wheel.
+
+#### par.5b1 ERGEBNIS W mit neuer Quellenregel (2026-10-03 22:43-22:51, Artefakt `evaluations/artifacts/asym_probe_w_src4.json`)
+
+Vorher Lib-Suite 827 gruen, Wheel neu, Anker-Drift und -Konservierung GRUEN (`anchor_v2_*_20261003_src4.json`).
+Je 100 Partien, gleicher Seed wie par.5a, Vergleich gegen `policy-dice` (par.5a):
+
+| Groesse (Grundmenge 100 Partien bzw. Drafting-Records) | alte Regel (par.5a) | neue Regel |
+| --- | --- | --- |
+| W-Siegquote [CI] | 0,25 [0,16; 0,35] | **0,23 [0,17; 0,28]** |
+| Punkte W / G | 35,38 / 51,50 | 38,85 / 52,92 |
+| gezahlte Wuerfelpunkte je Partie | 8,15 | **3,51** |
+| Versatz W / G | +0,109 / -0,136 | **+0,165 / -0,184** (beide CI ohne 0) |
+| Versatz W bei 0 erzwungenen Platten | +0,237 | +0,264 |
+| KL W gegen Sockel (Median-Differenz) | -0,082 | -0,114 [-0,151; -0,080] |
+| s je Partie (Zuege gleich: 19.207 / 19.151) | 3,108 | 4,134 (+42,7 % gegen `policy`) |
+
+Lesart: die neue Regel senkt die gezahlten Punkte um 4,6, W gewinnt aber NICHT haeufiger. Der Nachteil
+sitzt also in der Zufallswahl der Platte (und des Zeitpunkts der Plattenzuege), nicht in den Stapelkosten
+(HERLEITUNG). Die Wertverzerrung wird groesser; sie ist schon VOR der ersten erzwungenen Platte da
+(+0,264), also eine verborgene Behinderung, die das Netz an der Stellung nicht sehen kann.
+**Die Laufzeit ist UNGESICHERT:** waehrend des Laufs bearbeitete ein Agent Quelltexte (Engine-Bau Stoerer
+B). In `engine/target` gibt es keine Compile-Spur im Laufzeitfenster, Python-Last ist aber nicht
+ausschliessbar. Gleiche Zugzahl bei +33 % Wanduhr gegen die alte Regel; Wiederholung unter sauberen
+Bedingungen in der S4b-Kette.
+
+### par.5c NUTZER-ENTSCHEID 2026-10-03: Stoerer neu als lexikografische Wahl an der Wurzel ("B"), REGISTRIERT vor Bau und Lauf
+
+**Befund, der dazu fuehrte (Koordinator, am Code und an der Prereg-Historie gelesen):** S benutzte den Blend
+aus Task #28 (`opp_aware_points_utility`, net_mcts.rs:2104) mit w = 0,1 und lambda in {0; 0,5; 1; 2} -- exakt
+dem Raster, fuer das `PREREG_task28_aggression.md` (Statuszeile, Z. 112-117) schon "kein nutzbarer
+Denial-Effekt bei w=0,1" registriert hat; groessere w waren dort laut Z. 62f "toedlich" (v9b). S4 konnte
+also nur wirkungslos oder ruinoes ausgehen; das haette vor dem Bau gegen die Historie geprueft werden
+muessen. Mechanik (HERLEITUNG aus dem Code, nicht gemessen): der Gegnerterm sitzt auf der tanh-Skala der
+Endpunkte (Ziel `tanh(opp/50)`, corpus_dataset.py:1546) und wird halbiert (net_mcts.rs:2107); bei rund 48
+Punkten ist ein Gegnerpunkt im Blattwert etwa 0,00045 * lambda wert, gegen q75 des `own_q_gap` von 0,007
+(par.5a).
+
+**Konstruktion B** (Nutzer: *"ja bau B"*): S sucht normal, ohne Blend. An der Wurzel gilt unter den
+Halving-Ueberlebenden (Regel `AGGR_OWN_Q_GAP_N_MIN_RULE`) mit eigenem Q >= Q_best - eps derjenige Zug, dessen
+Teilbaum dem Gegner im Mittel die wenigsten Endpunkte prognostiziert (Gegnerpunkte-Akkumulator je Knoten,
+Perspektive fest der Stoerer). eps ist das ausdrueckliche Budget an Siegwahrscheinlichkeit, das S fuers
+Stoeren opfern darf; kein lambda, kein w. Knopf `MOSAIC_AGGR_SIDE_EPS` (Kombination mit
+`MOSAIC_AGGR_SIDE_LAMBDA` verboten). Record-Felder `aggr_opp_drop_pts` (prognostizierte Gegnerpunkte des
+eigenen Bestzugs minus des gewaehlten, >= 0) und `aggr_switched`. Die Policy-Maske `own_q_gap <= eps` ist per
+Konstruktion erfuellt; das Policy-Ziel bleibt die Suche.
+
+**Sonde S4b (vor dem Lauf registriert):** Klassen `policy-aggr-e01/e02/e04` (eps 0,01 / 0,02 / 0,04), je 100
+Partien, Seeds 20261730-32, sonst wie die S4-Klassen. Bezug: dieselben Partien-Kennzahlen der Klasse
+`policy` (par.5a, G gegen G) und die lambda-Arme aus par.5a. Berichtet je eps: Siegquote S [CI], Punkte S
+und G, Marge, Anteil `aggr_switched`, mittleres `aggr_opp_drop_pts`, Versatz je Seite, s je Partie.
+**Leseregel:** gewaehlt wird das groesste eps mit S-Siegquote >= 0,45 UND G-Punkten unter dem Mittel je
+Seite in `policy`; erfuellt das kein eps, oder liegt die G-Senkung unter 2 Punkten, geht die Frage an den
+Nutzer (B dann ebenfalls zu schwach). Mehrkosten > +10 % gegen `policy` je Partie: Nutzer-Entscheid.
+
+#### par.5c1 ERGEBNIS S4b (2026-10-03 23:18-23:35, Artefakt `evaluations/artifacts/asym_probe_s4b.json`) und Laufzeit-Wiederholung W
+
+Vorher Lib-Suite 836 gruen, Wheel neu, Anker-Drift und -Konservierung GRUEN (`anchor_v2_*_20261003_s4b.json`).
+Je eps 100 Partien; Bezug `policy` (par.5a): 46,85 Punkte je Seite.
+
+| eps | Siegquote S [CI] | Punkte S / G | Marge S | Anteil `aggr_switched` | mittl. `aggr_opp_drop_pts` | Versatz S / G | s je Partie |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0,01 | 0,81 [0,74; 0,88] | 56,51 / 39,07 | +17,44 | 0,113 | 0,07 | -0,227 / +0,227 | 3,345 |
+| 0,02 | 0,77 [0,66; 0,88] | 56,94 / 39,03 | +17,91 | 0,158 | 0,10 | -0,187 / +0,177 | 3,022 |
+| 0,04 | 0,78 [0,69; 0,87] | 54,50 / 41,11 | +13,39 | 0,177 | 0,12 | -0,200 / +0,182 | 3,488 |
+
+(Grundmenge `aggr_switched`/`aggr_opp_drop_pts`: rund 5.900 Drafting-Records der S-Seite je eps; Einheit
+Anteil bzw. prognostizierte Gegnerpunkte je Zug.) Die Leseregel waehlt formal eps = 0,04. **Das Ergebnis ist
+aber KEIN Stoerer-Effekt, die Konstruktion ist konfundiert:** S stoert kaum (11-18 % der Zuege, im Mittel
+0,07-0,12 prognostizierte Gegnerpunkte je Zug), gewinnt aber 77-81 % und holt rund 10 Punkte MEHR als der
+Sockel; der Abstand haengt nicht am eps. `disruptor_pick` misst gegen den Zug mit dem hoechsten EIGENEN Q
+unter den Halving-Ueberlebenden (net_mcts.rs:7896), nicht gegen den Zug, den die Erzeugung sonst spielt
+(Index aus `argmax_index` der Besuche, self_play.rs:7562, Gleichstand = ERSTER Eintrag, self_play.rs:559;
+`tau_argmax_from_move` 1 im v35-Rezept, models/v35.recipe.json:15). S spielt dadurch "Q-gierig unter den
+Ueberlebenden", G die normale Wahl (HERLEITUNG; wie oft die Ueberlebenden bei den Besuchen gleichauf liegen,
+ist NICHT gemessen). Folgerung: B muss gegen den normal gespielten Zug messen (siehe Vorschlag an den Nutzer);
+Nebenbefund zur Zugwahl der Erzeugung geht als eigene Frage an den Nutzer.
+
+**Laufzeit-Wiederholung W (par.5b1), saubere Bedingungen** (`evaluations/artifacts/asym_probe_w_src4_rep.json`,
+data/probe_asym_rep): `policy` 2,965 s je Partie, `policy-dice-src4` 3,918 s -> **+32,1 %**. Partien
+identisch zum ersten Lauf (Siegquote, Punkte, Versatz gleich, also deterministisch); der erste Lauf
+(+42,7 %) lag durch Nebenlast rund 10 Prozentpunkte zu hoch. Die Mehrkosten gegen die alte Regel (3,108 s)
+sind damit echt; Ursache nicht untersucht.
+
+#### par.5c2 NUTZER-ENTSCHEID 2026-10-03: B repariert (Bezugszug = Bestands-Wahl), S4b neu (REGISTRIERT vor dem Lauf)
+
+Nutzer: *"ja, repariere B und registrier den Nebenbefund"*. `RootOwnStats::disruptor_pick(eps, base)`
+(net_mcts.rs): Bezugszug `base` ist der Zug, den die Bestands-Zugwahl gezogen hat (self_play.rs,
+`net_drafting_policy_with_own_gap`, `stats[idx]`). Kandidaten: Halving-Ueberlebende mit
+`Q_own(base) - eps <= Q_own <= Q_own(base)`; der Stoerer weicht nur NACH UNTEN ab, nie zu einem
+eigen-besseren Zug. Gleichstand der Gegnerpunkte -> der Bezugszug. `aggr_switched` und `aggr_opp_drop_pts`
+messen jetzt gegen den Bezugszug. Damit ist eps = 0 bis auf exakte Q-Gleichstaende die Bestands-Wahl, also
+die eingebaute Kontrolle. Nebenfolge: das Policy-Ziel des Stoerers ist in Modus B die unvermischte Suche
+(w = 0), die `own_q_gap`-Maske (`MOSAIC_AGGR_OWN_Q_EPS`) ist fuer Modus B nicht noetig (HERLEITUNG: das
+Ziel ist dieselbe Groesse wie bei G).
+
+**S4b-Wiederholung:** dieselben drei Klassen `policy-aggr-e01/e02/e04` mit NEUEN Versionsnamen (die alten
+Dateien bleiben als Beleg der Konfundierung), gleiche Seeds, Leseregel par.5c unveraendert. Zusaetzlich
+berichtet: Siegquote S gegen 0,50 (muss jetzt UNTER oder bei 0,50 liegen; liegt sie bei eps 0,01 deutlich
+darueber, ist B weiter konfundiert).
+
+#### par.5e NEBENBEFUND (OFFEN, Nutzer: registrieren): Stichentscheid der argmax-Zugwahl in der Erzeugung
+
+Aus par.5c1: "Q-gierig unter den Halving-Ueberlebenden" gewann in Erzeugungsbedingungen 77-81 % gegen die
+Bestands-Wahl (300 Partien, drei eps-Stufen; die Stoerer-Wirkung war dabei vernachlaessigbar, 0,07-0,12
+prognostizierte Gegnerpunkte je Zug). Bestands-Wahl der Erzeugung ab `tau_argmax_from_move` (v35-Rezept: 1,
+models/v35.recipe.json:15): `argmax_index` der Besuche, Gleichstand = ERSTER Eintrag in Kinderreihenfolge
+(self_play.rs:559/7562), ohne Q. Der `deterministic`-Zweig (Arena) bricht Gleichstaende dagegen nach Q
+(self_play.rs, "Fund 2 (B2)"). Offene Fragen, NICHTS davon gemessen:
+1. Wie oft liegen die Ueberlebenden der letzten Halving-Stufe bei den Besuchen gleichauf (Grundmenge
+   Drafting-Entscheide der Erzeugung mit > 1 Aktion)?
+2. Ist der erste Eintrag gewollte Exploration (die Kinderreihenfolge traegt das Gumbel-Rauschen), oder
+   fehlt der Q-Stichentscheid (Gumbel-MuZero waehlt argmax g + logit + sigma(q) unter den Ueberlebenden)?
+3. Wirkung: ein Arm "Q-Stichentscheid im tau-Zweig" gegen den Bestand, gleiche Seeds, als Sonde (Siegquote,
+   Punkte, Spaltenbau) und, falls gross, als Erzeugungsfrage fuer das naechste Fenster.
+Vorschlag, keine Entscheidung: Frage 1 zuerst (billig, aus einem Instrumentierungs-Test), dann 3.
+
+### par.5d NUTZER-ENTSCHEID 2026-10-03: W als Eroeffnungs-Wuerfel (REGISTRIERT vor Bau und Lauf)
+
+Anlass (par.5a/par.5b1): W verliert 75-77 %, die Wertziele beider Seiten sind verzerrt, und G sieht keine
+nachweisbar anderen Stellungen (KL-Differenz -0,013, CI mit 0). Der Versatz der W-Seite faellt mit
+`forced_domes_before` von +0,264 auf etwa 0 nach der letzten Wuerfelplatte: verzerrt ist der Wert, solange
+KUENFTIGE Wuerfelplatten ausstehen, die die Stellung nicht zeigt (HERLEITUNG aus der Reihe).
+
+**Konstruktion:** nur EINE Seite wuerfelt (Nutzer: beide Seiten waere *"wieder symmetrisches spiel"*), und
+nur bis einschliesslich Runde R_dice; danach spielen beide normal. Die gewuerfelten Platten liegen danach
+sichtbar auf dem Brett, der Ausgang ist ab dort aus der Stellung erklaerbar. Alles andere aus par.3d/par.3c/
+par.5b bleibt (zugewiesene Platte, Positionswahl, Baum kennt die Regel nur bis R_dice). Records:
+Wertziele BEIDER Seiten aus der Wuerfelphase (Runde <= R_dice) maskiert; Policy-Ziele und
+Positionswahl-Records bleiben.
+
+**Sonde S5 (vor dem Lauf registriert):** zwei Arme `policy-dice-r1` (R_dice = 1) und `policy-dice-r2`
+(R_dice = 2), je 100 Partien, Seed wie `policy-dice`. Leseregel je Arm:
+1. Versatz je Seite ueber Drafting-Records NACH der Wuerfelphase: |Versatz| <= 0,03 (oder CI mit 0). Sonst
+   ist die Maske nicht ausreichend, Nutzer-Entscheid.
+2. KL der G-Seite nach der Wuerfelphase gegen den Sockel (Median-Differenz, Block-Bootstrap): CI ganz ueber 0
+   heisst "andere Stellungen". Sonst traegt W keine neuen Stellungen, Nutzer-Entscheid ueber W.
+3. Siegquote, Punkte, gezahlte Wuerfelpunkte, Kosten je Partie werden berichtet, ohne Schwelle.
 
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 

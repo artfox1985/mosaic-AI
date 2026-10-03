@@ -420,6 +420,20 @@ def asymmetric_policy_masked(step, own_q_eps, mask_dice_trigger) -> bool:
     return False
 
 
+def dice_phase_value_weight(step) -> float:
+    """Klasse W, Eroeffnungs-Wuerfel (`PREREG_asymmetric_selfplay.md` par.5d):
+    Wertgewicht eines Records unter `MOSAIC_MASK_DICE_PHASE_VALUE=1`.
+
+    0.0 fuer Records aus der Wuerfelphase (`dice_phase: true`, BEIDE Seiten):
+    solange kuenftige Wuerfelplatten ausstehen, die die Stellung nicht zeigt, ist
+    der Ausgang aus dem Zustand nicht erklaerbar (par.5a/par.5b1, Versatz). Sonst
+    1.0, auch fuer jeden Record ohne das Feld (Bestand, G-G-Partien). Policy-Ziele
+    beruehrt die Regel nicht. Nur unter dem Knopf aufgerufen; ohne Knopf entsteht
+    das Feld `value_weights` gar nicht.
+    """
+    return 0.0 if step.get("dice_phase") is True else 1.0
+
+
 def final_margin_of_step(step) -> float:
     """E2-Arm: rohe Endmarge eines Records in Punkten aus Sicht des Ziehers.
 
@@ -762,6 +776,12 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
         cache_key_material += "+aggrownq_eps" + _aggr_eps + "_v1"
     if _mask_dice_trigger_key():
         cache_key_material += "+maskdicetrigger_v1"
+    # par.5d (Eroeffnungs-Wuerfel): Wertmaske der Wuerfelphase, Zusatzfeld
+    # `value_weights`. Steht auch im BLOCK-Schluessel
+    # (`file_cache_key._mask_dice_phase_value_key`). Nur ANHAENGEN, wenn gesetzt.
+    from file_cache_key import _mask_dice_phase_value_key
+    if _mask_dice_phase_value_key():
+        cache_key_material += "+maskdicephasevalue_v1"
     digest = hashlib.md5(cache_key_material.encode()).hexdigest()
     return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
                           carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,
@@ -1035,6 +1055,12 @@ class MosaicDataset(Dataset):
         _aggr_eps_raw = _aggr_own_q_eps_key()
         _aggr_own_q_eps = None if _aggr_eps_raw is None else float(_aggr_eps_raw)
         _mask_dice_trigger = _mask_dice_trigger_key()
+        # par.5d: Wertmaske der Wuerfelphase. None = Feld nicht aktiv; dann
+        # bleiben Tupel-Form und Block-Inhalt exakt die bisherigen (Muster
+        # `final_margin`).
+        self.value_weights = None
+        from file_cache_key import _mask_dice_phase_value_key
+        _value_weights_active = _mask_dice_phase_value_key()
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
             raise ValueError(
@@ -1237,6 +1263,14 @@ class MosaicDataset(Dataset):
                             f"Feld 'final_margin' -- der Cache wurde ohne den Knopf gebaut. "
                             f"Bloecke und Monolith mit gesetztem Knopf neu bauen.")
                     self.final_margin = torch.from_numpy(hf['final_margin'][:])
+                # par.5d: Wertmaske der Wuerfelphase, gleiche Regel wie oben.
+                if _value_weights_active:
+                    if 'value_weights' not in hf:
+                        raise RuntimeError(
+                            f"HDF5-Cache {cache_path_h5}: MOSAIC_MASK_DICE_PHASE_VALUE=1, aber kein "
+                            f"Feld 'value_weights' -- der Cache wurde ohne den Knopf gebaut. "
+                            f"Bloecke und Monolith mit gesetztem Knopf neu bauen.")
+                    self.value_weights = torch.from_numpy(hf['value_weights'][:])
                 if self.encoder == "2d":
                     # Bitpacking (RAM-Optimierung v21): Dataset-Name
                     # selbstbeschreibend, unabhaengig vom `self.bitpacked`-
@@ -1283,6 +1317,12 @@ class MosaicDataset(Dataset):
                 raise RuntimeError(
                     f"Alter .pt-Cache {cache_path_pt} passt zum '+finalmargin_v1'-Key -- das kann "
                     f"eigentlich nicht vorkommen. Cache-Datei loeschen und neu bauen lassen.")
+            if _value_weights_active:
+                # par.5d: wie der Guard darueber ("+maskdicephasevalue_v1" ist
+                # juenger als jeder .pt-Cache).
+                raise RuntimeError(
+                    f"Alter .pt-Cache {cache_path_pt} passt zum '+maskdicephasevalue_v1'-Key -- das "
+                    f"kann eigentlich nicht vorkommen. Cache-Datei loeschen und neu bauen lassen.")
             print(f"📦 Migriere .pt → HDF5 Cache...")
             t0 = time.time()
             bundle = torch.load(cache_path_pt, weights_only=False)
@@ -1383,6 +1423,8 @@ class MosaicDataset(Dataset):
             # Nur bei gesetztem Knopf gesammelt; sonst None, kein Speicher, keine
             # Rechenzeit, Block-Inhalt byte-identisch.
             final_margin_l = [] if _final_margin_active else None
+            # par.5d: Wertgewicht je Record (0 = Wuerfelphase), nur mit Knopf.
+            value_weights_l = [] if _value_weights_active else None
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
             # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
             # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
@@ -1679,6 +1721,10 @@ class MosaicDataset(Dataset):
                         # entscheidet beim Verlust `wdl_outcome` (`winner`).
                         if final_margin_l is not None:
                             final_margin_l.append(final_margin_of_step(step))
+                        # par.5d: Wertgewicht in derselben Iteration wie die
+                        # Wertziele darueber (Listen bleiben synchron).
+                        if value_weights_l is not None:
+                            value_weights_l.append(dice_phase_value_weight(step))
 
                         t_policy = np.zeros(NUM_ACTIONS, dtype=np.float32)
                         for pe in step["policy"]:
@@ -1954,6 +2000,9 @@ class MosaicDataset(Dataset):
             final_margin_np = None
             if final_margin_l is not None:
                 final_margin_np = np.array(final_margin_l, dtype=np.float32); del final_margin_l
+            value_weights_np = None
+            if value_weights_l is not None:
+                value_weights_np = np.array(value_weights_l, dtype=np.float32); del value_weights_l
             planes_np    = None
             if planes_l is not None:
                 planes_np = np.array(planes_l, dtype=np.uint8)
@@ -2009,6 +2058,8 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('ranking_mask',         data=ranking_mask_np,  compression='lzf')
                 if final_margin_np is not None:
                     hf.create_dataset('final_margin',     data=final_margin_np,  compression='lzf')
+                if value_weights_np is not None:
+                    hf.create_dataset('value_weights',    data=value_weights_np, compression='lzf')
                 if planes_np is not None:
                     hf.create_dataset(_planes_key,        data=planes_np,    compression='lzf')
                     if self.bitpacked:
@@ -2058,6 +2109,8 @@ class MosaicDataset(Dataset):
             self.ranking_mask        = torch.from_numpy(ranking_mask_np)
             if final_margin_np is not None:
                 self.final_margin    = torch.from_numpy(final_margin_np)
+            if value_weights_np is not None:
+                self.value_weights   = torch.from_numpy(value_weights_np)
             # `self._planes_h5_path` wurde oben bereits gesetzt (RAM-Fix) --
             # kein `self.planes`-Tensor mehr hier.
 
@@ -2254,6 +2307,10 @@ class MosaicDataset(Dataset):
         # Knopf (`final_margin is None`) bleibt die Tupel-Form die bisherige.
         if self.final_margin is not None:
             base = base + (self.final_margin[idx],)
+        # par.5d: Wertgewicht NUR mit aktivem Feld, als allerletztes Element
+        # (hinter `final_margin`); train.py trennt es zuerst ab.
+        if self.value_weights is not None:
+            base = base + (self.value_weights[idx],)
         # Task #11 Phase 2: bei encoder="2d" wird `planes` ALS ERSTES Element
         # vorangestellt -- `encoder="flat"` (Standard) behaelt exakt die
         # bisherige Tupel-FORM/-POSITION fuer Aufrufer, die den `encoder`-
@@ -2299,6 +2356,9 @@ class MosaicDataset(Dataset):
         # E2-Arm: wie in `__getitem__`, nur mit aktivem Feld, als letztes Element.
         if self.final_margin is not None:
             base = base + (take(self.final_margin),)
+        # par.5d: wie in `__getitem__`, als allerletztes Element.
+        if self.value_weights is not None:
+            base = base + (take(self.value_weights),)
         if self.encoder == "2d":
             if self._planes_eager_tensor is not None:
                 planes = self._planes_eager_tensor[idx]

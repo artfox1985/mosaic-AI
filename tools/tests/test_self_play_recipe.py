@@ -202,12 +202,12 @@ class DomeDiceClass(unittest.TestCase):
             "policy": {"expect_engine_config": {"dome_dice": 0}},
             "policy-dice": {"dome_dice": True, "dome_dice_sims": 600,
                             "expect_engine_config": {"dome_dice": 1, "dome_dice_sims": 600,
-                                                     "dome_dice_caps": [None, 7, 3, None]}},
+                                                     "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top"}},
         },
     }
     # So meldet `engine_config_json` die drei Felder (lib.rs).
-    ENGINE_ON = {"dome_dice": 1, "dome_dice_sims": 600, "dome_dice_caps": [None, 7, 3, None]}
-    ENGINE_OFF = {"dome_dice": 0, "dome_dice_sims": 600, "dome_dice_caps": [None, 7, 3, None]}
+    ENGINE_ON = {"dome_dice": 1, "dome_dice_sims": 600, "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top"}
+    ENGINE_OFF = {"dome_dice": 0, "dome_dice_sims": 600, "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top"}
 
     def _parse(self, cls):
         from tools.recipe_config import load_recipe as _load
@@ -240,6 +240,7 @@ class DomeDiceClass(unittest.TestCase):
         reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
         self.assertEqual(reserved.get("MOSAIC_DOME_DICE"), "dome_dice")
         self.assertEqual(reserved.get("MOSAIC_DOME_DICE_SIMS"), "dome_dice_sims")
+        self.assertEqual(reserved.get("MOSAIC_DOME_DICE_LAST_ROUND"), "dome_dice_last_round")
 
     def test_excursion_combination_is_rejected_before_any_run(self):
         """F8: Ausflug + Wuerfel bricht in generate_data ab, VOR Probe, Manifest und Chunk."""
@@ -272,14 +273,21 @@ class AsymmetricClassesGuard(unittest.TestCase):
                                  "expect_engine_config": {"dome_dice": 1, "dome_dice_sims": 600,
                                                           "aggr_side": 1, "aggr_side_w": 0.1,
                                                           "aggr_side_lambda": 1.0}},
+            # Modus B (par.5c): eps statt lambda, der Modus steht im Manifest.
+            "policy-aggr-e02": {"aggr_side": True, "aggr_side_eps": 0.02,
+                                "expect_engine_config": {"dome_dice": 0, "aggr_side": 1,
+                                                         "aggr_side_eps": 0.02,
+                                                         "aggr_side_mode": "lexicographic_root"}},
         },
     }
 
     @staticmethod
-    def engine(dice: int, aggr: int, lam=1.0) -> dict:
+    def engine(dice: int, aggr: int, lam=1.0, eps=None) -> dict:
         """So meldet `engine_config_json` die Felder (lib.rs)."""
-        return {"dome_dice": dice, "dome_dice_sims": 600, "dome_dice_caps": [None, 7, 3, None],
+        mode = None if not aggr else ("lexicographic_root" if eps is not None else "leaf_blend")
+        return {"dome_dice": dice, "dome_dice_sims": 600, "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top",
                 "aggr_side": aggr, "aggr_side_w": 0.1, "aggr_side_lambda": lam,
+                "aggr_side_eps": eps, "aggr_side_mode": mode,
                 "aggr_own_q_gap_n_min_rule": "halving_survivors_min_visits"}
 
     def _parse(self, cls):
@@ -300,12 +308,17 @@ class AsymmetricClassesGuard(unittest.TestCase):
         _, ns = self._parse("policy")
         self.assertEqual((ns.aggr_side, ns.aggr_side_lambda), (False, None),
                          "ohne Klassenwert bleibt der Stoerer aus, lambda ohne Default")
+        self.assertIsNone(ns.aggr_side_eps, "eps ohne Default")
+        _, ns = self._parse("policy-aggr-e02")
+        self.assertEqual((ns.aggr_side, ns.aggr_side_eps, ns.aggr_side_lambda, ns.aggr_side_w),
+                         (True, 0.02, None, 0.1), "Modus B: eps gesetzt, lambda nicht, w Default")
 
     def test_guard_per_class(self):
         from tools.recipe_config import check_engine_config, expected_engine_config
         recipe, _ = self._parse("policy")
         engines = {"policy": self.engine(0, 0), "policy-dice": self.engine(1, 0),
-                   "policy-aggr": self.engine(0, 1), "policy-dice-aggr": self.engine(1, 1)}
+                   "policy-aggr": self.engine(0, 1), "policy-dice-aggr": self.engine(1, 1),
+                   "policy-aggr-e02": self.engine(0, 1, lam=None, eps=0.02)}
         for cls in engines:
             want = expected_engine_config(recipe, cls)
             for other, eng in engines.items():
@@ -317,12 +330,18 @@ class AsymmetricClassesGuard(unittest.TestCase):
         want = expected_engine_config(recipe, "policy-aggr")
         self.assertTrue(check_engine_config(self.engine(0, 1, lam=2.0), want), "falsches lambda")
         self.assertTrue(check_engine_config({"dome_dice": 0}, want), "fehlendes Feld (altes Wheel)")
+        want = expected_engine_config(recipe, "policy-aggr-e02")
+        self.assertTrue(check_engine_config(self.engine(0, 1, lam=None, eps=0.04), want), "falsches eps")
+        old = {k: v for k, v in self.engine(0, 1, lam=None, eps=0.02).items()
+               if k not in ("aggr_side_eps", "aggr_side_mode")}
+        self.assertTrue(check_engine_config(old, want), "Wheel ohne Modus B")
 
     def test_env_variables_are_reserved_for_the_flags(self):
         reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
         self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE"), "aggr_side")
         self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE_W"), "aggr_side_w")
         self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE_LAMBDA"), "aggr_side_lambda")
+        self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE_EPS"), "aggr_side_eps")
 
     def test_aggr_guards_run_before_any_run(self):
         """Ausflug + Stoerer und fehlendes lambda brechen in generate_data ab, VOR Probe,
@@ -330,8 +349,11 @@ class AsymmetricClassesGuard(unittest.TestCase):
         text = SELF_PLAY.read_text(encoding="utf-8")
         body = text[text.index("def generate_data("):]
         for guard in ("if aggr_side and excursion_prob > 0:",
-                      "if aggr_side and aggr_side_lambda is None:",
-                      '("MOSAIC_AGGR_SIDE_LAMBDA", _aggr_lambda_want)'):
+                      "if aggr_side and aggr_side_lambda is None and aggr_side_eps is None:",
+                      "if aggr_side_eps is not None and aggr_side_lambda is not None:",
+                      "if aggr_side_eps is not None and aggr_side_w != 0.1:",
+                      '("MOSAIC_AGGR_SIDE_LAMBDA", _aggr_lambda_want)',
+                      '("MOSAIC_AGGR_SIDE_EPS", _aggr_eps_want)'):
             at = body.index(guard)
             for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
                           "make_chunk(n, chunk_idx"):

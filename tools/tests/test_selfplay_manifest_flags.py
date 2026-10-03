@@ -53,11 +53,15 @@ WORKER_ENV = {
     # Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a): immer gesetzt.
     "dome-dice": "MOSAIC_DOME_DICE",
     "dome-dice-sims": "MOSAIC_DOME_DICE_SIMS",
+    # par.5d (Eroeffnungs-Wuerfel): ebenfalls immer gesetzt.
+    "dome-dice-last-round": "MOSAIC_DOME_DICE_LAST_ROUND",
     # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a): Schalter und w immer,
     # lambda nur mit Wert gesetzt (Rust kennt keinen lambda-Default).
     "aggr-side": "MOSAIC_AGGR_SIDE",
     "aggr-side-w": "MOSAIC_AGGR_SIDE_W",
     "aggr-side-lambda": "MOSAIC_AGGR_SIDE_LAMBDA",
+    # Modus B (par.5c): nur mit Wert gesetzt; der Worker entfernt dann W.
+    "aggr-side-eps": "MOSAIC_AGGR_SIDE_EPS",
 }
 
 

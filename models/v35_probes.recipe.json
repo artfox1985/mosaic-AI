@@ -112,6 +112,145 @@
         "aggr_side_w": 0.1,
         "aggr_side_lambda": 2.0
       }
+    },
+    "policy-dice-src4": {
+      "description": "par.5b: W mit neuer Quellenregel (gleichverteilt ueber Auslageplaetze und oberste Stapelplatte), sonst wie policy-dice; gleicher Seed.",
+      "version": "probe-v35-policy-dice-src4",
+      "seed": 20261720,
+      "deviate_prob": 1.0,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "aggr_side": 0,
+        "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top"
+      }
+    },
+    "policy-aggr-e01": {
+      "description": "S4b (par.5c): G gegen lexikografischen Stoerer B, eps = 0.01.",
+      "version": "probe-v35-policy-aggr-e01",
+      "seed": 20261730,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_eps": 0.01,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_eps": 0.01,
+        "aggr_side_mode": "lexicographic_root"
+      }
+    },
+    "policy-aggr-e02": {
+      "description": "S4b (par.5c): G gegen lexikografischen Stoerer B, eps = 0.02.",
+      "version": "probe-v35-policy-aggr-e02",
+      "seed": 20261731,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_eps": 0.02,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_eps": 0.02,
+        "aggr_side_mode": "lexicographic_root"
+      }
+    },
+    "policy-aggr-e04": {
+      "description": "S4b (par.5c): G gegen lexikografischen Stoerer B, eps = 0.04.",
+      "version": "probe-v35-policy-aggr-e04",
+      "seed": 20261732,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_eps": 0.04,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_eps": 0.04,
+        "aggr_side_mode": "lexicographic_root"
+      }
+    },
+    "policy-dice-r1": {
+      "description": "S5 (par.5d): Eroeffnungs-Wuerfel, W wuerfelt nur bis Runde 1, sonst wie policy-dice-src4; gleicher Seed.",
+      "version": "probe-v35-policy-dice-r1",
+      "seed": 20261720,
+      "deviate_prob": 1.0,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "aggr_side": 0,
+        "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top",
+        "dome_dice_last_round": 1
+      },
+      "dome_dice_last_round": 1
+    },
+    "policy-dice-r2": {
+      "description": "S5 (par.5d): Eroeffnungs-Wuerfel, W wuerfelt nur bis Runde 2, sonst wie policy-dice-src4; gleicher Seed.",
+      "version": "probe-v35-policy-dice-r2",
+      "seed": 20261720,
+      "deviate_prob": 1.0,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "aggr_side": 0,
+        "dome_dice_source_rule": "uniform_over_display_slots_and_stack_top",
+        "dome_dice_last_round": 2
+      },
+      "dome_dice_last_round": 2
+    },
+    "policy-aggrb-e01": {
+      "description": "S4b neu (par.5c2): Stoerer B mit Bezugszug = Bestands-Wahl, eps = 0.01; gleicher Seed wie die konfundierte erste Fassung.",
+      "version": "probe-v35-policy-aggrb-e01",
+      "seed": 20261730,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_eps": 0.01,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_eps": 0.01,
+        "aggr_side_mode": "lexicographic_root"
+      }
+    },
+    "policy-aggrb-e02": {
+      "description": "S4b neu (par.5c2): Stoerer B mit Bezugszug = Bestands-Wahl, eps = 0.02; gleicher Seed wie die konfundierte erste Fassung.",
+      "version": "probe-v35-policy-aggrb-e02",
+      "seed": 20261731,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_eps": 0.02,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_eps": 0.02,
+        "aggr_side_mode": "lexicographic_root"
+      }
+    },
+    "policy-aggrb-e04": {
+      "description": "S4b neu (par.5c2): Stoerer B mit Bezugszug = Bestands-Wahl, eps = 0.04; gleicher Seed wie die konfundierte erste Fassung.",
+      "version": "probe-v35-policy-aggrb-e04",
+      "seed": 20261732,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_eps": 0.04,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_eps": 0.04,
+        "aggr_side_mode": "lexicographic_root"
+      }
     }
   },
   "expect_engine_config": {

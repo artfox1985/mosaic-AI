@@ -1304,6 +1304,17 @@ pub struct SearchConfig {
     /// Mondstapel-Nachsuche ihre Wurzel beim Gegner hat
     /// ([`moon_order_post_search`]) und trotzdem fuer den Stoerer sucht.
     pub aggr_player: Option<usize>,
+    /// Klasse S, Konstruktion B (`PREREG_asymmetric_selfplay.md` par.5c):
+    /// Budget `eps` an eigenem Siegwert, das der Stoerer fuers Stoeren opfern
+    /// darf. `Some(eps)` ZUSAMMEN mit [`Self::aggr_player`] = Modus B
+    /// ("lexikografischer Stoerer an der Wurzel"): am Blatt wird NICHT gemischt
+    /// (die Erzeugung setzt `aggr_w = Some(0.0)`), zusaetzlich fuehrt jeder
+    /// Knoten den Gegnerpunkte-Akkumulator (`Node::aggr_opp_pts_*`), und die
+    /// Zugwahl waehlt unter den Halving-Ueberlebenden mit `Q_own >= Q_best - eps`
+    /// den Zug mit den wenigsten prognostizierten Gegnerpunkten
+    /// ([`RootOwnStats::disruptor_pick`]). `None` = Bestand. Gesetzt NUR von
+    /// der Self-Play-Erzeugung (`self_play::aggr_search_config`).
+    pub aggr_eps: Option<f64>,
     /// Klasse W, Zufallsknoten im Baum (`PREREG_asymmetric_selfplay.md`
     /// par.3b): Spielerindex der Wuerfel-Seite dieser Partie. `Some(d)`: an
     /// JEDEM Knoten (auch der Wurzel), an dem `d` zieht und
@@ -1315,6 +1326,15 @@ pub struct SearchConfig {
     /// ALLE Suchen einer W-Partie; kein Spec-Feld, kein eigener Env-Knopf (der
     /// Erzeugungsknopf heisst `MOSAIC_DOME_DICE`).
     pub dome_dice_side: Option<usize>,
+    /// Klasse W, Eroeffnungs-Wuerfel (`PREREG_asymmetric_selfplay.md` par.5d):
+    /// letzte Runde der Wuerfelphase. Die Zusammenfassung zur Plattenkante gilt
+    /// nur an Knoten mit `round_number <= Grenze` (Regel
+    /// `self_play::in_dome_dice_phase`, ueber `dome_dice_open_state`); danach
+    /// zieht die W-Seite auch im Baum normal. `None` = keine Grenze (Bestand,
+    /// alle Plattenrunden). Gesetzt NUR von der Erzeugung
+    /// (`self_play::side_search_configs`, Knopf `MOSAIC_DOME_DICE_LAST_ROUND`),
+    /// zusammen mit [`Self::dome_dice_side`]; kein Spec-Feld.
+    pub dome_dice_last_round: Option<u32>,
 }
 
 /// Wie der Blattwert einer Suche gemischt wird (Klasse S, FS1). Aus der
@@ -1358,7 +1378,14 @@ impl SearchConfig {
     /// `SearchConfig` bekommt, aber unvermischt bleiben soll. Bei Bestand
     /// (`aggr_player == None`) eine Identitaet.
     pub(crate) fn without_aggr(&self) -> SearchConfig {
-        SearchConfig { aggr_w: None, aggr_lambda: None, aggr_player: None, ..*self }
+        SearchConfig { aggr_w: None, aggr_lambda: None, aggr_player: None, aggr_eps: None, ..*self }
+    }
+
+    /// Klasse S, Modus B (par.5c): `Some((Stoerer, eps))` genau dann, wenn
+    /// [`Self::aggr_player`] UND [`Self::aggr_eps`] gesetzt sind; sonst `None`
+    /// (Bestand oder Blend-Modus), dann rechnet niemand Gegnerpunkte.
+    pub(crate) fn disruptor_eps(&self) -> Option<(usize, f64)> {
+        Some((self.aggr_player?, self.aggr_eps?))
     }
     /// Liest den heutigen Env-Knopf `MOSAIC_IMPLICIT_MINIMAX_A` (dieselbe
     /// Parse-Regel wie der fruehere OnceLock-Getter: `read_f64_env`,
@@ -1440,9 +1467,11 @@ impl SearchConfig {
             aggr_w: None,
             aggr_lambda: None,
             aggr_player: None,
+            aggr_eps: None,
 
             // Klasse W (par.3b): ebenso nur von der Erzeugung gesetzt.
             dome_dice_side: None,
+            dome_dice_last_round: None,
         }
     }
 
@@ -2049,8 +2078,10 @@ impl SearchConfig {
             aggr_w: None,
             aggr_lambda: None,
             aggr_player: None,
-            // Klasse W (par.3b): ebenso kein Spec-Feld.
+            aggr_eps: None,
+            // Klasse W (par.3b, par.5d): ebenso kein Spec-Feld.
             dome_dice_side: None,
+            dome_dice_last_round: None,
         })
     }
 }
@@ -3012,6 +3043,20 @@ struct Node {
     /// `own_q_gap` ([`root_own_stats`]). Reine Arithmetik, beeinflusst keine
     /// Zugwahl und kein Policy-Ziel.
     own_value_sum: f64,
+    /// Klasse S, Modus B (`PREREG_asymmetric_selfplay.md` par.5c): prognostizierte
+    /// END-Punkte des GEGNERS des Stoerers an diesem Knoten, in PUNKTEN, aus
+    /// Sicht des Stoerers ([`disruptor_opp_points`]). `None` ausserhalb von
+    /// Modus B und ueberall, wo es keinen Wert gibt (fehlender Kopf, Wurzel der
+    /// Startsetzungs-Suche, Testknoten) -- bewusst KEIN Nullwert, der das Mittel
+    /// verfaelschen wuerde.
+    aggr_opp_pts_leaf: Option<f64>,
+    /// Summe von `aggr_opp_pts_leaf` der Blaetter aller Besuche durch diesen
+    /// Knoten, deren Blatt einen Wert hatte (Perspektive fest der Stoerer, NICHT
+    /// `player_who_acted`). Mittel = `aggr_opp_pts_sum / aggr_opp_pts_n`.
+    aggr_opp_pts_sum: f64,
+    /// Zahl der belegten Besuche in `aggr_opp_pts_sum` (Besuche mit
+    /// `aggr_opp_pts_leaf == None` zaehlen nicht mit).
+    aggr_opp_pts_n: u32,
     /// FS3 (`PREREG_asymmetric_selfplay.md` par.3a): NUR an der Wurzel
     /// gesetzt -- die kleinste Besuchszahl unter den Kandidaten der LETZTEN
     /// Sequential-Halving-Stufe (die Ueberlebenden, `current` am Ende von
@@ -3101,7 +3146,7 @@ fn build_untried_actions(
     moon_order_variants: u8,
 ) -> (Vec<(Action, f32)>, usize) {
     let (acts, n, _members) =
-        build_untried_actions_dice(state, logits, moon_scores, skip_cutoff, moon_order_variants, None);
+        build_untried_actions_dice(state, logits, moon_scores, skip_cutoff, moon_order_variants, None, None);
     (acts, n)
 }
 
@@ -3109,11 +3154,13 @@ fn build_untried_actions(
 /// Kante (Klasse W, `PREREG_asymmetric_selfplay.md` par.3b)? Die Wuerfel-Seite
 /// zieht, Drafting, und `self_play::dome_dice_open_state` (Runde 1..4, kein
 /// Teilzug offen, kein Pin) -- derselbe Zustandsteil wie beim Ausloeser der
-/// echten Partie (`self_play::dome_dice_triggers`).
-pub(crate) fn dome_dice_chance_applies(state: &GameState, dice_side: Option<usize>) -> bool {
+/// echten Partie (`self_play::dome_dice_triggers`). par.5d: `last_round` ist
+/// die Rundengrenze der Wuerfelphase (`SearchConfig::dome_dice_last_round`);
+/// in spaeteren Runden zieht die W-Seite auch im Baum normal.
+pub(crate) fn dome_dice_chance_applies(state: &GameState, dice_side: Option<usize>, last_round: Option<u32>) -> bool {
     dice_side == Some(state.current_player)
         && state.phase == Phase::Drafting
-        && crate::self_play::dome_dice_open_state(state)
+        && crate::self_play::dome_dice_open_state(state, last_round)
 }
 
 /// [`build_untried_actions`] mit Klasse W (par.3b): bei
@@ -3125,7 +3172,8 @@ pub(crate) fn dome_dice_chance_applies(state: &GameState, dice_side: Option<usiz
 /// logsumexp der ersetzten Logits minus derselben Normierung). Der dritte Wert
 /// sind die ersetzten Aktionen mit ihren Einzelpriors (`Node::dice_members`),
 /// `None` ohne Zusammenfassung. Bei `dice_side = None` ist der Ablauf
-/// unveraendert der Bestand.
+/// unveraendert der Bestand. `dice_last_round`: Rundengrenze der Wuerfelphase
+/// (par.5d, `None` = keine).
 fn build_untried_actions_dice(
     state: &GameState,
     logits: &[f32],
@@ -3133,6 +3181,7 @@ fn build_untried_actions_dice(
     skip_cutoff: bool,
     moon_order_variants: u8,
     dice_side: Option<usize>,
+    dice_last_round: Option<u32>,
 ) -> (Vec<(Action, f32)>, usize, Option<Vec<(Action, f32)>>) {
     let base_actions = drafting_actions(state);
     let n = base_actions.len();
@@ -3208,7 +3257,7 @@ fn build_untried_actions_dice(
     }
     // Klasse W (par.3b): Sammelkante "Platte legen" an der Stelle der ersten
     // Plattenaktion. Nur bei gesetzter Wuerfel-Seite ueberhaupt geprueft.
-    let dice_members: Option<Vec<(Action, f32)>> = if dome_dice_chance_applies(state, dice_side) {
+    let dice_members: Option<Vec<(Action, f32)>> = if dome_dice_chance_applies(state, dice_side, dice_last_round) {
         let members: Vec<(Action, f32)> =
             acts.iter().filter(|(a, _)| crate::self_play::is_dome_plate_action(a)).cloned().collect();
         match acts.iter().position(|(a, _)| crate::self_play::is_dome_plate_action(a)) {
@@ -3367,6 +3416,49 @@ pub(crate) fn aggressor_blend(wr_s: f64, pts_s: Option<f64>, opp_s: Option<f64>,
         _ => {
             warn_missing_opp_head_once();
             wr_s
+        }
+    }
+}
+
+static WARNED_NO_OPP_HEAD_DISRUPTOR: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
+/// Einmalige Warnung (Muster [`warn_missing_opp_head_once`]) fuer Modus B der
+/// Klasse S: das Netz liefert keinen Gegnerpunkte-Kopf aus Sicht des
+/// Stoerers. Die Knoten tragen dann keinen Wert, `disruptor_pick` liefert
+/// `None`, und die Zugwahl faellt auf den Bestand zurueck.
+fn warn_missing_opp_head_disruptor_once() {
+    WARNED_NO_OPP_HEAD_DISRUPTOR.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_AGGR_SIDE_EPS gesetzt (Klasse S, Modus B), aber das Netz liefert keinen \
+             Gegnerpunkte-Kopf -- keine Gegnerpunkte im Baum, die Stoerer-Zugwahl faellt auf den \
+             Bestand zurueck (PREREG_asymmetric_selfplay.md par.5c)."
+        );
+    });
+}
+
+/// Klasse S, Modus B (par.5c): ein Punkte-Kopfwert (tanh-Skala, Ziel
+/// `tanh(total/50)`, engine/py/corpus_dataset.py:1546) zurueck in PUNKTE,
+/// `50 * atanh(clamp(x, -0,995, 0,995))` -- dieselbe Ruecktransformation und
+/// Klammerung wie [`score_margin_points`].
+pub(crate) fn head_to_points(x: f64) -> f64 {
+    SCORE_UTILITY_MARGIN_SCALE * x.clamp(-SCORE_UTILITY_M_MAX, SCORE_UTILITY_M_MAX).atanh()
+}
+
+/// Klasse S, Modus B (par.5c): Gegnerpunkte des Stoerers `disruptor` an einem
+/// Knoten mit Zustand `state`. Ist die Partie zu Ende (`Phase::End`/`Final`),
+/// der tatsaechliche Endstand des Gegners (`score_unclamped`, dieselbe Groesse
+/// wie das Trainingsziel, corpus_dataset.py:1514); sonst der Kopfwert
+/// `opp_head` (Gegner des Stoerers, tanh-Skala) in Punkten. Fehlt der Kopf:
+/// einmalige Warnung und `None`. Reine Funktion bis auf die Warnung.
+pub(crate) fn disruptor_opp_points(state: &GameState, disruptor: usize, opp_head: Option<f32>) -> Option<f64> {
+    if matches!(state.phase, Phase::End | Phase::Final) {
+        return Some(f64::from(state.players[1 - disruptor].score_unclamped));
+    }
+    match opp_head {
+        Some(x) => Some(head_to_points(f64::from(x))),
+        None => {
+            warn_missing_opp_head_disruptor_once();
+            None
         }
     }
 }
@@ -4118,6 +4210,8 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             search_config.moon_order_variants,
             // Klasse W (par.3b): `None` = Bestand, keine Zusammenfassung.
             search_config.dome_dice_side,
+            // par.5d: Rundengrenze der Wuerfelphase, `None` = keine.
+            search_config.dome_dice_last_round,
         )
     };
 
@@ -4130,6 +4224,10 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     // Zeile fuer Zeile; nur `Aggressor` rechnet zusaetzlich den unvermischten
     // Zweitwert `own_leaf_value` fuer den zweiten Akkumulator.
     let leaf_blend = search_config.leaf_blend();
+    // Klasse S, Modus B (par.5c): Gegnerpunkte-Kopf aus Sicht des Stoerers,
+    // im `Aggressor`-Zweig unten belegt (dieselbe Quellenwahl wie `opp_s` des
+    // Blends). Ausserhalb von Modus B wird er nie gelesen.
+    let mut disruptor_opp_head: Option<f32> = None;
     let (leaf_value, own_leaf_value) = match ACTIVE_LEAF {
         LeafEval::Net => {
             let (today_value, own_today_value): ([f64; 2], Option<[f64; 2]>) = match leaf_blend {
@@ -4192,6 +4290,12 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                     } else {
                         (opp_points.first().copied(), points.first().copied())
                     };
+                    // Modus B: `opp_s` IST der Gegnerpunkte-Kopf aus Sicht des
+                    // Stoerers -- zieht er selbst, `opp_points` des Mover-Passes;
+                    // sonst `opp_points` des geflippten Passes (dessen Ego ist der
+                    // Stoerer); ohne geflippten Pass `points` des Ziehenden (der
+                    // dann der Gegner des Stoerers ist).
+                    disruptor_opp_head = opp_s;
                     let mut blended = own;
                     blended[player] =
                         aggressor_blend(own[player], pts_s.map(f64::from), opp_s.map(f64::from), w, lambda);
@@ -4433,6 +4537,13 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             (v, v)
         }
     };
+    // Klasse S, Modus B (par.5c): Gegnerpunkte dieses Knotens. Ersetzt ein
+    // Rundenuebergangs-Zweig oben den Siegwert, bleiben die Koepfe die des
+    // Zustands VOR dem Uebergang (dieselben, die der Bestand ablegt). Ausserhalb
+    // von Modus B `None`: keine Rechnung, keine Warnung.
+    let aggr_opp_pts_leaf = search_config
+        .disruptor_eps()
+        .and_then(|(disruptor, _)| disruptor_opp_points(&state, disruptor, disruptor_opp_head));
 
     Node {
         parent,
@@ -4465,6 +4576,9 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         // Klasse S: im Bestand `== leaf_value` (siehe oben).
         own_leaf_value,
         own_value_sum: 0.0,
+        aggr_opp_pts_leaf,
+        aggr_opp_pts_sum: 0.0,
+        aggr_opp_pts_n: 0,
         halving_min_visits: 0,
         dice: DiceNodeKind::Decision,
         dice_members,
@@ -4941,11 +5055,19 @@ fn backprop_path(nodes: &mut [Node], leaf_nid: usize) {
     // unvermischten Wert, gleiche Perspektive wie `value`. Im Bestand
     // `own_leaf_value == leaf_value`, also `own_value_sum == value`.
     let own = nodes[leaf_nid].own_leaf_value;
+    // Klasse S, Modus B (par.5c): Gegnerpunkte des Blatts, Perspektive fest der
+    // Stoerer (kein Index nach `player_who_acted`). Ausserhalb von Modus B
+    // `None`: kein Knoten wird beruehrt.
+    let opp_pts = nodes[leaf_nid].aggr_opp_pts_leaf;
     let mut cur = Some(leaf_nid);
     while let Some(i) = cur {
         nodes[i].visits += 1;
         nodes[i].value += value[nodes[i].player_who_acted];
         nodes[i].own_value_sum += own[nodes[i].player_who_acted];
+        if let Some(x) = opp_pts {
+            nodes[i].aggr_opp_pts_sum += x;
+            nodes[i].aggr_opp_pts_n += 1;
+        }
         update_im_value_backup(nodes, i);
         cur = nodes[i].parent;
     }
@@ -6192,6 +6314,13 @@ fn push_dice_chance_node(nodes: &mut Vec<Node>, nid: usize, act: Action, prior: 
         im_value: p.leaf_value,
         own_leaf_value: p.own_leaf_value,
         own_value_sum: 0.0,
+        // Klasse S, Modus B: wie `own_leaf_value` die Gegnerpunkte des
+        // Elternknotens (gleicher Zustand, gleiche Koepfe); nie Backprop-Quelle
+        // (siehe Funktionskommentar), der Akkumulator fuellt sich ueber die
+        // Ausgaenge darunter.
+        aggr_opp_pts_leaf: p.aggr_opp_pts_leaf,
+        aggr_opp_pts_sum: 0.0,
+        aggr_opp_pts_n: 0,
         halving_min_visits: 0,
         dice: DiceNodeKind::Chance,
         dice_members: None,
@@ -7074,6 +7203,8 @@ fn build_net_tree_for<R: Rng + ?Sized>(
         let value = nodes[nid].leaf_value;
         // Klasse S: Zweitakkumulator wie in `backprop_path`.
         let own = nodes[nid].own_leaf_value;
+        // Klasse S, Modus B: Gegnerpunkte wie in `backprop_path`.
+        let opp_pts = nodes[nid].aggr_opp_pts_leaf;
         logln!(
             "  EVAL   #{nid} ({}) win[{}]={:.3} win[{}]={:.3}",
             if ACTIVE_LEAF == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
@@ -7088,6 +7219,10 @@ fn build_net_tree_for<R: Rng + ?Sized>(
             let delta = value[nodes[i].player_who_acted];
             nodes[i].value += delta;
             nodes[i].own_value_sum += own[nodes[i].player_who_acted];
+            if let Some(x) = opp_pts {
+                nodes[i].aggr_opp_pts_sum += x;
+                nodes[i].aggr_opp_pts_n += 1;
+            }
             if log.is_some() {
                 bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
             }
@@ -7718,11 +7853,29 @@ pub fn net_root_child_stats_policy_and_prior<R: Rng + ?Sized>(
 /// 6.2 Punkt 4). `children`: `(Aktion, Besuche, Q_own)` je Wurzelkind in der
 /// Reihenfolge von `root_child_stats_from_nodes`, `Q_own = own_value_sum /
 /// visits` (unvermischter Siegwert aus Sicht des Wurzelspielers, 0 bei
-/// unbesuchten). `n_min`: Regel [`AGGR_OWN_Q_GAP_N_MIN_RULE`].
+/// unbesuchten). Viertes Element (Klasse S, Modus B, par.5c): mittlere
+/// prognostizierte Gegnerpunkte des Teilbaums, `aggr_opp_pts_sum /
+/// aggr_opp_pts_n` (Punkte, Gegner des Stoerers); `None` ausserhalb von Modus B
+/// und ohne belegten Besuch. `n_min`: Regel [`AGGR_OWN_Q_GAP_N_MIN_RULE`].
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RootOwnStats {
-    pub(crate) children: Vec<(Action, u32, f64)>,
+    pub(crate) children: Vec<(Action, u32, f64, Option<f64>)>,
     pub(crate) n_min: u32,
+}
+
+/// Ergebnis der lexikografischen Stoerer-Wahl an der Wurzel (Klasse S,
+/// Modus B, `PREREG_asymmetric_selfplay.md` par.5c, Reparatur par.5c2).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct DisruptorPick {
+    /// Der gewaehlte Zug: unter den Kandidaten der mit den wenigsten
+    /// prognostizierten Gegnerpunkten.
+    pub(crate) action: Action,
+    /// Der Zug, den die Bestands-Zugwahl gespielt haette (Bezugszug).
+    pub(crate) base_action: Action,
+    /// Gegnerpunkte(Bezugszug) minus Gegnerpunkte(gewaehlt), in Punkten, `>= 0`.
+    pub(crate) opp_drop_pts: f64,
+    /// `action != base_action`.
+    pub(crate) switched: bool,
 }
 
 impl RootOwnStats {
@@ -7733,14 +7886,55 @@ impl RootOwnStats {
     /// selbst unter der Schwelle, kann der Wert negativ werden -- er wird NICHT
     /// geklemmt, damit die Verteilung in S4 ehrlich bleibt.
     pub(crate) fn own_q_gap(&self, chosen: &Action) -> Option<f64> {
-        let q_chosen = self.children.iter().find(|(a, v, _)| a == chosen && *v > 0)?.2;
+        let q_chosen = self.children.iter().find(|(a, v, _, _)| a == chosen && *v > 0)?.2;
         let best = self
             .children
             .iter()
-            .filter(|(_, v, _)| *v > 0 && *v >= self.n_min)
-            .map(|(_, _, q)| *q)
+            .filter(|(_, v, _, _)| *v > 0 && *v >= self.n_min)
+            .map(|(_, _, q, _)| *q)
             .fold(f64::NEG_INFINITY, f64::max);
         best.is_finite().then(|| best - q_chosen)
+    }
+
+    /// Klasse S, Modus B (par.5c, repariert par.5c2): lexikografische Wahl des
+    /// Stoerers RELATIV ZUM BEZUGSZUG `base` -- dem Zug, den die Bestands-Zugwahl
+    /// gespielt haette. Ueberlebende = Wurzelkinder mit `visits > 0` und `visits
+    /// >= n_min` (dieselbe Menge wie bei [`Self::own_q_gap`]). Kandidaten =
+    /// Ueberlebende mit `Q_own(base) - eps <= Q_own <= Q_own(base)` UND belegtem
+    /// Gegnerpunkte-Mittel: der Stoerer weicht nur NACH UNTEN ab, nie zu einem
+    /// eigen-besseren Zug. Die erste Fassung mass gegen das maximale `Q_own` und
+    /// spielte dadurch Q-gierig statt stoerend (S4b, par.5c1). Gewaehlt wird das
+    /// kleinste Mittel (Gleichstand: der Bezugszug, dann hoeheres `Q_own`, dann mehr
+    /// Besuche, dann der fruehere). Bei `eps = 0` ist die Wahl der Bezugszug, ausser
+    /// ein Ueberlebender mit exakt gleichem Q hat weniger Gegnerpunkte. `None`, wenn
+    /// `base` kein Ueberlebender ist oder kein Gegnerpunkte-Mittel hat; der Aufrufer
+    /// faellt dann auf die Bestands-Zugwahl zurueck.
+    pub(crate) fn disruptor_pick(&self, eps: f64, base: &Action) -> Option<DisruptorPick> {
+        type Child = (Action, u32, f64, Option<f64>);
+        let survivors: Vec<&Child> =
+            self.children.iter().filter(|(_, v, _, _)| *v > 0 && *v >= self.n_min).collect();
+        let base_child = survivors.iter().copied().find(|c| c.0 == *base)?;
+        let base_opp = base_child.3?;
+        let (lo, hi) = (base_child.2 - eps, base_child.2);
+        let chosen = survivors
+            .iter()
+            .copied()
+            .filter(|c| c.2 >= lo && c.2 <= hi && c.3.is_some())
+            .reduce(|b, c| {
+                let (bo, co) = (b.3.unwrap_or(f64::INFINITY), c.3.unwrap_or(f64::INFINITY));
+                let better = co < bo
+                    || (co == bo
+                        && b.0 != *base
+                        && (c.0 == *base || c.2 > b.2 || (c.2 == b.2 && c.1 > b.1)));
+                if better { c } else { b }
+            })?;
+        let chosen_opp = chosen.3?;
+        Some(DisruptorPick {
+            action: chosen.0.clone(),
+            base_action: base.clone(),
+            opp_drop_pts: base_opp - chosen_opp,
+            switched: chosen.0 != *base,
+        })
     }
 }
 
@@ -7752,7 +7946,8 @@ fn root_own_stats(nodes: &[Node]) -> RootOwnStats {
         .filter_map(|&cid| {
             let n = &nodes[cid];
             let q = if n.visits > 0 { n.own_value_sum / n.visits as f64 } else { 0.0 };
-            n.action.clone().map(|a| (a, n.visits, q))
+            let opp = (n.aggr_opp_pts_n > 0).then(|| n.aggr_opp_pts_sum / f64::from(n.aggr_opp_pts_n));
+            n.action.clone().map(|a| (a, n.visits, q, opp))
         })
         .collect();
     RootOwnStats { children, n_min: nodes[0].halving_min_visits }
@@ -8825,6 +9020,12 @@ pub fn search_start_placement<R: Rng + ?Sized>(
         // Klasse S: Wurzel von Hand, dieselben Startwerte wie `leaf_value`.
         own_leaf_value: [0.5, 0.5],
         own_value_sum: 0.0,
+        // Klasse S, Modus B: kein Netzaufruf an dieser Wurzel, also kein Wert
+        // (`None` statt Null); die Startsetzungs-Suche laeuft ohnehin ohne
+        // Stoerer-Felder (FS4, `SearchConfig::without_aggr`).
+        aggr_opp_pts_leaf: None,
+        aggr_opp_pts_sum: 0.0,
+        aggr_opp_pts_n: 0,
         halving_min_visits: 0,
         dice: DiceNodeKind::Decision,
         dice_members: None,
@@ -9482,6 +9683,9 @@ mod tests {
             im_value: [0.0, 0.0],
             own_leaf_value: [0.0, 0.0],
             own_value_sum: value,
+            aggr_opp_pts_leaf: None,
+            aggr_opp_pts_sum: 0.0,
+            aggr_opp_pts_n: 0,
             halving_min_visits: 0,
             dice: DiceNodeKind::Decision,
             dice_members: None,
@@ -10229,8 +10433,10 @@ mod tests {
             aggr_w: None,
             aggr_lambda: None,
             aggr_player: None,
+            aggr_eps: None,
             // Klasse W: Bestand (kein Zufallsknoten).
             dome_dice_side: None,
+            dome_dice_last_round: None,
         }
     }
 
@@ -16104,7 +16310,7 @@ mod tests {
     fn own_q_gap_uses_halving_survivors_only() {
         let a = |i: usize| Action::BonusChip(crate::moves::TakeBonusChipMove { factory_id: i });
         let stats = RootOwnStats {
-            children: vec![(a(0), 27, 0.40), (a(1), 26, 0.55), (a(2), 11, 0.90), (a(3), 0, 0.0)],
+            children: vec![(a(0), 27, 0.40, None), (a(1), 26, 0.55, None), (a(2), 11, 0.90, None), (a(3), 0, 0.0, None)],
             n_min: 26,
         };
         assert_eq!(stats.own_q_gap(&a(1)), Some(0.0));
@@ -16126,7 +16332,7 @@ mod tests {
             let max_n = own.children.iter().map(|c| c.1).max().unwrap_or(0);
             assert!(own.n_min > 0 && own.n_min <= max_n, "Spiel {gi}: n_min {} max {max_n}", own.n_min);
             assert!(max_n - own.n_min <= 1, "Spiel {gi}: Finalisten streuen hoechstens um 1");
-            let finalists: Vec<&(Action, u32, f64)> = own.children.iter().filter(|c| c.1 >= own.n_min).collect();
+            let finalists: Vec<&(Action, u32, f64, Option<f64>)> = own.children.iter().filter(|c| c.1 >= own.n_min).collect();
             assert!(!finalists.is_empty());
             for f in &finalists {
                 assert!(own.own_q_gap(&f.0).unwrap() >= 0.0, "Spiel {gi}: Finalist mit negativem Abstand");
@@ -16176,6 +16382,211 @@ mod tests {
         let mut r2 = StdRng::seed_from_u64(1);
         let y = search_start_placement(&net, &game.state, pi, 32, false, &mut r2, &on).expect("Startsuche");
         assert_eq!(format!("{x:?}"), format!("{y:?}"));
+    }
+
+    // ── Klasse S, Modus B: lexikografischer Stoerer an der Wurzel (par.5c) ──
+
+    /// So setzt `self_play::aggr_search_config` Modus B: kein Blend, `eps`.
+    fn disruptor_cfg(base: SearchConfig, player: usize, eps: f64) -> SearchConfig {
+        SearchConfig { aggr_w: Some(0.0), aggr_lambda: Some(0.0), aggr_player: Some(player), aggr_eps: Some(eps), ..base }
+    }
+
+    /// `disruptor_pick` an Hand-Statistik (par.5c2): Bezugszug ist der Zug der
+    /// Bestands-Wahl; Kandidaten nur mit `Q(base) - eps <= Q <= Q(base)`, also nie
+    /// ein eigen-besserer Zug; Kinder unter N_min zaehlen nie; Gleichstaende
+    /// bevorzugen den Bezugszug; fehlende Gegnerpunkte-Mittel.
+    #[test]
+    fn disruptor_pick_on_hand_statistics() {
+        let a = |i: usize| Action::BonusChip(crate::moves::TakeBonusChipMove { factory_id: i });
+        let stats = RootOwnStats {
+            children: vec![
+                (a(0), 27, 0.55, Some(40.0)),
+                (a(1), 26, 0.54, Some(30.0)),
+                (a(2), 26, 0.50, Some(20.0)),
+                (a(3), 11, 0.40, Some(5.0)), // unter N_min: nie Kandidat
+                (a(4), 0, 0.0, None),
+            ],
+            n_min: 26,
+        };
+        // Bezugszug a(0): eps 0 -> keine Abweichung; 0,02 -> a(1); 1 -> a(2).
+        let p = stats.disruptor_pick(0.0, &a(0)).expect("eps 0");
+        assert_eq!((p.action.clone(), p.base_action.clone(), p.switched), (a(0), a(0), false));
+        assert_eq!(p.opp_drop_pts, 0.0);
+        let p = stats.disruptor_pick(0.02, &a(0)).expect("eps 0,02");
+        assert_eq!((p.action.clone(), p.switched), (a(1), true));
+        assert!((p.opp_drop_pts - 10.0).abs() < 1e-12);
+        let p = stats.disruptor_pick(1.0, &a(0)).expect("eps 1");
+        assert_eq!((p.action.clone(), p.switched), (a(2), true), "a(3) liegt unter N_min");
+        assert!((p.opp_drop_pts - 20.0).abs() < 1e-12);
+        // Bezugszug a(2) (eigen-schlechtester): KEIN Aufstieg zu a(0)/a(1), auch
+        // nicht bei grossem eps -- das war die Konfundierung der ersten Fassung.
+        for eps in [0.0, 0.05, 1.0] {
+            let p = stats.disruptor_pick(eps, &a(2)).unwrap();
+            assert_eq!((p.action.clone(), p.switched, p.opp_drop_pts), (a(2), false, 0.0), "eps {eps}");
+        }
+        // Bezugszug a(1), eps 1: nur a(1) und a(2) sind Kandidaten -> a(2).
+        let p = stats.disruptor_pick(1.0, &a(1)).unwrap();
+        assert_eq!((p.action.clone(), p.base_action.clone()), (a(2), a(1)));
+        // Eigenwert des gewaehlten Zugs liegt per Konstruktion in [Q(base) - eps, Q(base)].
+        for (base, eps) in [(a(0), 0.0), (a(0), 0.01), (a(0), 0.05), (a(1), 0.02), (a(0), 1.0)] {
+            let p = stats.disruptor_pick(eps, &base).unwrap();
+            let q = |x: &Action| stats.children.iter().find(|c| c.0 == *x).unwrap().2;
+            assert!(q(&p.action) <= q(&base) && q(&p.action) >= q(&base) - eps - 1e-12);
+            assert!(p.opp_drop_pts >= 0.0);
+        }
+
+        // Gleichstand der Gegnerpunkte: der Bezugszug bleibt.
+        let tie = RootOwnStats { children: vec![(a(0), 30, 0.50, Some(10.0)), (a(1), 30, 0.50, Some(10.0))], n_min: 30 };
+        assert_eq!(tie.disruptor_pick(0.1, &a(1)).unwrap().action, a(1));
+        assert_eq!(tie.disruptor_pick(0.1, &a(0)).unwrap().action, a(0));
+        // Gleiches Q, weniger Gegnerpunkte: Wechsel schon bei eps 0.
+        let tie = RootOwnStats { children: vec![(a(0), 30, 0.50, Some(10.0)), (a(1), 30, 0.50, Some(8.0))], n_min: 30 };
+        assert_eq!(tie.disruptor_pick(0.0, &a(0)).unwrap().action, a(1));
+        // Gleiche Gegnerpunkte unter Nicht-Bezugszuegen: hoeheres Q, dann mehr Besuche.
+        let tie = RootOwnStats {
+            children: vec![(a(0), 31, 0.60, Some(10.0)), (a(1), 30, 0.52, Some(9.0)), (a(2), 32, 0.50, Some(9.0))],
+            n_min: 30,
+        };
+        assert_eq!(tie.disruptor_pick(0.2, &a(0)).unwrap().action, a(1));
+        let tie = RootOwnStats {
+            children: vec![(a(0), 31, 0.60, Some(10.0)), (a(1), 30, 0.50, Some(9.0)), (a(2), 32, 0.50, Some(9.0))],
+            n_min: 30,
+        };
+        assert_eq!(tie.disruptor_pick(0.2, &a(0)).unwrap().action, a(2));
+
+        // Fehlende Gegnerpunkte: ein Kandidat ohne Mittel faellt heraus; hat der
+        // Bezugszug keins oder ist er kein Ueberlebender, gibt es keine Wahl.
+        let miss = RootOwnStats { children: vec![(a(0), 30, 0.50, Some(20.0)), (a(1), 30, 0.49, None)], n_min: 30 };
+        let p = miss.disruptor_pick(0.1, &a(0)).unwrap();
+        assert_eq!((p.action.clone(), p.switched), (a(0), false));
+        let miss = RootOwnStats { children: vec![(a(0), 30, 0.50, None), (a(1), 30, 0.49, Some(1.0))], n_min: 30 };
+        assert_eq!(miss.disruptor_pick(0.1, &a(0)), None);
+        assert_eq!(stats.disruptor_pick(0.1, &a(3)), None, "Bezugszug unter N_min");
+        let none = RootOwnStats { children: vec![(a(0), 0, 0.0, None)], n_min: 0 };
+        assert_eq!(none.disruptor_pick(0.1, &a(0)), None, "kein besuchtes Kind");
+    }
+
+    /// Ruecktransformation und Endstand: `head_to_points(tanh(x/50)) == x`,
+    /// Klammerung bei 0,995; am Partieende zaehlt der echte Endstand des
+    /// Gegners; ohne Kopf `None`.
+    #[test]
+    fn disruptor_opp_points_scale_and_terminal() {
+        for x in [-20.0f64, 0.0, 37.0, 48.0, 90.0] {
+            assert!((head_to_points((x / 50.0).tanh()) - x).abs() < 1e-9, "{x}");
+        }
+        assert_eq!(head_to_points(1.0), head_to_points(0.995));
+        let mut s = gumbel_test_state(0);
+        assert_eq!(s.phase, Phase::Drafting);
+        assert_eq!(disruptor_opp_points(&s, 0, None), None, "ohne Kopf kein Wert");
+        let h = (30.0f64 / 50.0).tanh() as f32;
+        assert!((disruptor_opp_points(&s, 0, Some(h)).unwrap() - 30.0).abs() < 1e-4);
+        s.phase = Phase::End;
+        s.players[1].score_unclamped = 37;
+        s.players[0].score_unclamped = 11;
+        assert_eq!(disruptor_opp_points(&s, 0, Some(h)), Some(37.0), "Endstand des Gegners, nicht der Kopf");
+        assert_eq!(disruptor_opp_points(&s, 1, None), Some(11.0));
+    }
+
+    /// Modus B an der `SearchConfig`: `disruptor_eps` nur mit beiden Feldern,
+    /// `without_aggr` streift `aggr_eps` mit ab.
+    #[test]
+    fn disruptor_config_fields() {
+        let base = search_config_off();
+        assert_eq!(base.disruptor_eps(), None);
+        assert_eq!(aggr_cfg(base, 1, 0.1, 1.0).disruptor_eps(), None, "Blend-Modus ist nicht Modus B");
+        let b = disruptor_cfg(base, 1, 0.02);
+        assert_eq!(b.disruptor_eps(), Some((1, 0.02)));
+        assert_eq!(b.without_aggr(), base);
+        assert_eq!(SearchConfig { aggr_eps: Some(0.02), ..base }.disruptor_eps(), None, "eps ohne Stoerer");
+    }
+
+    /// Modus B im Baum (Champion-Netz): dieselben Besuche und Werte wie die
+    /// Bestandssuche (kein Blend), der Gegnerpunkte-Akkumulator ist an jedem
+    /// Knoten bei jedem Besuch belegt; im Bestand bleibt er leer. Das Blatt
+    /// traegt den Kopf aus Sicht des Stoerers: zieht er, `opp_points` seines
+    /// Passes; zieht G, mit geflipptem Pass dessen `opp_points` (Ego Stoerer),
+    /// ohne ihn `points` des Ziehenden.
+    #[test]
+    fn disruptor_accumulator_in_tree() {
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let net = champion_net_for_aggr();
+        assert!(net.has_opp_head(), "Champion ohne opp_points-Kopf -- Testvoraussetzung");
+        let mut rng = StdRng::seed_from_u64(55);
+        let mut checked = 0usize;
+        for gi in 0..6u64 {
+            let Some(state) = random_drafting_state(gi, 8, &mut rng) else { continue };
+            for single_pass in [false, true] {
+                let base = SearchConfig { single_pass_other_val: single_pass, ..search_config_off() };
+                for s in [state.current_player, 1 - state.current_player] {
+                    let mut r1 = StdRng::seed_from_u64(9 + gi);
+                    let a = build_gumbel_tree_inner(&net, None, &state, 32, false, &mut r1, None, true, &base);
+                    let mut r2 = StdRng::seed_from_u64(9 + gi);
+                    let b = build_gumbel_tree_inner(&net, None, &state, 32, false, &mut r2, None, true, &disruptor_cfg(base, s, 0.02));
+                    assert_eq!(a.len(), b.len(), "Spiel {gi}: Baumgroesse");
+                    for (x, y) in a.iter().zip(b.iter()) {
+                        assert_eq!(x.visits, y.visits);
+                        assert_eq!(x.value.to_bits(), y.value.to_bits(), "Spiel {gi}: Modus B mischt nicht");
+                        assert_eq!(x.action, y.action);
+                        assert_eq!((x.aggr_opp_pts_leaf, x.aggr_opp_pts_n), (None, 0), "Bestand ohne Gegnerpunkte");
+                        assert!(y.aggr_opp_pts_leaf.is_some(), "Spiel {gi}: Modus-B-Knoten ohne Wert");
+                        assert_eq!(y.aggr_opp_pts_n, y.visits, "Spiel {gi}: jeder Besuch belegt");
+                    }
+                    let own = root_own_stats(&b);
+                    assert!(own.children.iter().all(|c| (c.1 > 0) == c.3.is_some()), "Mittel genau bei besuchten Kindern");
+                    // Blattquelle an der Wurzel selbst.
+                    let root = &b[0];
+                    let want = if state.current_player == s {
+                        root.opp_points_forecast
+                    } else if single_pass {
+                        root.points_forecast
+                    } else {
+                        let mut flipped = state.clone();
+                        flipped.current_player = s;
+                        let mut r = StdRng::seed_from_u64(1);
+                        make_node(&net, None, flipped, None, None, None, 0.0, 1 - s, &mut r, &base).opp_points_forecast
+                    };
+                    let got = root.aggr_opp_pts_leaf.unwrap();
+                    let want = head_to_points(f64::from(want.expect("Kopf vorhanden")));
+                    assert!((got - want).abs() < 1e-2, "Spiel {gi} s {s} single {single_pass}: {got} gegen {want}");
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked >= 12, "zu wenige Stichproben ({checked})");
+    }
+
+    /// Modus B an der Wurzel (Champion-Netz, par.5c2): Bezugszug ist der
+    /// Ueberlebende mit den meisten Besuchen (wie die argmax-Zugwahl). Mit eps = 0
+    /// bleibt das eigene Q gleich dem des Bezugszugs; mit eps = 1 ist die Wahl unter
+    /// den Ueberlebenden mit Q <= Q(base) die mit den wenigsten Gegnerpunkten.
+    #[test]
+    fn disruptor_pick_on_champion_trees() {
+        let net = champion_net_for_aggr();
+        let mut rng = StdRng::seed_from_u64(77);
+        let (mut checked, mut switched_at_one) = (0usize, 0usize);
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 6, &mut rng) else { continue };
+            let s = state.current_player;
+            let mut r = StdRng::seed_from_u64(gi);
+            let nodes = build_gumbel_tree_inner(&net, None, &state, 64, false, &mut r, None, true, &disruptor_cfg(search_config_off(), s, 0.0));
+            let own = root_own_stats(&nodes);
+            let surv: Vec<&(Action, u32, f64, Option<f64>)> =
+                own.children.iter().filter(|c| c.1 > 0 && c.1 >= own.n_min).collect();
+            let base = surv.iter().max_by_key(|c| c.1).unwrap();
+            let p0 = own.disruptor_pick(0.0, &base.0).expect("eps 0");
+            let c0 = surv.iter().find(|c| c.0 == p0.action).unwrap();
+            assert_eq!(c0.2, base.2, "Spiel {gi}: eps 0 haelt das eigene Q des Bezugszugs");
+            let p1 = own.disruptor_pick(1.0, &base.0).expect("eps 1");
+            let min_opp = surv.iter().filter(|c| c.2 <= base.2).filter_map(|c| c.3).fold(f64::INFINITY, f64::min);
+            let c1 = surv.iter().find(|c| c.0 == p1.action).unwrap();
+            assert_eq!(c1.3.unwrap(), min_opp, "Spiel {gi}: eps 1 waehlt die wenigsten Gegnerpunkte");
+            assert!(c1.2 <= base.2, "Spiel {gi}: nie eigen-besser als der Bezugszug");
+            assert!(p1.opp_drop_pts >= 0.0);
+            switched_at_one += usize::from(p1.switched);
+            checked += 1;
+        }
+        assert!(checked >= 4, "zu wenige Stichproben ({checked})");
+        eprintln!("[disruptor] eps 1: Wechsel in {switched_at_one} von {checked} Wurzeln");
     }
 }
 
@@ -16290,7 +16701,7 @@ mod dome_dice_chance_tests {
         let logits = synthetic_logits(5);
         let moon = [0f32; 5];
         let run = |s: &GameState, side: Option<usize>| {
-            build_untried_actions_dice(s, &logits, &moon, true, MOON_ORDER_VARIANTS_DEFAULT, side)
+            build_untried_actions_dice(s, &logits, &moon, true, MOON_ORDER_VARIANTS_DEFAULT, side, None)
         };
         let (plain, n_plain, m_plain) = run(&st, None);
         assert!(m_plain.is_none());
@@ -16397,7 +16808,7 @@ mod dome_dice_chance_tests {
         let g_nodes = build_gumbel_tree_inner(&net, None, &st_g, 400, false, &mut rng, None, false, &cfg(Some(w)));
         let mut w_open = 0usize;
         for n in &g_nodes {
-            if n.dice == DiceNodeKind::Decision && !n.terminal && dome_dice_chance_applies(&n.state, Some(w)) {
+            if n.dice == DiceNodeKind::Decision && !n.terminal && dome_dice_chance_applies(&n.state, Some(w), None) {
                 let plates = n
                     .children
                     .iter()
@@ -16418,10 +16829,79 @@ mod dome_dice_chance_tests {
         assert!(chance > 0, "der G-Baum legt Zufallsknoten an ({w_open} offene W-Knoten)");
     }
 
+    /// par.5d (Eroeffnungs-Wuerfel), reine Funktion: die Zusammenfassung zur
+    /// Plattenkante gilt nur bis zur Rundengrenze. Runde 1 mit Grenze 1: wie
+    /// ohne Grenze. Runde 2 mit Grenze 1: Kandidaten exakt wie im Bestand
+    /// (`dice_side = None`). Runde 2 mit Grenze 2 bzw. 4: wieder zusammengefasst.
+    #[test]
+    fn collapse_respects_dice_last_round() {
+        let st1 = w_state(11, None);
+        let w = st1.current_player;
+        let logits = synthetic_logits(5);
+        let moon = [0f32; 5];
+        let run = |s: &GameState, side: Option<usize>, last: Option<u32>| {
+            build_untried_actions_dice(s, &logits, &moon, true, MOON_ORDER_VARIANTS_DEFAULT, side, last)
+        };
+        let (a, _, ma) = run(&st1, Some(w), Some(1));
+        let (b, _, mb) = run(&st1, Some(w), None);
+        assert!(ma.is_some(), "Runde 1 liegt in der Wuerfelphase (Grenze 1)");
+        assert_eq!(format!("{a:?}|{ma:?}"), format!("{b:?}|{mb:?}"), "Grenze 1 in Runde 1 wie ohne Grenze");
+
+        let mut st2 = st1.clone();
+        st2.round_number = 2;
+        let (x, _, mx) = run(&st2, Some(w), Some(1));
+        let (y, _, _) = run(&st2, None, None);
+        assert!(mx.is_none(), "Runde 2 nach Grenze 1: keine Plattenkante");
+        assert_eq!(format!("{x:?}"), format!("{y:?}"), "Runde 2 nach Grenze 1: Kandidaten wie im Bestand");
+        assert!(x.iter().filter(|(a, _)| is_dome_plate_action(a)).count() > 1, "alle Plattenaktionen einzeln");
+        for last in [Some(2), Some(4), None] {
+            let (_, _, m) = run(&st2, Some(w), last);
+            assert!(m.is_some(), "Runde 2 mit Grenze {last:?}: zusammengefasst");
+        }
+        assert!(!dome_dice_chance_applies(&st2, Some(w), Some(1)));
+        assert!(dome_dice_chance_applies(&st2, Some(w), Some(2)));
+    }
+
+    /// par.5d, echtes Netz: eine W-Suche in Runde 2 mit Grenze 1 legt KEINEN
+    /// Zufallsknoten und keine Plattenkante an und ist Knoten fuer Knoten der
+    /// Baum ohne Wuerfel-Modell (gleicher Such-Seed); mit Grenze 2 fasst die
+    /// Wurzel wieder zusammen (Positivkontrolle).
+    #[test]
+    fn w_tree_after_last_round_has_no_chance_nodes() {
+        let net = champion();
+        let mut st = w_state(12, Some(&net));
+        st.round_number = 2;
+        let w = st.current_player;
+        let tree = |c: &SearchConfig| {
+            let mut rng = StdRng::seed_from_u64(1);
+            build_gumbel_tree_inner(&net, None, &st, 64, false, &mut rng, None, false, c)
+        };
+        let shape = |nodes: &[Node]| -> Vec<String> {
+            nodes.iter().map(|n| format!("{:?}|{:?}|{}|{:?}", n.parent, n.action, n.visits, n.dice)).collect()
+        };
+        let limited = SearchConfig { dome_dice_last_round: Some(1), ..cfg(Some(w)) };
+        let nodes = tree(&limited);
+        assert!(nodes.iter().all(|n| n.dice == DiceNodeKind::Decision), "kein Zufallsknoten nach der Wuerfelphase");
+        assert!(nodes.iter().all(|n| n.dice_members.is_none()), "keine Plattenkante nach der Wuerfelphase");
+        let root_plates = nodes[0]
+            .children
+            .iter()
+            .filter_map(|&c| nodes[c].action.clone())
+            .chain(nodes[0].untried.iter().map(|(a, _)| a.clone()))
+            .filter(is_dome_plate_action)
+            .count();
+        assert!(root_plates > 1, "W-Wurzel in Runde 2: Plattenaktionen einzeln, waren {root_plates}");
+        assert_eq!(shape(&nodes), shape(&tree(&cfg(None))), "Baum wie ohne Wuerfel-Modell");
+
+        let open = SearchConfig { dome_dice_last_round: Some(2), ..cfg(Some(w)) };
+        let nodes = tree(&open);
+        assert!(nodes[0].dice_members.is_some(), "Grenze 2: Runde 2 liegt in der Wuerfelphase");
+    }
+
     /// Test (b), OHNE Widening (par.3b-Stand, je Thread abgeschaltet): der
     /// Zufallsknoten wuerfelt je Besuch neu und passt in der Verteilung zu
-    /// `roll_dome_dice` (Runde 1, keine Obergrenze, Rueckgabe-Streuung aus:
-    /// Quelle 1/2, Platte 1/Auslage bzw. Tiefe 1/Stapel, Rotation 1/4); gleiche
+    /// `roll_dome_dice` (Runde 1, Rueckgabe-Streuung aus: Quelle gleichverteilt
+    /// ueber Auslageplaetze und oberste Stapelplatte, Rotation 1/4); gleiche
     /// Wuerfe teilen sich einen Ausgang, jeder Ausgang traegt den Pin seines
     /// Wurfs.
     #[test]
@@ -16455,11 +16935,11 @@ mod dome_dice_chance_tests {
             .collect();
         let distinct: std::collections::HashSet<&String> = keys.iter().collect();
         assert_eq!(distinct.len(), keys.len(), "kein Wurf doppelt angelegt");
-        let all = 4 * (display_n + pool_n);
+        assert!(pool_n > 0 && display_n > 0);
+        let all = 4 * (display_n + 1);
         assert!(keys.len() <= all && keys.len() + 4 >= all, "fast alle {all} Ausgaenge gesehen: {}", keys.len());
         // Randverteilungen gegen die Regeln des Wuerfels.
         let mut display = 0usize;
-        let mut by_depth = vec![0usize; pool_n + 1];
         let mut by_tile: HashMap<usize, usize> = HashMap::new();
         let mut by_rot = [0usize; 4];
         for &o in &nodes[cid].children {
@@ -16472,8 +16952,7 @@ mod dome_dice_chance_tests {
                     *by_tile.entry(tile_id).or_default() += k;
                 }
                 DiceRollSource::Stack { depth, depth_max } => {
-                    assert_eq!(depth_max, pool_n, "Runde 1 ohne Obergrenze");
-                    by_depth[depth] += k;
+                    assert_eq!((depth, depth_max), (1, 1), "Stapel heisst oberste Platte");
                 }
             }
             // Ausgang = Zustand nach dem Wurf: Pin gesetzt, W weiter am Zug.
@@ -16482,17 +16961,13 @@ mod dome_dice_chance_tests {
             assert_eq!(nodes[o].state.current_player, w);
             assert_eq!(nodes[o].player_who_acted, w);
         }
-        let frac = display as f64 / n_draws as f64;
-        assert!((0.46..0.54).contains(&frac), "Quelle Auslage {frac:.3}");
+        // Jede Option (Auslageplatz oder Stapel) 1/(Auslage + 1).
+        let e = n_draws as f64 / (display_n + 1) as f64;
         for (t, k) in &by_tile {
-            let e = display as f64 / display_n as f64;
-            assert!((0.8..1.2).contains(&(*k as f64 / e)), "Platte {t}: {k} gegen {e:.0}");
+            assert!((0.85..1.15).contains(&(*k as f64 / e)), "Platte {t}: {k} gegen {e:.0}");
         }
         let stack = n_draws - display;
-        for (d, k) in by_depth.iter().enumerate().skip(1) {
-            let e = stack as f64 / pool_n as f64;
-            assert!((0.7..1.3).contains(&(*k as f64 / e)), "Tiefe {d}: {k} gegen {e:.0}");
-        }
+        assert!((0.85..1.15).contains(&(stack as f64 / e)), "Stapel: {stack} gegen {e:.0}");
         for (i, k) in by_rot.iter().enumerate() {
             assert!((0.9..1.1).contains(&(*k as f64 / (n_draws as f64 / 4.0))), "Rotation {}: {k}", i * 90);
         }
@@ -16511,26 +16986,25 @@ mod dome_dice_chance_tests {
         let mut nodes = vec![root];
         let act = drafting_actions(&st).into_iter().find(|a| is_dome_plate_action(a)).unwrap();
         let cid = push_dice_chance_node(&mut nodes, 0, act, 1.0);
-        let pool_n = st.dome_tile_pool.len();
+        let display_n = st.dome_display.len();
+        assert!(display_n > 0 && !st.dome_tile_pool.is_empty());
         let n = 6400usize;
-        let (mut display, mut by_depth, mut by_rot) = (0usize, vec![0usize; pool_n + 1], [0usize; 4]);
+        let (mut display, mut by_rot) = (0usize, [0usize; 4]);
         for _ in 0..n {
             match dice_chance_choice(&nodes, cid, &mut rng, true).expect("Wurf") {
                 DiceChoice::New(r) => {
                     by_rot[(r.rotation / 90) as usize] += 1;
                     match r.source {
                         DiceRollSource::Display { .. } => display += 1,
-                        DiceRollSource::Stack { depth, .. } => by_depth[depth] += 1,
+                        DiceRollSource::Stack { depth, depth_max } => assert_eq!((depth, depth_max), (1, 1)),
                     }
                 }
                 DiceChoice::Existing(_) => panic!("frischer Zufallsknoten hat keinen Ausgang"),
             }
         }
-        assert!((0.46..0.54).contains(&(display as f64 / n as f64)));
-        let e = (n - display) as f64 / pool_n as f64;
-        for (d, k) in by_depth.iter().enumerate().skip(1) {
-            assert!((0.7..1.3).contains(&(*k as f64 / e)), "Tiefe {d}: {k} gegen {e:.0}");
-        }
+        let want = display_n as f64 / (display_n + 1) as f64;
+        let got = display as f64 / n as f64;
+        assert!((got - want).abs() < 0.04, "Quelle Auslage {got:.3} gegen {want:.3}");
         for k in by_rot {
             assert!((0.9..1.1).contains(&(k as f64 / (n as f64 / 4.0))));
         }
@@ -16620,6 +17094,9 @@ mod dome_dice_chance_tests {
             im_value: [0.5, 0.5],
             own_leaf_value: [0.5, 0.5],
             own_value_sum: 0.0,
+            aggr_opp_pts_leaf: None,
+            aggr_opp_pts_sum: 0.0,
+            aggr_opp_pts_n: 0,
             halving_min_visits: 0,
             dice: DiceNodeKind::Decision,
             dice_members: None,

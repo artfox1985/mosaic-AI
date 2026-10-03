@@ -850,12 +850,16 @@ fn engine_config_json() -> String {
         // `tie_mirror` mit derselben OnceLock-Regel (Variable setzen, DANN lesen).
         "tie_mirror_p": crate::tie_mirror::tie_mirror_p(),
         // Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a): Wuerfel-Knopf,
-        // Sim-Budget der Platzsuche und die festen Tiefen-Obergrenzen je Runde
-        // 1..4 (null = keine). Env-Knoepfe, keine Spec-Felder: ein Rezept kann sie
+        // Sim-Budget der Platzsuche und die Quellenregel des Wuerfels (par.5b).
+        // Env-Knoepfe, keine Spec-Felder: ein Rezept kann sie
         // je Klasse ueber `expect_engine_config` pruefen. OnceLock-Regel wie oben.
         "dome_dice": u8::from(crate::self_play::dome_dice_enabled()),
         "dome_dice_sims": crate::self_play::dome_dice_sims(),
-        "dome_dice_caps": crate::self_play::DOME_DICE_DEPTH_CAPS.to_vec(),
+        "dome_dice_source_rule": crate::self_play::DOME_DICE_SOURCE_RULE,
+        // par.5d (Eroeffnungs-Wuerfel): letzte Wuerfelrunde. Wie in der Erzeugung
+        // NUR bei `dome_dice = 1` gelesen; sonst null (ohne Klasse W ohne Wirkung).
+        "dome_dice_last_round": crate::self_play::dome_dice_enabled()
+            .then(crate::self_play::dome_dice_last_round),
         // par.3b: wie die Suchen einer W-Partie die W-Platten modellieren
         // (Regelname, Muster `aggr_own_q_gap_n_min_rule`); trennt im Manifest
         // Laeufe vor und nach dem Zufallsknoten.
@@ -870,6 +874,11 @@ fn engine_config_json() -> String {
         "aggr_side": u8::from(crate::self_play::aggr_side_enabled()),
         "aggr_side_w": crate::self_play::aggr_side_w(),
         "aggr_side_lambda": crate::self_play::aggr_side_lambda(),
+        // Modus B (PREREG_asymmetric_selfplay.md par.5c): eps der
+        // lexikografischen Wurzelwahl (null = ungesetzt oder ungueltig) und der
+        // Modus ("lexicographic_root" | "leaf_blend" | null = Klasse S aus).
+        "aggr_side_eps": crate::self_play::aggr_side_eps(),
+        "aggr_side_mode": crate::self_play::aggr_side_mode(),
         "aggr_own_q_gap_n_min_rule": crate::net_mcts::AGGR_OWN_Q_GAP_N_MIN_RULE,
         // Code-Review 2026-09-26 #13: eigener Label-Strom (rtv/Bootstrap) statt
         // Partie-RNG. Aendert Self-Play-Bytes, darum im Manifest; OnceLock-Regel
