@@ -1,0 +1,124 @@
+{
+  "recipe_version": 1,
+  "tool": "self_play",
+  "description": "Sonden S1-S4 des asymmetrischen Self-Plays (evaluations/PREREG_asymmetric_selfplay.md par.5), je Klasse 100 Partien in einem eigenen Datenordner (MOSAIC_DATA_DIR=data/probe_asym). Generator, Spec und Env wie models/v35.recipe.json (v34-b01, R5 per Netz @400, sonst 100 Sims, Spiegelknopf, E1). S1 vergleicht policy und policy-dice bei gleichem Seed; S4 je lambda-Stufe eine Klasse, weil der Waechter lambda prueft.",
+  "common": {
+    "mode": "network",
+    "model": "models/alphazero_v34-b01_brierbest.onnx",
+    "spec": "models/v35_generation.spec.json",
+    "games": 100,
+    "sims": 100,
+    "threads": 11,
+    "chunk": 10,
+    "per_file": 10,
+    "return_order_random_p": 0.81,
+    "tau_argmax_from_move": 1,
+    "start_slot_random_p": 0.15,
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true
+  },
+  "env": {
+    "MOSAIC_STACK_DRAW_RESEARCH": "1",
+    "MOSAIC_SINGLE_PASS_OTHER_VAL": "1",
+    "MOSAIC_R5_NET_SOLVER": "0"
+  },
+  "classes": {
+    "policy": {
+      "description": "S1-Bezug: Sockel G gegen G wie die v34-policy-Klasse (Weg C), Seed wie policy-dice.",
+      "version": "probe-v35-policy",
+      "seed": 20261720,
+      "deviate_prob": 1.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0
+      }
+    },
+    "policy-dice": {
+      "description": "S1-S3: G gegen W (Wuerfel), Platzsuche @600 deterministisch, eine zugewiesene Platte im Baum (par.3d).",
+      "version": "probe-v35-policy-dice",
+      "seed": 20261720,
+      "deviate_prob": 1.0,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "aggr_side": 0
+      }
+    },
+    "policy-aggr-l0": {
+      "description": "S4: G gegen S, w = 0,1 (FS2), lambda = 0.0.",
+      "version": "probe-v35-policy-aggr-l0",
+      "seed": 20261724,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_w": 0.1,
+      "aggr_side_lambda": 0.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_w": 0.1,
+        "aggr_side_lambda": 0.0
+      }
+    },
+    "policy-aggr-l05": {
+      "description": "S4: G gegen S, w = 0,1 (FS2), lambda = 0.5.",
+      "version": "probe-v35-policy-aggr-l05",
+      "seed": 20261725,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_w": 0.1,
+      "aggr_side_lambda": 0.5,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_w": 0.1,
+        "aggr_side_lambda": 0.5
+      }
+    },
+    "policy-aggr-l1": {
+      "description": "S4: G gegen S, w = 0,1 (FS2), lambda = 1.0.",
+      "version": "probe-v35-policy-aggr-l1",
+      "seed": 20261726,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_w": 0.1,
+      "aggr_side_lambda": 1.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_w": 0.1,
+        "aggr_side_lambda": 1.0
+      }
+    },
+    "policy-aggr-l2": {
+      "description": "S4: G gegen S, w = 0,1 (FS2), lambda = 2.0.",
+      "version": "probe-v35-policy-aggr-l2",
+      "seed": 20261727,
+      "deviate_prob": 1.0,
+      "aggr_side": true,
+      "aggr_side_w": 0.1,
+      "aggr_side_lambda": 2.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 1,
+        "aggr_side_w": 0.1,
+        "aggr_side_lambda": 2.0
+      }
+    }
+  },
+  "expect_engine_config": {
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true,
+    "single_pass_other_val": true,
+    "r5_net_solver": false
+  }
+}
