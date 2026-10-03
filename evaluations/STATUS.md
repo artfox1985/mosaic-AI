@@ -66,7 +66,7 @@ par.6e-6g); R4-Substrat eingefroren; `v33_window` und `tie_mirror` geschlossen.
 * Kostentor der Erzeugung (par.8a): Runde 5 per Netz +11,5 % je Partie (2,727 gegen 2,446 s).
 * v33-Kontrolle der Offline-Pruefung (`PREREG_targeted_branching.md` par.7b): DiD(v33) -0,00071
   [-0,00160; +0,00020].
-* Generator `v33-b01` eingefroren (`models/frozen_champions/v33-b01`, Rolle generator, Golden Probe,
+* Generator `v33-b01` eingefroren (`models/frozen_champions/v33-b01`, am 2026-10-03 geloescht, restic `4c985a1f`; Golden Probe,
   Referee-Selbsttest gruen); restic daily `a3755374` mit Pruefung; Aufraeumen A-H mit Freigabe
   (`data/` 9,5 -> 2,0 GB, Liste im Generationsbericht v33).
 
@@ -254,8 +254,9 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
 
 1. ~~Promotion v34-b01~~ ENTSCHIEDEN 2026-10-02 (ja, `PREREG_v34_window.md` par.10d); Ablauf nach dem
    Neustart, Abschnitt 1.
-2. **Loeschfreigabe** `data/selfplay_v30-b02-policy_*` (400 Dateien, restic `a3755374`; das R4-Substrat
-   ist eingefroren), pfadgenau.
+2. ~~Loeschfreigaben~~ ERLEDIGT 2026-10-03 (Nutzer: *"erteilt"*): `frozen_champions/v31-b01` und `v33-b01`,
+   `data/selfplay_v30-b02-policy_*` (400), `data/probe_r5sims` (44), `probe_r5cost` (33), `probe_v35smoke` (6);
+   je Gruppe Trefferzahl = Dateizahl in restic `4c985a1f` (2026-10-03 11:15), keine Links.
 3. **Code-Review 2, nur nach Entscheid:** #17 (Loeser-Prognose ohne Untergrenze 0), #18, #19
    (Anker- bzw. Regelpfad, danach Anker-Invarianz).
 4. **Asymmetrisches Self-Play, offene Punkte im Entwurf** (`PREREG_asymmetric_selfplay.md`):

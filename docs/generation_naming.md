@@ -189,7 +189,7 @@ Weitere Arme ab `v29-b12` nur mit eigener Registrierung. Kein Knopf-Suffix im Na
 
 **Reserviert 2026-10-01 (Generationswechsel v33 -> v34):**
 **`v34-b01`** (Grundarm der Generation v34 auf dem v34-Fenster, `PREREG_v34_window.md` par.1/par.6;
-Generator der Erzeugung ist `v33-b01_brierbest`, eingefroren unter `models/frozen_champions/v33-b01`,
+Generator der Erzeugung ist `v33-b01_brierbest`, eingefroren unter `models/frozen_champions/v33-b01` (am 2026-10-03 geloescht, restic `4c985a1f`),
 Rolle generator, KEIN Champion). Fensterzuschnitt in b04-Form: die ganze v34-Erzeugung plus aus G-1
 (`v32-b01-*`) und G-2 (`v31-b01-*`) NUR die Policy-Traeger. Seed **20260961**, Val-Pool
 `^selfplay_v33-b01-`. Die Erzeugungsdateien heissen nach dem GENERATOR: `selfplay_v33-b01-policy_*`,

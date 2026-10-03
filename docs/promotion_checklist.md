@@ -106,14 +106,16 @@ Gedaechtnis:
    Die Aufrufe von v32 (Rezept und Seeds wie bei v31):
 
    ```
-   python -X utf8 -u tools/r4_value_calibration.py --models models/alphazero_<neu>.pth --sims 400 --c-puct 1.5 --n-states 72 --k-refills 16 --data-glob "data/selfplay_v30-b02-policy_*.pkl" --state-seed 20260803 --n-bootstrap 1000 --out evaluations/artifacts/r4_value_calibration_<neu>_n72.json
+   python -X utf8 -u tools/r4_value_calibration.py --models models/alphazero_<neu>.pth --sims 400 --c-puct 1.5 --n-states 72 --k-refills 16 --states-file data/frozen_substrates/r4_states_v30-b02-policy_seed20260803_n72.json --state-seed 20260803 --n-bootstrap 1000 --out evaluations/artifacts/r4_value_calibration_<neu>_n72.json
    python -X utf8 -u tools/r4b_zone_probe.py --r4b-json evaluations/artifacts/r4_value_calibration_<neu>_n72.json --model-key models/alphazero_<neu>.pth --out evaluations/artifacts/r4b_zone_probe_<neu>.json
    ```
 
    **Paarungs-Belege, je einer:** R4 -- `game_id`, `true_margin`, `true_winprob` Zustand fuer
-   Zustand identisch. Kosten gemessen: R4 2.756 s einkernig, R4b 43 s. **R4-Substrat rotiert beim v34-Wechsel heraus**
-   (`selfplay_v30-b02-*`); danach ist die Reihe nur noch gepaart, wenn die 72 Zustaende vorher
-   gesichert wurden.
+   Zustand identisch. Kosten gemessen: R4 2.756 s einkernig, R4b 43 s. **R4-Substrat seit 2026-10-02
+   eingefroren** (`data/frozen_substrates/r4_states_v30-b02-policy_seed20260803_n72.json`, sha256
+   `f2e173d1...`, game_ids gegen die Referenz geprueft); die Quelldateien `selfplay_v30-b02-policy_*`
+   sind am 2026-10-03 geloescht (restic `4c985a1f`). Seit v34-b01 laeuft R4 auf dieser Datei
+   (`--states-file`), gepaart gegen v32-b01.
 
    5b. **Anzeige-Kalibrierung nachziehen**: Platt-Parameter A/B des NEUEN
    Champions in `server.py` (`_DISPLAY_CAL_A/_B`) eintragen -- sie sind
