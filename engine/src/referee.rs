@@ -460,6 +460,51 @@ fn load_cached<'a>(nets: &'a mut std::collections::HashMap<String, Net>, path: &
     Ok(nets.get(path).expect("gerade eingefuegt"))
 }
 
+/// Deckel der Aufloese-Schleife in `advance_to_decision` je Aufruf (Code-Review
+/// 2026-10-02 Befund 22e). Bis dahin lief die Schleife ohne Deckel, und ein
+/// fehlgeschlagener Schritt (per `let _ =` verschluckt) liess den Zustand
+/// unveraendert: derselbe Schritt kam wieder, die Schleife lief endlos, und
+/// der Python-Treiber (`tools/frozen_referee_match.py`, eigener Deckel 100.000)
+/// bekam die Kontrolle nie zurueck. Wert: `MAX_GAME_STEPS` der Arena-Schleifen
+/// (self_play.rs) -- ein Aufruf loest hoechstens die Startsetzungen oder EINE
+/// Tiling-Phase auf, das ist weit darunter.
+const ADVANCE_ITERATION_CAP: u32 = crate::self_play::MAX_GAME_STEPS;
+
+/// `Err`, sobald die Aufloese-Schleife den Deckel ueberschreitet.
+fn check_advance_iterations(iterations: u32, steps: u32) -> Result<(), String> {
+    if iterations > ADVANCE_ITERATION_CAP {
+        return Err(format!(
+            "advance_to_decision: mehr als {ADVANCE_ITERATION_CAP} Aufloese-Schritte ohne              Entscheidung (steps={steps}) -- Haenger, kein stiller Weiterlauf."
+        ));
+    }
+    Ok(())
+}
+
+impl RefereeGame {
+    /// Wendet einen Tiling-Schritt an und meldet einen Fehlschlag als `Err`
+    /// (Code-Review 2026-10-02 Befund 22e: vorher `let _ =`). `apply_single_tiling`
+    /// und `apply_tiling` pruefen VOR jeder Aenderung, ein `Err` heisst also
+    /// "Zustand unveraendert" -- weiterzulaufen hiesse, denselben Schritt erneut
+    /// zu waehlen.
+    fn apply_tiling_step_checked(&mut self, pi: usize, step: &TilingStep) -> Result<(), String> {
+        match step {
+            TilingStep::Place(ta) => self
+                .game
+                .apply_single_tiling(pi, ta)
+                .map(|_| ())
+                .map_err(|e| format!("Tiling-Schritt {step:?} fuer Spieler {pi} fehlgeschlagen: {e}")),
+            TilingStep::Chips { row, chips } => {
+                apply_bonus_chips_with(&mut self.game.state.players[pi], *row, chips);
+                Ok(())
+            }
+            TilingStep::End => self
+                .game
+                .apply_tiling(&TilingMove::EndTiling { player: pi }, &mut self.rng)
+                .map_err(|e| format!("EndTiling fuer Spieler {pi} fehlgeschlagen: {e}")),
+        }
+    }
+}
+
 #[pymethods]
 impl RefereeGame {
     /// Baut den Startzustand GENAU wie `run_net_vs_net_arena`s `play`-Closure
@@ -586,7 +631,10 @@ impl RefereeGame {
         spec_p0: Option<String>, spec_p1: Option<String>, start_sims: Option<u32>,
     ) -> PyResult<String> {
         let externe = external_players.unwrap_or_default();
+        let mut iterations = 0u32;
         loop {
+            iterations += 1;
+            check_advance_iterations(iterations, self.steps).map_err(PyValueError::new_err)?;
             match self.game.state.phase {
                 Phase::StartPlacement | Phase::Drafting => {
                     if self.game.state.players.iter().any(|p| p.start_tile_pending) {
@@ -644,7 +692,12 @@ impl RefereeGame {
                         };
                         match placement {
                             Some((tid, r, c2, rot)) => {
-                                let _ = apply_start_placement(&mut self.game.state, pi, tid, r, c2, rot);
+                                // Befund 22e: Fehlschlag melden statt verschlucken.
+                                apply_start_placement(&mut self.game.state, pi, tid, r, c2, rot).map_err(|e| {
+                                    PyValueError::new_err(format!(
+                                        "advance_to_decision: Startsetzung ({tid}, {r}, {c2}, {rot}) fuer                                          Spieler {pi} fehlgeschlagen: {e}"
+                                    ))
+                                })?;
                             }
                             None => return Ok("stuck".to_string()),
                         }
@@ -680,17 +733,9 @@ impl RefereeGame {
                         _ => crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
                     };
                     let step = resolve_tiling_step_tiebreak(&self.game.state, pi, net, tiebreak);
-                    match step {
-                        TilingStep::Place(ta) => {
-                            let _ = self.game.apply_single_tiling(pi, &ta);
-                        }
-                        TilingStep::Chips { row, chips } => {
-                            apply_bonus_chips_with(&mut self.game.state.players[pi], row, &chips);
-                        }
-                        TilingStep::End => {
-                            let _ = self.game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut self.rng);
-                        }
-                    }
+                    // Befund 22e: Fehlschlag melden statt verschlucken.
+                    self.apply_tiling_step_checked(pi, &step)
+                        .map_err(|e| PyValueError::new_err(format!("advance_to_decision: {e}")))?;
                     self.steps += 1;
                 }
                 _ => return Ok("game_over".to_string()),
@@ -742,7 +787,11 @@ impl RefereeGame {
                 legal.len()
             )));
         }
-        let _ = apply_start_placement(&mut self.game.state, pi, tid, r, c, rot);
+        // Befund 22e: eine legale Setzung, die nicht anwendbar ist, ist ein
+        // Engine-Widerspruch -- melden statt still als Schritt zaehlen.
+        apply_start_placement(&mut self.game.state, pi, tid, r, c, rot).map_err(|e| {
+            PyValueError::new_err(format!("start_placement_apply_external: Anwenden fehlgeschlagen: {e}"))
+        })?;
         self.pending_start_player = None;
         self.steps += 1;
         Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot}).to_string())
@@ -817,17 +866,9 @@ impl RefereeGame {
                 legal.len()
             )));
         }
-        match &step {
-            TilingStep::Place(ta) => {
-                let _ = self.game.apply_single_tiling(pi, ta);
-            }
-            TilingStep::Chips { row, chips } => {
-                apply_bonus_chips_with(&mut self.game.state.players[pi], *row, chips);
-            }
-            TilingStep::End => {
-                let _ = self.game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut self.rng);
-            }
-        }
+        // Befund 22e: Fehlschlag melden statt verschlucken.
+        self.apply_tiling_step_checked(pi, &step)
+            .map_err(|e| PyValueError::new_err(format!("tiling_apply_external: {e}")))?;
         self.steps += 1;
         Ok(crate::serialize::tiling_step_to_dict(&step).to_string())
     }
@@ -989,5 +1030,52 @@ impl RefereeGame {
         } else {
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod review_2026_10_02_tests {
+    use super::*;
+    use crate::round_end::TilingAction;
+
+    fn new_referee() -> RefereeGame {
+        RefereeGame::new(("A".to_string(), "B".to_string()), 0, 42, None)
+    }
+
+    /// Code-Review 2026-10-02 Befund 22e: ein nicht anwendbarer Tiling-Schritt
+    /// wird als `Err` gemeldet (vorher `let _ =`), und der Zustand bleibt
+    /// unveraendert -- genau die Lage, in der die alte Schleife endlos lief.
+    #[test]
+    fn failed_tiling_step_is_reported_not_swallowed() {
+        let mut rg = new_referee();
+        let before = state_to_json_exact(&rg.game.state, true);
+        // Musterreihe 0 ist leer: dieser Platz-Schritt ist nicht anwendbar.
+        let step = TilingStep::Place(TilingAction { pattern_row: 0, slot_row: 0, slot_col: 0, space_index: 0 });
+        let err = rg.apply_tiling_step_checked(0, &step).expect_err("muss als Fehler gemeldet werden");
+        assert!(err.contains("fehlgeschlagen"), "{err}");
+        assert_eq!(state_to_json_exact(&rg.game.state, true), before, "Zustand unveraendert");
+        // EndTiling ausserhalb der Tiling-Phase: ebenfalls gemeldet.
+        assert!(rg.apply_tiling_step_checked(0, &TilingStep::End).is_err());
+    }
+
+    /// Der Deckel der Aufloese-Schleife greift genau oberhalb von
+    /// `ADVANCE_ITERATION_CAP`.
+    #[test]
+    fn advance_iteration_cap_triggers_above_the_cap() {
+        assert!(check_advance_iterations(1, 0).is_ok());
+        assert!(check_advance_iterations(ADVANCE_ITERATION_CAP, 0).is_ok());
+        let err = check_advance_iterations(ADVANCE_ITERATION_CAP + 1, 7).expect_err("Deckel");
+        assert!(err.contains("steps=7"), "{err}");
+    }
+
+    /// Gegenprobe Bestandspfad: auf einer frischen Partie loest
+    /// `advance_to_decision` beide Startsetzungen per Handregel auf und haelt
+    /// an der ersten Drafting-Entscheidung an -- weder Fehler noch Deckel.
+    #[test]
+    fn advance_to_decision_reaches_drafting_on_fresh_game() {
+        let mut rg = new_referee();
+        let status = rg.advance_to_decision(None, None, None, None, None, None).expect("kein Fehler");
+        assert_eq!(status, "drafting");
+        assert_eq!(rg.steps, 2, "zwei Startsetzungen");
     }
 }

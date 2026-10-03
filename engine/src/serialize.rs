@@ -1118,6 +1118,133 @@ fn player_from_json(v: &Value) -> Result<PlayerBoard, String> {
     })
 }
 
+/// Obergrenze je Farbzaehler in `bag_colors`/`tower_colors` (Code-Review
+/// 2026-10-02 Befund 16). Bewusst die GESAMTZAHL normaler Steine
+/// (`tile::NORMAL_TILES`, 65) und nicht `TILES_PER_COLOR` (13): der Deckel
+/// soll die Aufblaehung eines Zaehlers zu einer Liste begrenzen, nicht die
+/// Steinerhaltung pruefen; ein knapper Deckel koennte sonst ein Alt-Record
+/// abweisen, das an einer Erhaltungsfrage haengt, die mit Speicher und
+/// Haengern nichts zu tun hat.
+const MAX_COLOR_COUNT_IN_JSON: u64 = crate::tile::NORMAL_TILES as u64;
+
+/// Bereichspruefung eines rekonstruierten Zustands (Code-Review 2026-10-02
+/// Befund 16). Prueft genau die Groessen, mit denen spaeter INDIZIERT oder
+/// gerechnet wird und die das JSON frei waehlen kann: Spielerindex und
+/// Spielerzahl, Fabrikzahl, Musterreihen (Zahl, Index, Fuellstand gegen
+/// Kapazitaet, Phantome), Strafleiste, Platten-, Chip- und Wertungs-IDs, Runde,
+/// `tiled_max_row`. Gueltige Zustaende aus der Engine erfuellen alles per
+/// Konstruktion (Fundstellen je Grenze im Kommentar); ein Verstoss wird zum
+/// `Err` statt zu einer Panic, die in Python an `except Exception` vorbeiliefe.
+fn validate_state_ranges(state: &GameState) -> Result<(), String> {
+    use crate::state::{NUM_PLAYERS, NUM_ROUNDS, NUM_SMALL_FACTORIES};
+    let num_dome_designs = crate::dome::NUM_DOME_TILE_DESIGNS;
+    let num_chips = crate::dome::build_bonus_chip_pool().len();
+    let num_scoring = crate::scoring::ALL_SCORING_TILES.len();
+    let num_rows = crate::board::PlayerBoard::new(0, "").pattern_lines.len();
+
+    // Runde: `setup_new_game` startet bei 1, `setup_new_round` zaehlt hoch und
+    // wird nach Runde NUM_ROUNDS nicht mehr gerufen (state.rs).
+    if state.round_number < 1 || state.round_number > NUM_ROUNDS {
+        return Err(format!("json_to_state: round {} ausserhalb 1..={NUM_ROUNDS}", state.round_number));
+    }
+    if state.current_player >= NUM_PLAYERS {
+        return Err(format!("json_to_state: current_player {} ausserhalb 0..{NUM_PLAYERS}", state.current_player));
+    }
+    if state.players.len() != NUM_PLAYERS {
+        return Err(format!("json_to_state: {} Spieler, erwartet {NUM_PLAYERS}", state.players.len()));
+    }
+    // `setup_new_game` legt immer NUM_SMALL_FACTORIES Fabriken an, leere bleiben stehen.
+    if state.factories.len() != NUM_SMALL_FACTORIES {
+        return Err(format!(
+            "json_to_state: {} Fabriken, erwartet {NUM_SMALL_FACTORIES}",
+            state.factories.len()
+        ));
+    }
+    if state.scoring_tile_ids.len() > num_scoring {
+        return Err(format!("json_to_state: {} Wertungsplatten, hoechstens {num_scoring}", state.scoring_tile_ids.len()));
+    }
+    if let Some(&id) = state.scoring_tile_ids.iter().find(|&&id| id >= num_scoring) {
+        return Err(format!("json_to_state: scoring_tile_id {id} ausserhalb 0..{num_scoring}"));
+    }
+    let check_dome_id = |id: usize, what: &str| -> Result<(), String> {
+        if id >= num_dome_designs {
+            return Err(format!("json_to_state: {what}: Kuppelplatte {id} ausserhalb 0..{num_dome_designs}"));
+        }
+        Ok(())
+    };
+    let check_chip_id = |id: usize, what: &str| -> Result<(), String> {
+        if id >= num_chips {
+            return Err(format!("json_to_state: {what}: Bonuschip {id} ausserhalb 0..{num_chips}"));
+        }
+        Ok(())
+    };
+    for t in state.dome_display.iter() {
+        check_dome_id(t.tile_id, "dome_display")?;
+    }
+    for t in state.pending_stack_draw.iter() {
+        check_dome_id(t.tile_id, "pending_stack_draw")?;
+    }
+    for f in state.factories.iter() {
+        if let Some(c) = &f.bonus_chip {
+            check_chip_id(c.chip_id, "factories.bonus_chip")?;
+        }
+    }
+    for (pi, p) in state.players.iter().enumerate() {
+        if p.player_id >= NUM_PLAYERS {
+            return Err(format!("json_to_state: players[{pi}].id {} ausserhalb 0..{NUM_PLAYERS}", p.player_id));
+        }
+        // `PlayerBoard::new` legt die Reihen 0..6 an; `capacity()` = index + 1,
+        // `spaces_left()` rechnet `capacity - tiles.len()` (board.rs) und liefe
+        // bei Ueberfuellung unter null.
+        if p.pattern_lines.len() != num_rows {
+            return Err(format!(
+                "json_to_state: players[{pi}] hat {} Musterreihen, erwartet {num_rows}",
+                p.pattern_lines.len()
+            ));
+        }
+        for (ri, line) in p.pattern_lines.iter().enumerate() {
+            if line.row_index != ri {
+                return Err(format!("json_to_state: players[{pi}].pattern_lines[{ri}].index ist {}", line.row_index));
+            }
+            if line.tiles.len() > line.capacity() {
+                return Err(format!(
+                    "json_to_state: players[{pi}].pattern_lines[{ri}] traegt {} Steine bei Kapazitaet {}",
+                    line.tiles.len(),
+                    line.capacity()
+                ));
+            }
+            if line.phantom_count > line.tiles.len() {
+                return Err(format!(
+                    "json_to_state: players[{pi}].pattern_lines[{ri}].phantom_count {} > {} Steine",
+                    line.phantom_count,
+                    line.tiles.len()
+                ));
+            }
+        }
+        // Die Strafleiste waechst nur ueber `add_broken`, das bei MAX_BROKEN deckelt (board.rs).
+        if p.broken_tiles.len() > crate::board::MAX_BROKEN {
+            return Err(format!(
+                "json_to_state: players[{pi}].floor traegt {} Steine, hoechstens {}",
+                p.broken_tiles.len(),
+                crate::board::MAX_BROKEN
+            ));
+        }
+        // -1 = noch nichts getafelt, sonst ein Musterreihen-Index (round_end.rs).
+        if p.tiled_max_row < -1 || p.tiled_max_row >= num_rows as i32 {
+            return Err(format!("json_to_state: players[{pi}].tiled_max_row {} ausserhalb -1..{num_rows}", p.tiled_max_row));
+        }
+        for row in p.dome_grid.dome_slots.iter() {
+            for t in row.iter().flatten() {
+                check_dome_id(t.tile_id, "dome_grid")?;
+            }
+        }
+        for c in p.bonus_chips.iter() {
+            check_chip_id(c.chip_id, "players.bonus_chips")?;
+        }
+    }
+    Ok(())
+}
+
 /// Baut aus einem Farb-Zähl-Array (`bag_colors`/`tower_colors`, Reihenfolge
 /// `TileColor::NORMAL`) eine konkrete, neu gemischte Fliesenliste -- die exakte
 /// Reihenfolge ist für beide Spieler ohnehin verdecktes Wissen (s.o. Kategorie 1).
@@ -1133,6 +1260,14 @@ fn color_counts_to_tiles<R: Rng + ?Sized>(counts_json: &[Value], rng: &mut R) ->
         let n = counts_json[i]
             .as_u64()
             .ok_or_else(|| "json_to_state: Farb-Zähler ist keine Zahl".to_string())?;
+        // Code-Review 2026-10-02 Befund 16: der Zaehler wird hier zu einer
+        // Liste AUFGEBLAEHT -- ohne Deckel liefe `[1e18, ...]` in Speicher und
+        // Haenger. Deckel siehe `MAX_COLOR_COUNT_IN_JSON`.
+        if n > MAX_COLOR_COUNT_IN_JSON {
+            return Err(format!(
+                "json_to_state: Farb-Zähler {n} ueber dem Deckel {MAX_COLOR_COUNT_IN_JSON}"
+            ));
+        }
         for _ in 0..n {
             tiles.push(c);
         }
@@ -1268,7 +1403,7 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
         .map(|s| s.as_str().map(|x| x.to_string()).ok_or_else(|| "json_to_state: log-Eintrag kein String".to_string()))
         .collect::<Result<_, _>>()?;
 
-    Ok(GameState {
+    let state = GameState {
         bag,
         tower,
         factories,
@@ -1301,7 +1436,11 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
         phase,
         log,
         tiling_done: [false, false], // s.o.: für Phase::Drafting per Konstruktion korrekt
-    })
+    };
+    // Code-Review 2026-10-02 Befund 16: Bereiche pruefen, bevor irgendein
+    // Konsument mit diesen Werten indiziert.
+    validate_state_ranges(&state)?;
+    Ok(state)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1907,7 +2046,85 @@ pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
     // der Aufruf hier entfaellt ERSATZLOS (nicht mehr noetig, keine
     // Naeherung mehr uebrig, die er reparieren muesste).
 
+    validate_exact_ranges(&state)?;
     Ok(state)
+}
+
+/// Bereichspruefung der Felder, die NUR der exact-Pfad setzt (Code-Review
+/// 2026-10-02 Befund 16; die Basisfelder prueft `json_to_state` selbst). Die
+/// Slot-Koordinaten zeigen in das 3x3-Kuppelraster (`DomeGrid::place_dome_tile`
+/// prueft dort `< 3`, andere Leser indizieren direkt), Spielerindizes in
+/// `players`, Platten-IDs in den Katalog.
+fn validate_exact_ranges(state: &GameState) -> Result<(), String> {
+    use crate::state::NUM_PLAYERS;
+    let num_dome_designs = crate::dome::NUM_DOME_TILE_DESIGNS;
+    let slot_ok = |r: usize, c: usize| r < 3 && c < 3;
+    if state.first_player_next_round >= NUM_PLAYERS {
+        return Err(format!(
+            "json_to_state_exact: first_player_next_round_exact {} ausserhalb 0..{NUM_PLAYERS}",
+            state.first_player_next_round
+        ));
+    }
+    for (pi, p) in state.players.iter().enumerate() {
+        if p.tiled_max_row < -1 || p.tiled_max_row >= p.pattern_lines.len() as i32 {
+            return Err(format!("json_to_state_exact: tiled_max_row_exact[{pi}] = {} ausserhalb", p.tiled_max_row));
+        }
+        // Negativ im JSON wird beim `as u32` riesig und faellt hier ebenfalls heraus.
+        if p.dome_tiles_placed_this_round > crate::board::MAX_DOME_SLOTS as u32 {
+            return Err(format!(
+                "json_to_state_exact: dome_tiles_placed_this_round_exact[{pi}] = {} ausserhalb",
+                p.dome_tiles_placed_this_round
+            ));
+        }
+    }
+    if let Some(b) = state.dome_pool_known_blocks.iter().find(|b| b.returner >= NUM_PLAYERS) {
+        return Err(format!("json_to_state_exact: dome_pool_known_blocks_exact.returner {} ausserhalb", b.returner));
+    }
+    match &state.pending_dome_choice {
+        None => {}
+        Some(PendingDomeChoice::FromDisplay { dome_tile_id, slot_row, slot_col }) => {
+            if *dome_tile_id >= num_dome_designs || !slot_ok(*slot_row, *slot_col) {
+                return Err(format!(
+                    "json_to_state_exact: pending_dome_choice_exact ausserhalb (Platte {dome_tile_id}, Slot {slot_row}/{slot_col})"
+                ));
+            }
+        }
+        Some(PendingDomeChoice::FromDrawStack { chosen_id, slot_row, slot_col, .. }) => {
+            if *chosen_id >= num_dome_designs || !slot_ok(*slot_row, *slot_col) {
+                return Err(format!(
+                    "json_to_state_exact: pending_dome_choice_exact ausserhalb (Platte {chosen_id}, Slot {slot_row}/{slot_col})"
+                ));
+            }
+        }
+    }
+    // `factory_id` ist 1..=NUM_SMALL_FACTORIES (moves.rs `PendingMoonOrder`).
+    if let Some(p) = &state.pending_moon_order {
+        if p.factory_id < 1 || p.factory_id > crate::state::NUM_SMALL_FACTORIES {
+            return Err(format!("json_to_state_exact: pending_moon_order_exact.factory_id {} ausserhalb", p.factory_id));
+        }
+    }
+    if let Some(p) = &state.pending_return_order {
+        if p.chosen_id >= num_dome_designs || !slot_ok(p.slot_row, p.slot_col) {
+            return Err(format!(
+                "json_to_state_exact: pending_return_order_exact ausserhalb (Platte {}, Slot {}/{})",
+                p.chosen_id, p.slot_row, p.slot_col
+            ));
+        }
+    }
+    if let Some(pin) = &state.dome_dice_pin {
+        let id = match pin.source {
+            crate::moves::DomeDiceSource::Display { tile_id } => tile_id,
+            crate::moves::DomeDiceSource::Stack { chosen_id } => chosen_id,
+        };
+        // Rotation in Grad, 0/90/180/270 (moves.rs `DomeDicePin`).
+        if pin.player >= NUM_PLAYERS || id >= num_dome_designs || pin.rotation % 90 != 0 || pin.rotation >= 360 {
+            return Err(format!(
+                "json_to_state_exact: dome_dice_pin_exact ausserhalb (Spieler {}, Platte {id}, Rotation {})",
+                pin.player, pin.rotation
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2251,6 +2468,54 @@ mod json_to_state_exact_tests {
         let mut rng = StdRng::seed_from_u64(31);
         let state = crate::state::setup_new_game(names(), 0, &mut rng);
         assert_roundtrip_exact(&state, "frischer Spielstart (start_placement)");
+    }
+
+    /// Code-Review 2026-10-02 Befund 16, exact-Pfad: Spielerindex, Slot- und
+    /// Platten-Indizes der nur hier gesetzten Felder werden geprueft (`Err`
+    /// statt Panic); der unveraenderte Zustand laedt weiter.
+    #[test]
+    fn json_to_state_exact_rejects_out_of_range_values() {
+        let mut rng = StdRng::seed_from_u64(31);
+        let state = crate::state::setup_new_game(names(), 0, &mut rng);
+        let json = state_to_json_exact(&state, true);
+        json_to_state_exact(&json).expect("gueltiger Ausgangszustand laedt");
+        let cases: Vec<(&str, &str, Value)> = vec![
+            ("Startspieler 2", "first_player_next_round_exact", json!(2)),
+            (
+                "Slot 3",
+                "pending_dome_choice_exact",
+                json!({"kind": "from_display", "dome_tile_id": 0, "slot_row": 3, "slot_col": 0}),
+            ),
+            (
+                "Platte 18",
+                "pending_dome_choice_exact",
+                json!({"kind": "from_draw_stack", "chosen_id": 18, "slot_row": 0, "slot_col": 0, "return_order": []}),
+            ),
+            (
+                "Pin-Spieler 2",
+                "dome_dice_pin_exact",
+                json!({"player": 2, "source": {"display": 0}, "rotation": 0}),
+            ),
+            (
+                "Pin-Rotation 45",
+                "dome_dice_pin_exact",
+                json!({"player": 0, "source": {"stack": 0}, "rotation": 45}),
+            ),
+            ("Mondfabrik 0", "pending_moon_order_exact", json!({"factory_id": 0, "remaining": [], "top_down": []})),
+            ("Blockspieler 2", "dome_pool_known_blocks_exact", json!([{"len": 1, "returner": 2}])),
+            ("tiled_max_row 9", "tiled_max_row_exact", json!([9, -1])),
+            ("negativer Plattenzaehler", "dome_tiles_placed_this_round_exact", json!([-1, 0])),
+        ];
+        for (what, key, value) in cases {
+            let mut j = json.clone();
+            j[key] = value;
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| json_to_state_exact(&j).map(|_| ())));
+            match res {
+                Ok(Err(_)) => {}
+                Ok(Ok(())) => panic!("{what}: haette abgewiesen werden muessen"),
+                Err(_) => panic!("{what}: Panic statt Err"),
+            }
+        }
     }
 
     /// (c) JSON-Roundtrip MIT bekannten Rueckgabe-Bloecken
@@ -2996,6 +3261,79 @@ mod json_to_state_tests {
             let mut j = json.clone();
             j["first_player_next_round"] = bad.clone();
             assert!(json_to_state(&j, &mut StdRng::seed_from_u64(1)).is_err(), "{bad} muss abgewiesen werden");
+        }
+    }
+
+    /// Code-Review 2026-10-02 Befund 16: `json_to_state` weist Zustaende mit
+    /// Werten ausserhalb der Bereiche ab, mit denen spaeter indiziert oder
+    /// allokiert wird -- als `Err`, nicht als Panic oder Speicherlauf. Der
+    /// unveraenderte Ausgangszustand laedt weiter (Gegenprobe).
+    #[test]
+    fn json_to_state_rejects_out_of_range_values() {
+        let mut rng = StdRng::seed_from_u64(77);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let json = state_to_json(&state, true);
+        json_to_state(&json, &mut StdRng::seed_from_u64(1)).expect("gueltiger Ausgangszustand laedt");
+        let red = serde_json::json!(TileColor::NORMAL[0].value());
+
+        type Mutation = Box<dyn Fn(&mut Value)>;
+        let cases: Vec<(&str, Mutation)> = vec![
+            ("current_player 2", Box::new(|j| j["current_player"] = serde_json::json!(2))),
+            ("round 0", Box::new(|j| j["round"] = serde_json::json!(0))),
+            ("round 6", Box::new(|j| j["round"] = serde_json::json!(6))),
+            ("ein Spieler zu wenig", Box::new(|j| {
+                j["players"].as_array_mut().unwrap().pop();
+            })),
+            ("drei Spieler", Box::new(|j| {
+                let p = j["players"][0].clone();
+                j["players"].as_array_mut().unwrap().push(p);
+            })),
+            ("Spieler-ID 5", Box::new(|j| j["players"][1]["id"] = serde_json::json!(5))),
+            ("fuenf Musterreihen", Box::new(|j| {
+                j["players"][0]["pattern_lines"].as_array_mut().unwrap().pop();
+            })),
+            ("Musterreihen-Index verschoben", Box::new(|j| {
+                j["players"][0]["pattern_lines"][2]["index"] = serde_json::json!(7)
+            })),
+            ("tiles > capacity", {
+                let red = red.clone();
+                Box::new(move |j| {
+                    j["players"][0]["pattern_lines"][0]["tiles"] = serde_json::json!([red.clone(), red.clone()]);
+                    j["players"][0]["pattern_lines"][0]["color"] = red.clone();
+                })
+            }),
+            ("phantom_count > tiles", Box::new(|j| {
+                j["players"][0]["pattern_lines"][3]["phantom_count"] = serde_json::json!(2)
+            })),
+            ("Strafleiste 5 Steine", {
+                let red = red.clone();
+                Box::new(move |j| j["players"][0]["floor"] = serde_json::json!(vec![red.clone(); 5]))
+            }),
+            ("tiled_max_row 6", Box::new(|j| j["players"][0]["tiled_max_row"] = serde_json::json!(6))),
+            ("bag_colors 1e18", Box::new(|j| {
+                j["bag_colors"] = serde_json::json!([1_000_000_000_000_000_000u64, 0, 0, 0, 0])
+            })),
+            ("tower_colors 66", Box::new(|j| j["tower_colors"] = serde_json::json!([66, 0, 0, 0, 0]))),
+            ("drei Fabriken", Box::new(|j| {
+                j["factories"].as_array_mut().unwrap().pop();
+            })),
+            ("scoring_tile_id 8", Box::new(|j| j["scoring_tile_ids"] = serde_json::json!([0, 8]))),
+            ("dome_display-ID 18", Box::new(|j| j["dome_display"][0]["id"] = serde_json::json!(18))),
+        ];
+        for (what, mutate) in cases {
+            let mut j = json.clone();
+            mutate(&mut j);
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                json_to_state(&j, &mut StdRng::seed_from_u64(1)).map(|_| ())
+            }));
+            match res {
+                Ok(Err(_)) => {}
+                Ok(Ok(())) => panic!("{what}: haette abgewiesen werden muessen"),
+                Err(_) => panic!("{what}: Panic statt Err"),
+            }
         }
     }
 }

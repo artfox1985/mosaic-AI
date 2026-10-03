@@ -192,11 +192,11 @@ fn chance_nodes_enabled() -> bool {
 /// weder Funktion noch Feld.
 pub(crate) fn net_solver_enabled() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| {
-        std::env::var("MOSAIC_R5_NET_SOLVER")
-            .map(|v| v.is_empty() || v != "0")
-            .unwrap_or(NET_SOLVER_DEFAULT)
-    })
+    // Code-Review 2026-10-02 Befund 21: einheitlich ueber `read_flag01_env`
+    // (getrimmt, "1"/"0", leer = Default, ungueltig = Default mit Warnung).
+    // Vorher ohne Trim und jeder Wert ausser "0" = an; die gesetzten Werte
+    // ("0" in den v34/v35-Rezepten, ungesetzt sonst) wirken unveraendert.
+    *CELL.get_or_init(|| crate::self_play::read_flag01_env("MOSAIC_R5_NET_SOLVER", NET_SOLVER_DEFAULT))
 }
 
 /// Bestand des Seiten-Felds `SearchConfig::r5_net_solver`: der Netzpfad nutzt
@@ -219,13 +219,24 @@ pub const NET_SOLVER_DEFAULT: bool = true;
 /// Funktion.
 pub fn node_budget() -> u64 {
     static CELL: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| {
-        std::env::var("MOSAIC_R5_NODE_BUDGET")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .filter(|&n| n > 0)
-            .unwrap_or(NODE_BUDGET)
+    // Code-Review 2026-10-02 Befund 21: ein ungueltiger Wert fiel vorher
+    // STILL auf NODE_BUDGET zurueck; jetzt getrimmt und mit Warnung.
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_R5_NODE_BUDGET") {
+        Err(_) => NODE_BUDGET,
+        Ok(raw) if raw.trim().is_empty() => NODE_BUDGET,
+        Ok(raw) => parse_node_budget(&raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_R5_NODE_BUDGET={raw:?} ist keine ganze Zahl >= 1 -- Default {NODE_BUDGET} gilt."
+            );
+            NODE_BUDGET
+        }),
     })
+}
+
+/// `MOSAIC_R5_NODE_BUDGET` als reine Pruefung: getrimmt, ganze Zahl >= 1,
+/// sonst `None`.
+pub(crate) fn parse_node_budget(raw: &str) -> Option<u64> {
+    raw.trim().parse::<u64>().ok().filter(|&n| n > 0)
 }
 
 /// Bestand des Seiten-Felds `SearchConfig::r5_solver_iterative`: aus, der

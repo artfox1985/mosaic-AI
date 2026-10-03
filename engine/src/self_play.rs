@@ -212,10 +212,16 @@ fn insert_completion_fields(result: &mut Value, completed: bool, abort: Option<G
     if let Value::Object(map) = result {
         map.insert("completed".into(), json!(completed));
         if !completed {
-            let reason = abort.map(GameAbort::as_str).unwrap_or("loop_exit");
-            map.insert("abort_reason".into(), json!(reason));
+            map.insert("abort_reason".into(), json!(abort_reason_str(abort)));
         }
     }
+}
+
+/// Wert von `abort_reason` einer unvollstaendigen Partie: der Grund aus
+/// [`GameAbort`], sonst `"loop_exit"` (Schleife endete aus anderem Grund vor
+/// `Phase::End`). Gemeinsam fuer Arena-Summary und Self-Play-Records.
+fn abort_reason_str(abort: Option<GameAbort>) -> &'static str {
+    abort.map(GameAbort::as_str).unwrap_or("loop_exit")
 }
 
 // ── Fortschritts-Tracking: Einzelspiel-Flush + Heartbeat (Task #71) ─────────
@@ -2891,6 +2897,38 @@ pub(crate) const DOME_DICE_DEPTH_CAPS: [Option<usize>; 4] = [None, Some(7), Some
 /// Default von `MOSAIC_DOME_DICE_SIMS` (Prereg par.2 Punkt 4: 600 Sims).
 pub(crate) const DOME_DICE_SIMS_DEFAULT: u32 = 600;
 
+/// Einheitliche Auswertung eines 0/1-Knopfs (Code-Review 2026-10-02 Befund
+/// 21): getrimmt; `"1"` an, `"0"` aus, leer = `default`; alles andere ist
+/// ungueltig (`None`). Vorher werteten die Knoepfe uneinheitlich aus (jeder
+/// nicht-leere Wert ausser `"0"` schaltete ein, auch `"false"`; oder ohne Trim).
+/// Die Werte, die Rezepte und Ketten setzen (`"1"`, `"0"`, ungesetzt), wirken
+/// unveraendert.
+pub(crate) fn parse_flag01(raw: &str, default: bool) -> Option<bool> {
+    match raw.trim() {
+        "1" => Some(true),
+        "0" => Some(false),
+        "" => Some(default),
+        _ => None,
+    }
+}
+
+/// Liest einen 0/1-Knopf ueber [`parse_flag01`]; ungesetzt = `default`, ein
+/// ungueltiger Wert faellt LAUT (eine Zeile auf stderr) auf `default` zurueck,
+/// Muster [`dome_dice_enabled`]. Die Aufrufer cachen per OnceLock, die Warnung
+/// erscheint also einmal je Prozess.
+pub(crate) fn read_flag01_env(name: &str, default: bool) -> bool {
+    match std::env::var(name) {
+        Err(_) => default,
+        Ok(raw) => parse_flag01(&raw, default).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  {name}={raw:?} ist weder 0 noch 1 -- Default {} gilt.",
+                u8::from(default)
+            );
+            default
+        }),
+    }
+}
+
 /// `MOSAIC_DOME_DICE` als reine Pruefung: `"1"` an, `"0"` oder leer aus,
 /// alles andere ungueltig (`None`).
 fn parse_dome_dice_flag(raw: &str) -> Option<bool> {
@@ -4170,18 +4208,14 @@ fn stamp_branch_kl(steps: &mut [Value], branch_kl: Option<f64>) {
 // DEFAULT AUS = BYTE-IDENTISCH: ohne Knopf wird die Funktion nicht
 // aufgerufen, `ex_rng` bleibt unberuehrt.
 
-/// `MOSAIC_EXCURSION_RESHUFFLE`: jeder nicht-leere Wert ausser `"0"` schaltet
-/// die Neumischung am Abzweig ein. Default aus. Prozessweit gecacht
+/// `MOSAIC_EXCURSION_RESHUFFLE`: `"1"` schaltet die Neumischung am Abzweig
+/// ein, `"0"`/leer/ungesetzt aus, alles andere aus mit Warnung ([`read_flag01_env`],
+/// Code-Review 2026-10-02 Befund 21; vorher schaltete JEDER nicht-leere Wert
+/// ausser `"0"` ein, auch `"false"`). Default aus. Prozessweit gecacht
 /// (OnceLock), Variable VOR dem ersten Lesen setzen.
 pub(crate) fn excursion_reshuffle_enabled() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| match std::env::var("MOSAIC_EXCURSION_RESHUFFLE") {
-        Err(_) => false,
-        Ok(raw) => {
-            let v = raw.trim();
-            !v.is_empty() && v != "0"
-        }
-    })
+    *CELL.get_or_init(|| read_flag01_env("MOSAIC_EXCURSION_RESHUFFLE", false))
 }
 
 /// Mischt am Ausflug-Abzweig alles neu, was KEIN Spieler kennt (siehe
@@ -4712,19 +4746,15 @@ const LABEL_STREAM_RTV: u64 = 0;
 const LABEL_STREAM_BOOTSTRAP: u64 = 1;
 const LABEL_STREAMS_PER_ROUND: u64 = 2;
 
-/// `MOSAIC_LABEL_RNG_SPLIT`: jeder nicht-leere Wert ausser `"0"` schaltet den
-/// eigenen Label-Strom ein. Default aus (= Bestand, byte-identisch).
+/// `MOSAIC_LABEL_RNG_SPLIT`: `"1"` schaltet den eigenen Label-Strom ein,
+/// `"0"`/leer/ungesetzt aus, alles andere aus mit Warnung ([`read_flag01_env`],
+/// Code-Review 2026-10-02 Befund 21; vorher schaltete JEDER nicht-leere Wert
+/// ausser `"0"` ein). Default aus (= Bestand, byte-identisch).
 /// Prozessweit gecacht (OnceLock): die Variable MUSS vor dem ersten Lesen
 /// gesetzt sein, gleiche Regel wie `return_order_random_p`.
 pub(crate) fn label_rng_split_enabled() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| match std::env::var("MOSAIC_LABEL_RNG_SPLIT") {
-        Err(_) => false,
-        Ok(raw) => {
-            let v = raw.trim();
-            !v.is_empty() && v != "0"
-        }
-    })
+    *CELL.get_or_init(|| read_flag01_env("MOSAIC_LABEL_RNG_SPLIT", false))
 }
 
 /// Der abgeleitete Label-Strom EINER Label-Ziehung (Runde `round`, Art
@@ -5817,6 +5847,13 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // scores/winner ein echtes Endergebnis (inkl.
                         // Wertungsplatten). Downstream (self_play.py) prüft das.
                         m.insert("completed".into(), json!(completed));
+                        // Code-Review 2026-10-02 Befund 22d: der Abbruchgrund
+                        // stand bisher nur im Arena-Summary. Additiv und NUR im
+                        // Abbruchfall (regulaere Records bleiben byte-gleich),
+                        // gleiche Werte wie `insert_completion_fields`.
+                        if !completed {
+                            m.insert("abort_reason".into(), json!(abort_reason_str(abort)));
+                        }
                         // Labels additiv, nur fuer Runden mit echtem Übergang --
                         // Python-Seite muss das Fehlen tolerieren.
                         let round =
@@ -6941,18 +6978,33 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                     let chosen = if actions.len() == 1 {
                         actions[0].clone()
                     } else if pi == hybrid_board {
-                        let s = net_effective_sims(sims_hybrid, actions.len());
                         // Diagnose-Werkzeug (Task #88, kein Arena-/Self-Play-Pfad,
                         // siehe Modulkommentar) -- AUSSERHALB des Wave-1-Scopes von
                         // PREREG_agent_encapsulation.md, liest daher wie bisher aus
                         // der Umgebung (jetzt ueber `SearchConfig::from_env()`).
+                        //
+                        // Code-Review 2026-10-02 Befund 22b: die Basis-Sims laufen
+                        // jetzt wie an den beiden Agenten-Einstiegen ueber
+                        // `r5_adjusted_base_sims`. Wirkung HEUTE keine: `r5_net_sims`
+                        // hat bewusst keinen Env-Knopf, `from_env()` liefert immer
+                        // `None` (net_mcts.rs Test
+                        // `search_config_spec_r5_net_sims_is_optional_and_validated`),
+                        // und diese Arena nimmt keine Spec entgegen -- das Feld ist hier
+                        // also nicht SETZBAR, statt still ignoriert. Die Verdrahtung
+                        // haelt die Stelle gleich, falls die Arena je Specs bekommt.
+                        let cfg = crate::net_mcts::SearchConfig::from_env();
+                        let base = crate::net_mcts::r5_adjusted_base_sims(&game.state, sims_hybrid, &cfg);
+                        let s = net_effective_sims(base, actions.len());
                         net_search_drafting_action_hybrid(
-                            hybrid_policy, hybrid_value, &game.state, s, c_puct_hybrid, false, rng,
-                            &crate::net_mcts::SearchConfig::from_env(),
+                            hybrid_policy, hybrid_value, &game.state, s, c_puct_hybrid, false, rng, &cfg,
                         )
                         .unwrap_or_else(|| actions[0].clone())
                     } else {
-                        let s = net_effective_sims(sims_plain, actions.len());
+                        // Befund 22b wie oben: ohne Spec immer `sims_plain`.
+                        let base = crate::net_mcts::r5_adjusted_base_sims(
+                            &game.state, sims_plain, &crate::net_mcts::SearchConfig::from_env(),
+                        );
+                        let s = net_effective_sims(base, actions.len());
                         crate::provocation::preference_move(&game.state)
                             .or_else(|| crate::plate_builder::drafting_preference(&game.state))
                             .or_else(|| crate::plate_builder::dome_preference(&game.state))
@@ -7995,6 +8047,17 @@ pub fn run_net_self_play(
     // `None` -> `SearchConfig` passiert in `lib.rs` (Python-Grenze).
     search_config: crate::net_mcts::SearchConfig,
 ) -> Result<String, String> {
+    // Code-Review 2026-10-02 Befund 22c: die SUCHE liest `single_pass_other_val`
+    // aus der Spec (Feld der Seite), die LABEL-Pfade (TD-Bootstrap,
+    // Runden-Uebergang, `net_mcts::net_leaf_eval`) aus der Umgebung
+    // (`MOSAIC_SINGLE_PASS_OTHER_VAL`). Bewusst KEIN Verhaltenswechsel (das
+    // v34/v35-Rezept setzt beide gleich); weichen sie ab, wird es hier laut.
+    if let Some(msg) = crate::net_mcts::single_pass_split_warning(
+        search_config.single_pass_other_val,
+        crate::net_mcts::single_pass_other_val_env(),
+    ) {
+        eprintln!("{msg}");
+    }
     // Klasse W, F8 (`PREREG_asymmetric_selfplay.md` par.3a): Ausflug und Wuerfel
     // nie zusammen. Ein Ausflug erbt die Wuerfel-Seite nicht (Bauplan 11a F8) und
     // liefe als G-G-Fortsetzung einer W-Partie weiter. Harter Fehler VOR dem
@@ -8779,6 +8842,14 @@ fn stage3_choose_action<R: Rng + ?Sized>(
     best_action
 }
 
+/// Haenger-Alarm (Sekunden) der Stufe-3-Arena (Code-Review 2026-10-02 Befund
+/// 20). Bis dahin war 3.600 s die ABBRUCHBEDINGUNG: Stufe 3 macht je Zug
+/// deutlich mehr Arbeit (Top-K x n_reps Rollouts), deshalb kein
+/// `net_game_timeout_secs`. Jetzt ist sie nur noch Alarm und wird wie in den
+/// anderen Arenen um [`ARENA_HANG_ALARM_FACTOR`] grosszuegiger gesetzt als das
+/// alte Limit; die eigentliche Abbruchbedingung ist [`MAX_GAME_STEPS`].
+const STAGE3_HANG_ALARM_SECS: u64 = 3_600 * ARENA_HANG_ALARM_FACTOR;
+
 /// Ein Spiel Stufe 3 (Brett 0) vs. Stufe 1 (Brett 1), dasselbe Netz. Analog zu
 /// `play_net_vs_net_game`, nur dass Brett 0 bis einschliesslich Runde
 /// `stage3_max_round` `stage3_choose_action` nutzt (danach faellt es auf
@@ -8799,19 +8870,27 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
     scoring_ids: Vec<usize>,
     names: [String; 2],
     first_player: usize,
+    game_seed: u64,
+    max_steps: u32,
+    hang_alarm_secs: u64,
     rng: &mut R,
 ) -> Value {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
-    // Grosszuegiger fester Timeout statt `net_game_timeout_secs`: Stufe 3
-    // macht pro Zug deutlich mehr Arbeit (Top-K x n_reps Rollouts bis
-    // Spielende) -- dieselbe Falle wie beim Disagreement-Study-Timeout-Bug.
-    let timeout_secs: u64 = 3600;
+    // Code-Review 2026-10-02 Befund 20: bis dahin brach diese Schleife nach
+    // Wanduhr (3.600 s) ab und gab den Zwischenstand OHNE Markierung in die
+    // Wertung -- derselbe Defekt, den der `MAX_GAME_STEPS`-Abschnitt am
+    // Modulkopf fuer die anderen Arenen behebt. Jetzt dieselbe Bauform:
+    // Schrittlimit als Abbruch, Wanduhr nur als Haenger-Alarm
+    // (`STAGE3_HANG_ALARM_SECS`), Ergebnis mit `completed`/`abort_reason`.
+    let mut abort: Option<GameAbort> = None;
     loop {
         guard += 1;
-        if guard > 100_000 || t_start.elapsed().as_secs() >= timeout_secs {
+        if let Some(a) = game_loop_abort(guard, max_steps, t_start, hang_alarm_secs) {
+            report_game_abort(a, game_seed, steps, t_start);
+            abort = Some(a);
             break;
         }
         match game.state.phase {
@@ -8882,12 +8961,13 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
             _ => break,
         }
     }
-    if game.state.phase == Phase::End {
+    let completed = game.state.phase == Phase::End;
+    if completed {
         let _ = game.apply_end_scoring();
     }
     let p0 = &game.state.players[0];
     let p1 = &game.state.players[1];
-    json!({
+    let mut out = json!({
         "scores": [p0.score, p1.score],
         "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
@@ -8913,7 +8993,9 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
         // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
         "scoring_tile_ids": game.state.scoring_tile_ids,
-    })
+    });
+    insert_completion_fields(&mut out, completed, abort);
+    out
 }
 
 /// `n_games` Spiele Stufe 3 (Brett 0) vs. Stufe 1 (Brett 1), dasselbe Netz,
@@ -8943,14 +9025,15 @@ pub fn run_stage3_vs_stage1_arena(
     STAGE3_ROLLOUTS_TRIGGERED.store(0, Ordering::Relaxed);
 
     let play = |i: usize| -> Value {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["Stufe3".to_string(), "Stufe1".to_string()];
         play_stage3_vs_stage1_game(
             &net, sims1, stage3_shortlist_sims, stage3_rollout_sims, c_puct, top_k, n_reps,
-            horizon_rounds, stage3_max_round, alphabeta_depth, alphabeta_node_budget, ids, names, first, &mut rng,
+            horizon_rounds, stage3_max_round, alphabeta_depth, alphabeta_node_budget, ids, names, first,
+            game_seed, MAX_GAME_STEPS, STAGE3_HANG_ALARM_SECS, &mut rng,
         )
     };
 
@@ -10162,6 +10245,112 @@ pub(crate) mod tests {
         let out = heuristic_summary_game(31_003, MAX_GAME_STEPS, 0);
         assert_eq!(out["completed"], json!(false));
         assert_eq!(out["abort_reason"], json!("hang_alarm"));
+    }
+
+    /// Code-Review 2026-10-02 Befund 20: die Stufe-3-Arena markiert einen
+    /// Abbruch jetzt wie die anderen Arenen (`completed: false` plus
+    /// `abort_reason`), statt den Zwischenstand still zu werten. Schrittlimit 0
+    /// bzw. Alarm 0 s greifen im ersten Durchlauf, also ohne Netzsuche; das
+    /// Netz wird nur geladen, weil die Signatur es verlangt.
+    #[test]
+    fn stage3_arena_marks_aborted_games_incomplete() {
+        let net = Net::load_auto(load_test_net_for_gating().as_str()).expect("Champion laedt");
+        let play = |max_steps: u32, alarm: u64| {
+            let mut rng = StdRng::seed_from_u64(5);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            play_stage3_vs_stage1_game(
+                &net, 4, 4, 4, SELF_PLAY_C, 2, 1, 1, 2, 0, 0, ids,
+                ["Stufe3".to_string(), "Stufe1".to_string()], 0, 5, max_steps, alarm, &mut rng,
+            )
+        };
+        let cut = play(0, STAGE3_HANG_ALARM_SECS);
+        assert_eq!(cut["completed"], json!(false));
+        assert_eq!(cut["abort_reason"], json!("step_limit"));
+        let hung = play(MAX_GAME_STEPS, 0);
+        assert_eq!(hung["completed"], json!(false));
+        assert_eq!(hung["abort_reason"], json!("hang_alarm"));
+        assert!(STAGE3_HANG_ALARM_SECS > 3_600, "Alarm grosszuegiger als das alte Abbruchlimit");
+    }
+
+    /// Code-Review 2026-10-02 Befund 22d: Self-Play-Records einer
+    /// abgebrochenen Partie tragen `abort_reason` (wie das Arena-Summary),
+    /// regulaer beendete Partien bekommen das Feld NICHT (byte-gleich zum
+    /// Bestand).
+    #[test]
+    fn selfplay_records_carry_abort_reason_only_when_aborted() {
+        let records = |max_steps: u32| -> Vec<Value> {
+            let mut r = StdRng::seed_from_u64(31_005);
+            let agent = HeuristicSelfPlayAgent { base_sims: 8, c: SELF_PLAY_C, variant: crate::mcts::HeuristicVariant::Hv1 };
+            let player = PlayerLoopConfig {
+                agent: &agent,
+                tiling_net: None,
+                envelope_tiling_w: 0.0,
+                envelope_profile: crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+                envelope_tiling_value_w: 0.0,
+                apply_via_chosen_action: false,
+                column_build_trace: false,
+                return_order_mode: 0,
+                start_search: None,
+                heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+                net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+            };
+            let cfg = GameLoopConfig {
+                hang_alarm_secs: 3_600,
+                max_steps,
+                seed_from_steps: true,
+                game_seed: 31_005,
+                move_heartbeat: None,
+                labels: None,
+                mode: LoopMode::Records { game_id: "abort_g1" },
+                players: [player, player],
+                preference_hits: None,
+                start_state: None,
+                deviate_net: None,
+                excursion_branch: None,
+                is_excursion: false,
+                excursion_deviated: None,
+                dome_dice: None,
+                aggr_side: None,
+            };
+            let ids = sample_valid_scoring_ids(3, &mut r);
+            match unified_game_loop(ids, ["A".into(), "B".into()], 0, &mut r, cfg) {
+                LoopOutput::Records(out) => out,
+                LoopOutput::Summary(_) => unreachable!("Records-Modus konfiguriert"),
+            }
+        };
+        let cut = records(30);
+        assert!(!cut.is_empty(), "30 Schritte erzeugen Records");
+        for rec in &cut {
+            assert_eq!(rec["completed"], json!(false));
+            assert_eq!(rec["abort_reason"], json!("step_limit"));
+        }
+        let full = records(MAX_GAME_STEPS);
+        assert_eq!(full.last().unwrap()["completed"], json!(true));
+        assert!(full.iter().all(|rec| rec.get("abort_reason").is_none()));
+    }
+
+    /// Code-Review 2026-10-02 Befund 21: einheitliche 0/1-Auswertung. Die von
+    /// Rezepten und Ketten gesetzten Werte ("1", "0", leer) wirken wie vorher;
+    /// "false" schaltet NICHT mehr ein, Leerraum wird getrimmt, alles andere
+    /// ist ungueltig (Aufrufer warnt und nimmt den Default).
+    #[test]
+    fn flag01_parser_is_uniform() {
+        for default in [false, true] {
+            assert_eq!(parse_flag01("1", default), Some(true));
+            assert_eq!(parse_flag01("0", default), Some(false));
+            assert_eq!(parse_flag01(" 1\n", default), Some(true));
+            assert_eq!(parse_flag01(" 0 ", default), Some(false));
+            assert_eq!(parse_flag01("", default), Some(default));
+            assert_eq!(parse_flag01("  ", default), Some(default));
+            for bad in ["false", "true", "on", "2", "yes"] {
+                assert_eq!(parse_flag01(bad, default), None, "{bad:?}");
+            }
+        }
+        assert_eq!(crate::round5::parse_node_budget("300"), Some(300));
+        assert_eq!(crate::round5::parse_node_budget(" 300 "), Some(300));
+        for bad in ["0", "-5", "abc", "2.5"] {
+            assert_eq!(crate::round5::parse_node_budget(bad), None, "{bad:?}");
+        }
     }
 
     /// Reine Pruefung: Schrittlimit gewinnt gegen den gleichzeitig faelligen

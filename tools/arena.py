@@ -480,6 +480,24 @@ def run_net_vs_net(model_a, model_b, sims_a=200, sims_b=200, games=100,
     )
 
 
+def find_incomplete_stage3_games(results, first_game_index, chunk_seed):
+    """Alle Partien eines Stufe-3-Chunks mit `completed is False` (der
+    Diagnose-Eintrag `stage3_diagnostics` zaehlt nicht mit). Ein FEHLENDES
+    Feld zaehlt hier nicht (Wheel vor dem Umbau), das meldet der Aufrufer
+    gesondert. Gleiche Bauform wie `paired_gating.py::find_incomplete_games`."""
+    out = []
+    games = [g for g in results if not g.get("stage3_diagnostics")]
+    for i, g in enumerate(games):
+        if g.get("completed") is False:
+            out.append({
+                "game_index": first_game_index + i,
+                "chunk_seed": chunk_seed,
+                "abort_reason": g.get("abort_reason"),
+                "steps": g.get("steps"),
+            })
+    return out
+
+
 def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rollout_sims=50,
                          top_k=2, n_reps=3, horizon_rounds=2, stage3_max_round=2,
                          alphabeta_depth=2, alphabeta_node_budget=100, games=50,
@@ -536,6 +554,22 @@ def run_stage3_vs_stage1(model, sims1=200, stage3_shortlist_sims=100, stage3_rol
             alphabeta_node_budget=alphabeta_node_budget, seed=base_seed + chunk_idx, num_threads=threads,
         )
         results = json.loads(raw)
+        # Code-Review 2026-10-02 Befund 20: eine abgebrochene Partie traegt
+        # einen Zwischenstand ohne Endwertung und darf nicht in Elo/SPRT
+        # eingehen (Muster `paired_gating.py::find_incomplete_games`).
+        incomplete = find_incomplete_stage3_games(results, first_game_index=done,
+                                                  chunk_seed=base_seed + chunk_idx)
+        if incomplete:
+            reasons = sorted({str(x["abort_reason"]) for x in incomplete})
+            raise RuntimeError(
+                f"Stufe-3-Arena: Chunk {chunk_idx + 1} (Seed={base_seed + chunk_idx}) enthaelt "
+                f"{len(incomplete)} UNVOLLSTAENDIGE Partie(n) (abort_reason: {', '.join(reasons)}): "
+                f"{incomplete}. Sie werden nicht gewertet; der Lauf bricht ab. Bisher gewertet: "
+                f"{done} Partien.")
+        missing = sum(1 for g in results if not g.get("stage3_diagnostics") and "completed" not in g)
+        if missing:
+            print(f"  WARNUNG: {missing} Partien ohne Feld `completed` -- das Wheel ist aelter als "
+                  f"der Befund-20-Umbau, ein Abbruch waere NICHT erkennbar.", flush=True)
         chunk_idx += 1
         diag = None
         for g in results:

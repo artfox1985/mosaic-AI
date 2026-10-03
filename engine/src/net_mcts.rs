@@ -652,6 +652,20 @@ pub(crate) fn single_pass_other_val_env() -> bool {
     })
 }
 
+/// Code-Review 2026-10-02 Befund 22c: Warntext, wenn Suche (Spec-Feld
+/// `single_pass_other_val` der Seite) und Label-Pfade (Umgebung, siehe
+/// [`net_leaf_eval`]) verschiedene Einpass-Stellungen fahren. Nur Meldung,
+/// kein Verhaltenswechsel.
+pub(crate) fn single_pass_split_warning(search_value: bool, label_env_value: bool) -> Option<String> {
+    (search_value != label_env_value).then(|| {
+        format!(
+            "⚠️  single_pass_other_val: Suche (Spec) = {}, Labels (MOSAIC_SINGLE_PASS_OTHER_VAL) = {} --              die TD-Bootstrap- und Rundenuebergangs-Labels laufen mit einer ANDEREN Blattbewertung              als die Suche. Beide gleich setzen, falls das nicht gewollt ist.",
+            u8::from(search_value),
+            u8::from(label_env_value)
+        )
+    })
+}
+
 pub(crate) fn read_moon_order_search_sims_env() -> u32 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SIMS") else {
@@ -1141,7 +1155,10 @@ pub struct SearchConfig {
     /// Wirkt an allen Blattstellen der Netzsuche (`make_node`,
     /// `batched_expand_root_candidates`, Variante-B-Blatt ueber
     /// [`net_leaf_eval_with`]). Die SearchConfig-freien Label-Pfade
-    /// ([`net_leaf_eval`]) folgen dem Env-Knopf, nicht diesem Feld.
+    /// ([`net_leaf_eval`]) folgen dem Env-Knopf, nicht diesem Feld. Weichen
+    /// beide ab, warnt `self_play::run_net_self_play` beim Start
+    /// ([`single_pass_split_warning`], Code-Review 2026-10-02 Befund 22c);
+    /// bewusst ohne Verhaltenswechsel.
     ///
     /// Spec-Feld je Seite (`single_pass_other_val`, OPTIONAL, 0 oder 1; fehlt
     /// es, gilt der Env-Default), Env-Default `MOSAIC_SINGLE_PASS_OTHER_VAL`.
@@ -1956,6 +1973,22 @@ impl SearchConfig {
         // Kandidaten gibt es nichts zu filtern, das waere keine Abweichungsregel.
         let deviate_candidates = spec_u32("deviate_candidates", 2.0, 1_000_000.0)?
             .unwrap_or_else(|| crate::self_play::deviate_candidates() as u32);
+        // Code-Review 2026-10-02 Befund 22a: `r5_net_sims` wirkt nur, wenn die
+        // NETZSUCHE Runde 5 spielt (`r5_adjusted_base_sims`); bei
+        // `r5_net_solver` an uebernimmt der Loeser, und das Feld war bis dahin
+        // STILL wirkungslos. Warnung statt Ablehnung, weil `r5_net_solver` auch
+        // aus der Umgebung kommen kann (`MOSAIC_R5_NET_SOLVER`, Env-Default des
+        // Felds): dieselbe Spec ist unter der einen Kette wirksam und unter der
+        // anderen nicht, und ein Werkzeug, das die Spec nur liest, soll daran
+        // nicht scheitern. Einmal je Pfad und Prozess.
+        if let Some(msg) = r5_net_sims_ineffective_warning(path, r5_net_sims, r5_net_solver) {
+            static WARNED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+            let mut warned = WARNED.lock().unwrap_or_else(|e| e.into_inner());
+            if !warned.iter().any(|p| p == path) {
+                warned.push(path.to_string());
+                eprintln!("{msg}");
+            }
+        }
 
         Ok(Self {
             implicit_minimax_alpha,
@@ -6901,6 +6934,22 @@ pub(crate) fn r5_solver_takes_over(state: &GameState, search_config: &SearchConf
     search_config.r5_net_solver && crate::round5::applies(state)
 }
 
+/// Warntext, wenn eine Spec `r5_net_sims` setzt, die Seite in Runde 5 aber
+/// den Loeser nutzt (`r5_net_solver` an) -- dann ist das Feld wirkungslos
+/// (Code-Review 2026-10-02 Befund 22a, siehe [`r5_adjusted_base_sims`]).
+pub(crate) fn r5_net_sims_ineffective_warning(
+    path: &str,
+    r5_net_sims: Option<u32>,
+    r5_net_solver: bool,
+) -> Option<String> {
+    match r5_net_sims {
+        Some(n) if r5_net_solver => Some(format!(
+            "⚠️  Spec-Datei {path}: 'r5_net_sims' = {n} ist WIRKUNGSLOS, weil r5_net_solver an ist              (Spec-Feld fehlt oder 1, bzw. MOSAIC_R5_NET_SOLVER) -- in Runde 5 entscheidet der              Loeser. Fuer Netzsuche in Runde 5 'r5_net_solver': 0 setzen."
+        )),
+        _ => None,
+    }
+}
+
 /// Basis-Sims einer Netz-Entscheidung DIESER Seite
 /// (`PREREG_r5_net_vs_solver.md` par.5b, Feld [`SearchConfig::r5_net_sims`]):
 /// in Runde 5 (`round5::applies`), wenn die NETZSUCHE dort spielt
@@ -10016,6 +10065,32 @@ mod tests {
             std::fs::remove_file(&p_bad).ok();
             assert!(msg.contains(field), "Fehlermeldung nennt das Feld ({field}={value}): {msg}");
         }
+    }
+
+    #[test]
+    fn single_pass_split_warns_only_on_mismatch() {
+        // Code-Review 2026-10-02 Befund 22c.
+        assert!(single_pass_split_warning(true, true).is_none());
+        assert!(single_pass_split_warning(false, false).is_none());
+        assert!(single_pass_split_warning(true, false).is_some());
+        assert!(single_pass_split_warning(false, true).is_some());
+    }
+
+    #[test]
+    fn r5_net_sims_with_solver_on_warns_but_loads() {
+        // Code-Review 2026-10-02 Befund 22a: Warntext nur, wenn das Feld
+        // gesetzt UND der Loeser an ist; geladen wird die Spec trotzdem.
+        assert!(r5_net_sims_ineffective_warning("x", Some(400), true).is_some());
+        assert!(r5_net_sims_ineffective_warning("x", Some(400), false).is_none());
+        assert!(r5_net_sims_ineffective_warning("x", None, true).is_none());
+        let path = std::env::temp_dir()
+            .join(format!("mosaic_test_spec_r5sims_solver_on_{}.json", std::process::id()));
+        std::fs::write(&path, format!(r#"{{{SPEC_MIN_FIELDS}, "r5_net_solver": 1, "r5_net_sims": 400}}"#))
+            .unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("Spec laedt weiter");
+        std::fs::remove_file(&path).ok();
+        assert!(cfg.r5_net_solver);
+        assert_eq!(cfg.r5_net_sims, Some(400));
     }
 
     /// `PREREG_r5_net_vs_solver.md` par.5b: `r5_net_sims` ist OPTIONAL (fehlt
