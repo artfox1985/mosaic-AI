@@ -32,6 +32,9 @@ Endgueltige Zusammensetzung nach den Sonden S1-S4. **Seeds:** Vierer-Block 20260
    `PREREG_tie_mirror.md` par.4b).
 4. **E1 an, KL-Abzweig im Ausflug an, getrennte Label-RNG, Ausflug-Neumischung** wie v34.
 5. Klassenname `value-deviate` statt `value-wegc` (Nutzer 2026-10-01), Flags identisch.
+6. **KL-Abzweig im Ausflug bleibt an** (Nutzer 2026-10-03: *"lass ihn an"*), obwohl die Offline-Pruefung
+   keinen zuordenbaren Lerneffekt fand (`PREREG_targeted_branching.md` par.7d): er erzeugt andere
+   Abzweigstellen ohne Zusatzkosten; gilt fuer alle v35-Klassen mit Ausflug.
 
 ## par.6 REZEPT (Schwarm)
 

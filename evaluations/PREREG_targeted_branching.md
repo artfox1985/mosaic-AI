@@ -302,3 +302,6 @@ auf dieser Val-Menge in beiden Gruppen nicht besser als sein Generator (Brier 0,
 bzw. 0,20354 gegen 0,20343), passend zur flachen Brier-Kurve der Arme (`PREREG_v34_window.md` par.10).
 **Folge fuer v35:** der Knopf steckt im v35-Rezept (`value-excursion`, schon erzeugt); ihn fuer die
 naechste Erzeugung abzuschalten waere ein Nutzer-Entscheid, die Leseregel verlangt es nicht.
+
+**NUTZER-ENTSCHEID 2026-10-03:** *"lass ihn an"* -- der Knopf bleibt in v35 an (Vielfalt der
+Abzweigstellen ohne Zusatzkosten), nicht als nachgewiesener Lernhebel.
