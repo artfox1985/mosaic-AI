@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: Bau-Fragen entschieden (par.3a). Klasse W gebaut 2026-10-03 (Lib-Tests gruen, noch kein Wheel), Klasse S im Bau; Leseregeln der Sonden S1-S4 registriert (par.5). Ziel-Zusammensetzung par.4. -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: Gebaut (W mit zugewiesener Platte im Baum, par.3d; S). Sonden (par.5a): W kostet +7,2 %, W gewinnt 25 %, Wertziele verzerrt (Versatz W +0,109, G -0,136, Regel b); S schwach (lambda 0,5 nach Regel, G -0,7 Punkte). Masken- und Zusammensetzungs-Entscheid beim Nutzer. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -344,6 +344,51 @@ Lauf aendern.
   das 50-%-Quantil von `own_q_gap` der Stoerer-Zuege bei diesem lambda (die Haelfte der Stoerer-Zuege
   liefert ein Policy-Ziel). Senkt keine Stufe die Punkte von G, ist der Stoerer in dieser Form
   wirkungslos: berichtet, Nutzer-Entscheid.
+
+### par.5a ERGEBNISSE S1-S4 (2026-10-03 18:24-18:54 Laeufe, exklusiv; Auswertung `tools/probes/asym_probe_report.py`)
+
+Wheel `59f32a16...` (Anker-Invarianz gruen), Rezept `models/v35_probes.recipe.json`, je Klasse 100 Partien,
+Generator `v34-b01`, Artefakt `evaluations/artifacts/asym_probes_s1_s4.json`. Rezept-Waechter in allen sechs
+Klassen gruen, alle Exit 0.
+
+**S1 Kosten** (Grundmenge 100 Partien je Klasse, Einheit s Wanduhr je Partie, 11 Threads): `policy` 2,898,
+`policy-dice` 3,108 -> **+7,2 %**, Leseregel: Plan haelt (<= +25 %). Je W-Partie 8,0 erzwungene Platten und
+7,0 Platzwahl-Records.
+
+**S2 Andere Stellungen?** (Grundmenge Drafting-Records R1-4 mit Ziel >= 2 IDs, ohne Platzwahl-Records; W-Klasse
+nach der ersten erzwungenen Platte; Einheit KL(Ziel || Prior), Median, CI Block-Bootstrap ueber Dateien):
+Sockel 0,316 (n 11.999); **W-Seite 0,234 (n 4.383), Differenz -0,082 [-0,148; -0,033]**; G-Seite 0,313 (n 5.156),
+Differenz -0,002 [-0,078; +0,061]. Lesart: G sieht keine nachweisbar anderen Stellungen. Die W-Seite liegt
+NIEDRIGER, das ist aber zum Teil KONSTRUIERT (HERLEITUNG): ihr Policy-Ziel verteilt die Masse der
+Plattenkante nach dem Prior (`push_dice_split`, net_mcts.rs:6391), INNERHALB der Kante ist das Ziel also
+proportional zum Prior und traegt null KL bei; nur die Kantenmasse selbst kann abweichen.
+Die Registrierung fragte nur nach "hoeher"; "niedriger" ist kein Befund fuer "andere Stellungen". Die
+Auswertung beschriftete den Fall zunaechst als "nicht nachweisbar anders"; korrigiert, Lesart heisst jetzt "niedriger".
+
+**S3 Wert-Verzerrung** (Grundmenge 100 Partien bzw. Drafting-Records der Klasse `policy-dice`): W gewinnt **25 %
+[16; 35]**, Punkte 35,4 gegen 51,5, Marge -16,1; gezahlte Wuerfel-Punkte **8,15 je Partie**. Brier W 0,171,
+G 0,182, Sockel 0,223 (nicht ueber dem Sockel, Regel a greift nicht). **Kalibrierungsversatz** (Vorhersage
+P(Sieg) minus Siegrate): **W +0,109 [+0,030; +0,184]**, **G -0,136 [-0,208; -0,053]** -> **Regel b greift fuer
+beide Seiten.** Nach `forced_domes_before` faellt der Versatz der W-Seite von +0,237 (0 Platten, n 654) ueber
++0,145 (2) und +0,070 (4) auf +0,025 (6) und -0,031 (7); G spiegelbildlich von -0,291 (0) auf -0,041 (6). Das
+liest sich als verborgene Behinderung (HERLEITUNG, nicht getestet): frueh in der Partie sieht der Zustand
+normal aus, der Ausgang ist es nicht; mit jeder gezahlten Platte wird sie sichtbarer und der Versatz schrumpft. **Folge nach Leseregel: Maske als Vorlage an den Nutzer.**
+
+**S4 Stoerer-Pilot** (Grundmenge je lambda 100 Partien, w = 0,1; Einheit je Partie bzw. Record):
+
+| lambda | Siegquote S [CI] | Punkte S / G | Versatz S / G | own_q_gap Median (Anteil <= 0) | s je Partie |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 0,57 [0,48; 0,67] | 48,27 / 47,42 | -0,059 / +0,051 | 0,0 (63,6 %) | 2,865 |
+| 0,5 | 0,52 [0,44; 0,62] | 47,39 / 46,73 | -0,012 / +0,005 | 0,0 (63,7 %) | 2,925 |
+| 1 | 0,48 [0,39; 0,59] | 46,50 / 46,79 | +0,021 / -0,032 | 0,0 (63,5 %) | 2,897 |
+| 2 | 0,50 [0,43; 0,58] | 44,16 / 45,81 | -0,002 / -0,021 | 0,0 (63,3 %) | 3,003 |
+
+Leseregel (groesstes lambda mit S-Siegquote >= lambda-0-Wert - 5 Prozentpunkte UND weniger G-Punkten): **lambda =
+0,5**, eps = Median own_q_gap = **0,0** (63,7 % der S-Zuege liefern dann ein Policy-Ziel). **Einschraenkung:** die
+G-Punkte fallen bei lambda 0,5 nur um 0,69 gegen lambda 0, ohne CI; bei einer Streuung von rund 15 Punkten je
+Partie (HERLEITUNG) ist das Rauschen. Der Stoerer kostet sich selbst mehr als G (lambda 2: S -4,1, G -1,6).
+In dieser Form ist er schwach.
+Laufzeit der Auswertung 125,9 s.
 
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 
