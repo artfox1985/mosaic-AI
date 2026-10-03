@@ -120,6 +120,49 @@ def _supply_demand_key() -> bool:
     return supply_demand_key()
 
 
+def _aggr_own_q_eps_key() -> str | None:
+    """Liest `MOSAIC_AGGR_OWN_Q_EPS` fuer BEIDE Cache-Schluessel (Klasse S).
+
+    `PREREG_asymmetric_selfplay.md` par.3/par.3a: Records der Stoerer-Seite
+    (`player == aggr_side`) mit `own_q_gap > eps` bekommen Policy-Gewicht 0
+    (`corpus_dataset.asymmetric_policy_masked`). Das aendert `policy_weights` im
+    BLOCK, darum steht der Knopf hier UND im Fenster-Schluessel
+    (`feedback_feature_knob_belongs_in_both_cache_keys`) -- ein zweites eps auf
+    demselben Korpus waere sonst ein Datensatz mit dem Namen des ersten.
+
+    Rueckgabe: `None` = Maske aus (ungesetzt oder leer, Bestand, kein Marker),
+    sonst die KANONISCHE Schreibweise `repr(float(eps))`, damit "0.02" und
+    "0.020" denselben Schluessel bekommen. Ungueltig (keine endliche Zahl) ist
+    ein harter Fehler: ein Tippfehler darf weder still "aus" noch einen dritten
+    Datensatz erzeugen. Aus der Umgebung gelesen, kein Parameter (Holschuld,
+    `test_cache_key_knobs_are_env_coupled.py`).
+    """
+    import math
+    import os
+    raw = (os.environ.get("MOSAIC_AGGR_OWN_Q_EPS") or "").strip()
+    if not raw:
+        return None
+    try:
+        eps = float(raw)
+    except ValueError:
+        eps = float("nan")
+    if not math.isfinite(eps):
+        raise ValueError(f"MOSAIC_AGGR_OWN_Q_EPS={raw!r} ist keine endliche Zahl")
+    return repr(eps)
+
+
+def _mask_dice_trigger_key() -> bool:
+    """Liest `MOSAIC_MASK_DICE_TRIGGER` fuer BEIDE Cache-Schluessel (Klasse W).
+
+    `PREREG_asymmetric_selfplay.md` par.3a F2 (Bauplan 7 (b)): der Ausloeser-Record
+    (`dice_trigger: true`) behaelt im Bestand sein Policy-Ziel; der Knopf nimmt es
+    optional weg. Aendert `policy_weights` im Block, also beide Schluessel. Exakt
+    "1", nichts sonst; nur dann ein Marker.
+    """
+    import os
+    return os.environ.get("MOSAIC_MASK_DICE_TRIGGER") == "1"
+
+
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
                        conjunction_head: bool, bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
@@ -266,4 +309,12 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     # ANGEHAENGT, wenn gesetzt -- der Hash jedes vorhandenen Blocks bleibt.
     if _supply_demand_key():
         material += "|supplydemand_v1"
+    # Klasse S/W (PREREG_asymmetric_selfplay.md par.3/par.3a): Policy-Masken der
+    # asymmetrischen Records. Nur ANGEHAENGT, wenn gesetzt -- der Hash jedes
+    # vorhandenen Blocks bleibt.
+    _aggr_eps = _aggr_own_q_eps_key()
+    if _aggr_eps is not None:
+        material += "|aggrownq_eps" + _aggr_eps + "_v1"
+    if _mask_dice_trigger_key():
+        material += "|maskdicetrigger_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

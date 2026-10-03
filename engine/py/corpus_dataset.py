@@ -363,6 +363,33 @@ def moon_target_from_policy(step):
     return max(best_base, key=lambda ps: ps[0])[1]
 
 
+def asymmetric_policy_masked(step, own_q_eps, mask_dice_trigger) -> bool:
+    """Klasse S/W (`PREREG_asymmetric_selfplay.md` par.3/par.3a): nimmt die
+    Bauschleife diesem Record das Policy-Ziel weg?
+
+    * S-Maske (`own_q_eps` nicht None, Knopf `MOSAIC_AGGR_OWN_Q_EPS`): Record der
+      Stoerer-Seite (`player == aggr_side`) mit `own_q_gap > own_q_eps`. Der Zug
+      des Stoerers war nach dem EIGENEN Wert nicht fast gleichwertig -- als
+      Policy-Ziel waere er Stoeren um den Preis eigener Staerke. Ein
+      Stoerer-Record OHNE `own_q_gap` (keine echte Suche) bleibt unberuehrt:
+      sein Ziel ist ohnehin eine Eins auf dem einzigen bzw. Vorzugs-Zug.
+    * W-Maske (`mask_dice_trigger`, Knopf `MOSAIC_MASK_DICE_TRIGGER`): Ausloeser-
+      Record (`dice_trigger: true`) -- der Zug der Suche wurde vom Wuerfel
+      ersetzt (F2 behaelt ihn im Bestand).
+
+    Wertziele bleiben in beiden Faellen (Nutzer, Prereg par.2/par.3). Ohne Knoepfe
+    `False` fuer JEDEN Record -- Datensatz byte-identisch.
+    """
+    if own_q_eps is not None:
+        gap = step.get("own_q_gap")
+        side = step.get("aggr_side")
+        if gap is not None and side is not None and step.get("player") == side and float(gap) > own_q_eps:
+            return True
+    if mask_dice_trigger and step.get("dice_trigger") is True:
+        return True
+    return False
+
+
 def final_margin_of_step(step) -> float:
     """E2-Arm: rohe Endmarge eines Records in Punkten aus Sicht des Ziehers.
 
@@ -693,6 +720,18 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     from file_cache_key import _supply_demand_key
     if _supply_demand_key():
         cache_key_material += "+supplydemand_v1"
+    # Klasse S/W (PREREG_asymmetric_selfplay.md par.3/par.3a): Policy-Masken der
+    # asymmetrischen Records (`asymmetric_policy_masked`). Stehen auch im
+    # BLOCK-Schluessel (`file_cache_key._aggr_own_q_eps_key`,
+    # `file_cache_key._mask_dice_trigger_key`), denn der Block traegt
+    # `policy_weights`. Nur ANHAENGEN, wenn gesetzt -- der Bestand behaelt seinen
+    # Schluessel.
+    from file_cache_key import _aggr_own_q_eps_key, _mask_dice_trigger_key
+    _aggr_eps = _aggr_own_q_eps_key()
+    if _aggr_eps is not None:
+        cache_key_material += "+aggrownq_eps" + _aggr_eps + "_v1"
+    if _mask_dice_trigger_key():
+        cache_key_material += "+maskdicetrigger_v1"
     digest = hashlib.md5(cache_key_material.encode()).hexdigest()
     return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
                           carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,
@@ -960,6 +999,12 @@ class MosaicDataset(Dataset):
         self.final_margin = None
         from file_cache_key import _final_margin_key
         _final_margin_active = _final_margin_key()
+        # Klasse S/W: Policy-Masken der asymmetrischen Records, EINMAL je Bau
+        # gelesen (dieselbe Quelle wie die beiden Cache-Schluessel).
+        from file_cache_key import _aggr_own_q_eps_key, _mask_dice_trigger_key
+        _aggr_eps_raw = _aggr_own_q_eps_key()
+        _aggr_own_q_eps = None if _aggr_eps_raw is None else float(_aggr_eps_raw)
+        _mask_dice_trigger = _mask_dice_trigger_key()
 
         if value_target_variant not in VALUE_TARGET_VARIANTS:
             raise ValueError(
@@ -1759,6 +1804,12 @@ class MosaicDataset(Dataset):
                         # also auf dem Wheel davor (geprueft 2026-09-27). Ohne
                         # Feld liefert `.get` None -> Datensatz byte-identisch.
                         if step.get("fallback_random_action") is True:
+                            pol_w = 0.0
+                        # Klasse S/W (PREREG_asymmetric_selfplay.md par.3/par.3a):
+                        # S-Maske nach `own_q_gap > eps` und optionale
+                        # `dice_trigger`-Maske, beide hinter Knoepfen in BEIDEN
+                        # Cache-Schluesseln. Ohne Knoepfe wirkungslos.
+                        if asymmetric_policy_masked(step, _aggr_own_q_eps, _mask_dice_trigger):
                             pol_w = 0.0
                         polw_l.append(np.float32(pol_w))
                         # Schema 19 (RANKING_CACHE_FIELDS): finale Maske erst

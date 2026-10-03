@@ -50,6 +50,14 @@ WORKER_ENV = {
     "label-rng-split": "MOSAIC_LABEL_RNG_SPLIT",
     "excursion-reshuffle": "MOSAIC_EXCURSION_RESHUFFLE",
     "excursion-kl-weight": "MOSAIC_EXCURSION_KL_WEIGHT",
+    # Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a): immer gesetzt.
+    "dome-dice": "MOSAIC_DOME_DICE",
+    "dome-dice-sims": "MOSAIC_DOME_DICE_SIMS",
+    # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a): Schalter und w immer,
+    # lambda nur mit Wert gesetzt (Rust kennt keinen lambda-Default).
+    "aggr-side": "MOSAIC_AGGR_SIDE",
+    "aggr-side-w": "MOSAIC_AGGR_SIDE_W",
+    "aggr-side-lambda": "MOSAIC_AGGR_SIDE_LAMBDA",
 }
 
 

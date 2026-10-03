@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::board::PlayerBoard;
 use crate::dome::{build_bonus_chip_pool, build_dome_tile_pool, BonusChip, DomeTile};
 use crate::factory::{Factory, LargeFactory};
-use crate::moves::{PendingDomeChoice, PendingMoonOrder, PendingReturnOrder};
+use crate::moves::{DomeDicePin, PendingDomeChoice, PendingMoonOrder, PendingReturnOrder};
 use crate::supply::{Bag, Tower};
 use crate::tile::TileColor;
 
@@ -132,6 +132,16 @@ pub struct GameState {
     /// der GUI-/Referee-/Replay-Pfad setzt es nicht und bleibt damit
     /// bitidentisch.
     pub extended_action_nodes: [bool; NUM_PLAYERS],
+
+    /// Klasse W des asymmetrischen Self-Plays (`PREREG_asymmetric_selfplay.md`
+    /// par.2): Pin des laufenden erzwungenen Plattenzugs der Wuerfel-Seite.
+    /// `None` ist der Bestand -- dann sind `drafting_actions` und
+    /// `apply_drafting` Zeile fuer Zeile unveraendert. Wie
+    /// `extended_action_nodes` KEIN Teil der Spielregeln, sondern der
+    /// Erzeugungs-Konfiguration: `state_to_json` schreibt ihn nicht (Records
+    /// und Netz-Eingabe unveraendert), `state_to_json_exact` nur, wenn er
+    /// gesetzt ist.
+    pub dome_dice_pin: Option<DomeDicePin>,
 
     pub scoring_tile_ids: Vec<usize>,
 
@@ -575,6 +585,8 @@ pub fn setup_new_game<R: Rng + ?Sized>(
         pending_moon_order: None,
         pending_return_order: None,
         extended_action_nodes: [false; NUM_PLAYERS],
+        // Klasse W: gesetzt nur von `self_play::apply_forced_dome_move`.
+        dome_dice_pin: None,
         scoring_tile_ids: Vec::new(),
         round_number: 1,
         current_player: first_player,
@@ -593,6 +605,10 @@ pub fn setup_new_round<R: Rng + ?Sized>(state: &mut GameState, rng: &mut R) {
     state.round_number += 1;
     state.phase = Phase::Drafting;
     state.current_player = state.first_player_next_round;
+    // Klasse W (Bauplan 4.1): ein Pin lebt nur innerhalb EINES Plattenzugs und
+    // wird bei `ChooseDomeRotation` geloescht. Hier nur vorsorglich, damit er
+    // unter keinen Umstaenden in eine neue Runde leckt. Bei `None` ein No-Op.
+    state.dome_dice_pin = None;
     state.large_factory.reset_for_new_round();
 
     fill_factories(

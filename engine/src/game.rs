@@ -8,8 +8,8 @@ use rand::Rng;
 
 use crate::execution::{execute_move, execute_move_with_moon, finish_moon_placement};
 use crate::moves::{
-    Action, DrawFromStackMove, Move, PendingDomeChoice, PendingMoonOrder, PendingReturnOrder,
-    PlaceDomeTileMove, TakeBonusChipMove, TakeSource,
+    Action, DomeDicePin, DomeDiceSource, DrawFromStackMove, Move, PendingDomeChoice, PendingMoonOrder,
+    PendingReturnOrder, PlaceDomeTileMove, TakeBonusChipMove, TakeSource,
 };
 use crate::tile::TileColor;
 use crate::round_end::{
@@ -806,7 +806,99 @@ pub fn rest_in_draw_order(state: &GameState, chosen_id: usize) -> Vec<usize> {
 
 /// Alle gültigen Drafting-Aktionen für den aktiven Spieler eines Zustands.
 /// Leer → [Pass]. Single Source of Truth für Game-Loop und MCTS.
+///
+/// Klasse W (`PREREG_asymmetric_selfplay.md` par.2, Bauplan 4.1): ist ein
+/// [`DomeDicePin`] fuer den Spieler am Zug gesetzt, wird die Liste auf die
+/// Teilzuege des gewuerfelten Plattenzugs gefiltert
+/// ([`filter_actions_by_dome_dice_pin`]). Ohne Pin (Bestand, jeder Pfad ausser
+/// der W-Erzeugung) ist das genau die ungefilterte Liste, ohne weiteren Aufwand.
 pub fn drafting_actions(state: &GameState) -> Vec<Action> {
+    let actions = drafting_actions_unpinned(state);
+    match &state.dome_dice_pin {
+        Some(pin) if pin.player == state.current_player => {
+            let filtered = filter_actions_by_dome_dice_pin(state, pin, &actions);
+            if filtered.is_empty() {
+                // Engine-Fehler (Pin passt nicht zum Zustand): laut im Debug-Bau,
+                // im Release-Bau die ungefilterte Liste statt eines stillen Pass
+                // (Bauplan 4.1).
+                debug_assert!(false, "dome_dice_pin passt zu keiner legalen Aktion: {pin:?}");
+                return actions;
+            }
+            filtered
+        }
+        _ => actions,
+    }
+}
+
+/// Filter des Wuerfel-Pins (Bauplan 4.1). Dieselbe Rangfolge der offenen
+/// Zustaende wie in [`drafting_actions_unpinned`]: Rueckgabeknoten, Rotation,
+/// laufender Stapelzug, nichts offen. Leere Rueckgabe heisst "Pin passt nicht
+/// zum Zustand" (der Aufrufer faellt dann auf die ungefilterte Liste zurueck).
+fn filter_actions_by_dome_dice_pin(state: &GameState, pin: &DomeDicePin, actions: &[Action]) -> Vec<Action> {
+    if state.pending_moon_order.is_some() {
+        // Ein Mondknoten gehoert nie zu einem Plattenzug; der Pin wird erst nach
+        // einer Plattenwahl der Suche gesetzt. Nichts filtern.
+        return actions.to_vec();
+    }
+    if state.pending_return_order.is_some() {
+        return match pin.return_first {
+            Some(p) => actions
+                .iter()
+                .filter(|a| matches!(a, Action::ChooseReturnFirst(q) if *q == p))
+                .cloned()
+                .collect(),
+            // Kein vorab gewuerfelter Kopf (Muenze nicht gefallen): der Knoten
+            // bleibt frei, die Suche entscheidet (par.3a F4).
+            None => actions.to_vec(),
+        };
+    }
+    if state.pending_dome_choice.is_some() {
+        return actions
+            .iter()
+            .filter(|a| matches!(a, Action::ChooseDomeRotation(r) if *r == pin.rotation))
+            .cloned()
+            .collect();
+    }
+    if !state.pending_stack_draw.is_empty() {
+        let DomeDiceSource::Stack { chosen_id } = pin.source else {
+            return Vec::new();
+        };
+        // KEIN `DrawStackPeek` (E13): die Tiefe hat der Wuerfel festgelegt.
+        // Nur Plaetze, auf denen die gewuerfelte Rotation legal ist.
+        return actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::ChooseDrawStackSlot(m) if m.chosen_id == chosen_id => {
+                    let mut m = m.clone();
+                    if let Some(order) = &pin.return_order {
+                        m.return_order = order.clone();
+                    }
+                    draw_stack_slot_rotation_candidates(state, m.chosen_id, m.slot_row, m.slot_col, &m.return_order)
+                        .contains(&pin.rotation)
+                        .then_some(Action::ChooseDrawStackSlot(m))
+                }
+                _ => None,
+            })
+            .collect();
+    }
+    let DomeDiceSource::Display { tile_id } = pin.source else {
+        return Vec::new();
+    };
+    actions
+        .iter()
+        .filter(|a| match a {
+            Action::ChooseDomeSlot(m) if m.dome_tile_id == tile_id => {
+                dome_slot_rotation_candidates(state, m.dome_tile_id, m.slot_row, m.slot_col).contains(&pin.rotation)
+            }
+            _ => false,
+        })
+        .cloned()
+        .collect()
+}
+
+/// Die Drafting-Aktionen OHNE Wuerfel-Pin -- der Bestand von
+/// [`drafting_actions`] vor Klasse W, Zeile fuer Zeile.
+fn drafting_actions_unpinned(state: &GameState) -> Vec<Action> {
     let mut actions: Vec<Action> = Vec::new();
 
     // Weg A Stufe 2+ (`PREREG_moon_stack_order.md` par.12.2): eine
@@ -975,6 +1067,18 @@ impl Game {
         // Mondknoten zuerst, dann der offene Rueckgabeknoten, dann die
         // Kuppelrotation, dann der laufende Stapelzug. Beide neuen Zweige sind
         // unerreichbar, solange die Felder `None` sind (Tor aus).
+        // Klasse W (Bauplan 4.1, Projektregel "Aenderungen am Spielbrett
+        // validieren"): unter einem Wuerfel-Pin fuer den Spieler am Zug ist NUR
+        // erlaubt, was `drafting_actions` anbietet. Abgelehnt wird VOR jeder
+        // Mutation, der Zustand bleibt unveraendert. Ohne Pin (Bestand) wird
+        // dieser Zweig nicht betreten.
+        if let Some(pin) = &self.state.dome_dice_pin {
+            if pin.player == self.state.current_player && !drafting_actions(&self.state).contains(action) {
+                return Err(format!(
+                    "Aktion {action:?} liegt ausserhalb des Wuerfel-Pins {pin:?} (Klasse W)."
+                ));
+            }
+        }
         if self.state.pending_moon_order.is_some() {
             if !matches!(action, Action::ChooseMoonTop(_) | Action::Pass) {
                 return Err(
@@ -1160,6 +1264,9 @@ impl Game {
                     }
                 }
                 self.state.pending_dome_choice = None;
+                // Klasse W: der Plattenzug ist abgeschlossen, der Pin erlischt
+                // (Bauplan 4.1/E14). Bei `None` ein No-Op.
+                self.state.dome_dice_pin = None;
                 self.state.switch_player();
             }
             Action::BonusChip(m) => {
@@ -2571,6 +2678,359 @@ mod dome_pool_knowledge_game_tests {
         let n = game.state.dome_tile_pool.len();
         let bottom: Vec<usize> = game.state.dome_tile_pool[n - 2..].iter().map(|t| t.tile_id).collect();
         assert_eq!(bottom, vec![drawn[2], drawn[1]], "der Block liegt in der gewaehlten Reihenfolge unten");
+        assert!(dome_pool_knowledge_is_consistent(&game.state));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Klasse W: Wuerfel-Pin (PREREG_asymmetric_selfplay.md par.2, Bauplan 4.1,
+// Tests 8.1 Nr. 1-5, 10, 11, 17a, 18)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod dome_dice_pin_tests {
+    use super::*;
+    use crate::moves::{DomeDicePin, DomeDiceSource};
+    use crate::state::{dome_pool_knowledge_is_consistent, KnownPoolBlock};
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn names() -> [String; NUM_PLAYERS] {
+        ["P1".into(), "P2".into()]
+    }
+
+    /// Frische Partie, Startkuppeln als gesetzt markiert (Raster leer, 9 Plaetze).
+    fn started_game(seed: u64) -> Game {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game
+    }
+
+    fn display_pin(game: &Game, tile_id: usize, rotation: u32) -> DomeDicePin {
+        DomeDicePin {
+            player: game.state.current_player,
+            source: DomeDiceSource::Display { tile_id },
+            rotation,
+            return_first: None,
+            return_order: None,
+        }
+    }
+
+    fn peek_n(game: &mut Game, n: usize) {
+        game.state.players[game.state.current_player].score = 0;
+        for _ in 0..n {
+            game.apply_drafting(&Action::DrawStackPeek).expect("Peek");
+        }
+    }
+
+    fn snapshot(state: &GameState) -> serde_json::Value {
+        crate::serialize::state_to_json_exact(state, false)
+    }
+
+    /// Test 1 (E13/4.1): Auslage-Pin -> nur Plaetze der gewuerfelten Platte.
+    #[test]
+    fn dome_dice_pin_display_offers_only_pinned_tile_slots() {
+        let mut game = started_game(21);
+        let tile_id = game.state.dome_display[1].tile_id;
+        game.state.dome_dice_pin = Some(display_pin(&game, tile_id, 90));
+        let actions = drafting_actions(&game.state);
+        assert_eq!(actions.len(), 9, "leeres Raster: neun Plaetze, eine Platte");
+        assert!(actions.iter().all(|a| matches!(a, Action::ChooseDomeSlot(m) if m.dome_tile_id == tile_id)));
+        // Ohne Pin: drei Platten mal neun Plaetze plus Stein-/Chip-/Peek-Aktionen.
+        game.state.dome_dice_pin = None;
+        assert!(drafting_actions(&game.state).len() > 27);
+    }
+
+    /// Test 2 (E13): Stapel-Pin -> nur die gewuerfelte gezogene Platte, kein Peek.
+    #[test]
+    fn dome_dice_pin_stack_offers_only_chosen_tile_and_no_peek() {
+        let mut game = started_game(22);
+        peek_n(&mut game, 3);
+        let chosen_id = game.state.pending_stack_draw[2].tile_id;
+        assert!(drafting_actions(&game.state).contains(&Action::DrawStackPeek), "ohne Pin ist Weiterziehen legal");
+        game.state.dome_dice_pin = Some(DomeDicePin {
+            player: game.state.current_player,
+            source: DomeDiceSource::Stack { chosen_id },
+            rotation: 180,
+            return_first: None,
+            return_order: None,
+        });
+        let actions = drafting_actions(&game.state);
+        assert_eq!(actions.len(), 9);
+        assert!(!actions.contains(&Action::DrawStackPeek), "der Pin entfernt das Weiterziehen (E13)");
+        assert!(actions.iter().all(|a| matches!(a, Action::ChooseDrawStackSlot(m) if m.chosen_id == chosen_id)));
+    }
+
+    /// Knotentor aus: der Pin traegt die volle Rueckgabe-Reihenfolge, und die
+    /// Kandidaten tragen genau sie (die Suche bewertet, was tatsaechlich kommt).
+    #[test]
+    fn dome_dice_pin_stack_carries_pinned_return_order_without_the_gate() {
+        let mut game = started_game(23);
+        assert!(!game.state.extended_action_nodes[0]);
+        peek_n(&mut game, 4);
+        let ids: Vec<usize> = game.state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+        let order = vec![ids[2], ids[0], ids[1]];
+        game.state.dome_dice_pin = Some(DomeDicePin {
+            player: game.state.current_player,
+            source: DomeDiceSource::Stack { chosen_id: ids[3] },
+            rotation: 0,
+            return_first: None,
+            return_order: Some(order.clone()),
+        });
+        let actions = drafting_actions(&game.state);
+        assert!(!actions.is_empty());
+        for a in &actions {
+            match a {
+                Action::ChooseDrawStackSlot(m) => assert_eq!(m.return_order, order),
+                other => panic!("unerwartet: {other:?}"),
+            }
+        }
+        game.apply_drafting(&actions[0]).expect("gepinnter Kandidat ist legal");
+        game.apply_drafting(&Action::ChooseDomeRotation(0)).expect("Rotation");
+        let n = game.state.dome_tile_pool.len();
+        let bottom: Vec<usize> = game.state.dome_tile_pool[n - 3..].iter().map(|t| t.tile_id).collect();
+        assert_eq!(bottom, order, "die gepinnte Reihenfolge liegt unten");
+    }
+
+    /// Test 3: Rotation festgenagelt; die Anwendung loescht den Pin und wechselt
+    /// den Spieler.
+    #[test]
+    fn dome_dice_pin_rotation_offers_single_rotation_and_clears_on_apply() {
+        let mut game = started_game(24);
+        let mover = game.state.current_player;
+        let tile_id = game.state.dome_display[0].tile_id;
+        game.state.dome_dice_pin = Some(display_pin(&game, tile_id, 270));
+        let slot = drafting_actions(&game.state)[4].clone();
+        let Action::ChooseDomeSlot(m) = slot.clone() else { panic!("Slot erwartet") };
+        game.apply_drafting(&slot).unwrap();
+        assert_eq!(drafting_actions(&game.state), vec![Action::ChooseDomeRotation(270)]);
+        assert!(game.apply_drafting(&Action::ChooseDomeRotation(0)).is_err(), "andere Rotation abgelehnt");
+        game.apply_drafting(&Action::ChooseDomeRotation(270)).unwrap();
+        assert!(game.state.dome_dice_pin.is_none(), "Pin erlischt mit dem Zug (E14)");
+        assert_eq!(game.state.current_player, 1 - mover, "switch_player erst nach der Rotation");
+        assert!(game.state.players[mover].dome_grid.dome_slots[m.slot_row][m.slot_col].is_some());
+    }
+
+    /// Test 4: vorab gewuerfelter Rueckgabekopf -> genau eine Position; ohne
+    /// Kopf bleibt der Knoten frei.
+    #[test]
+    fn dome_dice_pin_return_first_offers_single_position() {
+        let cases: [(Option<usize>, Vec<Action>); 2] = [
+            (Some(2), vec![Action::ChooseReturnFirst(2)]),
+            (None, (0..3).map(Action::ChooseReturnFirst).collect()),
+        ];
+        for (head, want) in cases {
+            let mut game = started_game(25);
+            game.state.extended_action_nodes = [true, true];
+            peek_n(&mut game, 4);
+            let chosen_id = game.state.pending_stack_draw[3].tile_id;
+            game.state.dome_dice_pin = Some(DomeDicePin {
+                player: game.state.current_player,
+                source: DomeDiceSource::Stack { chosen_id },
+                rotation: 90,
+                return_first: head,
+                return_order: None,
+            });
+            let slot = drafting_actions(&game.state)[0].clone();
+            game.apply_drafting(&slot).unwrap();
+            assert!(game.state.pending_return_order.is_some(), "Knoten offen (3 Restplatten)");
+            assert_eq!(drafting_actions(&game.state), want);
+            if head.is_some() {
+                assert!(game.apply_drafting(&Action::ChooseReturnFirst(0)).is_err());
+            }
+            game.apply_drafting(&want[want.len() - 1]).unwrap();
+            assert_eq!(drafting_actions(&game.state), vec![Action::ChooseDomeRotation(90)]);
+        }
+    }
+
+    /// Test 5: alles ausserhalb des Pins wird abgelehnt, der Zustand bleibt
+    /// byte-gleich.
+    #[test]
+    fn apply_drafting_rejects_actions_outside_the_pin_and_leaves_state_unchanged() {
+        let mut game = started_game(26);
+        let pinned = game.state.dome_display[0].tile_id;
+        let other = game.state.dome_display[1].tile_id;
+        let unpinned = drafting_actions_unpinned(&game.state);
+        game.state.dome_dice_pin = Some(display_pin(&game, pinned, 0));
+        let before = snapshot(&game.state);
+        let mut rejected = 0;
+        for a in &unpinned {
+            if matches!(a, Action::ChooseDomeSlot(m) if m.dome_tile_id == pinned) {
+                continue;
+            }
+            assert!(game.apply_drafting(a).is_err(), "muss abgelehnt werden: {a:?}");
+            assert_eq!(snapshot(&game.state), before, "Zustand nach Ablehnung von {a:?} veraendert");
+            rejected += 1;
+        }
+        assert!(unpinned.iter().any(|a| matches!(a, Action::ChooseDomeSlot(m) if m.dome_tile_id == other)));
+        assert!(unpinned.contains(&Action::DrawStackPeek));
+        assert!(rejected > 20, "Testaufbau: viele verbotene Aktionen geprueft, waren {rejected}");
+
+        // Stapel-Pin: Weiterziehen und andere gezogene Platten sind verboten.
+        let mut game = started_game(27);
+        peek_n(&mut game, 2);
+        let ids: Vec<usize> = game.state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+        game.state.dome_dice_pin = Some(DomeDicePin {
+            player: game.state.current_player,
+            source: DomeDiceSource::Stack { chosen_id: ids[1] },
+            rotation: 0,
+            return_first: None,
+            return_order: None,
+        });
+        let before = snapshot(&game.state);
+        assert!(game.apply_drafting(&Action::DrawStackPeek).is_err());
+        let wrong = generate_draw_stack_moves(&game.state).into_iter().find(|m| m.chosen_id == ids[0]).unwrap();
+        assert!(game.apply_drafting(&Action::ChooseDrawStackSlot(wrong)).is_err());
+        assert_eq!(snapshot(&game.state), before);
+    }
+
+    /// E14: ein Pin des ANDEREN Spielers filtert nichts, und der Rundenwechsel
+    /// loescht jeden Pin.
+    #[test]
+    fn dome_dice_pin_of_the_other_player_is_inert_and_round_change_clears_it() {
+        let mut game = started_game(28);
+        let tile_id = game.state.dome_display[0].tile_id;
+        let mut pin = display_pin(&game, tile_id, 0);
+        pin.player = 1 - game.state.current_player;
+        let unpinned = drafting_actions_unpinned(&game.state);
+        game.state.dome_dice_pin = Some(pin);
+        assert_eq!(drafting_actions(&game.state), unpinned);
+        let mut rng = StdRng::seed_from_u64(1);
+        crate::state::setup_new_round(&mut game.state, &mut rng);
+        assert!(game.state.dome_dice_pin.is_none());
+    }
+
+    /// Test 17 (Teil a): ohne Pin ist `drafting_actions` exakt der Bestand,
+    /// ueber viele Zustaende ganzer Zufallspartien.
+    #[test]
+    fn drafting_actions_without_pin_equal_the_unpinned_list() {
+        use rand::seq::IndexedRandom;
+        let mut checked = 0usize;
+        for seed in 1u64..=8 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let first = (seed % 2) as usize;
+            let mut game =
+                Game::start(names(), first, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+            for pi in [1 - first, first] {
+                let (t, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+                apply_start_placement(&mut game.state, pi, t, r, c, rot).unwrap();
+            }
+            for _ in 0..300 {
+                if game.state.phase != Phase::Drafting {
+                    break;
+                }
+                let a = drafting_actions(&game.state);
+                assert_eq!(a, drafting_actions_unpinned(&game.state));
+                checked += 1;
+                let pick = a.choose(&mut rng).unwrap().clone();
+                game.apply_drafting(&pick).unwrap();
+            }
+        }
+        assert!(checked > 100, "Testaufbau: {checked} Zustaende");
+    }
+
+    /// Test 18 (E14): der Pin steht nie in `state_to_json` (Records, Netz-
+    /// Eingabe); im exakten JSON nur, wenn gesetzt, und dort rundlaufend.
+    #[test]
+    fn pin_never_serialized_in_records() {
+        let mut game = started_game(29);
+        let exact = snapshot(&game.state);
+        assert!(exact.get("dome_dice_pin_exact").is_none(), "ohne Pin kein neuer Schluessel");
+        peek_n(&mut game, 1);
+        let chosen_id = game.state.pending_stack_draw[0].tile_id;
+        game.state.dome_dice_pin = Some(DomeDicePin {
+            player: game.state.current_player,
+            source: DomeDiceSource::Stack { chosen_id },
+            rotation: 90,
+            return_first: Some(1),
+            return_order: Some(vec![3, 4]),
+        });
+        let with_pin = crate::serialize::state_to_json(&game.state, true);
+        let exact = snapshot(&game.state);
+        assert!(exact.get("dome_dice_pin_exact").is_some());
+        let back = crate::serialize::json_to_state_exact(&exact).expect("rundlaufend");
+        assert_eq!(back.dome_dice_pin, game.state.dome_dice_pin);
+        game.state.dome_dice_pin = None;
+        assert_eq!(with_pin, crate::serialize::state_to_json(&game.state, true), "Record-Zustand unabhaengig vom Pin");
+        let back = crate::serialize::json_to_state_exact(&snapshot(&game.state)).expect("rundlaufend");
+        assert!(back.dome_dice_pin.is_none());
+    }
+
+    /// Hilfsaufbau fuer Tests 10/11: Spieler 0 zieht den GANZEN Stapel (13 nach
+    /// den Startsetzungen) und legt 12 Platten als einen Block zurueck -- das
+    /// Beispiel des Nutzers (Bauplan 3.2), ohne Suche.
+    fn whole_stack_drawn_by_player_zero(seed: u64) -> (Game, Vec<usize>) {
+        // Startspieler 0 zieht nach den beiden Startsetzungen als Erster.
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(names(), 0, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+        for pi in [1, 0] {
+            let (t, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+            apply_start_placement(&mut game.state, pi, t, r, c, rot).unwrap();
+        }
+        assert_eq!(game.state.current_player, 0);
+        assert_eq!(game.state.dome_tile_pool.len(), 13, "Stapel R1 = 13 (Bauplan Abschnitt 2)");
+        for _ in 0..13 {
+            game.apply_drafting(&Action::DrawStackPeek).unwrap();
+        }
+        let drawn: Vec<usize> = game.state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+        let (r, c) = game.state.players[0].dome_grid.empty_slots()[0];
+        let m = DrawFromStackMove {
+            chosen_id: drawn[12],
+            slot_row: r,
+            slot_col: c,
+            rotation: 0,
+            return_order: drawn[..12].to_vec(),
+        };
+        game.apply_drafting(&Action::ChooseDrawStackSlot(m)).unwrap();
+        game.apply_drafting(&Action::ChooseDomeRotation(0)).unwrap();
+        assert_eq!(game.state.dome_pool_known_blocks, vec![KnownPoolBlock { len: 12, returner: 0 }]);
+        assert_eq!(game.state.dome_pool_unknown_prefix_len(), 0);
+        (game, drawn[..12].to_vec())
+    }
+
+    /// Test 10 (E2/E15): der Block der Wuerfel-Seite bleibt in IHRER
+    /// Determinisierung stehen, die des Gegners permutiert ihn nur in sich.
+    #[test]
+    fn opponent_determinization_permutes_dice_block_in_itself() {
+        let (game, returned) = whole_stack_drawn_by_player_zero(31);
+        let mut moved = false;
+        for s in 0u64..20 {
+            let mut own = game.state.clone();
+            crate::state::determinize_dome_pool(&mut own, Some(0), &mut StdRng::seed_from_u64(s));
+            let own_ids: Vec<usize> = own.dome_tile_pool.iter().map(|t| t.tile_id).collect();
+            assert_eq!(own_ids, returned, "eigener Block: Reihenfolge bekannt, unveraendert");
+            let mut opp = game.state.clone();
+            crate::state::determinize_dome_pool(&mut opp, Some(1), &mut StdRng::seed_from_u64(s));
+            let mut a: Vec<usize> = opp.dome_tile_pool.iter().map(|t| t.tile_id).collect();
+            if a != returned {
+                moved = true;
+            }
+            assert_eq!(
+                opp.dome_tile_pool[0].is_special_type(),
+                game.state.dome_tile_pool[0].is_special_type(),
+                "Typ der obersten Platte ist oeffentlich"
+            );
+            a.sort_unstable();
+            let mut b = returned.clone();
+            b.sort_unstable();
+            assert_eq!(a, b, "Multimenge gleich");
+        }
+        assert!(moved, "der Gegner kennt die Reihenfolge nicht: mindestens eine Permutation weicht ab");
+    }
+
+    /// Test 11 (E5): die Rundenvorbereitung fuellt die Auslage mit den obersten
+    /// drei Platten des Wuerfel-Blocks; der Block schrumpft von 12 auf 9.
+    #[test]
+    fn round_refill_takes_top_of_dice_block() {
+        let (mut game, returned) = whole_stack_drawn_by_player_zero(32);
+        game.state.dome_display.clear();
+        let mut rng = StdRng::seed_from_u64(5);
+        game.next_round(&mut rng);
+        let shown: Vec<usize> = game.state.dome_display.iter().map(|t| t.tile_id).collect();
+        assert_eq!(shown, returned[..3].to_vec());
+        assert_eq!(game.state.dome_pool_known_blocks, vec![KnownPoolBlock { len: 9, returner: 0 }]);
         assert!(dome_pool_knowledge_is_consistent(&game.state));
     }
 }

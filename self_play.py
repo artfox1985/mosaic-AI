@@ -66,6 +66,13 @@ RECIPE_RESERVED_ENV = {
     "MOSAIC_LABEL_RNG_SPLIT": "label_rng_split",
     "MOSAIC_EXCURSION_RESHUFFLE": "excursion_reshuffle",
     "MOSAIC_EXCURSION_KL_WEIGHT": "excursion_kl_weight",
+    # Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a).
+    "MOSAIC_DOME_DICE": "dome_dice",
+    "MOSAIC_DOME_DICE_SIMS": "dome_dice_sims",
+    # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a).
+    "MOSAIC_AGGR_SIDE": "aggr_side",
+    "MOSAIC_AGGR_SIDE_W": "aggr_side_w",
+    "MOSAIC_AGGR_SIDE_LAMBDA": "aggr_side_lambda",
 }
 
 _RECIPE_PRE = None
@@ -213,6 +220,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       start_slot_random_p=0.0, return_order_random_p=0.0,
                       tie_mirror_p=None, label_rng_split=False,
                       excursion_reshuffle=False, excursion_kl_weight=False,
+                      dome_dice=False, dome_dice_sims=600,
+                      aggr_side=False, aggr_side_w=0.1, aggr_side_lambda=None,
                       engine_config_only=False):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
@@ -284,6 +293,16 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     darum genau wie bisher verhalten und eine geerbte Variable durchlassen.
     Die Doppelquelle (Flag UND abweichende geerbte Variable) faengt
     `generate_data` vor dem Start ab.
+    `dome_dice` / `dome_dice_sims` (Klasse W, PREREG_asymmetric_selfplay.md
+    par.2/par.3a): Wuerfel-Kuppelplatten auf einer Seite je Partie. Bauform wie
+    `return_order_random_p` (OnceLock in Rust, Variable IMMER vor dem Import
+    gesetzt, `0` = aus); eine abweichende geerbte Variable faengt
+    `generate_data` vorher als Doppelquelle ab.
+    `aggr_side` / `aggr_side_w` / `aggr_side_lambda` (Klasse S,
+    PREREG_asymmetric_selfplay.md par.3/par.3a): Stoerer auf einer Seite je
+    Partie. `MOSAIC_AGGR_SIDE` und `MOSAIC_AGGR_SIDE_W` IMMER gesetzt,
+    `MOSAIC_AGGR_SIDE_LAMBDA` nur bei gegebenem Wert (Rust kennt bewusst keinen
+    lambda-Default); Doppelquellen faengt `generate_data` vorher ab.
     `engine_config_only` (Rezept-Waechter, `check_engine_config`): nach dem
     Setzen der Umgebung und dem Import NUR `engine_config_json()` melden und
     ohne Partie enden -- so sieht der Waechter genau die Konfiguration, die ein
@@ -310,6 +329,14 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
         os.environ["MOSAIC_EXCURSION_RESHUFFLE"] = "1"
     if excursion_kl_weight:
         os.environ["MOSAIC_EXCURSION_KL_WEIGHT"] = "1"
+    # Klasse W: immer gesetzt (siehe Docstring), Rust liest per OnceLock.
+    os.environ["MOSAIC_DOME_DICE"] = "1" if dome_dice else "0"
+    os.environ["MOSAIC_DOME_DICE_SIMS"] = str(dome_dice_sims)
+    # Klasse S: wie Klasse W immer gesetzt, lambda nur mit Wert.
+    os.environ["MOSAIC_AGGR_SIDE"] = "1" if aggr_side else "0"
+    os.environ["MOSAIC_AGGR_SIDE_W"] = repr(float(aggr_side_w))
+    if aggr_side_lambda is not None:
+        os.environ["MOSAIC_AGGR_SIDE_LAMBDA"] = repr(float(aggr_side_lambda))
     try:
         import mosaic_rust as mr
         if engine_config_only:
@@ -421,7 +448,10 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           return_order_random_p=0.0,
                           tie_mirror_p=None, label_rng_split=False,
                           excursion_reshuffle=False,
-                          excursion_kl_weight=False) -> str | None:
+                          excursion_kl_weight=False,
+                          dome_dice=False, dome_dice_sims=600,
+                          aggr_side=False, aggr_side_w=0.1,
+                          aggr_side_lambda=None) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -441,7 +471,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               deviate_prob, deviate_candidates, action_temp,
               excursion_prob, excursion_profile, start_slot_random_p,
               return_order_random_p, tie_mirror_p, label_rng_split,
-              excursion_reshuffle, excursion_kl_weight),
+              excursion_reshuffle, excursion_kl_weight, dome_dice, dome_dice_sims,
+              aggr_side, aggr_side_w, aggr_side_lambda),
     )
     proc.start()
     t_start = time.time()
@@ -553,6 +584,11 @@ def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
             "label_rng_split": knobs.get("label_rng_split", False),
             "excursion_reshuffle": knobs.get("excursion_reshuffle", False),
             "excursion_kl_weight": knobs.get("excursion_kl_weight", False),
+            "dome_dice": knobs.get("dome_dice", False),
+            "dome_dice_sims": knobs.get("dome_dice_sims", 600),
+            "aggr_side": knobs.get("aggr_side", False),
+            "aggr_side_w": knobs.get("aggr_side_w", 0.1),
+            "aggr_side_lambda": knobs.get("aggr_side_lambda"),
             "engine_config_only": True,
         },
     )
@@ -633,6 +669,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   label_rng_split: bool = False,
                   excursion_reshuffle: bool = False,
                   excursion_kl_weight: bool = False,
+                  dome_dice: bool = False,
+                  dome_dice_sims: int = 600,
+                  aggr_side: bool = False,
+                  aggr_side_w: float = 0.1,
+                  aggr_side_lambda: float | None = None,
                   recipe_info: dict | None = None):
     # `recipe_info` (Rezeptdatei, docs/working_rules.md): None ohne Rezept,
     # sonst {"recipe": Recipe, "class": str|None, "overrides": dict} aus
@@ -744,6 +785,55 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         if _want is not None and _have is not None and _have != _want:
             raise SystemExit(f"❌ {_flag} will {_env}={_want!r}, die Umgebung traegt schon "
                              f"{_have!r} (Doppelquelle: Variable aus Kette/Shell entfernen).")
+    # Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a): Wuerfel-Kuppelplatten
+    # auf einer Seite je Partie. Harte Fehler statt Warnung: eine W-Klasse, die
+    # still als G-G laeuft, waere ein falsch etikettierter Korpus.
+    if dome_dice_sims < 1:
+        raise SystemExit(f"❌ --dome-dice-sims muss >= 1 sein, ist {dome_dice_sims}.")
+    if dome_dice and mode != "network":
+        raise SystemExit("❌ --dome-dice wirkt nur bei --mode network (die Platzsuche braucht das Netz).")
+    # F8 (par.3a): Ausflug und Wuerfel nie zusammen -- ein Ausflug erbte die
+    # Wuerfel-Seite nicht und liefe als G-G-Fortsetzung einer W-Partie weiter.
+    # Rust lehnt dieselbe Kombination in run_net_self_play ab.
+    if dome_dice and excursion_prob > 0:
+        raise SystemExit(f"❌ --dome-dice und --excursion-prob={excursion_prob} schliessen sich aus "
+                         "(F8, PREREG_asymmetric_selfplay.md par.3a): Ausfluege bleiben in der "
+                         "G-G-Klasse value-excursion.")
+    # Doppelquelle wie oben: der Worker setzt beide Variablen immer; eine
+    # abweichende geerbte Variable wuerde still ueberschrieben.
+    for _env, _want in (("MOSAIC_DOME_DICE", "1" if dome_dice else "0"),
+                        ("MOSAIC_DOME_DICE_SIMS", str(dome_dice_sims))):
+        _have = os.environ.get(_env)
+        if _have is not None and _have != _want:
+            raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
+                             f"(--dome-dice/--dome-dice-sims -> {_want!r}); Variable entfernen.")
+    # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a): Stoerer auf einer
+    # Seite je Partie. Harte Fehler wie bei W. Bereiche wie Rust
+    # (self_play.rs parse_aggr_side_w/_lambda, net_mcts.rs set_aggression_params).
+    if not (0.0 <= aggr_side_w <= 1.0):
+        raise SystemExit(f"❌ --aggr-side-w muss in [0, 1] liegen, ist {aggr_side_w}.")
+    if aggr_side_lambda is not None and not (0.0 <= aggr_side_lambda <= 5.0):
+        raise SystemExit(f"❌ --aggr-side-lambda muss in [0, 5] liegen, ist {aggr_side_lambda}.")
+    if aggr_side and aggr_side_lambda is None:
+        raise SystemExit("❌ --aggr-side verlangt --aggr-side-lambda (kein Default: lambda ist die "
+                         "Laufvariable des Pilots S4, PREREG_asymmetric_selfplay.md par.3a FS2).")
+    if aggr_side and mode != "network":
+        raise SystemExit("❌ --aggr-side wirkt nur bei --mode network (der Blend sitzt in der Netzsuche).")
+    # Wie F8: ein Ausflug erbte die Stoerer-Seite nicht. Rust lehnt dieselbe
+    # Kombination in run_net_self_play ab.
+    if aggr_side and excursion_prob > 0:
+        raise SystemExit(f"❌ --aggr-side und --excursion-prob={excursion_prob} schliessen sich aus "
+                         "(wie F8, PREREG_asymmetric_selfplay.md par.3a): Ausfluege bleiben in der "
+                         "G-G-Klasse value-excursion.")
+    _aggr_lambda_want = None if aggr_side_lambda is None else repr(float(aggr_side_lambda))
+    for _env, _want in (("MOSAIC_AGGR_SIDE", "1" if aggr_side else "0"),
+                        ("MOSAIC_AGGR_SIDE_W", repr(float(aggr_side_w))),
+                        ("MOSAIC_AGGR_SIDE_LAMBDA", _aggr_lambda_want)):
+        _have = os.environ.get(_env)
+        if _have is not None and _have != _want:
+            raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
+                             f"(--aggr-side/--aggr-side-w/--aggr-side-lambda -> {_want!r}); "
+                             "Variable entfernen.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -805,6 +895,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                 "tie_mirror_p": tie_mirror_p, "label_rng_split": label_rng_split,
                 "excursion_reshuffle": excursion_reshuffle,
                 "excursion_kl_weight": excursion_kl_weight,
+                "dome_dice": dome_dice, "dome_dice_sims": dome_dice_sims,
+                "aggr_side": aggr_side, "aggr_side_w": aggr_side_w,
+                "aggr_side_lambda": aggr_side_lambda,
             })
     if recipe_info is not None:
         if _expected:
@@ -871,6 +964,17 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "label_rng_split": label_rng_split,
         "excursion_reshuffle": excursion_reshuffle,
         "excursion_kl_weight": excursion_kl_weight,
+        # Klasse W (PREREG_asymmetric_selfplay.md par.2): Erzeugungs-Knoepfe wie die
+        # Zeilen darueber; die engine_config des Chunk-Prozesses meldet dazu
+        # `dome_dice`, `dome_dice_sims` und `dome_dice_caps`.
+        "dome_dice": dome_dice,
+        "dome_dice_sims": dome_dice_sims,
+        # Klasse S (PREREG_asymmetric_selfplay.md par.3): die engine_config des
+        # Chunk-Prozesses meldet dazu `aggr_side`, `aggr_side_w`,
+        # `aggr_side_lambda` und `aggr_own_q_gap_n_min_rule`.
+        "aggr_side": aggr_side,
+        "aggr_side_w": aggr_side_w,
+        "aggr_side_lambda": aggr_side_lambda,
     }, recipe=_recipe_block, engine_config=_worker_cfg)
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -930,6 +1034,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                              f"Record ohne Policy-Ziel (par.9b)")
     else:
         start_slot_status = "AUS (Standard)"
+    dome_dice_status = (f"AN: eine Seite je Partie wuerfelt Platte/Tiefe/Rotation, Platzsuche "
+                        f"{dome_dice_sims} Sims deterministisch (Klasse W)" if dome_dice
+                        else "AUS (Standard)")
+    aggr_side_status = (f"AN: eine Seite je Partie stoert, w {aggr_side_w}, lambda {aggr_side_lambda} "
+                        f"(Klasse S)" if aggr_side else "AUS (Standard)")
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
@@ -940,6 +1049,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"Abweichung {deviate_status} | "
               f"Ausflug {excursion_status} | "
               f"Startslot-Streuung {start_slot_status} | "
+              f"Wuerfel-Kuppelplatten {dome_dice_status} | "
+              f"Stoerer {aggr_side_status} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -987,6 +1098,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             tie_mirror_p=tie_mirror_p, label_rng_split=label_rng_split,
             excursion_reshuffle=excursion_reshuffle,
             excursion_kl_weight=excursion_kl_weight,
+            dome_dice=dome_dice, dome_dice_sims=dome_dice_sims,
+            aggr_side=aggr_side, aggr_side_w=aggr_side_w, aggr_side_lambda=aggr_side_lambda,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1359,6 +1472,37 @@ if __name__ == "__main__":
                              "Aktionszahl und schreibt `branch_kl` an den ersten Ausflug-Record. "
                              "Setzt MOSAIC_EXCURSION_KL_WEIGHT=1; ohne Flag bleibt die Variable "
                              "unberuehrt.")
+    parser.add_argument("--dome-dice", dest="dome_dice", action="store_true",
+                        help="PREREG_asymmetric_selfplay.md par.2/par.3a, Klasse W (Wuerfel-"
+                             "Kuppelplatten): je Partie ist EINE Seite (Hash aus dem Partie-Seed) "
+                             "die Wuerfel-Seite. Waehlt ihre normale Suche eine Plattenaktion, "
+                             "wuerfelt die Engine Quelle, Platte bzw. Stapeltiefe (Deckel R2 7, R3 3) "
+                             "und Rotation; den Platz sucht eine eigene deterministische Suche "
+                             "(--dome-dice-sims). Die Teilschritte schreiben keine Records; neue "
+                             "Record-Felder dome_dice_side, forced_domes_before, dice_trigger, "
+                             "dome_dice_cost. Setzt MOSAIC_DOME_DICE=1 (ohne Flag 0). Nur --mode "
+                             "network, nicht mit --excursion-prob > 0 (F8).")
+    parser.add_argument("--dome-dice-sims", dest="dome_dice_sims", type=int, default=600,
+                        help="Klasse W: Sim-Budget der Platzsuche des erzwungenen Plattenzugs "
+                             "(Prereg par.2: 600). Setzt MOSAIC_DOME_DICE_SIMS; wirkt nur mit "
+                             "--dome-dice.")
+    parser.add_argument("--aggr-side", dest="aggr_side", action="store_true",
+                        help="PREREG_asymmetric_selfplay.md par.3/par.3a, Klasse S (Stoerer): je "
+                             "Partie ist EINE Seite der Stoerer (Hash aus dem Partie-Seed; mit "
+                             "--dome-dice die Gegenseite der Wuerfel-Seite). Seine Drafting-Suche "
+                             "mischt den Blattwert nur aus eigener Sicht (1-w)*wr + "
+                             "w*clamp(pts - lambda*opp), die andere Seite bleibt beim reinen "
+                             "Siegwert; Startsetzung und Tiling unvermischt. Record-Felder "
+                             "aggr_side (jeder Record) und own_q_gap (Drafting-Records der "
+                             "Stoerer-Seite). Setzt MOSAIC_AGGR_SIDE=1 (ohne Flag 0). Nur --mode "
+                             "network, verlangt --aggr-side-lambda, nicht mit --excursion-prob > 0.")
+    parser.add_argument("--aggr-side-w", dest="aggr_side_w", type=float, default=0.1,
+                        help="Klasse S: Mischgewicht w des Stoerers in [0, 1] (FS2: fest 0,1). "
+                             "Setzt MOSAIC_AGGR_SIDE_W; wirkt nur mit --aggr-side.")
+    parser.add_argument("--aggr-side-lambda", dest="aggr_side_lambda", type=float, default=None,
+                        help="Klasse S: Gegnerpunkte-Abzug lambda in [0, 5], PFLICHT mit "
+                             "--aggr-side (kein Default, Pilot S4). Setzt "
+                             "MOSAIC_AGGR_SIDE_LAMBDA; wirkt nur bei w > 0.")
     # Rezeptdatei: EIN zusaetzlicher Schritt statt `parser.parse_args()`. Ohne
     # --recipe ist `apply_to_parser` ein normaler parse_args (plus die zwei
     # Flags --recipe/--class), `_recipe_overrides` bleibt leer.
@@ -1437,6 +1581,11 @@ if __name__ == "__main__":
         label_rng_split=args.label_rng_split,
         excursion_reshuffle=args.excursion_reshuffle,
         excursion_kl_weight=args.excursion_kl_weight,
+        dome_dice=args.dome_dice,
+        dome_dice_sims=args.dome_dice_sims,
+        aggr_side=args.aggr_side,
+        aggr_side_w=args.aggr_side_w,
+        aggr_side_lambda=args.aggr_side_lambda,
         recipe_info=(None if _RECIPE_PRE is None else
                      {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
                       "overrides": _recipe_overrides}),

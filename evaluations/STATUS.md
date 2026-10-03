@@ -18,7 +18,14 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**LAEUFT: NICHTS.** **FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
+**LAEUFT seit 2026-10-03 nachmittags: Bau des asymmetrischen Self-Plays** (Nutzer: *"ja, fang mit dem Bau an. die
+sonden werden uns dann zeigen ob es in die richtige richtung geht"*). Reihenfolge: Agent W (Bauschritte 1-4 aus
+`asymmetric_selfplay_build_plan.md` Abschnitt 10, Entscheide `PREREG_asymmetric_selfplay.md` par.3a), danach
+Agent S (Schritt 5), dann Schritt 6 (corpus_dataset-Masken) und die Engine-Befunde aus Code-Review 2 (#16, #20-22);
+Wheel-Bau, Anker-Invarianz und Abnahmen 8.4 durch den Koordinator. Agenten committen nicht, bauen kein Wheel und
+fahren keine Messlaeufe. Bis dahin keine Engine-Dateien von Hand anfassen.
+
+**FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
 `PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
 Partien in 400 Dateien (`data/selfplay_v34-b01-value-*`), beide Exit 0, keine Watchdog-, Deadline- oder
 Haenger-Zeile. Smoke vorher gruen (Waechter 6 Knoepfe, Manifest traegt `r5_net_sims` 400), Tages-Snapshot
@@ -150,7 +157,7 @@ gegen dich selber spielst"*). Entwurf `PREREG_asymmetric_selfplay.md`: Wuerfel-K
 (ALLE Platten der Wuerfel-Seite gewuerfelt, Quelle/ID bzw. Stapeltiefe d in 1..max mit Obergrenze 7 in Runde 2 und 3 in Runde 3/Rotation, Platz
 per Suche @600, erzwungene Zuege ohne Record, alle Wertziele bleiben, Start normal); Stoerer-Klasse
 S skizziert (lambda_aggr je Seite, Records beider Seiten, Stoerer-Policy nur bei fast gleichwertigem
-eigenem Wert). Ziel-Zusammensetzung (Nutzer 2026-10-01): Sockel 4 x 2.000 (G-G, G-W, W-S, G-S),
+eigenem Wert). Ziel-Zusammensetzung (Nutzer 2026-10-01, W-S am 2026-10-03 gestrichen): Sockel 3 x 2.000 (G-G, G-W, G-S),
 Schwarm 4.000 Weg C plus 4.000 Ausflug, G-1/G-2 fallen weg; grob 12 h (HERLEITUNG); endgueltig nach
 den Sonden S1-S4 (par.4). Bau in der Wheel-Runde nach der v34-Erzeugung.
 

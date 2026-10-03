@@ -2851,6 +2851,591 @@ fn asym_preference_side(game_seed: u64) -> usize {
     }
 }
 
+// ── Klasse W: Wuerfel-Kuppelplatten (asymmetrisches Self-Play) ──────────────
+//
+// `PREREG_asymmetric_selfplay.md` par.2 (Klasse festgelegt 2026-10-01) und
+// par.3a (Bau-Fragen F1-F9 entschieden 2026-10-03), Bauplan
+// `evaluations/asymmetric_selfplay_build_plan.md` Abschnitt 4. Kurzform:
+//
+// * Eine Seite je Partie ist die Wuerfel-Seite ([`dome_dice_side`], Hash aus
+//   dem Partie-Seed, der Partie-RNG bleibt unberuehrt).
+// * WANN sie eine Platte legt, entscheidet weiter ihre normale Suche (F1).
+//   Waehlt diese `ChooseDomeSlot` oder `DrawStackPeek` (F7: beide gleich) und
+//   ist kein Teilzug offen, ersetzt [`apply_forced_dome_move`] die gespielte
+//   Aktion: Quelle, Platte bzw. Stapeltiefe und Rotation wuerfelt
+//   [`roll_dome_dice`], den PLATZ sucht eine eigene Suche mit
+//   `MOSAIC_DOME_DICE_SIMS` Simulationen, deterministisch ohne Root-Noise (F6).
+// * Der erzwungene Zug laeuft innerhalb EINER Schleifeniteration: kein Record
+//   fuer seine Teilschritte, `move_number`/`round_move_index` unveraendert.
+// * Alle Zufallszahlen kommen aus eigenen, aus dem Partie-Seed abgeleiteten
+//   Stroemen (PREREG_search_rng_split.md), Zaehler = Index der erzwungenen
+//   Platte in der Partie (Bauplan 4.4 Schritt 1).
+// * Knopf AUS (Default) heisst: kein Getter-Ergebnis wird je gelesen ausser dem
+//   Schalter selbst, kein Strom gebaut, kein Record-Feld geschrieben.
+
+/// Strom der Seitenwahl (Bauplan 4.7). Eigener Wert je Verbraucher, Pruefung in
+/// `dome_dice_distinguishers_are_unique`.
+pub(crate) const DOME_DICE_SIDE_DISTINGUISHER: u64 = 0xD1CE_51DE_5EED_C0DE;
+/// Strom des Wuerfels selbst (Quelle, Platte/Tiefe, Rotation, Rueckgabe-Muenze).
+pub(crate) const DOME_DICE_SEED_DISTINGUISHER: u64 = 0xD1CE_D1CE_5EED_C0DE;
+/// Strom der Platz- und Rueckgabesuchen des erzwungenen Zugs.
+pub(crate) const DOME_DICE_SEARCH_SEED_DISTINGUISHER: u64 = 0xD1CE_5EA2_5EED_C0DE;
+
+/// Obergrenzen der Stapeltiefe je Runde 1..4 (Nutzer 2026-10-01, Prereg par.2:
+/// *"Setz mir das maximum in runde 2 auf 7 und runde 3 auf 3. Runde 4 hat
+/// sowieso nur noch 1 im stapel"*). `None` = keine Obergrenze, die Tiefe ist
+/// nur durch den Stapel begrenzt (F3). Kein Knopf, aber im Lauf-Manifest
+/// gemeldet (`engine_config_json` -> `dome_dice_caps`).
+pub(crate) const DOME_DICE_DEPTH_CAPS: [Option<usize>; 4] = [None, Some(7), Some(3), None];
+
+/// Default von `MOSAIC_DOME_DICE_SIMS` (Prereg par.2 Punkt 4: 600 Sims).
+pub(crate) const DOME_DICE_SIMS_DEFAULT: u32 = 600;
+
+/// `MOSAIC_DOME_DICE` als reine Pruefung: `"1"` an, `"0"` oder leer aus,
+/// alles andere ungueltig (`None`).
+fn parse_dome_dice_flag(raw: &str) -> Option<bool> {
+    match raw.trim() {
+        "1" => Some(true),
+        "0" | "" => Some(false),
+        _ => None,
+    }
+}
+
+/// Erzeugungsknopf `MOSAIC_DOME_DICE` (0/1, Default 0 = Bestand): schaltet die
+/// Klasse W im Netz-Self-Play ein. Ungueltig -> AUS mit EINMALIGER Warnung
+/// (OnceLock, Muster [`return_order_random_p`]).
+pub(crate) fn dome_dice_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_DOME_DICE") {
+        Err(_) => false,
+        Ok(raw) => parse_dome_dice_flag(&raw).unwrap_or_else(|| {
+            eprintln!("⚠️  MOSAIC_DOME_DICE={raw:?} ist weder 0 noch 1 -- Klasse W bleibt AUS.");
+            false
+        }),
+    })
+}
+
+/// `MOSAIC_DOME_DICE_SIMS` als reine Pruefung: positive ganze Zahl, sonst `None`.
+fn parse_dome_dice_sims(raw: &str) -> Option<u32> {
+    raw.trim().parse::<u32>().ok().filter(|&n| n > 0)
+}
+
+/// Sim-Budget der Platzsuche der Wuerfel-Seite (Default 600). Ungueltig ->
+/// Default mit EINMALIGER Warnung.
+pub(crate) fn dome_dice_sims() -> u32 {
+    static CELL: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_DOME_DICE_SIMS") {
+        Err(_) => DOME_DICE_SIMS_DEFAULT,
+        Ok(raw) => parse_dome_dice_sims(&raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_DOME_DICE_SIMS={raw:?} ist keine positive ganze Zahl -- Default \
+                 {DOME_DICE_SIMS_DEFAULT}."
+            );
+            DOME_DICE_SIMS_DEFAULT
+        }),
+    })
+}
+
+/// Welche Seite (0/1) ist in DIESER Partie die Wuerfel-Seite (Bauplan 4.7):
+/// Hash aus `game_seed ^ DOME_DICE_SIDE_DISTINGUISHER` ueber den bereits
+/// genutzten SplitMix64-Finalizer (shaping.rs:344), Muster
+/// [`asym_preference_side`]. Der Partie-RNG wird nicht beruehrt. Mit dem
+/// Startspieler (Partie-RNG, `run_net_self_play`) ist die Seite NICHT per
+/// Konstruktion balanciert; `dome_dice_side_balance` prueft die 2x2-Tafel.
+pub(crate) fn dome_dice_side(game_seed: u64) -> usize {
+    let w = crate::net_mcts::game_weight_from_seed(game_seed ^ DOME_DICE_SIDE_DISTINGUISHER, 1.0);
+    usize::from(w >= 0.5)
+}
+
+/// Obergrenze der Stapeltiefe in Runde `round` (1-basiert); ausserhalb 1..4
+/// `None` (dort gibt es ohnehin keinen Plattenzug, game.rs:190-192).
+pub(crate) fn dice_depth_cap(round: u32) -> Option<usize> {
+    match round {
+        1..=4 => DOME_DICE_DEPTH_CAPS[(round - 1) as usize],
+        _ => None,
+    }
+}
+
+/// Gewuerfelte Quelle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum DiceRollSource {
+    /// Diese offene Platte der Auslage.
+    Display { tile_id: usize },
+    /// `depth` Platten ziehen und die letzte behalten; `depth_max` ist die
+    /// Obergrenze, aus der gewuerfelt wurde (Diagnose).
+    Stack { depth: usize, depth_max: usize },
+}
+
+/// Ergebnis EINES Wuerfelwurfs (Bauplan 4.2), vollstaendig VOR jeder Suche.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DiceRoll {
+    pub(crate) source: DiceRollSource,
+    /// 0/90/180/270.
+    pub(crate) rotation: u32,
+    /// Knotentor an: vorab gewuerfelter Rueckgabekopf (F4), `None` = Suche.
+    pub(crate) return_first: Option<usize>,
+    /// Knotentor aus: gestreute volle Rueckgabe-Reihenfolge, `None` = Ziehreihenfolge.
+    pub(crate) return_order: Option<Vec<usize>>,
+}
+
+/// Der Wuerfel als REINE Funktion von Zustand und Strom (Bauplan 4.2). Feste
+/// Ziehreihenfolge: (1) Muenze Quelle (`random::<bool>()`, `true` = Stapel),
+/// faellt IMMER, auch wenn eine Quelle leer ist; (2) Platte
+/// (`random_range(0..auslage)`) bzw. Tiefe (`random_range(1..=max)`, max =
+/// min(Obergrenze der Runde, Stapel), F3: ueber den GANZEN Stapel); (3)
+/// Rotation (`random_range(0..4)`); (4) nur bei Stapelquelle, mindestens
+/// [`RETURN_ORDER_MIN_REST`] Restplatten, Runde 1..4 und `return_p > 0`: die
+/// Rueckgabe-Muenze (F4, dieselben Bedingungen wie der Knotenweg in
+/// `unified_game_loop`). Der vierte Schritt ist der letzte Zug aus dem Strom,
+/// sein Ausfallen verschiebt also nichts.
+///
+/// Rueckfaelle (Prereg par.2 Punkt 1): Auslage leer -> Stapel, Stapel leer ->
+/// Auslage. Beide leer -> `None`; laut Bauplan Abschnitt 2 (HERLEITUNG) bei
+/// offener Pflicht unerreichbar, [`apply_forced_dome_move`] macht daraus einen
+/// Fehler (die Schleife bricht dann mit `panic!` ab, kein stiller Rueckfall).
+///
+/// `gate_on` = `extended_action_nodes` der Wuerfel-Seite: an -> Kopf als
+/// Position (`ChooseReturnFirst`), aus -> volle Reihenfolge fuer
+/// `ChooseDrawStackSlot` (Muster [`sample_random_return_order`]).
+pub(crate) fn roll_dome_dice<R: Rng + ?Sized>(
+    state: &GameState,
+    gate_on: bool,
+    return_p: f64,
+    rng: &mut R,
+) -> Option<DiceRoll> {
+    let coin_stack: bool = rng.random::<bool>();
+    let display_n = state.dome_display.len();
+    let pool_n = state.dome_tile_pool.len();
+    let use_stack = match (display_n > 0, pool_n > 0) {
+        (true, true) => coin_stack,
+        (false, true) => true,
+        (true, false) => false,
+        // Laut Bauplan Abschnitt 2 bei offener Pflicht unerreichbar (HERLEITUNG);
+        // der Aufrufer macht daraus einen harten Fehler (E8), die reine Funktion
+        // meldet es nur.
+        (false, false) => return None,
+    };
+    let source = if use_stack {
+        let depth_max = dice_depth_cap(state.round_number).unwrap_or(usize::MAX).min(pool_n);
+        let depth = rng.random_range(1..=depth_max);
+        DiceRollSource::Stack { depth, depth_max }
+    } else {
+        let idx = rng.random_range(0..display_n);
+        DiceRollSource::Display { tile_id: state.dome_display[idx].tile_id }
+    };
+    let rotation = [0u32, 90, 180, 270][rng.random_range(0..4usize)];
+    let mut return_first = None;
+    let mut return_order = None;
+    if let DiceRollSource::Stack { depth, .. } = source {
+        // Rest in Ziehreihenfolge: die obersten `depth - 1` Platten (gezogen wird
+        // mit `remove(0)`, game.rs:231; behalten wird die d-te).
+        let rest: Vec<usize> = state.dome_tile_pool[..depth - 1].iter().map(|t| t.tile_id).collect();
+        if return_p > 0.0 && rest.len() >= RETURN_ORDER_MIN_REST && return_order_round_allowed(state.round_number) {
+            if gate_on {
+                if rng.random::<f64>() < return_p {
+                    let n = rest.len().min(RETURN_ORDER_MAX_PERMUTED);
+                    return_first = Some(rng.random_range(0..n));
+                }
+            } else {
+                return_order = sample_random_return_order(return_p, &rest, rng);
+            }
+        }
+    }
+    Some(DiceRoll { source, rotation, return_first, return_order })
+}
+
+/// Was der Wuerfel-Zug zum Spielen braucht (nur im Netz-Self-Play gebaut,
+/// `play_net_self_play_game_with_dice`).
+#[derive(Clone, Copy)]
+pub(crate) struct DomeDiceConfig<'a> {
+    /// Wuerfel-Seite dieser Partie ([`dome_dice_side`]).
+    pub(crate) side: usize,
+    pub(crate) net: &'a Net,
+    /// Sims der Platzsuche (`MOSAIC_DOME_DICE_SIMS`).
+    pub(crate) place_sims: u32,
+    /// Sims der Rueckgabesuche, falls die Muenze NICHT gefallen ist: die
+    /// Sockel-Sims der Partie (Bauplan 4.4 Schritt 6).
+    pub(crate) return_sims: u32,
+    pub(crate) c_puct: f64,
+    pub(crate) search_config: SearchConfig,
+}
+
+/// Ergebnis eines erzwungenen Plattenzugs (Diagnose und Record-Feld F9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ForcedDomeOutcome {
+    pub(crate) round: u32,
+    /// `true` = Stapel, `false` = Auslage.
+    pub(crate) from_stack: bool,
+    /// Verlangte Tiefe d (0 bei Auslage).
+    pub(crate) depth: usize,
+    pub(crate) depth_max: usize,
+    /// Wie viele der gezogenen Positionen aus dem unbekannten Praefix, dem
+    /// eigenen und fremden bekannten Block kamen (Stand VOR dem ersten Peek,
+    /// state.rs:169-188).
+    pub(crate) from_prefix: usize,
+    pub(crate) from_own_block: usize,
+    pub(crate) from_foreign_block: usize,
+    /// Tatsaechlich bezahlte Punkte (Zahlung gedeckelt, board.rs `apply_paid_cost`).
+    pub(crate) paid: i32,
+    pub(crate) rotation: u32,
+    /// Zahl der Wurzelkandidaten der Platzsuche (1 = keine Suche, E12).
+    pub(crate) slots: usize,
+    /// Rueckgabe: "none" (kein Knoten, keine Wahl), "random" (Muenze gefallen),
+    /// "search" (Knoten per Suche), "single" (Knoten mit einem Kandidaten).
+    pub(crate) return_mode: &'static str,
+}
+
+impl ForcedDomeOutcome {
+    /// Ein Tupel der `[dome_dice]`-Zeile (Bauplan 4.6).
+    fn diag_tuple(&self) -> String {
+        format!(
+            "(r{},{},d={},max={},pre={},own={},foreign={},paid={},rot={},slots={},ret={})",
+            self.round,
+            if self.from_stack { "stack" } else { "display" },
+            self.depth,
+            self.depth_max,
+            self.from_prefix,
+            self.from_own_block,
+            self.from_foreign_block,
+            self.paid,
+            self.rotation,
+            self.slots,
+            self.return_mode
+        )
+    }
+
+    /// Record-Feld `dome_dice_cost` (F9): `[verlangte Tiefe, bezahlte Punkte]`.
+    /// Bei Auslage-Quelle `[0, 0]` (ENTSCHEID beim Bau: das Feld steht nach
+    /// JEDEM erzwungenen Zug, damit die Zahl der Felder gleich der Zahl der
+    /// erzwungenen Platten ist und eine Auswertung nicht zwischen "Auslage" und
+    /// "Feld fehlt" unterscheiden muss).
+    fn cost_field(&self) -> Value {
+        json!([self.depth, self.paid])
+    }
+}
+
+/// Record-Felder der Klasse W, die je Record verschieden sind (Bauplan 4.6):
+/// `forced_domes_before` immer, `dome_dice_cost` nur am ersten Record nach
+/// einem erzwungenen Zug (`pending` wird dabei verbraucht). Aufgerufen nur bei
+/// aktivem Knopf; `dome_dice_side` stempelt die Schleife am Partieende.
+fn stamp_dome_dice_counters(m: &mut Map<String, Value>, forced_before: u32, pending: &mut Option<Value>) {
+    m.insert("forced_domes_before".into(), json!(forced_before));
+    if let Some(cost) = pending.take() {
+        m.insert("dome_dice_cost".into(), cost);
+    }
+}
+
+/// Herkunft der obersten `depth` Pool-Positionen aus Sicht von `player`, VOR dem
+/// Ziehen: (Praefix, eigener Block, fremder Block). Gezogen wird erst das
+/// unbekannte Praefix, dann der aelteste Block von oben (state.rs:178-188).
+fn classify_drawn_positions(state: &GameState, player: usize, depth: usize) -> (usize, usize, usize) {
+    let prefix = state.dome_pool_unknown_prefix_len();
+    let (mut pre, mut own, mut foreign) = (0usize, 0usize, 0usize);
+    for i in 0..depth {
+        if i < prefix {
+            pre += 1;
+            continue;
+        }
+        let mut off = i - prefix;
+        for b in &state.dome_pool_known_blocks {
+            if off < b.len {
+                if b.returner == player {
+                    own += 1;
+                } else {
+                    foreign += 1;
+                }
+                break;
+            }
+            off -= b.len;
+        }
+    }
+    (pre, own, foreign)
+}
+
+/// Eine Suche OHNE Record ueber `drafting_actions(state)` (schon vom Pin
+/// gefiltert), deterministisch und ohne Root-Noise (F6). Bei nur einer Aktion
+/// keine Suche.
+fn dice_search_choice(
+    game: &Game,
+    cfg: &DomeDiceConfig<'_>,
+    sims: u32,
+    seed: u64,
+    move_number: u64,
+) -> (Action, usize) {
+    let actions = drafting_actions(&game.state);
+    if actions.len() == 1 {
+        return (actions[0].clone(), 1);
+    }
+    let mut rng = StdRng::seed_from_u64(seed);
+    let (chosen, _policy, _rq, _cq, _fallback, _kl) = net_drafting_policy_with_fallback_flag(
+        cfg.net,
+        &game.state,
+        &actions,
+        sims,
+        cfg.c_puct,
+        &mut rng,
+        false, // add_root_noise (F6)
+        true,  // deterministic: argmax der Besuche, Gleichstand nach Q (F6)
+        move_number,
+        None,
+        &cfg.search_config,
+    );
+    (chosen, actions.len())
+}
+
+/// Der erzwungene Plattenzug der Wuerfel-Seite (Bauplan 4.4), komplett
+/// innerhalb EINER Schleifeniteration. Alle Teilzuege direkt ueber
+/// `game.apply_drafting`, NICHT ueber `apply_chosen_action_with` (dessen
+/// Peek-Zweig koennte den Sammelaufloeser starten, self_play.rs
+/// `apply_chosen_action_with`). Schreibt keinen Record, beruehrt weder
+/// `move_number` noch den Partie-RNG; `move_number` geht nur an die Suche
+/// (wirkungslos bei `deterministic = true`, siehe
+/// `net_drafting_policy_with_fallback_flag`).
+///
+/// Vorbedingung (vom Aufrufer geprueft): die Wuerfel-Seite ist am Zug, Runde
+/// 1..4, kein Teilzug offen, kein Pin gesetzt.
+pub(crate) fn apply_forced_dome_move(
+    game: &mut Game,
+    cfg: &DomeDiceConfig<'_>,
+    game_seed: u64,
+    forced_index: u64,
+    move_number: u64,
+) -> Result<ForcedDomeOutcome, String> {
+    let player = game.state.current_player;
+    debug_assert_eq!(player, cfg.side);
+    debug_assert!(game.state.dome_dice_pin.is_none());
+    let round = game.state.round_number;
+    let gate_on = game.state.extended_action_nodes[player];
+    // (1) Wuerfeln aus dem eigenen Strom, Zaehler = Index der erzwungenen Platte.
+    let mut dice_rng =
+        StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEED_DISTINGUISHER, forced_index));
+    let roll = roll_dome_dice(&game.state, gate_on, return_order_random_p(), &mut dice_rng)
+        .ok_or_else(|| "Wuerfel: Auslage und Stapel leer bei offener Pflicht".to_string())?;
+    // (2) Quelle ausfuehren bzw. vormerken.
+    let score_before = game.state.players[player].score;
+    let (source, from_stack, depth, depth_max, (from_prefix, from_own_block, from_foreign_block)) =
+        match roll.source {
+            DiceRollSource::Display { tile_id } => {
+                (crate::moves::DomeDiceSource::Display { tile_id }, false, 0, 0, (0, 0, 0))
+            }
+            DiceRollSource::Stack { depth, depth_max } => {
+                let classes = classify_drawn_positions(&game.state, player, depth);
+                for _ in 0..depth {
+                    game.apply_drafting(&Action::DrawStackPeek)?;
+                }
+                // Die d-te gezogene Platte (push-Reihenfolge, game.rs:233).
+                let chosen_id = game.state.pending_stack_draw[depth - 1].tile_id;
+                (crate::moves::DomeDiceSource::Stack { chosen_id }, true, depth, depth_max, classes)
+            }
+        };
+    let paid = score_before - game.state.players[player].score;
+    // (3)+(4) Pin mit Rotation und (falls gefallen) Rueckgabe.
+    game.state.dome_dice_pin = Some(crate::moves::DomeDicePin {
+        player,
+        source,
+        rotation: roll.rotation,
+        return_first: roll.return_first,
+        return_order: roll.return_order.clone(),
+    });
+    // (5) Platzsuche (eigener Strom, Zaehler 2k).
+    let search_seed = |ctr: u64| {
+        crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEARCH_SEED_DISTINGUISHER, ctr)
+    };
+    let (place, slots) =
+        dice_search_choice(game, cfg, cfg.place_sims, search_seed(forced_index * 2), move_number);
+    debug_assert!(matches!(place, Action::ChooseDomeSlot(_) | Action::ChooseDrawStackSlot(_)));
+    game.apply_drafting(&place)?;
+    // (6) Rueckgabeknoten, nur falls er sich oeffnet (game.rs `return_order_node_applies`).
+    let return_mode = if game.state.pending_return_order.is_some() {
+        if roll.return_first.is_some() {
+            let (a, _) = dice_search_choice(game, cfg, cfg.return_sims, 0, move_number);
+            game.apply_drafting(&a)?;
+            "random"
+        } else {
+            let (a, n) =
+                dice_search_choice(game, cfg, cfg.return_sims, search_seed(forced_index * 2 + 1), move_number);
+            game.apply_drafting(&a)?;
+            if n == 1 { "single" } else { "search" }
+        }
+    } else if roll.return_order.is_some() {
+        "random"
+    } else {
+        "none"
+    };
+    // (7) Rotation: der Pin laesst genau eine Aktion zu; sie loescht ihn und
+    // wechselt den Spieler (game.rs `ChooseDomeRotation`).
+    game.apply_drafting(&Action::ChooseDomeRotation(roll.rotation))?;
+    debug_assert!(game.state.dome_dice_pin.is_none());
+    Ok(ForcedDomeOutcome {
+        round,
+        from_stack,
+        depth,
+        depth_max,
+        from_prefix,
+        from_own_block,
+        from_foreign_block,
+        paid,
+        rotation: roll.rotation,
+        slots,
+        return_mode,
+    })
+}
+
+/// Loest der Entscheid `chosen` der Spielerseite `player` den Wuerfel aus
+/// (Bauplan 4.3, F1/F7)? Reine Pruefung auf dem Zustand VOR dem Apply.
+pub(crate) fn dome_dice_triggers(state: &GameState, side: usize, player: usize, chosen: &Action) -> bool {
+    player == side
+        && (1..crate::state::NUM_ROUNDS).contains(&state.round_number)
+        && matches!(chosen, Action::ChooseDomeSlot(_) | Action::DrawStackPeek)
+        && state.pending_stack_draw.is_empty()
+        && state.pending_dome_choice.is_none()
+        && state.pending_return_order.is_none()
+        && state.pending_moon_order.is_none()
+        && state.dome_dice_pin.is_none()
+}
+
+// ── Klasse S: Stoerer-Seite (asymmetrisches Self-Play) ───────────────────────
+//
+// `PREREG_asymmetric_selfplay.md` par.3 und par.3a (FS1-FS4), Bauplan
+// `evaluations/asymmetric_selfplay_build_plan.md` 4.7-4.9 und 6.2. Kurzform:
+//
+// * Eine Seite je Partie ist der Stoerer ([`aggr_side_for`]): allein ein Hash
+//   aus dem Partie-Seed, mit Klasse W zusammen die GEGENSEITE der
+//   Wuerfel-Seite (4.9: `policy-dice-aggr` = W gegen S, keine zwei
+//   unabhaengigen Muenzen).
+// * Der Stoerer bekommt eine eigene Kopie der `SearchConfig` mit Seiten-Blend
+//   ([`aggr_search_config`], `net_mcts::LeafBlend::Aggressor`); die G-Seite
+//   spielt mit der unveraenderten Config (FS1). Startsetzung und Tiling bleiben
+//   unvermischt (FS4: `search_start_placement` streift die Felder ab, die
+//   `PlayerLoopConfig` der S-Seite bekommt die Basis-Config).
+// * Records beider Seiten bleiben. Jeder Record einer S-Partie traegt
+//   `aggr_side`, jeder Drafting-Record der S-Seite mit echter Suche
+//   `own_q_gap` (FS3). Die eps-Schwelle wirkt erst im Training
+//   (`engine/py/corpus_dataset.py`, `MOSAIC_AGGR_OWN_Q_EPS`).
+// * Knopf AUS (Default): keine Seitenwahl, keine Config-Kopie, kein Feld.
+
+/// Strom der Stoerer-Seitenwahl (Bauplan 4.7). Eigener Wert, Pruefung in
+/// `dome_dice_distinguishers_are_unique`.
+pub(crate) const AGGR_SIDE_DISTINGUISHER: u64 = 0xA661_51DE_5EED_C0DE;
+
+/// Default von `MOSAIC_AGGR_SIDE_W`: FS2 (Nutzer 2026-10-03) "fest w = 0,1"
+/// -- der gemessene Betriebspunkt aus `net_mcts::set_aggression_params`.
+pub(crate) const AGGR_SIDE_W_DEFAULT: f64 = 0.1;
+
+/// `MOSAIC_AGGR_SIDE` als reine Pruefung: `"1"` an, `"0"` oder leer aus,
+/// alles andere ungueltig (`None`).
+fn parse_aggr_side_flag(raw: &str) -> Option<bool> {
+    match raw.trim() {
+        "1" => Some(true),
+        "0" | "" => Some(false),
+        _ => None,
+    }
+}
+
+/// Erzeugungsknopf `MOSAIC_AGGR_SIDE` (0/1, Default 0 = Bestand): schaltet
+/// die Klasse S im Netz-Self-Play ein. Ungueltig -> AUS mit EINMALIGER
+/// Warnung (OnceLock, Muster [`dome_dice_enabled`]).
+pub(crate) fn aggr_side_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_AGGR_SIDE") {
+        Err(_) => false,
+        Ok(raw) => parse_aggr_side_flag(&raw).unwrap_or_else(|| {
+            eprintln!("⚠️  MOSAIC_AGGR_SIDE={raw:?} ist weder 0 noch 1 -- Klasse S bleibt AUS.");
+            false
+        }),
+    })
+}
+
+/// `MOSAIC_AGGR_SIDE_W` als reine Pruefung: endliche Zahl in [0, 1]
+/// (Bereich wie `net_mcts::set_aggression_params`), sonst `None`.
+fn parse_aggr_side_w(raw: &str) -> Option<f64> {
+    raw.trim().parse::<f64>().ok().filter(|w| w.is_finite() && (0.0..=1.0).contains(w))
+}
+
+/// `MOSAIC_AGGR_SIDE_LAMBDA` als reine Pruefung: endliche Zahl in [0, 5]
+/// (Bereich wie `net_mcts::set_aggression_params`), sonst `None`.
+fn parse_aggr_side_lambda(raw: &str) -> Option<f64> {
+    raw.trim().parse::<f64>().ok().filter(|l| l.is_finite() && (0.0..=5.0).contains(l))
+}
+
+/// Mischgewicht `w` des Stoerers. Ungesetzt -> [`AGGR_SIDE_W_DEFAULT`];
+/// ungueltig -> `None` mit EINMALIGER Warnung -- `run_net_self_play` lehnt
+/// den Lauf dann ab, statt einen falsch etikettierten Korpus zu erzeugen.
+pub(crate) fn aggr_side_w() -> Option<f64> {
+    static CELL: std::sync::OnceLock<Option<f64>> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_AGGR_SIDE_W") {
+        Err(_) => Some(AGGR_SIDE_W_DEFAULT),
+        Ok(raw) => {
+            let v = parse_aggr_side_w(&raw);
+            if v.is_none() {
+                eprintln!("⚠️  MOSAIC_AGGR_SIDE_W={raw:?} ist keine Zahl in [0, 1].");
+            }
+            v
+        }
+    })
+}
+
+/// Gegnerpunkte-Abzug `lambda` des Stoerers. BEWUSST OHNE Default: der Wert
+/// ist die Laufvariable des Pilots S4 (FS2, z. B. 0 / 0,5 / 1 / 2) und
+/// noch nicht festgelegt -- eine eingebaute Zahl waere eine Konstante auf
+/// einer Reihe, deren Punkte fehlen. Ungesetzt oder ungueltig -> `None`;
+/// bei `MOSAIC_AGGR_SIDE=1` lehnt `run_net_self_play` dann ab.
+pub(crate) fn aggr_side_lambda() -> Option<f64> {
+    static CELL: std::sync::OnceLock<Option<f64>> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_AGGR_SIDE_LAMBDA") {
+        Err(_) => None,
+        Ok(raw) => {
+            let v = parse_aggr_side_lambda(&raw);
+            if v.is_none() {
+                eprintln!("⚠️  MOSAIC_AGGR_SIDE_LAMBDA={raw:?} ist keine Zahl in [0, 5].");
+            }
+            v
+        }
+    })
+}
+
+/// Werte des Stoerers einer Partie (aus den drei Knoepfen).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct AggrSideParams {
+    pub(crate) w: f64,
+    pub(crate) lambda: f64,
+}
+
+/// Die Knoepfe zusammen gelesen: `Ok(None)` = Klasse S aus (Bestand),
+/// `Ok(Some)` = an mit gueltigen Werten, `Err` = an, aber `w` oder `lambda`
+/// fehlt oder ist ungueltig.
+pub(crate) fn aggr_side_params() -> Result<Option<AggrSideParams>, String> {
+    if !aggr_side_enabled() {
+        return Ok(None);
+    }
+    let w = aggr_side_w().ok_or("MOSAIC_AGGR_SIDE=1, aber MOSAIC_AGGR_SIDE_W ist ungueltig (erlaubt [0, 1])")?;
+    let lambda = aggr_side_lambda().ok_or(
+        "MOSAIC_AGGR_SIDE=1 verlangt MOSAIC_AGGR_SIDE_LAMBDA in [0, 5] (kein Default, Pilot S4 / FS2)",
+    )?;
+    Ok(Some(AggrSideParams { w, lambda }))
+}
+
+/// Welche Seite (0/1) ist in DIESER Partie der Stoerer (Bauplan 4.7/4.9)?
+/// Ohne Klasse W: Hash aus `game_seed ^ AGGR_SIDE_DISTINGUISHER`, Muster
+/// [`dome_dice_side`]. Mit Klasse W (`dice_side = Some(d)`): `1 - d` -- in
+/// `policy-dice-aggr` stehen sich W und S gegenueber, nie zwei unabhaengige
+/// Muenzen. Der Partie-RNG wird nicht beruehrt.
+pub(crate) fn aggr_side_for(game_seed: u64, dice_side: Option<usize>) -> usize {
+    match dice_side {
+        Some(d) => 1 - d,
+        None => {
+            let w = crate::net_mcts::game_weight_from_seed(game_seed ^ AGGR_SIDE_DISTINGUISHER, 1.0);
+            usize::from(w >= 0.5)
+        }
+    }
+}
+
+/// Die `SearchConfig` der Stoerer-Seite: Kopie der Basis mit gesetztem
+/// Seiten-Blend (FS1). Alle anderen Felder unveraendert.
+pub(crate) fn aggr_search_config(base: &SearchConfig, side: usize, p: AggrSideParams) -> SearchConfig {
+    SearchConfig { aggr_w: Some(p.w), aggr_lambda: Some(p.lambda), aggr_player: Some(side), ..*base }
+}
+
 // ── Weg C: Abweichungsregel der Self-Play-Erzeugung ──────────────────────────
 //
 // `PREREG_start_position_seeding.md` par.9c (Quelle: KataGo, Wu 2019,
@@ -3716,6 +4301,15 @@ struct DraftingDecision {
     /// geschrieben -- nur das Abzweig-Gewicht liest es (und der Abzweig-Record
     /// des Ausflugs traegt es als `branch_kl`).
     policy_kl: Option<f64>,
+    /// Klasse S (`PREREG_asymmetric_selfplay.md` par.3, FS3): `own_q_gap` der
+    /// Stoerer-Suche -- `max_c Q_own(c) - Q_own(Suchzug)` ueber die Wurzelkinder
+    /// mit mindestens N_min Besuchen (`net_mcts::RootOwnStats::own_q_gap`).
+    /// `Some` NUR bei gesetztem Seiten-Blend und echter Suche (mehr als eine
+    /// legale Aktion, kein Vorzug, kein Rueckfall, kein Runde-5-Loeser); wird
+    /// dann als Record-Feld `own_q_gap` geschrieben. Bezugszug ist der Zug DER
+    /// SUCHE (vor einer Weg-C-Abweichung), weil das Policy-Ziel des Records aus
+    /// dieser Suche stammt.
+    own_q_gap: Option<f64>,
 }
 
 impl DraftingDecision {
@@ -3730,6 +4324,7 @@ impl DraftingDecision {
             vorzug: None,
             fallback_random_action: false,
             policy_kl: None,
+            own_q_gap: None,
         }
     }
 }
@@ -4026,20 +4621,21 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
         let vorzug_kandidat = if self.vorzug { builder_drafting_preference(state) } else { None };
         // Sechster Wert (PREREG_targeted_branching.md par.7): Policy-Diskrepanz,
         // nur aus einer echten Suche und nur bei aktivem Knopf `Some`.
-        let (chosen, policy, root_q, root_child_q, fallback, policy_kl) = if actions.len() == 1 {
+        // Siebter Wert (Klasse S): `own_q_gap`, nur bei Seiten-Blend und echter Suche.
+        let (chosen, policy, root_q, root_child_q, fallback, policy_kl, own_q_gap) = if actions.len() == 1 {
             let a = actions[0].clone();
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new(), false, None)
+            (a, vec![e], None, Vec::new(), false, None, None)
         } else if let Some(a) = vorzug_kandidat.clone() {
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            (a, vec![e], None, Vec::new(), false, None)
+            (a, vec![e], None, Vec::new(), false, None, None)
         } else {
             // Task #80/#81: Kostenprofil-Kategorie (a) -- Gumbel-Suche der
             // tatsaechlich gespielten Zuege; `timed()` ist ohne
             // `clone_profiling`-Feature ein No-Op (siehe profiling.rs).
             crate::profiling::with_category(crate::profiling::Category::Gumbel, || {
                 crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
-                    net_drafting_policy_with_fallback_flag(
+                    net_drafting_policy_with_own_gap(
                         self.net, state, actions, effective_sims, self.c_puct, search_rng,
                         self.add_root_noise, self.deterministic, move_number,
                         self.tau_argmax_override, &self.search_config,
@@ -4059,6 +4655,7 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             vorzug: vorzug_kandidat,
             fallback_random_action: fallback,
             policy_kl,
+            own_q_gap,
         }
     }
 }
@@ -4365,6 +4962,17 @@ struct GameLoopConfig<'a> {
     /// Zelle neben der Stellung die Policy-Diskrepanz der Abzweigstelle
     /// ([`ExcursionBranch`]).
     excursion_branch: Option<&'a std::cell::Cell<Option<ExcursionBranch>>>,
+    /// Klasse W (`PREREG_asymmetric_selfplay.md` par.2): `Some` NUR im
+    /// Netz-Self-Play bei `MOSAIC_DOME_DICE=1` (und nie im Ausflug, F8). `None`
+    /// (alle uebrigen Aufrufer und Default AUS) = byte-identischer Bestand:
+    /// kein Ausloeser, kein Record-Feld, keine Diagnosezeile.
+    dome_dice: Option<DomeDiceConfig<'a>>,
+    /// Klasse S (`PREREG_asymmetric_selfplay.md` par.3/par.3a): Spielerindex
+    /// der Stoerer-Seite, `Some` NUR im Netz-Self-Play bei
+    /// `MOSAIC_AGGR_SIDE=1` (nie im Ausflug). Die Schleife stempelt daraus
+    /// `aggr_side` auf JEDEN Record der Partie; der Seiten-Blend selbst sitzt in
+    /// der `SearchConfig` des Stoerer-Agenten. `None` = Bestand, kein Feld.
+    aggr_side: Option<usize>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -4484,6 +5092,14 @@ fn unified_game_loop<R: Rng + ?Sized>(
     // Grund eines vorzeitigen Abbruchs (Schrittlimit/Haenger-Alarm), `None`
     // bei regulaerem Ende. Landet im Summary-Ergebnis als `abort_reason`.
     let mut abort: Option<GameAbort> = None;
+    // Klasse W (Bauplan 4.6): Zahl der bisher erzwungenen Platten der
+    // Wuerfel-Seite (Record-Feld `forced_domes_before`, Strom-Zaehler), die
+    // Kosten des letzten erzwungenen Zugs, die am NAECHSTEN Record landen (F9),
+    // und die Tupel der `[dome_dice]`-Zeile. Bei `dome_dice == None` bleiben
+    // alle drei unbenutzt.
+    let mut forced_domes: u32 = 0;
+    let mut pending_dice_cost: Option<Value> = None;
+    let mut dice_diag: Vec<String> = Vec::new();
     loop {
         guard += 1;
         if let Some(hb) = cfg.move_heartbeat {
@@ -4519,8 +5135,15 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     let start_search = cfg.players[pending_pi].start_search;
                     if recording {
                         // Self-Play-Pfade: Startplatzierung MIT Trainings-Record.
+                        // Klasse W: Startplatte normal (Nutzer "Start normal"),
+                        // nur das Zaehlerfeld kommt dazu.
                         match start_placement_step(&mut game, rng, start_search) {
-                            Some(rec) => records.push(rec),
+                            Some(mut rec) => {
+                                if cfg.dome_dice.is_some() {
+                                    stamp_dome_dice_counters(&mut rec, forced_domes, &mut pending_dice_cost);
+                                }
+                                records.push(rec)
+                            }
                             None => break,
                         }
                     } else {
@@ -4866,7 +5489,34 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     } else {
                         None
                     };
-                    if pcfg.apply_via_chosen_action {
+                    // Klasse W (Bauplan 4.3, F1/F7): der Ausloeser wird NACH dem
+                    // kompletten Entscheid geprueft (Suche, Rueckgabe-Streuung,
+                    // Weg C, Reservoir) -- es zaehlt die TATSAECHLICH gespielte
+                    // Aktion. Der Record dieses Halbzugs ist oben schon
+                    // vorbereitet (Zustand VOR dem Plattenzug) und bleibt mit
+                    // Policy- und Wertziel stehen (F2), markiert als
+                    // `dice_trigger`. Der Zaehlerstand fuer `forced_domes_before`
+                    // ist der VOR dem Zug.
+                    let forced_before_this = forced_domes;
+                    let dice_outcome: Option<ForcedDomeOutcome> = match &cfg.dome_dice {
+                        Some(dd) if dome_dice_triggers(&game.state, dd.side, player, &d.chosen) => {
+                            let outcome = apply_forced_dome_move(
+                                &mut game,
+                                dd,
+                                cfg.game_seed,
+                                u64::from(forced_domes),
+                                move_number,
+                            )
+                            .unwrap_or_else(|e| panic!("apply_forced_dome_move fehlgeschlagen: {e}"));
+                            forced_domes += 1;
+                            dice_diag.push(outcome.diag_tuple());
+                            Some(outcome)
+                        }
+                        _ => None,
+                    };
+                    if dice_outcome.is_some() {
+                        // Der Plattenzug ist vollstaendig ausgefuehrt; nichts mehr anzuwenden.
+                    } else if pcfg.apply_via_chosen_action {
                         // Sequenzielle Stapel-Zieh-Aufloesung (Netz-Spielpfade,
                         // siehe apply_chosen_action). `PREREG_dome_return_order.md`
                         // par.4: Netz und Modus DIESER Seite -- bei Modus 0
@@ -4975,7 +5625,27 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         if let Some(v) = fallback_random_action_field(d.fallback_random_action) {
                             m.insert("fallback_random_action".into(), v);
                         }
+                        // Klasse S (par.3, FS3): nur Drafting-Records der
+                        // Stoerer-Seite mit echter Suche tragen das Feld (sonst
+                        // ist `d.own_q_gap` `None`, Bestand ohne Feld).
+                        if let Some(gap) = d.own_q_gap {
+                            m.insert("own_q_gap".into(), json!(gap));
+                        }
+                        // Klasse W (Bauplan 4.6, F2/F9): nur bei aktivem Knopf.
+                        if cfg.dome_dice.is_some() {
+                            stamp_dome_dice_counters(&mut m, forced_before_this, &mut pending_dice_cost);
+                            if dice_outcome.is_some() {
+                                m.insert("dice_trigger".into(), json!(true));
+                            }
+                        }
                         records.push(m);
+                    }
+                    // F9: die Kosten des eben erzwungenen Zugs gehoeren an den
+                    // ERSTEN Record NACH ihm (Zustand nach dem Zug), nicht an den
+                    // Ausloeser-Record darueber (Zustand davor).
+                    if let Some(outcome) = &dice_outcome {
+                        debug_assert!(pending_dice_cost.is_none(), "zwei erzwungene Zuege ohne Record dazwischen");
+                        pending_dice_cost = Some(outcome.cost_field());
                     }
                     if let Some(line) = trace {
                         game.state.log_event(line);
@@ -4991,10 +5661,17 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 if recording {
                     // Self-Play-Pfade: Tiling MIT Trainings-Record; `tiling_net`
                     // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
-                    records.push(tiling_step_with_variant(
+                    let mut rec = tiling_step_with_variant(
                         &mut game, pcfg.tiling_net, rng, &pcfg.envelope_params(),
                         pcfg.heuristic_variant, pcfg.net_tiling_tiebreak,
-                    ));
+                    );
+                    // Klasse W: Zaehler und ggf. die Kosten des letzten
+                    // erzwungenen Zugs (er kann der letzte Drafting-Zug der
+                    // Runde gewesen sein, dann ist dies der erste Record danach).
+                    if cfg.dome_dice.is_some() {
+                        stamp_dome_dice_counters(&mut rec, forced_domes, &mut pending_dice_cost);
+                    }
+                    records.push(rec);
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
                     // `tiling_preference` separat (rein lesend) NUR fuer die
@@ -5058,6 +5735,23 @@ fn unified_game_loop<R: Rng + ?Sized>(
     //
     // Bei `moon_order_variants != 2` ist `applied` immer 0 und das Log bleibt
     // bitidentisch zum Bestand.
+    // Klasse W (Bauplan 4.6): EINE Zeile je W-Partie per eprintln, Muster
+    // `[deviate]` -- kein Schemaeingriff. `state.log` bleibt unberuehrt (es ist
+    // das Vergleichsobjekt des Kernbeweises, referee.rs::full_log).
+    if let Some(dd) = &cfg.dome_dice {
+        let gid = match &cfg.mode {
+            LoopMode::Records { game_id } => game_id.to_string(),
+            LoopMode::Summary { .. } => "-".to_string(),
+        };
+        eprintln!(
+            "[dome_dice] game_id={gid} seed={} side={} forced={} {}",
+            cfg.game_seed,
+            dd.side,
+            forced_domes,
+            dice_diag.join(" ")
+        );
+    }
+
     let (moon_applied, moon_changed) = crate::net_mcts::take_moon_order_diag();
     if moon_applied > 0 {
         game.state.log_event(format!(
@@ -5100,10 +5794,21 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 game.state.players[1].score_unclamped,
             ];
             let winner = determine_winner(&game.state);
+            // Klasse W: `dome_dice_side` auf JEDEM Record einer W-Partie (auch
+            // Start- und Tiling-Records), nur bei aktivem Knopf.
+            let dice_side: Option<usize> = cfg.dome_dice.as_ref().map(|dd| dd.side);
+            // Klasse S: `aggr_side` ebenso auf JEDEM Record einer S-Partie.
+            let aggr_side: Option<usize> = cfg.aggr_side;
             LoopOutput::Records(
                 records
                     .into_iter()
                     .map(|mut m| {
+                        if let Some(side) = dice_side {
+                            m.insert("dome_dice_side".into(), json!(side));
+                        }
+                        if let Some(side) = aggr_side {
+                            m.insert("aggr_side".into(), json!(side));
+                        }
                         m.insert("game_id".into(), json!(game_id));
                         m.insert("scores".into(), json!(scores));
                         m.insert("scores_unclamped".into(), json!(scores_unclamped));
@@ -5318,6 +6023,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
         excursion_branch: None,
         is_excursion: false,
         excursion_deviated: None,
+        // Klasse W: nur im Netz-Self-Play.
+        dome_dice: None,
+        aggr_side: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -5864,6 +6572,9 @@ fn play_net_game<R: Rng + ?Sized>(
         excursion_branch: None,
         is_excursion: false,
         excursion_deviated: None,
+        // Klasse W: nur im Netz-Self-Play.
+        dome_dice: None,
+        aggr_side: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -6053,6 +6764,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         excursion_branch: None,
         is_excursion: false,
         excursion_deviated: None,
+        // Klasse W: nur im Netz-Self-Play.
+        dome_dice: None,
+        aggr_side: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -6466,6 +7180,37 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     add_root_noise: bool,
     deterministic: bool,
     move_number: u64,
+    tau_argmax_override: Option<usize>,
+    search_config: &crate::net_mcts::SearchConfig,
+) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool, Option<f64>) {
+    // Duenner Wrapper (Klasse S): derselbe Rumpf, derselbe RNG-Verbrauch, der
+    // siebte Wert (`own_q_gap`) wird verworfen.
+    let (chosen, policy, root_q, child_q, fallback, policy_kl, _own_q_gap) = net_drafting_policy_with_own_gap(
+        net, state, actions, base_sims, c_puct, rng, add_root_noise, deterministic, move_number,
+        tau_argmax_override, search_config,
+    );
+    (chosen, policy, root_q, child_q, fallback, policy_kl)
+}
+
+/// Rumpf von [`net_drafting_policy_with_fallback_flag`] mit SIEBTEM
+/// Rueckgabewert (Klasse S, `PREREG_asymmetric_selfplay.md` par.3a FS3):
+/// `own_q_gap` des Suchzugs (`stats[idx]`, VOR der Mondstapel-Nachsuche, die
+/// nur die Reihenfolge der Mondsteine aendert), aus der Eigenwert-Statistik
+/// der Wurzel (`net_mcts::RootOwnStats`). `None` ohne Seiten-Blend, im
+/// Rueckfall-Zweig und wo die Suche keinen Einzelbaum liefert (Runde-5-
+/// Loeser, Mehrwelten-Wald). Reines Auslesen, Zugwahl und Policy-Ziel
+/// unberuehrt.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    base_sims: u32,
+    c_puct: f64,
+    rng: &mut R,
+    add_root_noise: bool,
+    deterministic: bool,
+    move_number: u64,
     // Weg B (`PREREG_start_position_seeding.md` par.9f): `Some(k)` ersetzt
     // das GLOBALE `net_mcts::tau_argmax_from_move()` fuer DIESEN Aufruf --
     // der Ausflug braucht einen vom Hauptpartie-Umschaltpunkt (Weg A)
@@ -6474,13 +7219,13 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     // dieselbe globale Env-Var-Abfrage wie vor diesem Parameter.
     tau_argmax_override: Option<usize>,
     search_config: &crate::net_mcts::SearchConfig,
-) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool, Option<f64>) {
+) -> (Action, Vec<Value>, Option<f64>, Vec<f64>, bool, Option<f64>, Option<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
     // PREREG_targeted_branching.md par.7: dieselbe Suche wie ueber
     // `net_root_child_stats_and_policy` (dessen Rumpf das IST), zusaetzlich die
     // Wurzel-Priors als fuenfter Wert -- reines Auslesen, kein RNG-Zug.
-    let (stats, completed_q_policy, root_q, root_child_q, root_prior) =
-        crate::net_mcts::net_root_child_stats_policy_and_prior(
+    let (stats, completed_q_policy, root_q, root_child_q, root_prior, root_own) =
+        crate::net_mcts::net_root_child_stats_policy_prior_and_own(
             net, state, sims, c_puct, add_root_noise, rng, search_config,
         );
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
@@ -6528,6 +7273,8 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
             Vec::new(),
             true,
             // par.7: keine brauchbare Suche -> keine Diskrepanz (Gewicht 0).
+            None,
+            // Klasse S: kein Suchzug -> kein `own_q_gap`.
             None,
         );
     }
@@ -6624,6 +7371,8 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     // `policy` kommt aus `completed_q_policy`, und die Aktions-ID kodiert die
     // Reihenfolge ohnehin nicht (par.6; der Aktionsraum blieb damals 406 -- seit Weg A,
     // par.12.6, hat die Reihenfolge eigene IDs, dann laeuft dieser Zweig aber gar nicht).
+    // Klasse S: `own_q_gap` des Suchzugs, bevor die Nachsuche ihn verschiebt.
+    let own_q_gap = root_own.as_ref().and_then(|o| o.own_q_gap(&stats[idx].0));
     let chosen = crate::net_mcts::moon_order_post_search(
         net,
         None,
@@ -6642,7 +7391,7 @@ pub(crate) fn net_drafting_policy_with_fallback_flag<R: Rng + ?Sized>(
     } else {
         None
     };
-    (chosen, policy, root_q, child_q, false, policy_kl)
+    (chosen, policy, root_q, child_q, false, policy_kl, own_q_gap)
 }
 
 /// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive
@@ -6871,6 +7620,50 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // uebrigen Aufrufer = byte-identisches Bestandsverhalten.
     excursion_run: bool,
 ) -> (Vec<Value>, Option<ExcursionBranch>, bool) {
+    // Klasse W (`PREREG_asymmetric_selfplay.md` par.2): der Knopf wird HIER
+    // gelesen, die Schleife bekommt nur das Ergebnis. Nie im Ausflug (F8: die
+    // Kombination ist verboten, `run_net_self_play` lehnt sie ab; der Ausflug
+    // erbte die Wuerfel-Seite ohnehin nicht, Bauplan 11a F8).
+    let dome_dice_place_sims = (dome_dice_enabled() && !excursion_run).then(dome_dice_sims);
+    // Klasse S (par.3/par.3a): ebenso hier gelesen, nie im Ausflug (Ablehnung
+    // der Kombination in `run_net_self_play`, Begruendung dort). Ungueltige
+    // Werte lehnt `run_net_self_play` VOR dem Lauf ab; hier bleibt dann nur
+    // der Bestand (`None`).
+    let aggr = if excursion_run { None } else { aggr_side_params().ok().flatten() };
+    play_net_self_play_game_with_dice(
+        net, base_sims, c_puct, scoring_ids, names, first_player, game_id, rng, add_root_noise,
+        deterministic, record_rtv, move_heartbeat, pcr_full_prob, pcr_cheap_sims, game_seed,
+        start_state, search_config, excursion_run, dome_dice_place_sims, aggr,
+    )
+}
+
+/// Rumpf von [`play_net_self_play_game`] mit dem Wuerfel-Parameter explizit
+/// (Tests setzen ihn ohne Umgebungsvariable). `dome_dice_place_sims`: `None` =
+/// Klasse W aus (Bestand), `Some(n)` = an, Platzsuche mit `n` Sims. `aggr`:
+/// `None` = Klasse S aus (Bestand), `Some` = Stoerer mit diesen Werten.
+#[allow(clippy::too_many_arguments)]
+fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
+    net: &Net,
+    base_sims: u32,
+    c_puct: f64,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    game_id: &str,
+    rng: &mut R,
+    add_root_noise: bool,
+    deterministic: bool,
+    record_rtv: bool,
+    move_heartbeat: Option<&AtomicU64>,
+    pcr_full_prob: Option<f64>,
+    pcr_cheap_sims: u32,
+    game_seed: u64,
+    start_state: Option<GameState>,
+    search_config: crate::net_mcts::SearchConfig,
+    excursion_run: bool,
+    dome_dice_place_sims: Option<u32>,
+    aggr: Option<AggrSideParams>,
+) -> (Vec<Value>, Option<ExcursionBranch>, bool) {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
     // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
@@ -6896,6 +7689,17 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // Weg B: `Some(1)` genau dann, wenn dieser Aufruf ein Ausflug ist --
     // sonst `None` (globales Verhalten, byte-identisch zum Bestand).
     let tau_argmax_override = excursion_tau_argmax_override(excursion_run);
+    // Klasse W/S: Seiten je Partie (Bauplan 4.9). Die Stoerer-Seite ist mit W
+    // die Gegenseite der Wuerfel-Seite. Ohne beide Knoepfe: beide `None`, beide
+    // Agenten bekommen `search_config` unveraendert (Bestand).
+    let dice_side: Option<usize> = dome_dice_place_sims.map(|_| dome_dice_side(game_seed));
+    let aggr_side: Option<usize> = aggr.map(|_| aggr_side_for(game_seed, dice_side));
+    let agent_config = |player: usize| -> crate::net_mcts::SearchConfig {
+        match (aggr, aggr_side) {
+            (Some(p), Some(s)) if s == player => aggr_search_config(&search_config, s, p),
+            _ => search_config,
+        }
+    };
     let agent0 = NetSelfPlayAgent {
         net,
         base_sims,
@@ -6905,7 +7709,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         pcr_full_prob,
         pcr_cheap_sims,
         vorzug: vorzug_p0,
-        search_config,
+        search_config: agent_config(0),
         tau_argmax_override,
     };
     let agent1 = NetSelfPlayAgent {
@@ -6917,7 +7721,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         pcr_full_prob,
         pcr_cheap_sims,
         vorzug: vorzug_p1,
-        search_config,
+        search_config: agent_config(1),
         tau_argmax_override,
     };
     let player0 = PlayerLoopConfig {
@@ -6987,6 +7791,19 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         // an seinem ersten Halbzug eine Abweichung -- die Hauptpartie nicht.
         is_excursion: excursion_run,
         excursion_deviated: if excursion_run { Some(&excursion_deviated) } else { None },
+        // Klasse W: Seite per Hash aus dem Partie-Seed, Platzsuche mit eigenem
+        // Budget, Rueckgabesuche mit den Sockel-Sims dieser Partie.
+        dome_dice: dome_dice_place_sims.map(|place_sims| DomeDiceConfig {
+            side: dome_dice_side(game_seed),
+            net,
+            place_sims,
+            return_sims: base_sims,
+            c_puct,
+            search_config,
+        }),
+        // Klasse S: nur das Stempelfeld; Startsetzung und Tiling der S-Seite
+        // laufen ueber `PlayerLoopConfig` mit der Basis-Config (FS4).
+        aggr_side,
     };
     let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -7178,6 +7995,35 @@ pub fn run_net_self_play(
     // `None` -> `SearchConfig` passiert in `lib.rs` (Python-Grenze).
     search_config: crate::net_mcts::SearchConfig,
 ) -> Result<String, String> {
+    // Klasse W, F8 (`PREREG_asymmetric_selfplay.md` par.3a): Ausflug und Wuerfel
+    // nie zusammen. Ein Ausflug erbt die Wuerfel-Seite nicht (Bauplan 11a F8) und
+    // liefe als G-G-Fortsetzung einer W-Partie weiter. Harter Fehler VOR dem
+    // Lauf statt `debug_assert`: der Release-Bau der Erzeugung muss es merken,
+    // und `self_play.py` lehnt die Kombination schon vorher ab -- hier landet
+    // nur, wer die Umgebungsvariablen von Hand setzt.
+    if dome_dice_enabled() && excursion_prob() > 0.0 {
+        return Err(format!(
+            "MOSAIC_DOME_DICE=1 und MOSAIC_EXCURSION_PROB={} schliessen sich aus (F8, \
+             PREREG_asymmetric_selfplay.md par.3a): Ausfluege bleiben in der G-G-Klasse.",
+            excursion_prob()
+        ));
+    }
+    // Klasse S: ungueltige oder fehlende Werte VOR dem Lauf ablehnen (eine
+    // S-Klasse, die still als G-G liefe, waere ein falsch etikettierter
+    // Korpus). Ausflug + Stoerer wie F8 abgelehnt: der Ausflug erbte die
+    // Stoerer-Seite nicht (`play_net_self_play_game` liest den Knopf mit
+    // `excursion_run = true` gar nicht) und liefe als G-G-Fortsetzung einer
+    // S-Partie weiter; die Ausfluege bleiben in der G-G-Klasse `value-excursion`
+    // (Prereg par.4). Der Bauplan nennt fuer S keine Ausnahme (4.8: Ablehnung
+    // der Kombination mit `--excursion-prob > 0`).
+    aggr_side_params()?;
+    if aggr_side_enabled() && excursion_prob() > 0.0 {
+        return Err(format!(
+            "MOSAIC_AGGR_SIDE=1 und MOSAIC_EXCURSION_PROB={} schliessen sich aus (wie F8, \
+             PREREG_asymmetric_selfplay.md par.3a): Ausfluege bleiben in der G-G-Klasse.",
+            excursion_prob()
+        ));
+    }
     let seed_positions: Option<Vec<(String, Value)>> = match seed_positions {
         None => None,
         Some(lines) => {
@@ -9213,6 +10059,8 @@ pub(crate) mod tests {
                 excursion_branch: None,
                 is_excursion: false,
                 excursion_deviated: None,
+                dome_dice: None,
+                aggr_side: None,
             };
             match unified_game_loop(vec![], ["A".into(), "B".into()], 0, &mut r, cfg) {
                 LoopOutput::Records(out) => serde_json::to_string(&out).unwrap(),
@@ -9268,6 +10116,8 @@ pub(crate) mod tests {
             excursion_branch: None,
             is_excursion: false,
             excursion_deviated: None,
+            dome_dice: None,
+            aggr_side: None,
         };
         let mut rng = StdRng::seed_from_u64(seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
@@ -13837,5 +14687,539 @@ mod review_2026_09_26_tests {
             recs.iter().all(|r| r.get("fallback_random_action").is_none()),
             "ohne Rueckfall darf kein Record das Feld tragen"
         );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Klasse W: Wuerfel und erzwungener Plattenzug (PREREG_asymmetric_selfplay.md
+// par.2/par.3a, Bauplan 4.2-4.7, Tests 8.1 Nr. 6-9, 12-17, 19)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod dome_dice_tests {
+    use super::*;
+    use crate::state::{dome_pool_knowledge_is_consistent, KnownPoolBlock};
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn champion_net() -> Net {
+        let path = crate::net::test_champion_model_path();
+        Net::load_auto(path.to_str().unwrap())
+            .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
+    }
+
+    fn dice_cfg(net: &Net, side: usize) -> DomeDiceConfig<'_> {
+        DomeDiceConfig {
+            side,
+            net,
+            place_sims: 16,
+            return_sims: 8,
+            c_puct: crate::net_mcts::DEFAULT_C_PUCT,
+            search_config: SearchConfig::from_env(),
+        }
+    }
+
+    /// Runde 1 nach beiden Startsetzungen (Startspieler 0 am Zug, Stapel 13).
+    fn round_one_game(seed: u64, extended_nodes: bool) -> Game {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(
+            ["W".into(), "G".into()],
+            0,
+            sample_valid_scoring_ids(3, &mut rng),
+            &mut rng,
+        );
+        for pi in [1, 0] {
+            let (t, r, c, rot) = choose_start_placement(&game.state, pi).unwrap();
+            apply_start_placement(&mut game.state, pi, t, r, c, rot).unwrap();
+        }
+        game.state.extended_action_nodes = [extended_nodes, extended_nodes];
+        game
+    }
+
+    /// Wuerfelwurf genau so, wie `apply_forced_dome_move` ihn macht.
+    fn roll_for(state: &GameState, game_seed: u64, forced_index: u64) -> Option<DiceRoll> {
+        let mut rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+            game_seed ^ DOME_DICE_SEED_DISTINGUISHER,
+            forced_index,
+        ));
+        roll_dome_dice(state, state.extended_action_nodes[state.current_player], return_order_random_p(), &mut rng)
+    }
+
+    /// Erster Partie-Seed, dessen Wurf `pred` erfuellt (der Wuerfel ist eine
+    /// reine Funktion -- so laesst sich ein bestimmter Wurf erzwingen).
+    fn seed_where(state: &GameState, forced_index: u64, pred: impl Fn(&DiceRoll) -> bool) -> u64 {
+        (0u64..100_000)
+            .find(|&s| roll_for(state, s, forced_index).is_some_and(|r| pred(&r)))
+            .expect("Wurf in 100.000 Seeds nicht gefunden")
+    }
+
+    #[test]
+    fn dome_dice_knob_parsers() {
+        assert_eq!(parse_dome_dice_flag("1"), Some(true));
+        assert_eq!(parse_dome_dice_flag(" 0 "), Some(false));
+        assert_eq!(parse_dome_dice_flag(""), Some(false));
+        assert_eq!(parse_dome_dice_flag("2"), None);
+        assert_eq!(parse_dome_dice_flag("true"), None);
+        assert_eq!(parse_dome_dice_sims("600"), Some(600));
+        assert_eq!(parse_dome_dice_sims("0"), None);
+        assert_eq!(parse_dome_dice_sims("-5"), None);
+        assert_eq!(parse_dome_dice_sims("x"), None);
+        assert_eq!(dice_depth_cap(1), None);
+        assert_eq!(dice_depth_cap(2), Some(7));
+        assert_eq!(dice_depth_cap(3), Some(3));
+        assert_eq!(dice_depth_cap(4), None);
+        assert_eq!(dice_depth_cap(5), None);
+    }
+
+    /// Test 6: Tiefe in 1..=min(Obergrenze, Stapel), jeder Wert kommt vor,
+    /// grob gleichverteilt (Probe ueber viele Stroeme der reinen Funktion).
+    #[test]
+    fn dice_depth_respects_round_caps_and_pool() {
+        let base = round_one_game(3, true);
+        for (round, pool_len, want_max) in [(1u32, 13usize, 13usize), (2, 9, 7), (2, 5, 5), (3, 5, 3), (3, 2, 2), (4, 1, 1)] {
+            let mut st = base.state.clone();
+            st.round_number = round;
+            st.dome_tile_pool.truncate(pool_len);
+            st.dome_pool_known_blocks.clear();
+            let mut counts = vec![0usize; want_max + 1];
+            let mut stack_rolls = 0usize;
+            for s in 0u64..6000 {
+                if let Some(DiceRoll { source: DiceRollSource::Stack { depth, depth_max }, .. }) = roll_for(&st, s, 0) {
+                    assert_eq!(depth_max, want_max, "Runde {round}, Stapel {pool_len}");
+                    assert!((1..=want_max).contains(&depth), "Tiefe {depth} ausserhalb 1..={want_max}");
+                    counts[depth] += 1;
+                    stack_rolls += 1;
+                }
+            }
+            assert!(stack_rolls > 2500, "Muenze 50:50: {stack_rolls} von 6000 Stapelwuerfe");
+            let expected = stack_rolls as f64 / want_max as f64;
+            for d in 1..=want_max {
+                let ratio = counts[d] as f64 / expected;
+                assert!((0.75..1.25).contains(&ratio), "Runde {round}: d={d} {} mal, erwartet {expected:.0}", counts[d]);
+            }
+        }
+    }
+
+    /// Test 7 (E6/E7/E8): Rueckfaelle der Quelle.
+    #[test]
+    fn dice_source_falls_back_when_display_or_stack_empty() {
+        let base = round_one_game(4, true);
+        let mut no_display = base.state.clone();
+        no_display.dome_display.clear();
+        let mut no_stack = base.state.clone();
+        no_stack.dome_tile_pool.clear();
+        no_stack.dome_pool_known_blocks.clear();
+        for s in 0u64..200 {
+            assert!(matches!(roll_for(&no_display, s, 0).unwrap().source, DiceRollSource::Stack { .. }));
+            assert!(matches!(roll_for(&no_stack, s, 0).unwrap().source, DiceRollSource::Display { .. }));
+        }
+    }
+
+    #[test]
+    fn dice_source_none_when_both_empty() {
+        let mut st = round_one_game(5, true).state;
+        st.dome_display.clear();
+        st.dome_tile_pool.clear();
+        st.dome_pool_known_blocks.clear();
+        assert!(roll_for(&st, 1, 0).is_none());
+    }
+
+    /// Test 12 (E11): Runde 4 mit einer Platte im Stapel und leerer Auslage.
+    #[test]
+    fn round_four_single_stack_plate() {
+        let mut st = round_one_game(6, true).state;
+        st.round_number = 4;
+        st.dome_tile_pool.truncate(1);
+        st.dome_pool_known_blocks.clear();
+        st.dome_display.clear();
+        for s in 0u64..100 {
+            let r = roll_for(&st, s, 0).unwrap();
+            assert_eq!(r.source, DiceRollSource::Stack { depth: 1, depth_max: 1 });
+            assert!(r.return_first.is_none() && r.return_order.is_none(), "kein Rest, keine Rueckgabe");
+        }
+    }
+
+    /// Test 8 (Beispiel des Nutzers, E3/E9/E10): R1, ganzer Stapel. Stand 5 -> 0,
+    /// Pool 12 als EIN Block der Wuerfel-Seite, Praefix 0, konsistent; die
+    /// behaltene Platte ist die unterste des urspruenglichen Stapels.
+    /// Test 9 (E1) auf demselben Zustand: zweite Ziehung in den eigenen Block,
+    /// d = 12, gratis, neuer Block {11, W}.
+    #[test]
+    fn dice_full_stack_draw_round_one_and_second_draw_into_own_block() {
+        let net = champion_net();
+        let mut game = round_one_game(7, crate::net_mcts::net_supports_extended_action_nodes(&net));
+        let w = game.state.current_player;
+        assert_eq!(game.state.dome_tile_pool.len(), 13);
+        assert_eq!(game.state.players[w].score, 5, "Startstand 5 (board.rs)");
+        let bottom_id = game.state.dome_tile_pool[12].tile_id;
+        let seed = seed_where(&game.state, 0, |r| r.source == DiceRollSource::Stack { depth: 13, depth_max: 13 });
+        let cfg = dice_cfg(&net, w);
+        let out = apply_forced_dome_move(&mut game, &cfg, seed, 0, 1).expect("erzwungener Zug");
+        assert_eq!((out.from_stack, out.depth, out.depth_max), (true, 13, 13));
+        assert_eq!((out.from_prefix, out.from_own_block, out.from_foreign_block), (13, 0, 0));
+        assert_eq!(out.paid, 5, "Zahlung auf den Stand gedeckelt (board.rs apply_paid_cost)");
+        assert_eq!(game.state.players[w].score, 0);
+        assert_eq!(game.state.dome_tile_pool.len(), 12);
+        assert_eq!(game.state.dome_pool_known_blocks, vec![KnownPoolBlock { len: 12, returner: w }]);
+        assert_eq!(game.state.dome_pool_unknown_prefix_len(), 0);
+        assert!(dome_pool_knowledge_is_consistent(&game.state));
+        assert!(game.state.dome_dice_pin.is_none());
+        assert!(game.state.pending_stack_draw.is_empty());
+        assert_eq!(game.state.current_player, 1 - w, "Zug beendet");
+        let placed: Vec<usize> =
+            game.state.players[w].dome_grid.dome_slots.iter().flatten().flatten().map(|t| t.tile_id).collect();
+        assert!(placed.contains(&bottom_id), "die d-te (unterste) Platte liegt");
+
+        // Test 9: dieselbe Seite zieht erneut, jetzt aus dem EIGENEN Block.
+        game.state.current_player = w;
+        let seed = seed_where(&game.state, 1, |r| matches!(r.source, DiceRollSource::Stack { depth: 12, .. }));
+        let out = apply_forced_dome_move(&mut game, &cfg, seed, 1, 3).expect("zweiter Zug");
+        assert_eq!((out.from_prefix, out.from_own_block, out.from_foreign_block), (0, 12, 0));
+        assert_eq!(out.paid, 0, "bei Stand 0 gratis (E9)");
+        assert_eq!(game.state.dome_tile_pool.len(), 11);
+        assert_eq!(game.state.dome_pool_known_blocks, vec![KnownPoolBlock { len: 11, returner: w }]);
+        assert!(dome_pool_knowledge_is_consistent(&game.state));
+        assert_eq!(game.state.players[w].dome_tiles_placed_this_round, 2);
+    }
+
+    /// Test 13 (E12): letzte Platte, ein einziger Platz -> keine Suche.
+    #[test]
+    fn single_slot_skips_the_search() {
+        let net = champion_net();
+        let mut game = round_one_game(8, true);
+        let w = game.state.current_player;
+        let filler = game.state.dome_tile_pool[0].clone();
+        let empty = game.state.players[w].dome_grid.empty_slots();
+        for &(r, c) in &empty[1..] {
+            game.state.players[w].dome_grid.dome_slots[r][c] = Some(filler.clone());
+        }
+        assert_eq!(game.state.players[w].dome_grid.empty_slots().len(), 1);
+        let seed = seed_where(&game.state, 0, |r| matches!(r.source, DiceRollSource::Display { .. }));
+        let out = apply_forced_dome_move(&mut game, &dice_cfg(&net, w), seed, 0, 1).unwrap();
+        assert_eq!(out.slots, 1, "ein Kandidat: Platz ohne Suche angewandt");
+        assert!(game.state.players[w].dome_grid.empty_slots().is_empty());
+    }
+
+    /// Test 19 (E18/F1/F7): der Ausloeser liest die TATSAECHLICH gespielte
+    /// Aktion -- auch eine, die Weg C eingesetzt hat.
+    #[test]
+    fn deviation_choosing_plate_triggers_dice() {
+        let game = round_one_game(9, true);
+        let st = &game.state;
+        let w = st.current_player;
+        let actions = drafting_actions(st);
+        let slot = actions.iter().find(|a| matches!(a, Action::ChooseDomeSlot(_))).unwrap().clone();
+        let stone = actions.iter().find(|a| matches!(a, Action::Stone(_))).unwrap().clone();
+        assert!(dome_dice_triggers(st, w, w, &slot));
+        assert!(dome_dice_triggers(st, w, w, &Action::DrawStackPeek), "F7: Stapel wie Auslage");
+        assert!(!dome_dice_triggers(st, w, w, &stone));
+        assert!(!dome_dice_triggers(st, 1 - w, w, &slot), "nur die Wuerfel-Seite");
+        let mut mid = st.clone();
+        mid.pending_stack_draw.push(mid.dome_tile_pool[0].clone());
+        assert!(!dome_dice_triggers(&mid, w, w, &Action::DrawStackPeek), "offener Teilzug loest nicht aus");
+        let mut r5 = st.clone();
+        r5.round_number = 5;
+        assert!(!dome_dice_triggers(&r5, w, w, &slot));
+    }
+
+    /// Test 16: Seitenwahl 50:50 und die 2x2-Tafel mit dem Startspieler, der
+    /// in `run_net_self_play` aus dem Partie-RNG kommt (gleiche Ableitung hier).
+    #[test]
+    fn dome_dice_side_balance() {
+        let n = 10_000u64;
+        let mut table = [[0u32; 2]; 2];
+        for i in 0..n {
+            let game_seed = 12345u64.wrapping_add(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            let mut rng = StdRng::seed_from_u64(game_seed);
+            let _ids = sample_valid_scoring_ids(3, &mut rng);
+            let first = rng.random_range(0..2usize);
+            table[dome_dice_side(game_seed)][first] += 1;
+        }
+        let side0 = table[0][0] + table[0][1];
+        assert!((4800..=5200).contains(&side0), "Seite 0 in {side0} von {n}");
+        for row in table {
+            for cell in row {
+                assert!((2350..=2650).contains(&cell), "2x2-Tafel Seite x Startspieler unbalanciert: {table:?}");
+            }
+        }
+        assert_eq!(dome_dice_side(77), dome_dice_side(77), "reproduzierbar");
+    }
+
+    /// Test 15 (Teil 1): alle Distinguisher im Baum sind paarweise verschieden.
+    #[test]
+    fn dome_dice_distinguishers_are_unique() {
+        let all: [(&str, u64); 15] = [
+            ("DOME_DICE_SIDE_DISTINGUISHER", DOME_DICE_SIDE_DISTINGUISHER),
+            ("DOME_DICE_SEED_DISTINGUISHER", DOME_DICE_SEED_DISTINGUISHER),
+            ("DOME_DICE_SEARCH_SEED_DISTINGUISHER", DOME_DICE_SEARCH_SEED_DISTINGUISHER),
+            ("AGGR_SIDE_DISTINGUISHER", AGGR_SIDE_DISTINGUISHER),
+            ("LABEL_SEED_DISTINGUISHER", LABEL_SEED_DISTINGUISHER),
+            ("RETURN_ORDER_SEED_DISTINGUISHER", RETURN_ORDER_SEED_DISTINGUISHER),
+            ("RETURN_ORDER_NODE_SEED_DISTINGUISHER", RETURN_ORDER_NODE_SEED_DISTINGUISHER),
+            ("DEVIATE_SEED_DISTINGUISHER", DEVIATE_SEED_DISTINGUISHER),
+            ("EXCURSION_SEED_DISTINGUISHER", EXCURSION_SEED_DISTINGUISHER),
+            ("asym_preference_side", 0xA5A5_A5A5_A5A5_A5A5),
+            ("MOON_ORDER_SEARCH_SEED_DISTINGUISHER", crate::net_mcts::MOON_ORDER_SEARCH_SEED_DISTINGUISHER),
+            ("ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER", crate::round_transition::ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER),
+            ("TIE_MIRROR_SEED_DISTINGUISHER", crate::tie_mirror::TIE_MIRROR_SEED_DISTINGUISHER),
+            ("round_transition 0x5EED", 0x5EED),
+            ("py.rs debug", 0xDEB0_6DEB_06DE_B06D),
+        ];
+        for i in 0..all.len() {
+            for j in (i + 1)..all.len() {
+                assert_ne!(all[i].1, all[j].1, "{} kollidiert mit {}", all[i].0, all[j].0);
+            }
+        }
+    }
+
+    /// Test 15 (Teil 2): der Wurf ist reproduzierbar je (Partie, Index) und je
+    /// Index verschieden; er liest den Partie-RNG nicht (`roll_dome_dice` und
+    /// `apply_forced_dome_move` bekommen ihn gar nicht erst).
+    #[test]
+    fn dome_dice_roll_is_reproducible_per_index() {
+        let st = round_one_game(10, true).state;
+        assert_eq!(roll_for(&st, 99, 0), roll_for(&st, 99, 0));
+        let distinct: std::collections::HashSet<String> =
+            (0u64..8).map(|k| format!("{:?}", roll_for(&st, 99, k))).collect();
+        assert!(distinct.len() > 3, "verschiedene Indizes, verschiedene Wuerfe: {distinct:?}");
+    }
+
+    fn play_dice_game(net: &Net, seed: u64, place_sims: Option<u32>) -> Vec<Value> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (records, _x, _d) = play_net_self_play_game_with_dice(
+            net,
+            8,
+            crate::net_mcts::DEFAULT_C_PUCT,
+            ids,
+            ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize,
+            "dice_test",
+            &mut rng,
+            false,
+            true,
+            false,
+            None,
+            None,
+            0,
+            seed,
+            None,
+            SearchConfig::from_env(),
+            false,
+            place_sims,
+            None,
+        );
+        records
+    }
+
+    const DICE_FIELDS: [&str; 4] = ["dome_dice_side", "forced_domes_before", "dice_trigger", "dome_dice_cost"];
+
+    /// Test 14 (4.6) und Test 15 (Teil 3): eine ganze W-Partie. Keine Records
+    /// fuer Teilschritte (kein W-Record mit offenem Stapelzug oder offener
+    /// Rotation), `forced_domes_before` monoton und hoechstens 8, je Ausloeser
+    /// genau ein `dome_dice_cost`, `dome_dice_side` ueberall. Dieselbe Partie
+    /// zweimal ist byte-gleich.
+    #[test]
+    fn forced_dome_move_writes_no_records_and_stamps_fields() {
+        let net = champion_net();
+        let seed = 4711u64;
+        let side = dome_dice_side(seed);
+        let records = play_dice_game(&net, seed, Some(16));
+        assert!(!records.is_empty());
+        assert_eq!(records.last().unwrap()["completed"], json!(true), "Partie regulaer beendet");
+        let mut last = 0u64;
+        let (mut triggers, mut costs) = (0usize, 0usize);
+        for r in &records {
+            assert_eq!(r["dome_dice_side"], json!(side));
+            let f = r["forced_domes_before"].as_u64().expect("forced_domes_before ueberall");
+            assert!(f >= last && f <= 8, "monoton, <= 8: {last} -> {f}");
+            last = f;
+            if r.get("dice_trigger").is_some() {
+                triggers += 1;
+                assert_eq!(r["player"], json!(side), "nur die Wuerfel-Seite loest aus");
+            }
+            if let Some(c) = r.get("dome_dice_cost") {
+                costs += 1;
+                let c = c.as_array().unwrap();
+                assert!(c[1].as_i64().unwrap() <= c[0].as_i64().unwrap(), "bezahlt <= verlangt");
+            }
+            let st = &r["state"];
+            if r["player"] == json!(side) && r.get("valid_actions").is_some() {
+                for a in r["valid_actions"].as_array().unwrap() {
+                    let t = a["type"].as_str().unwrap_or("");
+                    assert!(
+                        !t.contains("rotation") && !t.contains("draw_stack_slot") && !t.contains("return_first"),
+                        "Record der Wuerfel-Seite mit offenem Plattenteilzug: {a} / {st}"
+                    );
+                }
+            }
+        }
+        // Der letzte Record (Tiling Runde 5) steht nach allen erzwungenen Zuegen.
+        assert_eq!(triggers as u64, last, "ein Ausloeser je erzwungener Platte");
+        assert_eq!(triggers, costs, "je erzwungener Platte genau ein Kostenfeld (F9)");
+        assert!(triggers >= 6, "eine ganze Partie legt bis zu 8 Platten, waren {triggers}");
+        assert_eq!(serde_json::to_string(&records).unwrap(), serde_json::to_string(&play_dice_game(&net, seed, Some(16))).unwrap());
+    }
+
+    /// Test 17 (Teil b): Knopf AUS ist byte-gleich zum Bestandsweg, und kein
+    /// neues Feld erscheint. Gegen die Bestands-FIXTURE prueft dasselbe
+    /// `net_parity_hash_matches_champion_fixture` (Default-Knoepfe).
+    #[test]
+    fn dice_off_is_byte_identical() {
+        assert!(!dome_dice_enabled(), "Test laeuft ohne MOSAIC_DOME_DICE");
+        let net = champion_net();
+        let seed = 4243u64;
+        let off = play_dice_game(&net, seed, None);
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (bestand, _, _) = play_net_self_play_game(
+            &net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize, "dice_test", &mut rng, false, true, false, None, None, 0, seed, None,
+            SearchConfig::from_env(), false,
+        );
+        assert_eq!(serde_json::to_string(&off).unwrap(), serde_json::to_string(&bestand).unwrap());
+        for r in &off {
+            for f in DICE_FIELDS {
+                assert!(r.get(f).is_none(), "Feld {f} bei Knopf AUS");
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Klasse S: Stoerer-Seite (PREREG_asymmetric_selfplay.md par.3/par.3a,
+// Bauplan 4.7-4.9 und 6.2, Tests 8.2 Nr. 1 und 5)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod aggr_side_tests {
+    use super::*;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn champion_net() -> Net {
+        let path = crate::net::test_champion_model_path();
+        Net::load_auto(path.to_str().unwrap())
+            .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
+    }
+
+    const PARAMS: AggrSideParams = AggrSideParams { w: 0.1, lambda: 1.0 };
+
+    fn play(net: &Net, seed: u64, place_sims: Option<u32>, aggr: Option<AggrSideParams>) -> Vec<Value> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (records, _x, _d) = play_net_self_play_game_with_dice(
+            net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize, "aggr_test", &mut rng, false, true, false, None, None, 0, seed, None,
+            SearchConfig::from_env(), false, place_sims, aggr,
+        );
+        records
+    }
+
+    #[test]
+    fn aggr_side_knob_parsers() {
+        assert_eq!(parse_aggr_side_flag("1"), Some(true));
+        assert_eq!(parse_aggr_side_flag(" 0 "), Some(false));
+        assert_eq!(parse_aggr_side_flag(""), Some(false));
+        assert_eq!(parse_aggr_side_flag("yes"), None);
+        assert_eq!(parse_aggr_side_w("0.1"), Some(0.1));
+        assert_eq!(parse_aggr_side_w("0"), Some(0.0));
+        assert_eq!(parse_aggr_side_w("1.5"), None);
+        assert_eq!(parse_aggr_side_w("nan"), None);
+        assert_eq!(parse_aggr_side_lambda("2"), Some(2.0));
+        assert_eq!(parse_aggr_side_lambda("5.1"), None);
+        assert_eq!(parse_aggr_side_lambda("-0.5"), None);
+        assert_eq!(parse_aggr_side_lambda("x"), None);
+        // Testprozess ohne Knopf: Klasse S aus, kein lambda-Default.
+        assert!(!aggr_side_enabled(), "Test laeuft ohne MOSAIC_AGGR_SIDE");
+        assert_eq!(aggr_side_params(), Ok(None));
+        assert_eq!(aggr_side_lambda(), None);
+        assert_eq!(aggr_side_w(), Some(AGGR_SIDE_W_DEFAULT));
+    }
+
+    /// Bauplan 4.7/4.9: ohne W ein Hash (50:50, reproduzierbar, unabhaengig
+    /// von der Wuerfel-Seite), mit W immer die Gegenseite.
+    #[test]
+    fn aggr_side_selection_balance_and_dice_pairing() {
+        let n = 10_000u64;
+        let mut side1 = 0u32;
+        let mut same_as_dice = 0u32;
+        for i in 0..n {
+            let game_seed = 777u64.wrapping_add(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            let s = aggr_side_for(game_seed, None);
+            side1 += s as u32;
+            same_as_dice += u32::from(s == dome_dice_side(game_seed));
+            let d = dome_dice_side(game_seed);
+            assert_eq!(aggr_side_for(game_seed, Some(d)), 1 - d, "W gegen S: nie dieselbe Seite");
+        }
+        assert!((4800..=5200).contains(&side1), "Seite 1 in {side1} von {n}");
+        assert!((4700..=5300).contains(&same_as_dice), "eigene Muenze, nicht die der Wuerfel-Seite: {same_as_dice}");
+        assert_eq!(aggr_side_for(5, None), aggr_side_for(5, None));
+    }
+
+    /// Test 8.2 Nr. 1 (Teil Schleife): Klasse S aus ist byte-gleich zum
+    /// Bestandsweg, kein neues Feld.
+    #[test]
+    fn aggr_off_selfplay_is_byte_identical() {
+        let net = champion_net();
+        let seed = 5150u64;
+        let off = play(&net, seed, None, None);
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (bestand, _, _) = play_net_self_play_game(
+            &net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize, "aggr_test", &mut rng, false, true, false, None, None, 0, seed, None,
+            SearchConfig::from_env(), false,
+        );
+        assert_eq!(serde_json::to_string(&off).unwrap(), serde_json::to_string(&bestand).unwrap());
+        for r in &off {
+            assert!(r.get("aggr_side").is_none() && r.get("own_q_gap").is_none());
+        }
+    }
+
+    /// Test 8.2 Nr. 5: `aggr_side` auf JEDEM Record, `own_q_gap` nur auf
+    /// Drafting-Records der Stoerer-Seite (und dort auf jedem mit echter
+    /// Suche), nie auf der G-Seite. Dieselbe Partie zweimal ist byte-gleich.
+    #[test]
+    fn own_q_gap_only_on_aggressor_records() {
+        let net = champion_net();
+        let seed = 2026u64;
+        let side = aggr_side_for(seed, None);
+        let records = play(&net, seed, None, Some(PARAMS));
+        assert_eq!(records.last().unwrap()["completed"], json!(true));
+        let mut gaps = 0usize;
+        for r in &records {
+            assert_eq!(r["aggr_side"], json!(side), "aggr_side fehlt oder falsch");
+            if let Some(g) = r.get("own_q_gap") {
+                gaps += 1;
+                assert_eq!(r["player"], json!(side), "own_q_gap nur auf der Stoerer-Seite");
+                assert!(g.as_f64().unwrap().is_finite());
+                assert!(r.get("root_q").is_some(), "own_q_gap nur bei echter Suche (root_q vorhanden)");
+            }
+        }
+        assert!(gaps >= 10, "eine Partie hat viele echte Stoerer-Suchen, gefunden {gaps}");
+        assert_eq!(
+            serde_json::to_string(&records).unwrap(),
+            serde_json::to_string(&play(&net, seed, None, Some(PARAMS))).unwrap(),
+            "reproduzierbar"
+        );
+    }
+
+    /// `policy-dice-aggr` (Bauplan 4.9): W und S auf verschiedenen Seiten, beide
+    /// Feldsaetze nebeneinander.
+    #[test]
+    fn dice_and_aggr_sit_on_opposite_sides() {
+        let net = champion_net();
+        let seed = 4711u64;
+        let records = play(&net, seed, Some(16), Some(PARAMS));
+        let d = dome_dice_side(seed);
+        for r in &records {
+            assert_eq!(r["dome_dice_side"], json!(d));
+            assert_eq!(r["aggr_side"], json!(1 - d));
+            if r.get("own_q_gap").is_some() {
+                assert_eq!(r["player"], json!(1 - d));
+            }
+            if r.get("dice_trigger").is_some() {
+                assert_eq!(r["player"], json!(d));
+            }
+        }
     }
 }

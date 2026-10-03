@@ -191,6 +191,153 @@ class RecipeRejects(unittest.TestCase):
             self.assertIn(dest, dests, f"{name} verweist auf unbekannten dest {dest!r}")
 
 
+class DomeDiceClass(unittest.TestCase):
+    """Klasse W (PREREG_asymmetric_selfplay.md par.2/par.3a): ein Rezept kann die
+    Wuerfel-Knoepfe je Klasse setzen und ueber `expect_engine_config` pruefen."""
+
+    RECIPE = {
+        "recipe_version": 1, "tool": "self_play",
+        "common": {"mode": "network", "version": "vx", "seed": 1},
+        "classes": {
+            "policy": {"expect_engine_config": {"dome_dice": 0}},
+            "policy-dice": {"dome_dice": True, "dome_dice_sims": 600,
+                            "expect_engine_config": {"dome_dice": 1, "dome_dice_sims": 600,
+                                                     "dome_dice_caps": [None, 7, 3, None]}},
+        },
+    }
+    # So meldet `engine_config_json` die drei Felder (lib.rs).
+    ENGINE_ON = {"dome_dice": 1, "dome_dice_sims": 600, "dome_dice_caps": [None, 7, 3, None]}
+    ENGINE_OFF = {"dome_dice": 0, "dome_dice_sims": 600, "dome_dice_caps": [None, 7, 3, None]}
+
+    def _parse(self, cls):
+        from tools.recipe_config import load_recipe as _load
+        with tempfile.TemporaryDirectory() as d:
+            path = write_recipe(Path(d), self.RECIPE)
+            recipe = _load(path)
+            ns, _ = apply_to_parser(fresh_parser(), ["--recipe", str(path), "--class", cls],
+                                    str(path), cls, tool="self_play")
+        return recipe, ns
+
+    def test_class_sets_the_flags(self):
+        _, ns = self._parse("policy-dice")
+        self.assertIs(ns.dome_dice, True)
+        self.assertEqual(ns.dome_dice_sims, 600)
+        _, ns = self._parse("policy")
+        self.assertIs(ns.dome_dice, False, "ohne Klassenwert bleibt der Knopf aus")
+
+    def test_guard_per_class(self):
+        from tools.recipe_config import check_engine_config, expected_engine_config
+        recipe, _ = self._parse("policy-dice")
+        want = expected_engine_config(recipe, "policy-dice")
+        self.assertEqual(check_engine_config(self.ENGINE_ON, want), [])
+        self.assertTrue(check_engine_config(self.ENGINE_OFF, want), "Knopf aus muss auffallen")
+        self.assertTrue(check_engine_config({"dome_dice": 1}, want), "fehlendes Feld (altes Wheel)")
+        want_policy = expected_engine_config(recipe, "policy")
+        self.assertEqual(check_engine_config(self.ENGINE_OFF, want_policy), [])
+        self.assertTrue(check_engine_config(self.ENGINE_ON, want_policy))
+
+    def test_env_variables_are_reserved_for_the_flags(self):
+        reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
+        self.assertEqual(reserved.get("MOSAIC_DOME_DICE"), "dome_dice")
+        self.assertEqual(reserved.get("MOSAIC_DOME_DICE_SIMS"), "dome_dice_sims")
+
+    def test_excursion_combination_is_rejected_before_any_run(self):
+        """F8: Ausflug + Wuerfel bricht in generate_data ab, VOR Probe, Manifest und Chunk."""
+        text = SELF_PLAY.read_text(encoding="utf-8")
+        body = text[text.index("def generate_data("):]
+        guard = body.index("if dome_dice and excursion_prob > 0:")
+        for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
+                      "make_chunk(n, chunk_idx"):
+            self.assertLess(guard, body.index(later), later)
+
+
+class AsymmetricClassesGuard(unittest.TestCase):
+    """Klasse S und die Kombination W+S (PREREG_asymmetric_selfplay.md par.3/par.3a,
+    Bauplan 4.8/4.9): je Klasse eigene `expect_engine_config`, der Waechter faengt
+    eine Klasse, deren Chunk-Prozess die Knoepfe anders meldet."""
+
+    RECIPE = {
+        "recipe_version": 1, "tool": "self_play",
+        "common": {"mode": "network", "version": "vx", "seed": 1},
+        "classes": {
+            "policy": {"expect_engine_config": {"dome_dice": 0, "aggr_side": 0}},
+            "policy-dice": {"dome_dice": True, "dome_dice_sims": 600,
+                            "expect_engine_config": {"dome_dice": 1, "dome_dice_sims": 600,
+                                                     "aggr_side": 0}},
+            "policy-aggr": {"aggr_side": True, "aggr_side_w": 0.1, "aggr_side_lambda": 1.0,
+                            "expect_engine_config": {"dome_dice": 0, "aggr_side": 1,
+                                                     "aggr_side_w": 0.1, "aggr_side_lambda": 1.0}},
+            "policy-dice-aggr": {"dome_dice": True, "dome_dice_sims": 600,
+                                 "aggr_side": True, "aggr_side_w": 0.1, "aggr_side_lambda": 1.0,
+                                 "expect_engine_config": {"dome_dice": 1, "dome_dice_sims": 600,
+                                                          "aggr_side": 1, "aggr_side_w": 0.1,
+                                                          "aggr_side_lambda": 1.0}},
+        },
+    }
+
+    @staticmethod
+    def engine(dice: int, aggr: int, lam=1.0) -> dict:
+        """So meldet `engine_config_json` die Felder (lib.rs)."""
+        return {"dome_dice": dice, "dome_dice_sims": 600, "dome_dice_caps": [None, 7, 3, None],
+                "aggr_side": aggr, "aggr_side_w": 0.1, "aggr_side_lambda": lam,
+                "aggr_own_q_gap_n_min_rule": "halving_survivors_min_visits"}
+
+    def _parse(self, cls):
+        from tools.recipe_config import load_recipe as _load
+        with tempfile.TemporaryDirectory() as d:
+            path = write_recipe(Path(d), self.RECIPE)
+            recipe = _load(path)
+            ns, _ = apply_to_parser(fresh_parser(), ["--recipe", str(path), "--class", cls],
+                                    str(path), cls, tool="self_play")
+        return recipe, ns
+
+    def test_classes_set_the_flags(self):
+        _, ns = self._parse("policy-aggr")
+        self.assertEqual((ns.aggr_side, ns.aggr_side_w, ns.aggr_side_lambda, ns.dome_dice),
+                         (True, 0.1, 1.0, False))
+        _, ns = self._parse("policy-dice-aggr")
+        self.assertEqual((ns.aggr_side, ns.dome_dice), (True, True))
+        _, ns = self._parse("policy")
+        self.assertEqual((ns.aggr_side, ns.aggr_side_lambda), (False, None),
+                         "ohne Klassenwert bleibt der Stoerer aus, lambda ohne Default")
+
+    def test_guard_per_class(self):
+        from tools.recipe_config import check_engine_config, expected_engine_config
+        recipe, _ = self._parse("policy")
+        engines = {"policy": self.engine(0, 0), "policy-dice": self.engine(1, 0),
+                   "policy-aggr": self.engine(0, 1), "policy-dice-aggr": self.engine(1, 1)}
+        for cls in engines:
+            want = expected_engine_config(recipe, cls)
+            for other, eng in engines.items():
+                problems = check_engine_config(eng, want)
+                if other == cls:
+                    self.assertEqual(problems, [], f"{cls} gegen eigene Engine")
+                else:
+                    self.assertTrue(problems, f"{cls} muss eine {other}-Engine ablehnen")
+        want = expected_engine_config(recipe, "policy-aggr")
+        self.assertTrue(check_engine_config(self.engine(0, 1, lam=2.0), want), "falsches lambda")
+        self.assertTrue(check_engine_config({"dome_dice": 0}, want), "fehlendes Feld (altes Wheel)")
+
+    def test_env_variables_are_reserved_for_the_flags(self):
+        reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
+        self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE"), "aggr_side")
+        self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE_W"), "aggr_side_w")
+        self.assertEqual(reserved.get("MOSAIC_AGGR_SIDE_LAMBDA"), "aggr_side_lambda")
+
+    def test_aggr_guards_run_before_any_run(self):
+        """Ausflug + Stoerer und fehlendes lambda brechen in generate_data ab, VOR Probe,
+        Manifest und Chunk; dazu die Doppelquellen-Pruefung."""
+        text = SELF_PLAY.read_text(encoding="utf-8")
+        body = text[text.index("def generate_data("):]
+        for guard in ("if aggr_side and excursion_prob > 0:",
+                      "if aggr_side and aggr_side_lambda is None:",
+                      '("MOSAIC_AGGR_SIDE_LAMBDA", _aggr_lambda_want)'):
+            at = body.index(guard)
+            for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
+                          "make_chunk(n, chunk_idx"):
+                self.assertLess(at, body.index(later), f"{guard} vor {later}")
+
+
 class WithoutRecipeUnchanged(unittest.TestCase):
     V33_LIKE = ["--mode", "network", "--model", "m.onnx", "--spec", "s.spec.json",
                 "--games", "4000", "--sims", "100", "--value-only", "--version", "v-x",

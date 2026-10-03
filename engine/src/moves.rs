@@ -151,6 +151,43 @@ pub struct PendingReturnOrder {
     pub rest_in_draw_order: Vec<usize>,
 }
 
+/// Klasse W des asymmetrischen Self-Plays (`PREREG_asymmetric_selfplay.md`
+/// par.2/par.3a, Bauplan `asymmetric_selfplay_build_plan.md` 4.1): WOHER die
+/// gewuerfelte Kuppelplatte kommt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DomeDiceSource {
+    /// Auslage: genau diese offene Platte.
+    Display { tile_id: usize },
+    /// Stapel: die d-te gezogene Platte (die Peeks sind beim Setzen des Pins
+    /// schon gelaufen, `chosen_id` liegt in `pending_stack_draw`).
+    Stack { chosen_id: usize },
+}
+
+/// Zustands-Pin des erzwungenen Plattenzugs der Wuerfel-Seite (Bauplan 4.1).
+/// Solange er gesetzt ist UND `player` am Zug ist, bietet
+/// `game::drafting_actions` nur noch die Teilzuege an, die zur gewuerfelten
+/// Platte, Rotation und (falls vorab gewuerfelt) Rueckgabe passen; die Suche
+/// baut ihre Kandidaten an JEDEM Knoten daraus (net_mcts.rs:2906,
+/// `build_untried_actions`), der Pin wirkt also an der Wurzel UND im Baum.
+/// Gesetzt NUR von `self_play::apply_forced_dome_move`, geloescht beim
+/// erfolgreichen `ChooseDomeRotation` und vorsorglich beim Rundenwechsel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DomeDicePin {
+    /// Spieler, dessen Zug festgenagelt ist (die Wuerfel-Seite).
+    pub player: usize,
+    pub source: DomeDiceSource,
+    /// Gewuerfelte Rotation in Grad (0/90/180/270).
+    pub rotation: u32,
+    /// Knotentor an (`extended_action_nodes`): vorab gewuerfelter Kopf der
+    /// Rueckgabe als Position in der Ziehreihenfolge (`ChooseReturnFirst`).
+    /// `None` = nicht gewuerfelt, der Rueckgabeknoten bleibt frei.
+    pub return_first: Option<usize>,
+    /// Knotentor aus: die VOLLE Rueckgabe-Reihenfolge, die
+    /// `ChooseDrawStackSlot` tragen muss (Ziehreihenfolge oder gestreut).
+    /// `None` = die kanonische Reihenfolge aus `generate_draw_stack_moves`.
+    pub return_order: Option<Vec<usize>>,
+}
+
 /// Vereinheitlichter Drafting-Zug (ersetzt das Python-isinstance-Dispatch).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {

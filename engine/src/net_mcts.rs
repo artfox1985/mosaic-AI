@@ -1261,9 +1261,77 @@ pub struct SearchConfig {
     /// werden. Default 6, nicht 0 -- wirkt nur bei `deviate_prob > 0`.
     /// Env-Default ueber `self_play::deviate_candidates`.
     pub deviate_candidates: u32,
+
+    // -- Klasse S des asymmetrischen Self-Plays (Stoerer) -----------------
+    //
+    // `PREREG_asymmetric_selfplay.md` par.3/par.3a (FS1-FS4), Bauplan
+    // `evaluations/asymmetric_selfplay_build_plan.md` 6.2. Alle drei Felder
+    // `None` = Bestand: der Blattwert mischt wie bisher mit den
+    // PROZESSWEITEN Werten `points_utility_w()`/`aggr_lambda()` fuer den am
+    // Blatt Ziehenden, Zeile fuer Zeile. Gesetzt werden sie NUR von der
+    // Self-Play-Erzeugung fuer die Suche der Stoerer-Seite
+    // (`self_play::play_net_self_play_game_with_dice`); kein Spec-Feld, kein
+    // eigener Env-Knopf (die Erzeugungsknoepfe heissen `MOSAIC_AGGR_SIDE*`).
+    /// Mischgewicht `w` des Stoerers. Wirkt nur zusammen mit
+    /// [`Self::aggr_player`]; `None` heisst dort `0` (kein Blend).
+    pub aggr_w: Option<f64>,
+    /// Gegnerpunkte-Abzug `lambda` des Stoerers (wirkt nur bei `w > 0`,
+    /// FS2). `None` heisst bei gesetztem [`Self::aggr_player`] `0`.
+    pub aggr_lambda: Option<f64>,
+    /// Spielerindex des Stoerers. `Some(s)` schaltet den Seiten-Blend ein
+    /// (FS1): NUR der Blattwert aus Sicht von `s` wird gemischt,
+    /// `(1-w)*wr_s + w*clamp(pts_s - lambda*opp_s, -1, 1)` (auf [0,1]
+    /// skaliert, [`opp_aware_points_utility`]), der des Gegners bleibt der
+    /// reine Siegwert; der prozessweite Blend ist dann fuer DIESE Suche aus.
+    /// Ein fester Index statt "Wurzelspieler der Suche", weil die
+    /// Mondstapel-Nachsuche ihre Wurzel beim Gegner hat
+    /// ([`moon_order_post_search`]) und trotzdem fuer den Stoerer sucht.
+    pub aggr_player: Option<usize>,
+}
+
+/// Wie der Blattwert einer Suche gemischt wird (Klasse S, FS1). Aus der
+/// `SearchConfig` abgeleitet, damit `node_from_net_outputs` und der
+/// Sammel-Faden-Waechter dieselbe Entscheidung lesen.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum LeafBlend {
+    /// Bestand: prozessweites `w`/`lambda` fuer den am Blatt Ziehenden.
+    ProcessWide,
+    /// Seiten-Blend: nur die Perspektive `player` wird mit `w`/`lambda`
+    /// gemischt, die andere bleibt unvermischt.
+    Aggressor { player: usize, w: f64, lambda: f64 },
 }
 
 impl SearchConfig {
+    /// Klasse S: welcher Blattwert-Blend gilt fuer diese Suche? `None` in
+    /// [`Self::aggr_player`] (Bestand) -> [`LeafBlend::ProcessWide`].
+    pub(crate) fn leaf_blend(&self) -> LeafBlend {
+        match self.aggr_player {
+            None => LeafBlend::ProcessWide,
+            Some(player) => LeafBlend::Aggressor {
+                player,
+                w: self.aggr_w.unwrap_or(0.0),
+                lambda: self.aggr_lambda.unwrap_or(0.0),
+            },
+        }
+    }
+
+    /// Das `w`, mit dem DIESE Suche am Blatt tatsaechlich mischt -- der Wert,
+    /// den der Sammel-Faden-Waechter ([`try_batched_pair_ex`], Review #11)
+    /// pruefen muss. Bestand: der prozessweite Wert.
+    pub(crate) fn effective_blend_w(&self) -> f64 {
+        match self.leaf_blend() {
+            LeafBlend::ProcessWide => points_utility_w(),
+            LeafBlend::Aggressor { w, .. } => w,
+        }
+    }
+
+    /// FS4 (`PREREG_asymmetric_selfplay.md` par.3a): Kopie OHNE den
+    /// Stoerer-Blend -- fuer die Startsetzung per Suche, die dieselbe
+    /// `SearchConfig` bekommt, aber unvermischt bleiben soll. Bei Bestand
+    /// (`aggr_player == None`) eine Identitaet.
+    pub(crate) fn without_aggr(&self) -> SearchConfig {
+        SearchConfig { aggr_w: None, aggr_lambda: None, aggr_player: None, ..*self }
+    }
     /// Liest den heutigen Env-Knopf `MOSAIC_IMPLICIT_MINIMAX_A` (dieselbe
     /// Parse-Regel wie der fruehere OnceLock-Getter: `read_f64_env`,
     /// Default `0.0`).
@@ -1339,6 +1407,11 @@ impl SearchConfig {
             tau_argmax_from_move: tau_argmax_from_move().unwrap_or(0) as u32,
             deviate_prob: crate::self_play::deviate_prob(),
             deviate_candidates: crate::self_play::deviate_candidates() as u32,
+            // Klasse S: kein Env-Default hier -- nur die Erzeugung setzt die
+            // Felder fuer die Stoerer-Seite (`self_play`), sonst Bestand.
+            aggr_w: None,
+            aggr_lambda: None,
+            aggr_player: None,
         }
     }
 
@@ -1924,6 +1997,11 @@ impl SearchConfig {
             tau_argmax_from_move,
             deviate_prob,
             deviate_candidates,
+            // Klasse S: bewusst KEIN Spec-Feld (Bauplan 4.8: Env-Knoepfe der
+            // Erzeugung, damit der Rezept-Waechter aussagekraeftig bleibt).
+            aggr_w: None,
+            aggr_lambda: None,
+            aggr_player: None,
         })
     }
 }
@@ -2874,7 +2952,33 @@ struct Node {
     /// entscheidet per `alpha`, ob dieser Wert das Ergebnis ueberhaupt
     /// beeinflusst.
     im_value: [f64; 2],
+    /// Klasse S (Bauplan 6.2 Punkt 4): Blattwert JE SPIELER ohne den
+    /// Stoerer-Blend (sonst dieselbe Kette wie `leaf_value`). Bei
+    /// [`LeafBlend::ProcessWide`] (Bestand) per Konstruktion `== leaf_value`.
+    own_leaf_value: [f64; 2],
+    /// Zweiter Akkumulator neben `value`: Summe von
+    /// `own_leaf_value[player_who_acted]` ueber alle Besuche, im selben
+    /// Backprop mitgefuehrt (kein Netzaufruf). `Q_own = own_value_sum/visits`
+    /// ist der Wert des Zugs nach dem EIGENEN Siegwert, Grundlage von
+    /// `own_q_gap` ([`root_own_stats`]). Reine Arithmetik, beeinflusst keine
+    /// Zugwahl und kein Policy-Ziel.
+    own_value_sum: f64,
+    /// FS3 (`PREREG_asymmetric_selfplay.md` par.3a): NUR an der Wurzel
+    /// gesetzt -- die kleinste Besuchszahl unter den Kandidaten der LETZTEN
+    /// Sequential-Halving-Stufe (die Ueberlebenden, `current` am Ende von
+    /// [`build_gumbel_tree_inner_for`]); bei einem einzigen Kandidaten dessen
+    /// Besuche. Regel [`AGGR_OWN_Q_GAP_N_MIN_RULE`]. 0 an allen anderen
+    /// Knoten und im PUCT-Legacy-Pfad (dann zaehlt jedes besuchte Kind).
+    halving_min_visits: u32,
 }
+
+/// FS3: Name der N_min-Regel fuer `own_q_gap`, im Lauf-Manifest gemeldet
+/// (`lib.rs::engine_config_json`, Feld `aggr_own_q_gap_n_min_rule`).
+/// Bedeutung: N_min = kleinste Besuchszahl unter den Ueberlebenden der
+/// letzten Halving-Stufe (= die Finalisten, unter denen die Gumbel-Zugwahl
+/// faellt); `own_q_gap` vergleicht nur Wurzelkinder mit mindestens N_min
+/// Besuchen.
+pub const AGGR_OWN_Q_GAP_N_MIN_RULE: &str = "halving_survivors_min_visits";
 
 impl crate::search_common::SearchNode for Node {
     fn parent(&self) -> Option<usize> { self.parent }
@@ -3094,6 +3198,26 @@ fn blended_leaf_win_prob_with(
     let opp_raw = opp_points.first().copied().unwrap_or(0.0) as f64;
     let u_pts = opp_aware_points_utility(pts_raw, opp_raw, lambda_aggr);
     (1.0 - w) * wr + w * u_pts
+}
+
+/// Klasse S (FS1, Bauplan 6.2 Punkt 3): Blattwert AUS SICHT DES STOERERS.
+/// `wr_s` ist sein unvermischter (kalibrierter) Siegwert, `pts_s`/`opp_s`
+/// sind die Punkte-Koepfe in SEINER Ego-Sicht (tanh-Skala). Dieselben drei
+/// Stufen wie [`blended_leaf_win_prob_with`]: `w == 0` -> `wr_s`; fehlt einer
+/// der Koepfe -> `wr_s` (einmalige Warnung); sonst
+/// `(1-w)*wr_s + w*opp_aware_points_utility(pts_s, opp_s, lambda)`. Reine
+/// Funktion, ohne Env und Netz -- direkt testbar.
+pub(crate) fn aggressor_blend(wr_s: f64, pts_s: Option<f64>, opp_s: Option<f64>, w: f64, lambda: f64) -> f64 {
+    if w == 0.0 {
+        return wr_s;
+    }
+    match (pts_s, opp_s) {
+        (Some(p), Some(o)) => (1.0 - w) * wr_s + w * opp_aware_points_utility(p, o, lambda),
+        _ => {
+            warn_missing_opp_head_once();
+            wr_s
+        }
+    }
 }
 
 // ── K1: saettigende, re-zentrierte Margen-Utility im Blattwert ─────────────
@@ -3362,7 +3486,8 @@ fn try_batched_single_eval(
 /// Ownership-Verbraucher Teil 1: der Sammel-Faden liefert seit der
 /// Verdrahtung SECHS Spalten je Zeile, `ownership` kommt also auch ueber
 /// diesen Pfad durch (frueher waere hier still ein leerer Kopf entstanden).
-/// Der `points_utility_w()`-Waechter bleibt unangetastet -- siehe
+/// Der Misch-Waechter bleibt in der Absicht unangetastet (seit 2026-10-03 auf
+/// das `w` der suchenden Seite umgestellt, siehe unten) -- siehe
 /// `net_batcher.rs`-Modulkommentar "Was NICHT Teil dieser Datei ist".
 ///
 /// Review-Befund #11 (`evaluations/review/code_review_2026-09-26_verification.md`,
@@ -3375,21 +3500,41 @@ fn try_batched_single_eval(
 /// "kein Kopf", ohne Verschraenkung den Kopf. Jetzt reicht
 /// [`split_batched_pair`] alle sechs Spalten durch. Bei Knopf aus (Default)
 /// wird diese Stelle nie erreicht (`lookup` liefert `None`): byte-identisch.
+///
+/// Zweite Haelfte von Review #11 (2026-10-03, Klasse S): der Waechter prueft
+/// das `w` der SUCHENDEN SEITE (`blend_w`, aus
+/// [`SearchConfig::effective_blend_w`]), nicht mehr allein das prozessweite.
+/// Seit dem Seiten-Blend kann eine Suche mischen, obwohl der Prozesswert 0 ist
+/// (Stoerer-Seite), und eine andere Suche im selben Prozess ungemischt bleiben.
+/// Bestand (`aggr_player == None`): `blend_w == points_utility_w()`, derselbe
+/// Waechter wie vorher. Die SearchConfig-freien Aufrufer
+/// ([`net_leaf_eval_with`]) mischen immer prozessweit und reichen genau
+/// diesen Wert.
 #[allow(clippy::type_complexity)]
 fn try_batched_pair_ex(
     net: &Net,
     feats_a: &[f32],
     feats_b: &[f32],
+    blend_w: f64,
 ) -> Option<(
     (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
     (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>),
 )> {
-    if points_utility_w() != 0.0 {
+    if !batched_pair_allowed(blend_w) {
         return None;
     }
     let batcher = crate::net_batcher::lookup(net)?;
     let rows = batcher.eval_rows(&[feats_a, feats_b]).ok()?;
     split_batched_pair(rows)
+}
+
+/// Waechter von [`try_batched_pair_ex`] als reine Funktion: der Sammel-Faden
+/// wird nur benutzt, wenn die suchende Seite am Blatt NICHT mischt
+/// (`blend_w == 0`). Strenger als noetig (der Faden reicht `opp_points` seit
+/// Review #11 durch), aber unveraendert in der Absicht: Task #28 unter
+/// Verschraenkung ist nie gemessen (`net_batcher.rs`-Modulkommentar).
+fn batched_pair_allowed(blend_w: f64) -> bool {
+    blend_w == 0.0
 }
 
 /// Zerlegt die Antwort des Sammel-Faden fuer EIN Mover-/Gegner-Paar in die
@@ -3499,7 +3644,7 @@ pub(crate) fn net_leaf_eval_with(net: &Net, state: &GameState, single_pass: bool
         let (
             (_logits, value, _moon, points, opp_points, ownership),
             (_o_logits, o_value, _o_moon, o_points, o_opp_points, _o_ownership),
-        ) = match try_batched_pair_ex(net, &feats, &other_feats) {
+        ) = match try_batched_pair_ex(net, &feats, &other_feats, points_utility_w()) {
             Some(pair) => pair,
             None => crate::profiling::timed_net_eval(2, || {
                 net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
@@ -3673,7 +3818,7 @@ fn make_node<R: Rng + ?Sized>(
             let (
                 (logits, value, moon, points, opp_points, ownership),
                 (_o_logits, o_value, _o_moon, o_points, o_opp_points, _o_ownership),
-            ) = match try_batched_pair_ex(net, &feats, &other_feats) {
+            ) = match try_batched_pair_ex(net, &feats, &other_feats, search_config.effective_blend_w()) {
                 Some(pair) => pair,
                 None => crate::profiling::timed_net_eval(2, || {
                     net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
@@ -3828,32 +3973,84 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     // `state.current_player` ab, siehe features.rs/state_to_tensor) — für
     // den jeweils ANDEREN Spieler braucht es deshalb einen zweiten
     // Forward-Pass mit geflipptem `current_player`, nicht einfach `1-wert`.
-    let leaf_value = match ACTIVE_LEAF {
+    // Klasse S (FS1, Bauplan 6.2 Punkt 3/4): `ProcessWide` ist der Bestand,
+    // Zeile fuer Zeile; nur `Aggressor` rechnet zusaetzlich den unvermischten
+    // Zweitwert `own_leaf_value` fuer den zweiten Akkumulator.
+    let leaf_blend = search_config.leaf_blend();
+    let (leaf_value, own_leaf_value) = match ACTIVE_LEAF {
         LeafEval::Net => {
-            let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
-            // E1: `other_pass` ist genau dann `None`, wenn der Aufrufer mit
-            // demselben `search_config` den geflippten Pass ausgelassen hat
-            // (`make_node`, `batched_expand_root_candidates`).
-            let other_val = if search_config.single_pass_other_val {
-                1.0 - mover_val
-            } else {
-                // `other_pass` wurde oben bereits per `eval_pair` MIT dem
-                // Mover-Pass zusammen berechnet (Paket 1) -- hier nur noch
-                // auslesen, kein zweiter Forward-Pass mehr nötig.
-                let (o_value, o_points, o_opp_points) =
-                    other_pass.expect("need_other_pass deckt genau diesen Zweig ab");
-                blended_leaf_win_prob(&o_value, &o_points, &o_opp_points)
+            let (today_value, own_today_value): ([f64; 2], Option<[f64; 2]>) = match leaf_blend {
+                LeafBlend::ProcessWide => {
+                    let mover_val = blended_leaf_win_prob(&value, &points, &opp_points);
+                    // E1: `other_pass` ist genau dann `None`, wenn der Aufrufer mit
+                    // demselben `search_config` den geflippten Pass ausgelassen hat
+                    // (`make_node`, `batched_expand_root_candidates`).
+                    let other_val = if search_config.single_pass_other_val {
+                        1.0 - mover_val
+                    } else {
+                        // `other_pass` wurde oben bereits per `eval_pair` MIT dem
+                        // Mover-Pass zusammen berechnet (Paket 1) -- hier nur noch
+                        // auslesen, kein zweiter Forward-Pass mehr nötig.
+                        let (o_value, o_points, o_opp_points) =
+                            other_pass.expect("need_other_pass deckt genau diesen Zweig ab");
+                        blended_leaf_win_prob(&o_value, &o_points, &o_opp_points)
+                    };
+                    // Perspektiven-/OOD-Audit (siehe Modul-Kommentar oben) -- nur
+                    // aussagekräftig, wenn `other_val` ein ECHTER zweiter Forward-Pass
+                    // ist (bei `single_pass_other_val=true` wäre die Divergenz trivial 0,
+                    // per Konstruktion, keine echte Information).
+                    if !search_config.single_pass_other_val {
+                        record_perspective_divergence(state.round_number, mover_val, other_val);
+                    }
+                    let today_value =
+                        if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+                    (today_value, None)
+                }
+                LeafBlend::Aggressor { player, w, lambda } => {
+                    // Beide Perspektiven zuerst UNVERMISCHT (w = 0, Kalibrierung wie
+                    // im Bestand) -- das ist der reine Siegwert, den die G-Seite und
+                    // der zweite Akkumulator sehen.
+                    let (cal_a, cal_b) = (value_cal_a(), value_cal_b());
+                    let mover_own = blended_leaf_win_prob_with(&value, &points, &opp_points, 0.0, 0.0, cal_a, cal_b);
+                    let (other_own, other_heads) = if search_config.single_pass_other_val {
+                        (1.0 - mover_own, None)
+                    } else {
+                        let (o_value, o_points, o_opp_points) =
+                            other_pass.expect("need_other_pass deckt genau diesen Zweig ab");
+                        (
+                            blended_leaf_win_prob_with(&o_value, &o_points, &o_opp_points, 0.0, 0.0, cal_a, cal_b),
+                            Some((o_points.first().copied(), o_opp_points.first().copied())),
+                        )
+                    };
+                    if !search_config.single_pass_other_val {
+                        record_perspective_divergence(state.round_number, mover_own, other_own);
+                    }
+                    let own = if state.current_player == 0 { [mover_own, other_own] } else { [other_own, mover_own] };
+                    // Die Koepfe AUS SICHT DES STOERERS: zieht er am Blatt selbst,
+                    // die des Mover-Passes; sonst die des geflippten Passes, und
+                    // ohne ihn (E1) die Ego-Koepfe des Ziehenden VERTAUSCHT
+                    // (Bauplan 6.2 Punkt 3; `VALUE_OPP_EPSILON = 0`, die
+                    // Rueckgewinnung in `opp_aware_points_utility` ist dann die
+                    // Identitaet).
+                    let (pts_s, opp_s) = if state.current_player == player {
+                        (points.first().copied(), opp_points.first().copied())
+                    } else if let Some(heads) = other_heads {
+                        heads
+                    } else {
+                        (opp_points.first().copied(), points.first().copied())
+                    };
+                    let mut blended = own;
+                    blended[player] =
+                        aggressor_blend(own[player], pts_s.map(f64::from), opp_s.map(f64::from), w, lambda);
+                    (blended, Some(own))
+                }
             };
-            // Perspektiven-/OOD-Audit (siehe Modul-Kommentar oben) -- nur
-            // aussagekräftig, wenn `other_val` ein ECHTER zweiter Forward-Pass
-            // ist (bei `single_pass_other_val=true` wäre die Divergenz trivial 0,
-            // per Konstruktion, keine echte Information).
-            if !search_config.single_pass_other_val {
-                record_perspective_divergence(state.round_number, mover_val, other_val);
-            }
-            let mut today_value =
-                if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
 
+            // Klasse S: die Zustands-Korrekturen unten laufen fuer den
+            // gemischten Wert und (nur im Seiten-Blend) ein zweites Mal fuer den
+            // unvermischten. Als Closure, damit es EINE Kette bleibt; im Bestand
+            // genau ein Aufruf, dieselben Schritte in derselben Reihenfolge.
+            let shape_leaf = |mut today_value: [f64; 2]| -> [f64; 2] {
             // K1 (PREREG_saturating_score_utility.md par.14.3): re-zentrierte
             // Margen-Utility ADDITIV direkt hinter dem Rueckgabewert von
             // `blended_leaf_win_prob` (`U = clamp(wr + u, 0, 1)`), VOR
@@ -4007,6 +4204,10 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // 0,0) exakte Identitaet: `apply_ownership_shaping` steigt VOR
             // jeder Rechnung aus (kein Sigmoid, kein tanh, keine Rundung).
             today_value = apply_ownership_shaping(today_value, &state, &ownership);
+            today_value
+            };
+            let today_value = shape_leaf(today_value);
+            let own_today_value = own_today_value.map(shape_leaf);
 
             // KEIN separates Freischalt-Shaping mehr (2026-08-11): der
             // Spezialfeld-Anteil (Kriterium 6 samt ungegatetem ⭐-Bonus) steckt
@@ -4036,12 +4237,18 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // konfundierter Arm (par.4.3 zur Mehr-Faktoren-Disziplin); der
             // Bestandsschalter ist ohnehin eine Kompilierzeit-Konstante mit
             // Default `false`.
+            //
+            // Klasse S: ersetzt einer der beiden Uebergangs-Zweige den Wert, gilt
+            // er fuer BEIDE Akkumulatoren (dort wird nicht gemischt -- die
+            // Bewerter rufen `net_leaf_eval_with` mit dem prozessweiten Blend;
+            // Variante B ist im v35-Rezept aus, `ROUND_TRANSITION_SAMPLING` eine
+            // Konstante `false`).
             if let Some(v) =
                 round_transition_leaf_value(net_policy, net_value, &state, terminal, search_config)
             {
-                v
+                (v, v)
             } else if terminal && ROUND_TRANSITION_SAMPLING {
-                match crate::round_transition::resolve_to_pre_chance(&state) {
+                let v = match crate::round_transition::resolve_to_pre_chance(&state) {
                     Some(pre) => crate::round_transition::sample_round_transition_value(
                         &pre,
                         crate::round_transition::N_SAMPLES_SEARCH,
@@ -4059,14 +4266,19 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                         std::time::Instant::now() + crate::round_transition::TIME_BUDGET,
                     ),
                     None => today_value, // defensiv, sollte durch das `terminal`-Gating nie vorkommen
-                }
+                };
+                (v, v)
             } else {
-                today_value
+                // Bestand: kein zweiter Wert, der Zweitakkumulator sieht denselben.
+                (today_value, own_today_value.unwrap_or(today_value))
             }
         }
-        LeafEval::Dfs => crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
-            crate::mcts::evaluate(&state, n_actions)
-        }),
+        LeafEval::Dfs => {
+            let v = crate::profiling::timed(crate::profiling::note_dfs_eval_ns, || {
+                crate::mcts::evaluate(&state, n_actions)
+            });
+            (v, v)
+        }
     };
 
     Node {
@@ -4097,6 +4309,10 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         // `leaf_value`, spaeter per Backprop von `update_im_value_backup`
         // ueberschrieben, sobald es besuchte Kinder gibt.
         im_value: leaf_value,
+        // Klasse S: im Bestand `== leaf_value` (siehe oben).
+        own_leaf_value,
+        own_value_sum: 0.0,
+        halving_min_visits: 0,
     }
 }
 
@@ -4548,10 +4764,15 @@ fn update_im_value_backup(nodes: &mut [Node], nid: usize) {
 /// gesetzt.
 fn backprop_path(nodes: &mut [Node], leaf_nid: usize) {
     let value = nodes[leaf_nid].leaf_value;
+    // Klasse S (Bauplan 6.2 Punkt 4): zweiter Akkumulator mit dem
+    // unvermischten Wert, gleiche Perspektive wie `value`. Im Bestand
+    // `own_leaf_value == leaf_value`, also `own_value_sum == value`.
+    let own = nodes[leaf_nid].own_leaf_value;
     let mut cur = Some(leaf_nid);
     while let Some(i) = cur {
         nodes[i].visits += 1;
         nodes[i].value += value[nodes[i].player_who_acted];
+        nodes[i].own_value_sum += own[nodes[i].player_who_acted];
         update_im_value_backup(nodes, i);
         cur = nodes[i].parent;
     }
@@ -6080,6 +6301,17 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
         }
     }
 
+    // FS3 (`PREREG_asymmetric_selfplay.md` par.3a, Regel
+    // `AGGR_OWN_Q_GAP_N_MIN_RULE`): `current` sind jetzt die Ueberlebenden der
+    // LETZTEN Halving-Stufe (bei einem einzigen Kandidaten dieser eine). N_min
+    // = ihre kleinste Besuchszahl (der Rest-Verteiler oben kann um 1
+    // streuen). Reines Auslesen, kein Effekt auf Suche oder Zugwahl.
+    nodes[0].halving_min_visits = current
+        .iter()
+        .filter_map(|&ci| candidate_node[ci].map(|cid| nodes[cid].visits))
+        .min()
+        .unwrap_or(0);
+
     // Anforderung 2d: finale Zugwahl -- die Max-Visit-Menge (Sequential-
     // Halving-Überlebende) mit `ln(prior)+σ(Q)` je Finalist, exakt dieselbe
     // Menge/Formel wie `gumbel_final_root_action` (dort erneut, aber
@@ -6338,6 +6570,8 @@ fn build_net_tree_for<R: Rng + ?Sized>(
 
         // Eval: Blattwert wurde schon bei Knoten-Erzeugung berechnet (make_node).
         let value = nodes[nid].leaf_value;
+        // Klasse S: Zweitakkumulator wie in `backprop_path`.
+        let own = nodes[nid].own_leaf_value;
         logln!(
             "  EVAL   #{nid} ({}) win[{}]={:.3} win[{}]={:.3}",
             if ACTIVE_LEAF == LeafEval::Net { "Netz-Value" } else { "DFS-Solver" },
@@ -6351,6 +6585,7 @@ fn build_net_tree_for<R: Rng + ?Sized>(
             nodes[i].visits += 1;
             let delta = value[nodes[i].player_who_acted];
             nodes[i].value += delta;
+            nodes[i].own_value_sum += own[nodes[i].player_who_acted];
             if log.is_some() {
                 bp.push_str(&format!(" #{i}+={delta:.3}({})", names[nodes[i].player_who_acted]));
             }
@@ -6952,8 +7187,85 @@ pub fn net_root_child_stats_policy_and_prior<R: Rng + ?Sized>(
     rng: &mut R,
     search_config: &SearchConfig,
 ) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>, Vec<(Action, f64)>, Vec<(Action, f64)>) {
+    // Duenner Wrapper (Klasse S): derselbe Rumpf, derselbe RNG-Verbrauch; der
+    // sechste Wert (Eigenwert-Statistik der Wurzel) wird verworfen. Die
+    // oeffentliche Signatur bleibt damit fuer engine/examples und benches gleich.
+    let (stats, policy, root_q, root_child_q, root_prior, _own) = net_root_child_stats_policy_prior_and_own(
+        net, state, sims, c_puct, add_root_noise, rng, search_config,
+    );
+    (stats, policy, root_q, root_child_q, root_prior)
+}
+
+/// Eigenwert-Statistik der Wurzel fuer `own_q_gap` (Klasse S, FS3, Bauplan
+/// 6.2 Punkt 4). `children`: `(Aktion, Besuche, Q_own)` je Wurzelkind in der
+/// Reihenfolge von `root_child_stats_from_nodes`, `Q_own = own_value_sum /
+/// visits` (unvermischter Siegwert aus Sicht des Wurzelspielers, 0 bei
+/// unbesuchten). `n_min`: Regel [`AGGR_OWN_Q_GAP_N_MIN_RULE`].
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct RootOwnStats {
+    pub(crate) children: Vec<(Action, u32, f64)>,
+    pub(crate) n_min: u32,
+}
+
+impl RootOwnStats {
+    /// `own_q_gap = max_c Q_own(c) - Q_own(chosen)`, das Maximum NUR ueber
+    /// Wurzelkinder mit mindestens `n_min` (und mindestens einem) Besuch
+    /// (FS3). `None`, wenn `chosen` kein besuchtes Wurzelkind ist (dann gibt es
+    /// keinen Eigenwert) oder kein Kind die Schwelle erreicht. Ist `chosen`
+    /// selbst unter der Schwelle, kann der Wert negativ werden -- er wird NICHT
+    /// geklemmt, damit die Verteilung in S4 ehrlich bleibt.
+    pub(crate) fn own_q_gap(&self, chosen: &Action) -> Option<f64> {
+        let q_chosen = self.children.iter().find(|(a, v, _)| a == chosen && *v > 0)?.2;
+        let best = self
+            .children
+            .iter()
+            .filter(|(_, v, _)| *v > 0 && *v >= self.n_min)
+            .map(|(_, _, q)| *q)
+            .fold(f64::NEG_INFINITY, f64::max);
+        best.is_finite().then(|| best - q_chosen)
+    }
+}
+
+/// Liest [`RootOwnStats`] aus einem fertigen Baum (reines Auslesen).
+fn root_own_stats(nodes: &[Node]) -> RootOwnStats {
+    let children = nodes[0]
+        .children
+        .iter()
+        .filter_map(|&cid| {
+            let n = &nodes[cid];
+            let q = if n.visits > 0 { n.own_value_sum / n.visits as f64 } else { 0.0 };
+            n.action.clone().map(|a| (a, n.visits, q))
+        })
+        .collect();
+    RootOwnStats { children, n_min: nodes[0].halving_min_visits }
+}
+
+/// Wie [`net_root_child_stats_policy_and_prior`], liefert ZUSAETZLICH als
+/// sechstes Element die Eigenwert-Statistik der Wurzel ([`RootOwnStats`]) --
+/// NUR bei gesetztem Seiten-Blend (`search_config.aggr_player`, Klasse S) und
+/// nur aus einer EINZELWELT-Suche (Bestand `NUM_DETERMINIZATIONS = 1`); im
+/// Runde-5-Loeser-Zweig und im Mehrwelten-Wald `None` (kein einzelner Baum,
+/// dessen Halving-Stufe die Schwelle definiert). Keine zusaetzliche Rechnung
+/// im Bestand.
+#[allow(clippy::type_complexity)]
+pub(crate) fn net_root_child_stats_policy_prior_and_own<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+    search_config: &SearchConfig,
+) -> (
+    Vec<(Action, u32, f64)>,
+    Vec<(Action, f64)>,
+    Option<f64>,
+    Vec<(Action, f64)>,
+    Vec<(Action, f64)>,
+    Option<RootOwnStats>,
+) {
     if state.phase != Phase::Drafting {
-        return (Vec::new(), Vec::new(), None, Vec::new(), Vec::new());
+        return (Vec::new(), Vec::new(), None, Vec::new(), Vec::new(), None);
     }
     if r5_solver_takes_over(state, search_config) {
         // Zug und Wurzel-Q in EINEM Helfer (par.5a), Bestandspfad mit derselben
@@ -6994,7 +7306,7 @@ pub fn net_root_child_stats_policy_and_prior<R: Rng + ?Sized>(
         let root_child_q: Vec<(Action, f64)> =
             stats.iter().map(|(a, _, _)| (a.clone(), root_q.unwrap_or(0.5))).collect();
         // PREREG_targeted_branching.md par.7: kein Netz-Prior im Loeser-Zweig.
-        return (stats, policy, root_q, root_child_q, Vec::new());
+        return (stats, policy, root_q, root_child_q, Vec::new(), None);
     }
     let k = num_determinizations();
     if k <= 1 {
@@ -7002,12 +7314,14 @@ pub fn net_root_child_stats_policy_and_prior<R: Rng + ?Sized>(
             build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None, search_config);
         let root_visits = nodes[0].visits.max(1) as f64;
         let root_q = Some(nodes[0].value / root_visits);
+        let own = search_config.aggr_player.map(|_| root_own_stats(&nodes));
         return (
             root_child_stats_from_nodes(&nodes),
             root_completed_q_policy(&nodes),
             root_q,
             root_completed_q_raw(&nodes),
             root_prior_raw(&nodes),
+            own,
         );
     }
     // ISMCTS-Mehrfach-Determinisierung: Stats über die Welten-SUMME der
@@ -7029,6 +7343,8 @@ pub fn net_root_child_stats_policy_and_prior<R: Rng + ?Sized>(
         root_q,
         average_completed_q_raw(&forest),
         average_root_prior(&forest),
+        // Klasse S: im Wald kein `own_q_gap` (siehe Funktionskommentar).
+        None,
     )
 }
 
@@ -7918,6 +8234,12 @@ pub fn search_start_placement<R: Rng + ?Sized>(
     // Betrachter ist `pi`, nicht `current_player` (dieselbe Begruendung wie bei
     // `determinize_hidden_information_for` darueber). Bei Knopf 0 Identitaet
     // ohne RNG-Verbrauch.
+    // FS4 (`PREREG_asymmetric_selfplay.md` par.3a): die Startsetzung des
+    // Stoerers bleibt UNVERMISCHT, obwohl sie dieselbe `SearchConfig` bekommt
+    // -- die ausdrueckliche Ausnahme. Bestand: Identitaet (keine Felder
+    // gesetzt), kein RNG-Zug.
+    let start_config = search_config.without_aggr();
+    let search_config = &start_config;
     let leaf_config = with_round_transition_leaf_context(search_config, pi, rng);
     let search_config = &leaf_config;
 
@@ -7971,6 +8293,10 @@ pub fn search_start_placement<R: Rng + ?Sized>(
         opp_points_forecast: None,
         raw_value: None,
         im_value: [0.5, 0.5],
+        // Klasse S: Wurzel von Hand, dieselben Startwerte wie `leaf_value`.
+        own_leaf_value: [0.5, 0.5],
+        own_value_sum: 0.0,
+        halving_min_visits: 0,
     }];
     let mut candidate_node: Vec<Option<usize>> = vec![None; candidates.len()];
 
@@ -8623,6 +8949,9 @@ mod tests {
             // Default deckungsgleich mit `leaf_value` (Blatt-Fall) -- Tests,
             // die `im_value` explizit brauchen, setzen es nach dem Aufruf.
             im_value: [0.0, 0.0],
+            own_leaf_value: [0.0, 0.0],
+            own_value_sum: value,
+            halving_min_visits: 0,
         }
     }
 
@@ -9363,6 +9692,10 @@ mod tests {
             tau_argmax_from_move: 0,
             deviate_prob: 0.0,
             deviate_candidates: 6,
+            // Klasse S: Bestand (kein Seiten-Blend).
+            aggr_w: None,
+            aggr_lambda: None,
+            aggr_player: None,
         }
     }
 
@@ -15055,4 +15388,232 @@ mod tests {
         );
     }
 
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Klasse S: Seiten-Blend, Zweitakkumulator, own_q_gap, Review #11
+    // (PREREG_asymmetric_selfplay.md par.3/par.3a, Bauplan 6.2, Tests 8.2)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    fn champion_net_for_aggr() -> Net {
+        let path = crate::net::test_champion_model_path();
+        Net::load_auto(path.to_str().unwrap())
+            .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
+    }
+
+    fn aggr_cfg(base: SearchConfig, player: usize, w: f64, lambda: f64) -> SearchConfig {
+        SearchConfig { aggr_w: Some(w), aggr_lambda: Some(lambda), aggr_player: Some(player), ..base }
+    }
+
+    /// Reine Formel: w = 0 -> wr; fehlender Kopf -> wr; sonst Blend wie
+    /// `blended_leaf_win_prob_with` mit den Koepfen des Stoerers.
+    #[test]
+    fn aggressor_blend_matches_hand_calculation() {
+        assert_eq!(aggressor_blend(0.6, Some(0.4), Some(0.2), 0.0, 2.0), 0.6);
+        assert_eq!(aggressor_blend(0.6, None, Some(0.2), 0.1, 2.0), 0.6);
+        assert_eq!(aggressor_blend(0.6, Some(0.4), None, 0.1, 2.0), 0.6);
+        // u = (clamp(0.4 - 1.0*0.2, -1, 1) + 1) / 2 = 0.6; 0.9*0.6 + 0.1*0.6 = 0.6.
+        let v = aggressor_blend(0.6, Some(0.4), Some(0.2), 0.1, 1.0);
+        assert!((v - 0.6).abs() < 1e-12, "{v}");
+        // u = (clamp(0.4 - 2*0.5) + 1)/2 = 0.2; 0.5*0.8 + 0.5*0.2 = 0.5.
+        let v = aggressor_blend(0.8, Some(0.4), Some(0.5), 0.5, 2.0);
+        assert!((v - 0.5).abs() < 1e-12, "{v}");
+        // Dieselbe Zahl wie der Bestandsblend, wenn der Stoerer am Blatt zieht.
+        let b = blended_leaf_win_prob_with(&[0.6], &[0.4], &[0.5], 0.5, 2.0, 0.0, 1.0);
+        let a = aggressor_blend(value_to_win_prob(&[0.6]), Some(f64::from(0.4f32)), Some(f64::from(0.5f32)), 0.5, 2.0);
+        assert!((a - b).abs() < 1e-12, "{a} gegen {b}");
+    }
+
+    /// Test 8.2 Nr. 1 (Teil Suche): alle drei Felder `None` ist der Bestand
+    /// (`LeafBlend::ProcessWide`, `effective_blend_w` = prozessweit,
+    /// `without_aggr` eine Identitaet), und ein Seiten-Blend mit w = 0 baut
+    /// zahlengleich denselben Baum wie der Bestand (gleiche Besuche, gleiche
+    /// Werte, gleiche Policy).
+    #[test]
+    fn aggr_none_is_byte_identical() {
+        // Liest den prozessweiten Blend (Bestandsseite): gegen die
+        // `set_aggression_params`-Tests serialisieren.
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let off = search_config_off();
+        assert_eq!(off.leaf_blend(), LeafBlend::ProcessWide);
+        assert_eq!(off.effective_blend_w(), points_utility_w());
+        assert_eq!(off.without_aggr(), off);
+        assert_eq!(SearchConfig::from_env().leaf_blend(), LeafBlend::ProcessWide);
+        let net = champion_net_for_aggr();
+        let mut rng = StdRng::seed_from_u64(20261003);
+        let mut checked = 0usize;
+        for gi in 0..6u64 {
+            let Some(state) = random_drafting_state(gi, 10, &mut rng) else { continue };
+            for single_pass in [false, true] {
+                let base = SearchConfig { single_pass_other_val: single_pass, ..search_config_off() };
+                let zero = aggr_cfg(base, state.current_player, 0.0, 2.0);
+                let mut r1 = StdRng::seed_from_u64(7 + gi);
+                let a = build_gumbel_tree_inner(&net, None, &state, 32, false, &mut r1, None, true, &base);
+                let mut r2 = StdRng::seed_from_u64(7 + gi);
+                let b = build_gumbel_tree_inner(&net, None, &state, 32, false, &mut r2, None, true, &zero);
+                assert_eq!(a.len(), b.len(), "Spiel {gi}: Baumgroesse");
+                for (x, y) in a.iter().zip(b.iter()) {
+                    assert_eq!(x.visits, y.visits);
+                    assert_eq!(x.value.to_bits(), y.value.to_bits(), "Spiel {gi}: value");
+                    assert_eq!(x.leaf_value, y.leaf_value);
+                    assert_eq!(x.action, y.action);
+                }
+                assert_eq!(root_completed_q_policy(&a), root_completed_q_policy(&b));
+            }
+            checked += 1;
+        }
+        assert!(checked >= 3, "zu wenige Stichproben ({checked})");
+    }
+
+    /// Test 8.2 Nr. 2 (FS1): nur die Perspektive des Stoerers wird gemischt --
+    /// mit dem Stoerer am Blatt UND mit G am Blatt, mit und ohne geflippten
+    /// Pass. Die G-Komponente ist exakt der unvermischte Wert.
+    #[test]
+    fn aggr_blend_applies_to_aggressor_perspective_only() {
+        // Liest den prozessweiten Blend (Bestandsseite): gegen die
+        // `set_aggression_params`-Tests serialisieren.
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let net = champion_net_for_aggr();
+        assert!(net.has_opp_head(), "Champion ohne opp_points-Kopf -- Testvoraussetzung");
+        let mut rng = StdRng::seed_from_u64(31337);
+        let (mut differs, mut checked) = (0usize, 0usize);
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 8, &mut rng) else { continue };
+            for single_pass in [false, true] {
+                let base = SearchConfig { single_pass_other_val: single_pass, ..search_config_off() };
+                for aggressor in [state.current_player, 1 - state.current_player] {
+                    let cfg = aggr_cfg(base, aggressor, 0.5, 2.0);
+                    let mut r = StdRng::seed_from_u64(gi);
+                    let node = make_node(&net, None, state.clone(), None, None, None, 0.0, 1 - state.current_player, &mut r, &cfg);
+                    let g = 1 - aggressor;
+                    assert_eq!(
+                        node.leaf_value[g].to_bits(),
+                        node.own_leaf_value[g].to_bits(),
+                        "Spiel {gi}: G-Perspektive muss unvermischt bleiben"
+                    );
+                    // Der unvermischte Wert ist der Bestandswert (w = 0 prozessweit).
+                    let mut r0 = StdRng::seed_from_u64(gi);
+                    let plain = make_node(&net, None, state.clone(), None, None, None, 0.0, 1 - state.current_player, &mut r0, &base);
+                    assert_eq!(node.own_leaf_value, plain.leaf_value, "Spiel {gi}: own == Bestand");
+                    if node.leaf_value[aggressor] != node.own_leaf_value[aggressor] {
+                        differs += 1;
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked >= 12, "zu wenige Stichproben ({checked})");
+        assert!(differs * 2 >= checked, "der Blend muss die Stoerer-Perspektive meist verschieben: {differs}/{checked}");
+    }
+
+    /// Test 8.2 Nr. 3: ohne Seiten-Blend ist der Zweitakkumulator an JEDEM
+    /// Knoten bitgleich zu `value`; mit Blend weicht er an der Wurzel ab.
+    #[test]
+    fn own_accumulator_equals_value_when_blend_off() {
+        let net = champion_net_for_aggr();
+        let mut rng = StdRng::seed_from_u64(4242);
+        let mut found_diff = false;
+        let mut checked = 0usize;
+        for gi in 0..6u64 {
+            let Some(state) = random_drafting_state(gi, 6, &mut rng) else { continue };
+            let base = search_config_off();
+            let mut r = StdRng::seed_from_u64(gi);
+            let nodes = build_gumbel_tree_inner(&net, None, &state, 48, false, &mut r, None, true, &base);
+            for n in &nodes {
+                assert_eq!(n.own_value_sum.to_bits(), n.value.to_bits(), "Spiel {gi}: Bestand own != value");
+            }
+            assert!(nodes[0].halving_min_visits > 0, "Spiel {gi}: N_min an der Wurzel gesetzt");
+            let on = aggr_cfg(base, state.current_player, 0.5, 2.0);
+            let mut r = StdRng::seed_from_u64(gi);
+            let nodes = build_gumbel_tree_inner(&net, None, &state, 48, false, &mut r, None, true, &on);
+            if nodes[0].children.iter().any(|&c| nodes[c].own_value_sum != nodes[c].value) {
+                found_diff = true;
+            }
+            checked += 1;
+        }
+        assert!(checked >= 3);
+        assert!(found_diff, "mit Blend muss der Zweitakkumulator irgendwo vom gemischten Wert abweichen");
+    }
+
+    /// FS3: N_min ist die kleinste Besuchszahl der Ueberlebenden der letzten
+    /// Halving-Stufe; diese Kinder tragen die meisten Besuche, kein anderes
+    /// Kind liegt darueber. `own_q_gap` des besten Finalisten ist 0, der
+    /// Abstand ist nie negativ fuer einen Finalisten, und ein unbesuchter oder
+    /// fremder Zug gibt `None`.
+    #[test]
+    fn own_q_gap_uses_halving_survivors_only() {
+        let a = |i: usize| Action::BonusChip(crate::moves::TakeBonusChipMove { factory_id: i });
+        let stats = RootOwnStats {
+            children: vec![(a(0), 27, 0.40), (a(1), 26, 0.55), (a(2), 11, 0.90), (a(3), 0, 0.0)],
+            n_min: 26,
+        };
+        assert_eq!(stats.own_q_gap(&a(1)), Some(0.0));
+        assert!((stats.own_q_gap(&a(0)).unwrap() - 0.15).abs() < 1e-12, "Kind 2 (11 Besuche) zaehlt nicht");
+        // Unter der Schwelle gewaehlt: Abstand zum besten Finalisten, hier negativ.
+        assert!((stats.own_q_gap(&a(2)).unwrap() + 0.35).abs() < 1e-12);
+        assert_eq!(stats.own_q_gap(&a(3)), None, "unbesucht: kein Eigenwert");
+        assert_eq!(stats.own_q_gap(&a(9)), None, "kein Wurzelkind");
+
+        let net = champion_net_for_aggr();
+        let mut rng = StdRng::seed_from_u64(99);
+        let mut checked = 0usize;
+        for gi in 0..6u64 {
+            let Some(state) = random_drafting_state(gi, 6, &mut rng) else { continue };
+            let cfg = aggr_cfg(search_config_off(), state.current_player, 0.1, 1.0);
+            let mut r = StdRng::seed_from_u64(gi);
+            let nodes = build_gumbel_tree_inner(&net, None, &state, 64, false, &mut r, None, true, &cfg);
+            let own = root_own_stats(&nodes);
+            let max_n = own.children.iter().map(|c| c.1).max().unwrap_or(0);
+            assert!(own.n_min > 0 && own.n_min <= max_n, "Spiel {gi}: n_min {} max {max_n}", own.n_min);
+            assert!(max_n - own.n_min <= 1, "Spiel {gi}: Finalisten streuen hoechstens um 1");
+            let finalists: Vec<&(Action, u32, f64)> = own.children.iter().filter(|c| c.1 >= own.n_min).collect();
+            assert!(!finalists.is_empty());
+            for f in &finalists {
+                assert!(own.own_q_gap(&f.0).unwrap() >= 0.0, "Spiel {gi}: Finalist mit negativem Abstand");
+            }
+            checked += 1;
+        }
+        assert!(checked >= 3);
+    }
+
+    /// Test 8.2 Nr. 4 (Review #11): die Paar-Zerlegung behaelt `opp_points`,
+    /// und der Sammel-Faden-Waechter liest das `w` der SUCHENDEN Seite: im
+    /// Bestand den Prozesswert, beim Stoerer sein eigenes `w`; bei `w != 0`
+    /// gibt `try_batched_pair_ex` vor jedem Registry-Zugriff `None`.
+    #[test]
+    fn batched_pair_keeps_opp_points() {
+        // Liest den prozessweiten Blend (Bestandsseite): gegen die
+        // `set_aggression_params`-Tests serialisieren.
+        let _guard = AGGRESSION_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let row = |k: f32| (vec![k], vec![k + 0.1], vec![k + 0.2], vec![k + 0.3], vec![k + 0.4], vec![k + 0.5]);
+        let (a, b) = split_batched_pair(vec![row(1.0), row(2.0)]).expect("zwei Zeilen");
+        assert_eq!((a.4.clone(), b.4.clone()), (vec![1.4f32], vec![2.4f32]));
+        assert!(batched_pair_allowed(0.0));
+        assert!(!batched_pair_allowed(0.1));
+        let base = search_config_off();
+        assert_eq!(base.effective_blend_w(), points_utility_w(), "Bestand: prozessweit");
+        let s = aggr_cfg(base, 0, 0.1, 1.0);
+        assert_eq!(s.effective_blend_w(), 0.1, "Stoerer: sein eigenes w");
+        assert_eq!(aggr_cfg(base, 1, 0.0, 1.0).effective_blend_w(), 0.0);
+        let net = champion_net_for_aggr();
+        let f = vec![0.0f32; 4];
+        assert!(try_batched_pair_ex(&net, &f, &f, 0.1).is_none(), "w der Seite != 0 -> synchroner Pfad");
+    }
+
+    /// FS4: die Startsetzung per Suche streift den Seiten-Blend ab -- mit
+    /// gesetzten Feldern dasselbe Ergebnis wie ohne.
+    #[test]
+    fn start_placement_search_ignores_aggr_blend() {
+        let net = champion_net_for_aggr();
+        let mut rng = StdRng::seed_from_u64(5);
+        let ids = crate::scoring::sample_valid_scoring_ids(3, &mut rng);
+        let game = Game::start(["A".into(), "B".into()], 0, ids, &mut rng);
+        let pi = game.state.current_player;
+        let base = search_config_off();
+        let on = aggr_cfg(base, pi, 0.5, 2.0);
+        let mut r1 = StdRng::seed_from_u64(1);
+        let x = search_start_placement(&net, &game.state, pi, 32, false, &mut r1, &base).expect("Startsuche");
+        let mut r2 = StdRng::seed_from_u64(1);
+        let y = search_start_placement(&net, &game.state, pi, 32, false, &mut r2, &on).expect("Startsuche");
+        assert_eq!(format!("{x:?}"), format!("{y:?}"));
+    }
 }

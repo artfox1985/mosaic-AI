@@ -153,6 +153,10 @@ fn main() {
         tau_argmax_from_move: 0,
         deviate_prob: 0.0,
         deviate_candidates: 6,
+        // Klasse S: Bestand (kein Seiten-Blend).
+        aggr_w: None,
+        aggr_lambda: None,
+        aggr_player: None,
     };
     let actions = drafting_actions(&state1);
     println!(

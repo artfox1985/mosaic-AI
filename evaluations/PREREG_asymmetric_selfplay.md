@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: Klasse W festgelegt (par.2), alle Bau-Fragen F1-F9/FS1-FS4 entschieden 2026-10-03 (par.3a; F6 Platzsuche deterministisch). Nichts gebaut. Ziel-Zusammensetzung par.4; Sonden S1-S4 nach dem Bau (par.5). Schwarm der v35-Erzeugung liegt schon (PREREG_v35_window.md par.9). -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, spaeter ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: Bau-Fragen entschieden (par.3a). Klasse W gebaut 2026-10-03 (Lib-Tests gruen, noch kein Wheel), Klasse S im Bau; Leseregeln der Sonden S1-S4 registriert (par.5). Ziel-Zusammensetzung par.4. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -179,7 +179,7 @@ nach den Sonden S1-S4 (par.5):
 | --- | --- | --- | --- | --- |
 | `policy` | G gegen G | 2.000 | beide Seiten | alle |
 | `policy-dice` | G gegen W | 2.000 | G voll; W ausser den erzwungenen Plattenzuegen (kein Record) | alle |
-| `policy-dice-aggr` | W gegen S | 2.000 | W wie oben; S nur bei `own_q_gap <= eps` | alle |
+| ~~`policy-dice-aggr`~~ | ~~W gegen S~~ | **0, GESTRICHEN 2026-10-03** (par.4a) | -- | -- |
 | `policy-aggr` | G gegen S | 2.000 | G voll; S nur bei `own_q_gap <= eps` | alle |
 | `value-deviate` (bis v34 `value-wegc`) | G gegen G, Weg C | 4.000 | nein | alle |
 | `value-excursion` | G gegen G, Ausflug | 4.000 | nein | alle |
@@ -188,7 +188,7 @@ nach den Sonden S1-S4 (par.5):
 Annahmen, als VORSCHLAG markiert: die behinderte Seite (W bzw. S) sitzt je Partie 50:50 auf
 Spieler 0 oder 1; in `policy-dice-aggr` traegt jede Seite ihre eigene Regel (Wuerfel bzw.
 lambda_aggr), beide Record-Regeln gelten nebeneinander; Seeds und Klassennamen beim Bau.
-**Kosten (HERLEITUNG, ungemessen):** 16.000 statt 12.000 Partien; mit dem v34-Satz (rund 8,8 h fuer
+**Kosten (HERLEITUNG, ungemessen; ueberholt durch par.4a: 14.000 Partien, davon der Schwarm schon erzeugt):** 16.000 statt 12.000 Partien; mit dem v34-Satz (rund 8,8 h fuer
 12.000, `PREREG_v34_window.md` par.8a) rund 11,7 h, dazu die Platzsuchen @600 der Wuerfel-Seite in
 4.000 Partien (rund +20 % je solcher Partie, par.2) und der zweite Akkumulator des Stoerers (kein
 zusaetzlicher Netzaufruf): grob 12 h. S1 liefert die gemessene Zahl. **Kosten vom Nutzer
@@ -199,19 +199,60 @@ Seite; das Policy-Material der normalen Suche stammt aus `policy` (beide Seiten)
 von `policy-dice` / `policy-aggr`. Die Wertziele dieser 6.000 Partien bleiben alle (Nutzer, par.2);
 ihre Verzerrung misst S3, getrennt je Paarung.
 
+### par.4a NUTZER-ENTSCHEID 2026-10-03: W gegen S gestrichen, G-G-Sockel bleibt bei 2.000
+
+Auf die Einschaetzung des Koordinators (W gegen S: keine Seite spielt normal, Policy- und Wertziele
+beider Seiten verzerrt; Vorschlag streichen; zweiter Vorschlag G-G-Sockel auf 4.000 fuer einen
+Kontrollarm): *"W gegen s koennen wir streichen. Den g-g sockel will ich nicht wirklich vergroessern.
+Der ist als Basis ok, aber wirklich viel neues sieht das Netz hier nicht."* **Damit:** Sockel 3 x 2.000
+(G-G, G-W, G-S), Schwarm 2 x 4.000 (schon erzeugt, `PREREG_v35_window.md` par.9), zusammen 14.000
+Partien; behinderte Seite in 4.000 der 14.000. **Folge, benannt:** ohne Kontrollarm (Fenster ohne
+Asym-Klassen bei gleichem Schwarm) ist ein v35-Ergebnis dem Paket zuzuschreiben (Generator, R5 @400,
+Asym-Klassen), nicht den Asym-Klassen allein. Die Seitenwahl fuer W gegen S bleibt im Code (schadet
+nicht), wird aber in keinem Rezept benutzt.
+
 Stuetze fuer den Wegfall von G-1/G-2 (am Bestand): die Fensterarme b02-b04 waren ununterscheidbar,
 Menge und Alter des Value-Materials kein Hebel (`PREREG_v33_window.md` par.6d, STATUS RICHTUNG).
 
-## par.5 SONDEN vor der Festlegung (VORSCHLAG, Leseregeln vor dem Lauf hier eintragen)
+## par.5 SONDEN vor der Festlegung (Leseregeln REGISTRIERT 2026-10-03 vor dem Bau-Ende, Koordinator)
 
-* **S1 Kosten:** je 100 Partien Sockel gegen W, gleiche Seeds, Muster `tools/v34_cost_gate.sh`.
-* **S2 Andere Stellungen?** Policy-KL `KL(Ziel || Prior)` an den Zuegen nach erzwungenen Platten
-  gegen dieselbe Groesse im Sockel (Werkzeug `tools/probes/targeted_branching_pretest.py`),
-  dazu die sechs Standard-Kennzahlen je Seite.
-* **S3 Wert-Verzerrung:** Siegquote und Punkte der Wuerfel-Seite; Brier des Generator-Kopfs auf
-  W-Records gegen Sockel-Records, getrennt nach Seite.
-* **S4 Stoerer-Pilot** (nur nach dem Bau par.3): lambda-Reihe, Punkte der normalen Seite und des
-  Stoerers je lambda.
+Nutzer 2026-10-03: *"die sonden werden uns dann zeigen ob es in die richtige richtung geht"*. Gemeinsamer
+Aufbau: Generator `v34-b01`, Rezept der v35-Erzeugung (100 Sims, R5 per Netz @400, Spiegelknopf, E1,
+Weg C), je Klasse 100 Partien (S4: je lambda-Stufe), exklusiv, Seeds 20261720 ff. (20261700 ist in
+`PREREG_minimal_strength_core.md` als Anker-Seed-Basis belegt). Sechs Standard-Kennzahlen je Seite in
+jedem Bericht. Die Werte der Leseregeln sind Setzungen des Koordinators; der Nutzer kann sie vor dem
+Lauf aendern.
+
+* **S1 Kosten:** `policy` gegen `policy-dice`, gleiche Seeds (20261720), Wanduhr je Partie aus dem
+  Manifest, dazu je Partie die Zahl der 600er-Platzsuchen und der Rueckgabesuchen. **Leseregel:**
+  Mehrkosten je W-Partie <= +25 % -> Plan haelt; darueber -> Nutzer-Entscheid ueber die Sims der
+  Platzsuche (HERLEITUNG-Erwartung +15 bis +20 %, Bauplan Abschnitt 10).
+* **S2 Andere Stellungen?** Policy-KL `KL(Ziel || Prior)` (`tools/probes/targeted_branching_pretest.py`,
+  Prior aus dem Generator) an allen Drafting-Entscheiden beider Seiten NACH der ersten erzwungenen
+  Platte gegen dieselben Runden im Sockel, getrennt nach Seite (W / G) und Runde; dazu aus der
+  `[dome_dice]`-Zeile Quellenanteile, Tiefenverteilung je Runde, Anteil Ziehungen aus eigenem bzw.
+  fremdem Block. **Leseregel:** Median-KL der W-Partien ueber dem des Sockels mit Block-Bootstrap-CI
+  (Block Datei) ueber 0 -> "andere Stellungen" fuer diese Seite; ueberdeckt das CI 0 -> nicht
+  nachweisbar anders, berichtet, die Zusammensetzung entscheidet der Nutzer.
+* **S3 Wert-Verzerrung:** Siegquote, Punkte, Marge der W-Seite (gegen 50 %); Brier des Generator-Kopfs
+  auf W-Partie-Records gegen Sockel-Records, getrennt nach Seite und nach `forced_domes_before`;
+  gezahlte Wuerfel-Punkte je Partie (aus `dome_dice_cost`, bei Stand > 0 und bei 0). **ERWEITERT
+  2026-10-03 (Nutzer: *"S3 kannst erweitern"*): Kalibrierungsversatz je Seite** = mittlere Vorhersage
+  des Generator-Kopfs P(Sieg der Seite am Zug) minus tatsaechliche Siegrate dieser Seite, getrennt fuer
+  W- und G-Seite und nach `forced_domes_before`. Grund (HERLEITUNG): der Zustand verraet nicht, dass eine
+  Seite kuenftig gewuerfelte Platten legt; ein Wertziel aus diesem Regime ist dann systematisch
+  verschoben (W zu pessimistisch, G zu optimistisch), was der Brier allein nicht von "schwierigeren
+  Stellungen" trennt. Dasselbe fuer `policy-aggr` (S- und G-Seite). **Leseregeln:** (a) Brier der
+  W-Partien mehr als 0,01 ueber dem Sockel ODER (b) Versatz einer Seite mit Block-Bootstrap-CI ohne 0
+  und |Versatz| > 0,03 -> Wertziele dieser Seite als verzerrt markiert, Maske (nach Seite bzw.
+  `forced_domes_before`) als Vorlage an den Nutzer; sonst bleiben alle Wertziele (Nutzer-Entscheid par.2).
+* **S4 Stoerer-Pilot:** `policy-aggr` mit w = 0,1 fest (FS2), lambda in {0; 0,5; 1; 2}, je Stufe 100
+  Partien, Seeds 20261724-27. Berichtet je lambda: Punkte und Siegquote beider Seiten, Verteilung von
+  `own_q_gap`. **Leseregel:** gewaehlt wird das GROESSTE lambda, bei dem die Siegquote des Stoerers
+  nicht mehr als 5 Prozentpunkte unter der bei lambda = 0 liegt UND die Punkte von G sinken; eps =
+  das 50-%-Quantil von `own_q_gap` der Stoerer-Zuege bei diesem lambda (die Haelfte der Stoerer-Zuege
+  liefert ein Policy-Ziel). Senkt keine Stufe die Punkte von G, ist der Stoerer in dieser Form
+  wirkungslos: berichtet, Nutzer-Entscheid.
 
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 

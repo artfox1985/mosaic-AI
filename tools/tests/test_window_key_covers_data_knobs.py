@@ -51,6 +51,8 @@ DATEN_KNOEPFE = {
     "moon_target_source": "Ziel des moon-Kopfs: No-Op-Label gegen Suchverteilung (v29-b04)",
     "_final_margin_key": "Zusatzfeld final_margin (Endmarge) fuer den E2-Arm (v34)",
     "_supply_demand_key": "Angebots-Bedarfs-Block (48 Flachwerte) fuer den E4-Arm (v34)",
+    "_aggr_own_q_eps_key": "S-Maske: policy_weights 0 bei own_q_gap > eps (asymmetrisches Self-Play)",
+    "_mask_dice_trigger_key": "W-Maske: policy_weights 0 auf dice_trigger-Records (asymmetrisch)",
 }
 
 # Knoepfe, die in BEIDEN Schluesseln stehen muessen: der Wert steckt schon in den
@@ -62,6 +64,8 @@ BOTH_KEYS = {
     "moon_target_source": "moon_order_targets stecken je Datei im Block (v29-b04)",
     "_final_margin_key": "final_margin steckt je Datei im Block (E2-Arm, v34)",
     "_supply_demand_key": "der Flachvektor steckt je Datei im Block (E4-Arm, v34)",
+    "_aggr_own_q_eps_key": "policy_weights stecken je Datei im Block (Klasse S)",
+    "_mask_dice_trigger_key": "policy_weights stecken je Datei im Block (Klasse W)",
 }
 
 # Knoepfe, die BEWUSST nicht im Fenster-Schluessel stehen, mit Grund.

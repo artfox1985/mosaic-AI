@@ -13,7 +13,7 @@ Schwarm-Klassen; die Sockel-Klassen haengen am asymmetrischen Bau und sind NICHT
 | Klasse | Paarung | Partien | Stand |
 | --- | --- | --- | --- |
 | `policy` | G gegen G | 2.000 | nach dem Bau, Seed 20260950 reserviert |
-| `policy-dice`, `policy-dice-aggr`, `policy-aggr` | G/W/S | je 2.000 | nach dem Bau und den Sonden S1-S4 |
+| `policy-dice`, `policy-aggr` | G gegen W, G gegen S | je 2.000 | nach dem Bau und den Sonden S1-S4 (W gegen S gestrichen, `PREREG_asymmetric_selfplay.md` par.4a) |
 | `value-deviate` (bis v34 `value-wegc`) | G gegen G, Weg C | 4.000 | **hier, Seed 20260951** |
 | `value-excursion` | G gegen G, Ausflug | 4.000 | **hier, Seed 20260952** |
 | G-1 / G-2 | -- | 0 | faellt weg (Nutzer 2026-10-01) |

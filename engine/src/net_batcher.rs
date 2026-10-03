@@ -71,6 +71,9 @@
 //! Seit Review #11 (2026-10-01) reicht `try_batched_pair_ex` die
 //! `opp_points`-Spalte aber durch (vorher still leer), damit K1-Marge und
 //! Denial-Stichentscheid unter Verschraenkung denselben Kopf sehen wie ohne.
+//! Seit 2026-10-03 (Klasse S des asymmetrischen Self-Plays) prueft der
+//! Waechter das `w` der SUCHENDEN Seite (`SearchConfig::effective_blend_w`),
+//! im Bestand weiterhin genau `points_utility_w()`.
 //!
 //! ## Registry-Lebensdauer (Review #15, 2026-10-01)
 //!

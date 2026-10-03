@@ -1291,6 +1291,9 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
         pending_moon_order: None,
         pending_return_order: None,
         extended_action_nodes: [false; crate::state::NUM_PLAYERS],
+        // Klasse W: wie `extended_action_nodes` keine Spielregel, sondern
+        // Erzeugungs-Konfiguration; `state_to_json` schreibt den Pin nie.
+        dome_dice_pin: None,
         scoring_tile_ids,
         round_number,
         current_player,
@@ -1443,6 +1446,12 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
         },
     );
     obj.insert("extended_action_nodes_exact".to_string(), json!(state.extended_action_nodes));
+    // Klasse W (Bauplan 4.1): der Pin NUR, wenn er gesetzt ist -- ohne Pin
+    // bleibt das exakte JSON byte-gleich zum Bestand (kein neuer Schluessel).
+    // Gelesen tolerant in `json_to_state_exact` (fehlend = `None`).
+    if let Some(pin) = &state.dome_dice_pin {
+        obj.insert("dome_dice_pin_exact".to_string(), dome_dice_pin_to_json(pin));
+    }
     obj.insert("log_exact".to_string(), json!(state.log));
     // `first_player_next_round_exact`: NICHT etwa ein fehlendes Feld --
     // `state_to_json` schreibt `state.first_player_next_round` bereits
@@ -1632,6 +1641,52 @@ fn pending_moon_order_from_json(
 }
 
 /// R3: `pending_return_order_exact` -> [`crate::moves::PendingReturnOrder`].
+/// Klasse W: exakte Fassung des Pins (`dome_dice_pin_exact`).
+fn dome_dice_pin_to_json(pin: &crate::moves::DomeDicePin) -> Value {
+    let source = match pin.source {
+        crate::moves::DomeDiceSource::Display { tile_id } => json!({ "display": tile_id }),
+        crate::moves::DomeDiceSource::Stack { chosen_id } => json!({ "stack": chosen_id }),
+    };
+    json!({
+        "player": pin.player,
+        "source": source,
+        "rotation": pin.rotation,
+        "return_first": pin.return_first,
+        "return_order": pin.return_order,
+    })
+}
+
+/// Gegenstueck zu [`dome_dice_pin_to_json`]; fehlend oder `null` -> `None`.
+fn dome_dice_pin_from_json(v: Option<&Value>) -> Result<Option<crate::moves::DomeDicePin>, String> {
+    let Some(o) = v.filter(|x| !x.is_null()) else { return Ok(None) };
+    let err = |key: &str| format!("json_to_state_exact: dome_dice_pin_exact.{key} fehlt oder ungueltig");
+    let player = o.get("player").and_then(|x| x.as_u64()).ok_or_else(|| err("player"))? as usize;
+    let rotation = o.get("rotation").and_then(|x| x.as_u64()).ok_or_else(|| err("rotation"))? as u32;
+    let src = o.get("source").ok_or_else(|| err("source"))?;
+    let source = if let Some(id) = src.get("display").and_then(|x| x.as_u64()) {
+        crate::moves::DomeDiceSource::Display { tile_id: id as usize }
+    } else if let Some(id) = src.get("stack").and_then(|x| x.as_u64()) {
+        crate::moves::DomeDiceSource::Stack { chosen_id: id as usize }
+    } else {
+        return Err(err("source"));
+    };
+    let return_first = match o.get("return_first") {
+        None | Some(Value::Null) => None,
+        Some(x) => Some(x.as_u64().ok_or_else(|| err("return_first"))? as usize),
+    };
+    let return_order = match o.get("return_order") {
+        None | Some(Value::Null) => None,
+        Some(x) => Some(
+            x.as_array()
+                .ok_or_else(|| err("return_order"))?
+                .iter()
+                .map(|e| e.as_u64().map(|n| n as usize).ok_or_else(|| err("return_order")))
+                .collect::<Result<Vec<usize>, String>>()?,
+        ),
+    };
+    Ok(Some(crate::moves::DomeDicePin { player, source, rotation, return_first, return_order }))
+}
+
 fn pending_return_order_from_json(
     v: Option<&Value>,
 ) -> Result<Option<crate::moves::PendingReturnOrder>, String> {
@@ -1764,6 +1819,8 @@ pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
             *slot = arr.get(i).and_then(|x| x.as_bool()).unwrap_or(false);
         }
     }
+    // Klasse W: tolerant -- fehlend oder `null` heisst kein Pin (Bestand).
+    state.dome_dice_pin = dome_dice_pin_from_json(v.get("dome_dice_pin_exact"))?;
 
     // par.8e-Folge: sechstes/siebtes Pflichtfeld (s.o. `state_to_json_exact`-
     // Doku) -- `log` woertlich statt UI-gefenstert, `first_player_next_round`
