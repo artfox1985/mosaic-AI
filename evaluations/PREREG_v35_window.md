@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v35-Fenster erzeugt und zugeschnitten (Schwarm sofort, Sockel nach dem asymmetrischen Bau), und traegt ein Arm? | Beleg: Generator v34-b01, Runde 5 per Netz @400, Spiegelknopf an (par.5). Schwarm 2 x 4.000 erzeugt und abgenommen (par.9). Sockel 2026-10-04 erzeugt und abgenommen (par.10a/10b): policy 1.000 @400 + policy-s100 1.000 @100 + W-v2 R1 2.000, alle Modus 2, alle Abnahmen GRUEN. Offen: Traeger-Manifest, Fenster, Training v35-b01, Tore. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v35-Fenster erzeugt und zugeschnitten, und traegt v35-b01 gegen den Generator v34-b01? | Beleg: Erzeugung komplett und abgenommen (par.9, par.10a/10b): Schwarm 2 x 4.000 + Sockel policy @400 1.000, policy-s100 1.000, W-v2 R1 2.000, alle GRUEN. Fenster, Training v35-b01 und Tor 1 registriert (par.11), Lauf steht aus. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -162,3 +162,74 @@ der @100-Teil (hier 1.000 gegen 1.000 Partien, Richtung und Groesse wie gemessen
 **Naechste Schritte:** Traeger-Manifest, Fenster (Schwarm 8.000 + Sockel 4.000), Cache, Training `v35-b01`,
 Tor 1 gegen `v34-b01`, Promotion falls die Kante faellt. Exploiter-Klasse offen (par.7c der Asym-Prereg).
 
+## par.11 FENSTER, TRAINING v35-b01 UND TORE (REGISTRIERT 2026-10-04 abends VOR dem Lauf; Kette `tools/night_v35_chain.sh`)
+
+Nutzer-Rahmen: v35 ist die LETZTE Generation (STATUS, Abschnitt RICHTUNG). Exploiter bleibt aussen vor
+(Nutzer 15:20); der Nutzer fragt 2026-10-04 abends selbst, ob sein Nutzen den Aufwand rechtfertigt (Vorlage des
+Koordinators: streichen; Entscheid offen). Das Fenster wird OHNE Exploiter-Klasse gebaut.
+
+**Fenster (1.200 Dateien, 12.000 Partien, alles Generator `v34-b01`, alles in `data/`):** die fuenf Klassen aus
+par.9/par.10a: `value-deviate` 400, `value-excursion` 400, `policy` 100, `policy-s100` 100, `policy-dice-v2-r1`
+200. KEINE Alt-Generationen (G-1/G-2 fallen weg, `PREREG_asymmetric_selfplay.md` par.4a), KEINE Sonden- oder
+Probe-Daten (die liegen in `data/probe_asym`, `data/probe_asym_rep`, `data/exploiter*`,
+`data/probe_v35sockel_smoke`, nicht in `data/` direkt; geprueft 2026-10-04: `data/*.pkl` traegt nur
+`selfplay_v31-b01-*` bis `selfplay_v34-b01-*`). `MOSAIC_DATA_EXCLUDE` wird trotzdem um `selfplay_probe-`,
+`selfplay_x35`, `selfplay_x35e2` erweitert (Fenster-Pinning, zweite Sicherung neben der Dateiliste).
+
+**Traeger-Manifest `data/policy_carrier_manifest_v35.json`, 400 Traeger = die drei Sockel-Klassen vollstaendig**
+(`policy` 100 + `policy-s100` 100 + `policy-dice-v2-r1` 200; W-Klasse beide Seiten, par.5d der Asym-Prereg:
+"Policy-Ziele bleiben"). Die 800 Schwarm-Dateien (Weg C, Ausflug) sind wie in v34 KEINE Policy-Traeger
+(v34-Manifest: `v33-b01-value-*` 0 Traeger). **Abweichung von der Uebergabe, benannt:** die Uebergabe sagte "ohne
+Traeger-Manifest"; ohne Manifest macht `corpus_dataset._is_policy_carrier` (`corpus_dataset.py:126-158`,
+`carrier_set is None`) aber JEDE Datei zum Traeger, also auch den Schwarm. Gemeint war "ohne Alt-Generationen";
+so wird es gebaut. Erzeugung mit `tools/generate_carrier_manifest.py` (`--pattern` policy, `--n-files 100`,
+`--include-glob` fuer `policy-*`), Kette bricht ab, wenn das Manifest nicht 400 = 100 + 100 + 200 traegt.
+
+**Val-Menge 120 Dateien (10 %, val_frac 120/1.200), Val-Pool `^selfplay_v34-b01-`** (alle fuenf Klassen).
+v34 hatte 147/1.380 wegen `PREREG_targeted_branching.md` par.7a; die Prereg ist geschlossen, der Grund entfaellt.
+
+**Wertmaske der Wuerfelphase `MOSAIC_MASK_DICE_PHASE_VALUE=1`** (par.5d der Asym-Prereg: Wertziele BEIDER Seiten
+in Runde 1 der W-Partien maskiert, Zusatzfeld `value_weights`; Knopf in `file_cache_key.py:166-178` und `:336`
+(Block-Schluessel) sowie `corpus_dataset.py:781-784` (Fenster-Schluessel), Verbrauch `train.py:461-464`, `:864`).
+Stichprobe 2026-10-04: erste W-Datei 368 von 1.978 Records mit `dice_phase` true (n = 1 Datei). Die Maske
+wirkt nur auf die W-Klasse; Bestandsrecords ohne Feld bekommen Gewicht 1. Abnahme: der Schluessel des Monolithen
+traegt den Marker `maskdicephasevalue_v1` bzw. unterscheidet sich vom Schluessel ohne Knopf; das Trainings-Manifest
+traegt die Variable in `mosaic_env`.
+
+**Training `v35-b01`:** warm von `v34-b01_brierbest`, Rezept byte-gleich `models/manifest_train_v34-b01_20261001_183258.json`
+`cli_args` (12 Epochen, lr 5e-5 cosine, `--lr-t-max 12`, WDL, nortv, lambda 0,7, ownership-head-2d mit Gewicht 0,
+opp-points-head, destretch 0,0051/1,9269, `--select-by-brier`, `--fast-loader`), **Seed 20260965** (Vierer-Schritt
+nach `docs/generation_loop.md`; v34 20260961). Env wie v34 (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`,
+`MOSAIC_FEATURES_FROM_RUST=1`) plus Maske und Manifest v35. Erwartete Manifest-Abweichungen gegen v34-b01: genau
+`name, load, file_list, cache_file, seed, val_pool, val_frac` sowie Schluessel, die train.py seit dem v34-Manifest
+neu mit Default fuehrt (z. B. `margin_thresholds`, `margin_threshold_weight`, Asym-Prereg par.7 Lauf-Chronik);
+jede andere Abweichung STOPPT die Kette vor Tor 1. Gegatet wird das Brier-beste Netz, aus dem Manifest bestimmt
+(`tools/brier_best_checkpoint.py`, Code-Review 2 #1), nicht aus dem Dateinamen.
+
+**Tor 1 = Champion-Kante** (Generator `v34-b01` IST der amtierende Champion, `docs/generation_loop.md` Schritt 5
+und 7 fallen zusammen): `tools/paired_gating.py`, Seeds 20261600/20261601 a 200 Paare, 400 Sims beide, Blockgroesse
+5, SPRT 0,001, `--log-games`, Spec `models/v34-b01_brierbest.spec.json` BEIDSEITS (byte-gleich
+`models/v33_gating_r5net.spec.json`, `cmp` 2026-10-04: Startkuppel-Suche an, Runde 5 per Netz). Kriterium wie
+`PREREG_v34_window.md` par.2: z >= +1,96 oder gepoolt >= 52,5 % ohne Gegenbefund, Block-z ueber
+`tools/gating_block_z.py`; Stufenregel: loest GENAU EINER der beiden Seeds Block-z >= +1,96 aus, laeuft Seed
+20261602, Verdikt auf dem gepoolten Block-z. Zuordnung vorab: ein Gewinn gehoert dem v35-FENSTER (Mischsockel
+Modus 2, W-v2, Maske, R5 @400 in der Erzeugung) bei unveraendertem Rezept und gleicher Spec beider Seiten.
+
+**Tor 2a (Self-Play-Flaeche, ex post, schon gemessen par.10b):** `sp_voll` der Sockel-Klassen 0,826 (`policy`
+@400 M2) / 0,907 (`policy-s100` @100 M2) je Seite gegen 0,921 des v34-Sockels (par.9a der v34-Prereg); NICHT
+gleich bedingt (Stichentscheid Modus 2, Runde 5 @400 statt @100, par.9a Nachtrag dort), und der Nutzer hat den
+Mischsockel in Kenntnis der -0,07 Spalten @400 entschieden (par.10). Kein neues Tor-2a-Verdikt; die Zahlen stehen.
+**Tor 2b (Arena-Flaeche):** volle Spalten je Seite aus den Tor-1-Logs (`tools/probes/arena_column_probe.py`),
+Punktschaetzer v35-b01 >= v34-b01 in derselben Arena (Nicht-Fallen, `docs/generation_loop.md`).
+
+**Kosten (HERLEITUNG aus `docs/measured_runtimes.md`):** Bloecke 1.200 Dateien rund 20 min (0,96 s je Datei, 6
+Worker), Merge wenige Minuten, Training rund 1 h (v34-b01: 12 Epochen auf 1.233 Dateien), Tor 1 rund 1,3-1,5 h
+je Seed (200 Paare @400, 10 Threads); zusammen rund 4,5 h, darum im Terminal-Tab (2-h-Grenze der
+Hintergrundaufgaben). Laufzeiten stehen in den Artefakten (`laufzeit`-Block) und werden hier nachgetragen.
+
+**Nach dem Lauf, in dieser Reihenfolge:** Abnahme Fenster (1.200 Dateien, 0 Sonden-Namen, Schluessel traegt die
+Maske), Manifest-Diff, Netz-Gesundheit gegen den Warmstart (wie par.10 der v34-Prereg: NaN/Inf, BN-Gamma,
+relative Gewichtsaenderung), Tor-1-Verdikt mit Block-z, Tor 2b, sechs Standard-Kennzahlen je Seite, Elo-Register.
+Promotion NUR nach Nutzer-Entscheid und `/mosaic-champion-promotion`; Netz-Paritaets-Fixture (Checkliste 5d) und
+Diagnostiken (Platt, R4/R4b, sigma/Prior) gehoeren zur Promotion, nicht zur Trainings-Abnahme (die Fixture folgt
+`models/champion.txt`).
