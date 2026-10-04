@@ -33,6 +33,12 @@ Wert-Verlust sind in train.py dagegen MITTEL DER BATCH-MITTEL (train.py:931, 101
 1078-1079) und haengen damit an Batchgroesse und Reihenfolge; deshalb stehen beide
 Lesarten im Artefakt: `policy_val_loss` (train.py-gleich) und `policy_val_loss_pooled`.
 
+NETZ GEGEN WURZEL-Q (par.11d): im selben Datei-Durchgang je Rundenmenge (R1..R5, R1-4,
+all_rounds) der Brier des rohen Netzes und der Brier des Suchwerts `root_q` auf
+IDENTISCHEN Zeilen (root_q_mask>0, wdl_outcome>=0, value_weights>0), dazu der Brier der
+Konstanten (mittlerer Ausgang) und die gepaarte Differenz mit Datei-Bootstrap
+(Artefakt: `root_q_compare` je Checkpoint; Definitionen im Artefakt).
+
 DATEI-ZUORDNUNG JE ZEILE: der Val-Monolith traegt keine Dateigrenzen
 (`stamp_cache_key_attrs`, corpus_dataset.py:812-836, nur Schluessel, Dateizahl,
 erste/letzte Datei). Er ist aber die Verkettung der sortierten Dateien
@@ -111,6 +117,17 @@ BUILTIN_RECIPE_V35 = {
 PER_FILE_FIELDS = ["n_samples", "n_policy_samples", "brier_sqerr_sum", "brier_n",
                    "policy_ce_w_sum", "policy_w_sum", "value_loss_w_sum", "value_w_sum",
                    "brier_vw_sqerr_sum", "brier_vw_n"]
+
+# Vergleich rohes Netz gegen Suchwert der Wurzel (PREREG_v35_window.md par.11d):
+# Rundenmengen ueber `ds.rounds` (Runde des Zustands, corpus_dataset.py:1903).
+# Schluessel "all_rounds" statt "all", damit er nicht mit der Liste "all" verwechselt wird.
+ROUND_SETS = [("R1", (1,)), ("R2", (2,)), ("R3", (3,)), ("R4", (4,)), ("R5", (5,)),
+              ("R1-4", (1, 2, 3, 4)), ("all_rounds", None)]
+ROOT_Q_SUMS = ["n", "sq_net", "sq_rootq", "outcome_sum"]
+# Angehaengt an PER_FILE_FIELDS: je Rundenmenge die vier Summen, flach
+# (rq_<menge>_<summe>); die ersten zehn Spalten bleiben unveraendert.
+ROOT_Q_FIELDS = [f"rq_{rs}_{s}" for rs, _ in ROUND_SETS for s in ROOT_Q_SUMS]
+PER_FILE_FIELDS = PER_FILE_FIELDS + ROOT_Q_FIELDS
 
 # Vergleichsfelder der Selbstpruefung: Manifest-Feld -> Schluessel von _validate_one_epoch.
 SELFCHECK_FIELDS = {"value_val_brier": "epoch_val_brier", "policy_val_loss": "epoch_val_ploss",
@@ -336,10 +353,14 @@ def per_file_pass(train_mod, model, ds, ranges, encoder, device, recipe, batch_s
     t0 = time.time()
     with torch.no_grad():
         for j, (name, start, stop) in enumerate(ranges):
-            acc = [0, 0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0]
+            acc = [0, 0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0] + [0.0] * len(ROOT_Q_FIELDS)
             for b0 in range(start, stop, batch_size):
                 idx = torch.arange(b0, min(b0 + batch_size, stop), dtype=torch.long)
                 batch = ds.get_batch(idx)
+                # root_q steht nicht im Batch-Tupel; direkt aus den Datensatz-Attributen
+                # (corpus_dataset.py:1203-1204 bzw. 2099-2100, je Zeile ein Wert).
+                rq = ds.root_q[idx].to(device).float().view(-1)
+                rq_present = (ds.root_q_mask[idx].to(device).float().view(-1) > 0).float()
                 vw = None
                 if has_vw:
                     vw, batch = batch[-1], batch[:-1]
@@ -415,6 +436,25 @@ def per_file_pass(train_mod, model, ds, ranges, encoder, device, recipe, batch_s
                 acc[7] += float(rw.double().sum().item())
                 acc[8] += float(bsq_vw.double().sum().item())
                 acc[9] += int(bmask_vw.sum().item())
+                # Netz gegen Wurzel-Q (par.11d): Grundmenge = Brier-vw-Maske UND
+                # root_q_mask > 0; beide Vorhersagen auf DENSELBEN Zeilen.
+                outcome = wdl_outcome.clamp(min=0.0)
+                rq_mask = bmask_vw * rq_present
+                sq_net = (p_win - outcome) ** 2
+                sq_rq = ((rq + 1.0) * 0.5 - outcome) ** 2
+                for k, (_rs, rset) in enumerate(ROUND_SETS):
+                    if rset is None:
+                        m_s = rq_mask
+                    else:
+                        in_set = torch.zeros_like(rq_mask, dtype=torch.bool)
+                        for r in rset:
+                            in_set |= rounds == r
+                        m_s = rq_mask * in_set.float()
+                    base = 10 + k * len(ROOT_Q_SUMS)
+                    acc[base] += float(m_s.double().sum().item())
+                    acc[base + 1] += float((sq_net * m_s).double().sum().item())
+                    acc[base + 2] += float((sq_rq * m_s).double().sum().item())
+                    acc[base + 3] += float((outcome * m_s).double().sum().item())
             out[name] = acc
             if (j + 1) % 10 == 0 or j + 1 == len(ranges):
                 print(f"   [{label}] Datei {j + 1}/{len(ranges)}, {stop:,} Zeilen, "
@@ -459,6 +499,34 @@ def ci95(draws):
     if d.size == 0:
         return None
     return [float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))]
+
+
+def root_q_compare(per_file, names, idx) -> dict:
+    """Netz gegen Wurzel-Q je Rundenmenge auf denselben Zeilen (par.11d).
+
+    brier_const: Vorhersage = mittlerer Ausgang m dieser Zeilen, Brier = m*(1-m)
+    (wdl_outcome ist auf der Grundmenge hart 0/1, corpus_dataset.py:1661).
+    Differenz-CI: dieselben Datei-Ziehungen idx fuer beide Brier-Werte, also gepaart.
+    """
+    out = {}
+    for rs, _ in ROUND_SETS:
+        f_n, f_net, f_rq, f_o = (f"rq_{rs}_{s}" for s in ROOT_Q_SUMS)
+        i_n, i_net, i_rq, i_o = (PER_FILE_FIELDS.index(f) for f in (f_n, f_net, f_rq, f_o))
+        n = sum(per_file[x][i_n] for x in names)
+        s_net = sum(per_file[x][i_net] for x in names)
+        s_rq = sum(per_file[x][i_rq] for x in names)
+        s_o = sum(per_file[x][i_o] for x in names)
+        if n > 0:
+            b_net, b_rq, mean_o = s_net / n, s_rq / n, s_o / n
+            b_const, diff = mean_o * (1.0 - mean_o), s_net / n - s_rq / n
+        else:
+            b_net = b_rq = mean_o = b_const = diff = None
+        d_draws = (bootstrap_draws(per_file, names, idx, f_net, f_n)
+                   - bootstrap_draws(per_file, names, idx, f_rq, f_n))
+        out[rs] = {"n": int(round(n)), "brier_net": b_net, "brier_root_q": b_rq,
+                   "brier_const": b_const, "mean_outcome": mean_o,
+                   "diff_net_minus_root_q": diff, "diff_ci95": ci95(d_draws)}
+    return out
 
 
 def model_arch(model, encoder, ckpt_state) -> dict:
@@ -741,6 +809,9 @@ def main() -> int:
                       f"(Differenz {m['brier_consistency_abs_diff']:.2e}) -- Datei-Durchgang "
                       f"pruefen.", flush=True)
             entry["lists"][lname] = m
+        # 7c. Netz gegen Wurzel-Q (par.11d), je Liste und Rundenmenge
+        entry["root_q_compare"] = {lname: root_q_compare(pf, names, boot_idx[lname])
+                                   for lname, names in lists.items()}
         entry["selfcheck"] = self_check(meta, tp["all"], manifest, args.selfcheck_tol, len(ds),
                                         BATCH_SIZE)
         if entry["selfcheck"]["status"] == "FAIL":
@@ -824,7 +895,29 @@ def main() -> int:
             "*_pooled": "Summe/Summe ueber alle Zeilen der Liste (batchunabhaengig)",
             "ci95": "Perzentil-Bootstrap 2.5/97.5, Block = Datei, Ziehung mit Zuruecklegen",
             "diff": "Referenz minus Checkpoint, gepaart ueber dieselben Datei-Ziehungen",
-            "n_policy_samples": "Zeilen mit pol_w > 0"},
+            "n_policy_samples": "Zeilen mit pol_w > 0",
+            "root_q": "Cache-Feld je Zeile: Suchwert der Wurzel (MCTS value/visits, ISMCTS "
+                      "Summe/Summe ueber die Welten; in Runde 5 der Alpha-Beta-Wert ueber "
+                      "margin_to_win_prob) als Gewinnwahrscheinlichkeit aus Sicht des an der "
+                      "Wurzel Ziehenden (state.current_player, engine/src/net_mcts.rs:7905-7910, "
+                      "8114, 8156, 8185), beim Cache-Bau von [0,1] auf [-1,1] remappt "
+                      "(corpus_dataset.py:1492-1498); root_q_mask = 0, wenn der Record kein "
+                      "root_q traegt (Ein-Aktion-Zug ohne Suche, Datei ohne das Feld). "
+                      "Sichtgleich mit wdl_outcome = 1 wenn winner == step['player'] "
+                      "(corpus_dataset.py:1555, 1661; player = current_player, "
+                      "engine/src/self_play.rs:6180, 6610). apply_value_target_lambda "
+                      "veraendert root_q nicht (corpus_dataset.py:2219-2235)",
+            "root_q_compare": "je Checkpoint -> Liste -> Rundenmenge (R1..R5, R1-4, all_rounds "
+                              "ueber ds.rounds); Grundmenge Zeilen mit root_q_mask>0 UND "
+                              "wdl_outcome>=0 UND value_weights>0 (ohne Feld: ohne die letzte "
+                              "Bedingung); n = Zeilen; brier_net = ((pred_v+1)/2 - outcome)^2 "
+                              "gemittelt; brier_root_q = ((root_q+1)/2 - outcome)^2 gemittelt; "
+                              "brier_const = m*(1-m) mit m = mean_outcome dieser Zeilen "
+                              "(Vorhersage = mittlerer Ausgang, in der Stichprobe geschaetzt); "
+                              "diff_net_minus_root_q = brier_net - brier_root_q (negativ = "
+                              "Netz besser), diff_ci95 gepaart ueber dieselben Datei-Ziehungen "
+                              "wie alle CIs der Liste; Summen je Datei in per_file "
+                              "(Spalten rq_<menge>_<summe>)"},
         "bootstrap": {"draws": args.bootstrap_draws, "seed": args.bootstrap_seed, "unit": "file",
                       "ci": 0.95, "method": "percentile",
                       "rng": "numpy.random.default_rng(seed) je Liste neu"},
@@ -857,6 +950,21 @@ def main() -> int:
             print(f"      {lname:<20} n_files {m['n_files']:>4}  brier {m['value_val_brier']} "
                   f"{m['value_val_brier_ci95']}  ploss {m['policy_val_loss']}  "
                   f"ploss_pooled {m['policy_val_loss_pooled']}")
+
+    def fmt(x, nd=5):
+        return "None" if x is None else f"{x:.{nd}f}"
+    print("\n== Netz gegen Wurzel-Q (Brier; diff = net - root_q [CI95], negativ = Netz besser)",
+          flush=True)
+    for e in results:
+        print(f"   {e['path']}")
+        for lname, by_rs in e["root_q_compare"].items():
+            for rs, r in by_rs.items():
+                ci = r["diff_ci95"]
+                ci_s = "None" if ci is None else f"[{ci[0]:+.5f}, {ci[1]:+.5f}]"
+                print(f"      {lname:<20} {rs:<10} n {r['n']:>9,}  net {fmt(r['brier_net'])}  "
+                      f"root_q {fmt(r['brier_root_q'])}  const {fmt(r['brier_const'])}  "
+                      f"diff {'None' if r['diff_net_minus_root_q'] is None else format(r['diff_net_minus_root_q'], '+.5f')} "
+                      f"{ci_s}")
     print(f"   Artefakt: {rel(out)}  ({wall:.1f} s Wanduhr)", flush=True)
     return 3 if any_fail else 0
 

@@ -26,8 +26,11 @@ nicht entschieden, Seed 2 bei Bedarf nachholbar). Maschine frei. **par.11b ERLED
 minus Epoche 2 +0,0006 [-0,0003; +0,0014], je Klasse kein CI ueber 0, Punktschaetzer auf dem Schwarm am groessten,
 W negativ); nur der Policy-Kopf bewegt sich (+0,068 [+0,055; +0,080], am meisten auf der @400-Klasse). Hypothese
 "Modus-2-Material traegt fehlende Wert-Information" NICHT gestuetzt. **Netz-Gesundheit GESUND** (23:35: keine NaN/Inf, BN-tot 0/1.120; Wertkopf Epoche 12 um 22,9 %
-bewegt bei unveraendertem Brier). **OFFEN: Nutzer-Entscheid, wie es mit v35 weitergeht** (Seed 2 nachholen, b02 mit
-anderem Material, oder Abschluss mit v34-b01 als Tessa). Schritte der Kette:
+bewegt bei unveraendertem Brier). **par.11d (23:39): die 100-Sim-Suche ist dem rohen Netz beim Wert in Runde 1 UNTERLEGEN (diff -0,0068 [-0,0125;
+-0,0009]) und bis Runde 3 nicht ueberlegen; @400 liegt sie ab Runde 2 klar vorn (+0,014 bis +0,025).** Der Kreislauf
+steht, weil die Erzeugungs-Suche @100 dem Netz nichts mehr voraus hat. **OFFEN: Nutzer-Entscheid** ueber Arm v35-b02
+(Fenster komplett @400 mit Modus 2 neu erzeugen, rund 14 h HERLEITUNG), Seed 2 fuer b01, oder Abschluss mit v34-b01.
+Schritte der Kette:
 Traeger-Manifest v35 (400 Sockel-Dateien) -> Fenster `data/window_v35.txt` (1.200 Dateien, fuenf v34-b01-Klassen)
 -> Bloecke und Monolith MIT Wertmaske `MOSAIC_MASK_DICE_PHASE_VALUE=1` -> Training `v35-b01` warm von
 `v34-b01_brierbest`, Seed 20260965 -> Manifest-Diff (STOPPT bei Abweichung) -> Tor 1 = Champion-Kante gegen

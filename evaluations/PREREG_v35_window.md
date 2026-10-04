@@ -402,3 +402,42 @@ Klasse messbar. Belegt ist nur ein Policy-Effekt aus tieferer Suche (@400). Nutz
 22,0 % Punkte, 21,7 % Gegnerpunkte; moon- und ownership-Koepfe 0,0 % (Gewicht 0). Verdikt GESUND. Lesart: der Wertkopf
 hat sich in zwoelf Epochen um fast ein Viertel bewegt, ohne dass der Val-Brier sich bewegt (par.11b: Epoche 12 auf
 Warmstart-Niveau); das ist Anpassung an die Trainingsdateien, nicht an das Material (HERLEITUNG aus beiden Messungen).
+
+### par.11d ROHES NETZ GEGEN SUCHWERT DER WURZEL, je Runde und Klasse (2026-10-04 23:39, nach der Nutzer-Frage *"warum lernt es nichts mehr"*; Artefakt `checkpoint_val_eval_v35_rootq.json`, 33 s)
+
+Frage: ist die Suche der Erzeugung dem rohen Netz beim Wert noch voraus? Nur dann traegt der Kreislauf (die 30 %
+`root_q` im Wertziel, `corpus_dataset.py:2168`, und die Trajektorien). Werkzeug `tools/checkpoint_val_eval.py`
+(Block `root_q_compare`): auf IDENTISCHEN Zeilen (root_q_mask > 0, wdl_outcome >= 0, value_weights > 0) Brier des
+rohen Netzes `v34-b01_brierbest` (= Generator, Sicht des Ziehers) gegen Brier von `(root_q+1)/2` (Suchwert der Wurzel
+aus Sicht des Ziehers, `net_mcts.rs:7905-7923`, Skala `corpus_dataset.py:1492-1498`), gegen die Konstante m(1-m);
+diff = Netz minus root_q, positiv = Suche besser; CI Block-Bootstrap ueber Dateien. Grundmenge Val-Satz, Einheit
+Verlust je Zustand. Erzeugungs-Suche: Schwarm und policy-s100 @100 Sims, Klasse `policy` @400, Runde 5 ueberall per
+Netz @400 (par.5).
+
+| Liste (Sims) | Runde 1 | Runde 2 | Runde 3 | Runde 4 | Runde 5 |
+| --- | --- | --- | --- | --- | --- |
+| all (n 24.004 / 33.217 / 34.269 / 33.829 / 24.856) | Netz 0,2485, root_q 0,2553, **diff -0,0068 [-0,0125; -0,0009]** | +0,0022 [-0,0024; +0,0065] | +0,0063 [+0,0033; +0,0094] | +0,0127 [+0,0103; +0,0151] | +0,0212 [+0,0182; +0,0242] |
+| policy-s100 (@100; n 3.270 / 3.428 / 3.339 / 3.140 / 2.288) | **-0,0103 [-0,0189; -0,0016]** | +0,0019 [-0,0087; +0,0120] | +0,0030 [-0,0061; +0,0116] | +0,0093 [-0,0002; +0,0186] | +0,0335 [+0,0253; +0,0447] |
+| policy (@400; n 3.564 / 3.659 / 3.606 / 3.422 / 2.479) | -0,0002 [-0,0119; +0,0097] | **+0,0136 [+0,0045; +0,0224]** | **+0,0148 [+0,0047; +0,0255]** | **+0,0245 [+0,0126; +0,0353]** | +0,0228 [+0,0091; +0,0393] |
+| value-deviate (@100) | -0,0096 [-0,0198; +0,0000] | -0,0015 [-0,0101; +0,0072] | +0,0035 [-0,0026; +0,0105] | +0,0135 [+0,0094; +0,0172] | +0,0187 [+0,0147; +0,0232] |
+| value-excursion (@100) | -0,0045 [-0,0146; +0,0043] | +0,0003 [-0,0073; +0,0071] | +0,0071 [+0,0019; +0,0120] | +0,0099 [+0,0063; +0,0134] | +0,0190 [+0,0147; +0,0234] |
+| W (@100, nach Wuerfelphase) | -- | +0,0044 [-0,0060; +0,0144] | +0,0065 [-0,0002; +0,0138] | +0,0122 [+0,0084; +0,0160] | +0,0222 [+0,0149; +0,0308] |
+
+Konstante (Raten) ueberall 0,2500. Runde 5 ist ein anderes Schaetzproblem (Netz-Suche @400 mit Loeser-Resten,
+`net_mcts.rs:7725-7739`), dort nur berichtet.
+
+**Lesart (geprueft, n wie angegeben):** bei **100 Sims ist die Suche dem Netz beim Wert in Runde 1 UNTERLEGEN**
+(Netz 0,2485, Suche 0,2553, schlechter als Raten) und in Runde 2 und 3 nicht nachweisbar ueberlegen; erst ab Runde 4
+liegt sie vorn. Bei **400 Sims liegt die Suche ab Runde 2 klar vorn** (+0,014 / +0,015 / +0,025, CIs ohne 0; n = 12
+Val-Dateien). Damit ist der Mechanismus des Stillstands benannt: das Wertziel traegt zu 30 % einen Suchwert, der in
+der Eroeffnung schlechter ist als das Netz selbst, und zu 35 % die eigene Vorhersage; die Suche @100 hat dem Netz
+beim Wert nichts mehr voraus, @400 schon. Dasselbe Muster wie bei der Policy (par.11b: gelernt wird nur aus den
+@400-Zielen). Konsistent mit `project_lambda_sweep_result`: lambda 0,7 trug, als die Suche dem Netz voraus war.
+
+**Folgerung (Vorlage an den Nutzer, kein Entscheid):** der eine Hebel mit Beleg ist die SUCHTIEFE DER ERZEUGUNG, nicht
+Kopf, Ziel oder Kapazitaet (acht zielinvariante Gatings, `archive/history.md` Z. 9185-9229). Arm `v35-b02`: Fenster
+komplett mit 400 Sims und Modus 2 neu erzeugen (Schwarm 2 x 4.000, policy 2.000 davon 1.000 vorhanden, W 2.000;
+`policy-s100` entfaellt), Rezept und lambda 0,7 unveraendert, Tor 1 gegen v34-b01. Kosten HERLEITUNG aus 6,21 s je
+@400-Partie (par.10a) und dem Verhaeltnis @400/@100 von 1,95: Schwarm rund 4,9 bzw. 3,4 s, W rund 6,3 s je Partie,
+zusammen rund 14 h Erzeugung plus 20 min Bloecke, 37 min Training, 1,5 h Tor 1. Bekannter Preis: @400 kostet im
+Self-Play 0,07 volle Spalten je Seite (`PREREG_asymmetric_selfplay.md` par.8c1).
