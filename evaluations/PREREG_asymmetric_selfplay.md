@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W-v2 Runde 1 TRAEGT: G-KL +0,054 [+0,036; +0,073], kein Versatz, W 44,5 % (par.5d3a/b) -> Sockel-Vorschlag. Stoerer, Exploiter v1 (46 %), v32-Gegner tragen nicht. Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3). @400 mit Modus 2: KL x2, Punkte gleich, aber -0,07 volle Spalten (par.8c1) -> Mischsockel-Vorschlag. Exploiter v2 (par.7c) offen. -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W-v2 Runde 1 TRAEGT: G-KL +0,054 [+0,036; +0,073], kein Versatz, W 44,5 % (par.5d3a/b) -> Sockel-Vorschlag. Stoerer, Exploiter v1 (46 %), v32-Gegner tragen nicht. Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3). @400 mit Modus 2: KL x2, Punkte gleich, aber -0,07 volle Spalten (par.8c1) -> Mischsockel-Vorschlag. Exploiter v2 (par.7c) vom Nutzer GESTRICHEN (2026-10-04 abends, par.7c1); kein Exploiter im v35-Fenster. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -1013,6 +1013,17 @@ Gegner im Ziel, E_0 = G teilt G's blinde Flecken. Drei Aenderungen GLEICHZEITIG:
 9 s = 5 h (ungemessen, aus 6,1 s bei @100/@100 plus E-Haelfte doppelt), Training 5 min, Vortor 15 min, Tor 30
 min; zwei Zyklen rund 11 h. Falls das Vortor faellt, wird vor Zyklus 2 berichtet. Scheitert auch diese Form,
 ist die naechste Stellschraube ein anderer Startpunkt fuer E_0 (`v32-b01`) oder ein Gewicht statt Filter.
+
+
+#### par.7c1 NUTZER-ENTSCHEID 2026-10-04 abends: Exploiter-v2 GESTRICHEN (*"streich den exploiter"*)
+
+Vorlage des Koordinators (STATUS Abschnitt 1): v1 kostete 5,9 h und kam auf 46,25 % (par.7a) gegen Schwelle 55 %,
+Weg 1 trug nicht (par.7b1), v2 HERLEITUNG rund 11 h mit Vortor nach 5,5 h, Hebel ein Siebtel des Fensters, und
+v35 ist die letzte Generation. Der Nutzer streicht. Folgen: keine Klasse `policy-exploiter`, kein Lauf von
+`tools/night_v35_exploiter2_chain.sh` (Loeschkandidat beim Generationswechsel, nur mit Freigabe); die Knoepfe
+`--opponent-model`, `--record-sides`, `--opponent-sims` bleiben im Baum (Knopf AUS byte-gleich, par.7). Die
+Exploiter-Linie dieser Prereg ist damit GESCHLOSSEN; Reste `data/exploiter*`, `models/alphazero_x35-e0*` sind
+Loeschkandidaten (restic-Beleg und pfadgenaue Freigabe, STATUS Entscheid (c)).
 
 ## par.8 SOCKEL @400 SIMS (NUTZER 2026-10-04: *"sockel mit 400 sims kann ich gut leben"*)
 

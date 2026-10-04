@@ -660,3 +660,22 @@ gegen 0,50 mit Block-CI. Eine gepaarte Arena taugt dafuer NICHT, sie laeuft uebe
 (self_play.rs:4975) und nie durch die Erzeugungs-Zugwahl. Und: ein Zweig, der einen bestehenden Zweig
 "deterministisch nachbaut", kopiert dessen Stichentscheid mit, oder begruendet, warum nicht.
 
+## `MOSAIC_DATA_EXCLUDE` ist EIN Regex, keine Kommaliste; und ohne Traeger-Manifest traegt JEDE Datei Policy (2026-10-04)
+
+**Fund 1:** alle drei Leser wenden den Wert per `re.search` auf den Basename an (`engine/py/corpus_dataset.py:521`,
+`train.py:1391`, `tools/build_cache_incremental.py:164`). Die v34-Kette (`tools/night_v34_chain.sh:42`) setzte
+`'selfplay_v29-b11-probe_,selfplay_depth,selfplay_s4states,selfplay_tor2a'`; als Regex ist das ein Literal MIT
+Kommas und trifft keinen Dateinamen (Python-Probe: `re.search(<v34-Wert>, 'selfplay_depth_x.pkl')` ist `None`).
+Der Ausschluss war in v34 wirkungslos; folgenlos nur, weil `--file-list` das Fenster definiert und die
+Protokollzeile "0 von N Dateien ausgeschlossen" niemand als Befund las. **Regel:** Praefixe mit `|` trennen
+(`'a|b|c'`), und die Zeile "X von N ausgeschlossen" gegen die Erwartung pruefen; "0 von N" bei gesetztem Knopf und
+vorhandenen Sonden-Dateien ist ein Fehler, kein Erfolg. v35 setzt die Alternation (`tools/night_v35_chain.sh`).
+
+**Fund 2:** `corpus_dataset._is_policy_carrier` (`corpus_dataset.py:126-158`) gibt bei `carrier_set is None`, also
+ohne gefundenes Manifest, fuer JEDE Datei True. "Ohne Traeger-Manifest trainieren" heisst darum nicht "keine
+Alt-Traeger", sondern "alles traegt Policy", auch Weg-C- und Ausflug-Klassen, die seit v23 nie Policy trugen
+(v34-Manifest: `v33-b01-value-*` 0 Traeger). Die Uebergabe vom 2026-10-04 sagte "ohne Traeger-Manifest", gemeint
+war "ohne Alt-Generationen"; gebaut wurde ein Manifest mit genau den Sockel-Klassen (`PREREG_v35_window.md` par.11).
+**Regel:** jede Trainingskette benennt ihre Traeger ausdruecklich (Manifest mit Soll-Zahlen und Abbruch bei
+Abweichung), und der Diff des Trainings-Manifests liest `policy_carriers.traeger_dateien_je_praefix`, nicht nur
+`cli_args`. Siehe auch die Memory-Regel "Traeger-Status pruefen" (2026-08-16, Ownership-Korpus komplett maskiert).

@@ -531,3 +531,17 @@ Planungszahl v34-Erzeugung (HERLEITUNG aus v33 12,99 h, E1 -39,4 %, R5-Netz +11,
 | Spiegelknopf-Abnahme | 1.200 Dateien | 1 | **698,0 s** | Artefakt `laufzeit` |
 | KL-Abnahme Ausflug | 2.000 + 67.094 Records | 11 | **382,5 s** (cpu 860 s) | Artefakt `laufzeit` |
 
+## v35-Fenster, Training und Tor 1, gemessen am 2026-10-04 (`tools/night_v35_chain.sh`)
+
+| Lauf | Umfang | Threads | Wanduhr | Quelle |
+| --- | --- | --- | --- | --- |
+| Erzeugung Sockel `v34-b01-policy` (@400, Modus 2) | 1.000 Partien | 11 | **6.207,6 s** (6,21 s je Partie) | Manifest `laufzeit` (PREREG_v35_window par.10a) |
+| Erzeugung `v34-b01-policy-s100` (@100, Modus 2) | 1.000 Partien | 11 | **3.177,6 s** (3,18 s) | Manifest |
+| Erzeugung `v34-b01-policy-dice-v2-r1` (W-v2, Platzsuche 600) | 2.000 Partien | 11 | **6.415,0 s** (3,21 s) | Manifest |
+| Erzeugung Schwarm `value-deviate` / `value-excursion` (R5 @400) | je 4.000 Partien | 11 | **10.027,9 s** (2,51 s) / **6.887,9 s** (1,72 s) | Manifest (par.9) |
+| Cache-Bloecke neu (`build_cache_incremental.py`, 2D/nortv, Wertmaske) | 1.200 Dateien | 6 Worker | **953,5 s** (0,79 s je Datei) | Kettenausgabe |
+| Split plus Monolith-Merge aus liegenden Bloecken | 1.080 Dateien, 2.025.784 Zustaende | 6 | **165 s** (Merge 154 s) | Kettenausgabe |
+| **Training v35-b01**, Warmstart, 12 Epochen, fast-loader, cuda | 2.025.784 Samples | 6 | **2.198,0 s** = 37 min (cpu 9.871 s, Datenaufbau 17 s) | `manifest_train_v35-b01_20261004_200022.json` |
+| Tor 1 gepaartes Gating @400, 200 Paare, `--log-games`, GEBREMST (Nutzer-Spiel mit rund 17 % Last daneben) | 400 Partien | 10 | **9.509,9 s** (23,8 s je Partie; exklusiv 13,6 s, Z. 174) | Artefakt `laufzeit` |
+| Offline-Auswertung 3 Checkpoints auf Val-Satz (`checkpoint_val_eval.py`, cuda) | 3 x 224.893 Zustaende, 120 Dateien | 6 | **83,5 s** | Artefakt `laufzeit` |
+| Gewichts-Gesundheit (`checkpoint_weight_health.py`) | 3 Checkpoints | 1 | **2,9 s** | Artefakt `laufzeit` |

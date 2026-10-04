@@ -18,7 +18,44 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**UEBERGABE 2026-10-04 18:40 (Nutzer: `/mosaic-handover`). NICHTS LAEUFT.** Geprueft 18:35: keine self_play-,
+**KETTE `tools/night_v35_chain.sh` 19:41-23:4x (Terminal-Tab), Schritte 1-5 und Tor 1 Seed 1 fertig, Seed 2 abgebrochen.** Stand 20:40:
+Fenster STEHT (20:00, Maske GRUEN) und Training v35-b01 DURCH (20:37, 2.198 s, Manifest-Diff 0 unerwartet,
+gegatet `v35-b01_best`, Epoche 2; `PREREG_v35_window.md` par.11a); **Tor 1: Seed 20261600 FERTIG 23:15 (208:192 = 52,0 %, Block-z +0,92, Spalten 1,078 gegen 1,128;
+par.11c, gebremst durch Nutzer-Spiel neben der Arena), Seed 20261601 auf Nutzer-Entscheid ABGEBROCHEN 23:4x bei 8:12** (par.11c Nachtrag; Tor 1 b01 = ein Seed,
+nicht entschieden, Seed 2 bei Bedarf nachholbar). Maschine frei. **par.11b ERLEDIGT 23:27:** Wertkopf lernt aus dem Fenster nichts Messbares (dBrier Warmstart
+minus Epoche 2 +0,0006 [-0,0003; +0,0014], je Klasse kein CI ueber 0, Punktschaetzer auf dem Schwarm am groessten,
+W negativ); nur der Policy-Kopf bewegt sich (+0,068 [+0,055; +0,080], am meisten auf der @400-Klasse). Hypothese
+"Modus-2-Material traegt fehlende Wert-Information" NICHT gestuetzt. **Netz-Gesundheit GESUND** (23:35: keine NaN/Inf, BN-tot 0/1.120; Wertkopf Epoche 12 um 22,9 %
+bewegt bei unveraendertem Brier). **OFFEN: Nutzer-Entscheid, wie es mit v35 weitergeht** (Seed 2 nachholen, b02 mit
+anderem Material, oder Abschluss mit v34-b01 als Tessa). Schritte der Kette:
+Traeger-Manifest v35 (400 Sockel-Dateien) -> Fenster `data/window_v35.txt` (1.200 Dateien, fuenf v34-b01-Klassen)
+-> Bloecke und Monolith MIT Wertmaske `MOSAIC_MASK_DICE_PHASE_VALUE=1` -> Training `v35-b01` warm von
+`v34-b01_brierbest`, Seed 20260965 -> Manifest-Diff (STOPPT bei Abweichung) -> Tor 1 = Champion-Kante gegen
+`v34-b01` (Seeds 20261600/01, Stufenregel 20261602, Spec `v34-b01_brierbest.spec.json` beidseits, `--log-games`).
+Registrierung: `PREREG_v35_window.md` par.11 (Commit `a193b409`). Kosten HERLEITUNG rund 4,5 h. **Waehrend des
+Laufs: keine Builds, keine Sonden, kein Commit.** Danach faellig (par.11): Abnahme Fenster, Netz-Gesundheit,
+Tor-1-Verdikt mit Block-z, Tor 2b, sechs Kennzahlen, Elo-Register, Laufzeiten; Promotion nur nach Nutzer-Entscheid.
+
+**Zwei Befunde beim Kettenbau (geprueft am Code):** (1) ohne Traeger-Manifest macht `corpus_dataset._is_policy_carrier`
+(`corpus_dataset.py:126-158`, `carrier_set is None`) JEDE Datei zum Policy-Traeger, also auch den Schwarm; darum
+traegt v35 ein Manifest mit genau den 400 Sockel-Dateien (die Uebergabe sagte "ohne Manifest", gemeint war "ohne
+Alt-Generationen"). (2) `MOSAIC_DATA_EXCLUDE` ist ein Regex per `re.search` (`corpus_dataset.py:521`,
+`train.py:1391`, `build_cache_incremental.py:164`); der v34-Wert als Kommaliste war ein Literal ohne Treffer, in
+v34 folgenlos (die Dateiliste definiert das Fenster). v35 setzt eine Alternation mit `|`. Pitfalls-Eintrag faellig.
+
+**Exploiter-v2 GESTRICHEN (Nutzer 2026-10-04 abends: *"streich den exploiter, sockel-manifest passt so"*;
+`PREREG_asymmetric_selfplay.md` par.7c1). Traeger-Manifest mit 400 Sockel-Dateien bestaetigt.** Vorlage war:** v1 kostete 5,9 h
+und kam auf 46,25 % (185:215, n = 400, gepaarte Arena @100) gegen Schwelle 55 %, Weg 1 trug nicht
+(`PREREG_asymmetric_selfplay.md` par.7a/7b1); v2 HERLEITUNG rund 11 h, Vortor nach 5,5 h; v35 ist die letzte
+Generation, eine korrigierte Form wuerde nie geerntet. Nutzer fragt selbst, ob der Nutzen den Aufwand rechtfertigt.
+
+**Stand des Baums:** `a193b409`, 1 Commit vor `origin/main` (der Stand `be5bb104` wurde zwischen Uebergabe und
+Uebernahme gepusht, Reflog "update by push"; nicht von dieser Sitzung). `player_profiles.json` veraendert, nie committen.
+
+---
+
+**UEBERGABE 2026-10-04 18:40 (ueberholt durch den Block oben; Aufgabenliste gilt weiter).**
+Geprueft 18:35 damals: Geprueft 18:35: keine self_play-,
 train-, paired_gating-, cargo- oder Kettenprozesse; Baum committet (`de886409`, 12 Commits vor `origin/main`, nicht
 gepusht); Arbeitsbaum sauber bis auf `player_profiles.json` (nie committen). Installiertes Wheel = Stand `cb99977f`
 (W-v2 plus Gegner-Sims; Anker-Drift und -Konservierung gruen 11:18, `anchor_v2_*_20261004_chain3.json`). Im
@@ -64,7 +101,7 @@ verliert (par.8c1 der Asym-Prereg); W mit Basis 100 und Platzsuche 600 (13:30); 
    beiden Seiten), Stufenregel; Tor 2a/2b (Spalten) wie dort. Rund 1,6 h je Seed. Vorher die Tore in par.11
    registrieren.
 4. **Bei bestandener Kante:** `/mosaic-champion-promotion`, dann Tessa und `/mosaic-generation-turnover`.
-5. **Nur auf Nutzer-Aufruf:** Exploiter-v2 (`tools/night_v35_exploiter2_chain.sh`, `PREREG_asymmetric_selfplay.md`
+5. ~~Exploiter-v2~~ GESTRICHEN (Nutzer 2026-10-04 abends; `tools/night_v35_exploiter2_chain.sh` ist Loeschkandidat, `PREREG_asymmetric_selfplay.md`
    par.7c, rund 5,5 h bis zum Vortor, 11 h gesamt). Startbefehl im Terminal-Tab (2-h-Grenze der
    Hintergrundaufgaben; Git-bash aus `Git/bin/bash.exe`).
 
@@ -74,7 +111,7 @@ Loeschungen nur mit restic-Beleg UND pfadgenauer Freigabe. Messungen exklusiv, e
 waehrend eines Wanduhr-Laufs. *"lass den exploiter noch aussen vor"* (15:20). Subagenten Opus medium, Befunde
 nachpruefen; Koordinator baut nichts selbst (Nutzer 2026-10-04 00:00). Lange Ketten im Terminal-Tab starten.
 
-**Offene Nutzer-Entscheide:** (a) Exploiter-v2 fahren oder streichen (par.7c; Chance nach Koordinator rund 1 zu 4);
+**Offene Nutzer-Entscheide:** (a) ~~Exploiter-v2~~ GESTRICHEN 2026-10-04 abends (par.7c1);
 (b) nach Tor 1: Promotion und Projektabschluss; (c) Reste in `data/probe_asym` (Sonden), `data/exploiter`,
 `data/exploiter_smoke`, `data/exploiter2` (leer), `data/probe_v35sockel_smoke`, Modelle `alphazero_x35-e01/02/03*`:
 Loeschung nur auf Freigabe mit restic-Beleg; (d) Server-Neustart fuer v34-b01 in der GUI (seit 2026-10-03 offen).
@@ -225,6 +262,13 @@ Schwarm 4.000 Weg C plus 4.000 Ausflug, G-1/G-2 fallen weg; grob 12 h (HERLEITUN
 den Sonden S1-S4 (par.4). Bau in der Wheel-Runde nach der v34-Erzeugung.
 
 ### RICHTUNG (Nutzer-Entscheid 2026-09-27)
+
+**NUTZER 2026-10-04 abends (waehrend Tor 1 bei 90:80 stand): *"ich will v35 noch staerker hinbekommen als v34"*.**
+v35 bleibt die letzte Generation, aber mit dem Anspruch, die Kante gegen v34-b01 zu nehmen; weitere Arme (b02 ...)
+sind damit Teil von v35. Hebel-Reihenfolge nach Beleglage (Koordinator, Vorlage): erst Tor 1 und par.11b lesen
+(lernt der Wertkopf aus Modus-2-Material?), dann ggf. Schwarm mit Modus 2 neu erzeugen (Nutzer-Entscheid, rund
+4,7 h HERLEITUNG aus par.9-Laufzeiten), Fenster nur aus Modus-2-Material; Rezept-Knoepfe (lr, Epochen, Kaltstart,
+Kapazitaet) sind nach Memory und Kurven KEIN Hebel.
 
 **NUTZER 2026-10-04 12:00: v35 wird WIRKLICH die letzte Generation.** *"v34 hat das projektziel meiner meinung nach
 bereits erreicht. ich kann das netz in den bisherigen spielen nicht mehr schlagen."* Folge: v35 ist die

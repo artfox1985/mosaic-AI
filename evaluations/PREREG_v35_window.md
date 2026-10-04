@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v35-Fenster erzeugt und zugeschnitten, und traegt v35-b01 gegen den Generator v34-b01? | Beleg: Erzeugung komplett und abgenommen (par.9, par.10a/10b): Schwarm 2 x 4.000 + Sockel policy @400 1.000, policy-s100 1.000, W-v2 R1 2.000, alle GRUEN. Fenster, Training v35-b01 und Tor 1 registriert (par.11), Lauf steht aus. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: Fenster und Training v35-b01 GRUEN (par.11a), gegatet Epoche 2. Tor 1 Seed 1: 208:192 = 52,0 %, Block-z +0,92, Spalten 1,078 gegen 1,128 (par.11c); Seed 2 auf Nutzer-Entscheid abgebrochen, Tor NICHT entschieden. par.11b: Wertkopf lernt aus keiner Klasse messbar (dBrier +0,0006, CI mit 0), nur der Policy-Kopf bewegt sich (+0,068, am meisten @400). Offen: Nutzer-Entscheid Hebel. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -165,8 +165,9 @@ Tor 1 gegen `v34-b01`, Promotion falls die Kante faellt. Exploiter-Klasse offen 
 ## par.11 FENSTER, TRAINING v35-b01 UND TORE (REGISTRIERT 2026-10-04 abends VOR dem Lauf; Kette `tools/night_v35_chain.sh`)
 
 Nutzer-Rahmen: v35 ist die LETZTE Generation (STATUS, Abschnitt RICHTUNG). Exploiter bleibt aussen vor
-(Nutzer 15:20); der Nutzer fragt 2026-10-04 abends selbst, ob sein Nutzen den Aufwand rechtfertigt (Vorlage des
-Koordinators: streichen; Entscheid offen). Das Fenster wird OHNE Exploiter-Klasse gebaut.
+(Nutzer 15:20) und ist am 2026-10-04 abends GESTRICHEN (*"streich den exploiter, sockel-manifest passt so"*;
+`PREREG_asymmetric_selfplay.md` par.7c1). Das Fenster wird OHNE Exploiter-Klasse gebaut; das Traeger-Manifest mit den
+400 Sockel-Dateien ist vom Nutzer bestaetigt.
 
 **Fenster (1.200 Dateien, 12.000 Partien, alles Generator `v34-b01`, alles in `data/`):** die fuenf Klassen aus
 par.9/par.10a: `value-deviate` 400, `value-excursion` 400, `policy` 100, `policy-s100` 100, `policy-dice-v2-r1`
@@ -233,3 +234,171 @@ relative Gewichtsaenderung), Tor-1-Verdikt mit Block-z, Tor 2b, sechs Standard-K
 Promotion NUR nach Nutzer-Entscheid und `/mosaic-champion-promotion`; Netz-Paritaets-Fixture (Checkliste 5d) und
 Diagnostiken (Platt, R4/R4b, sigma/Prior) gehoeren zur Promotion, nicht zur Trainings-Abnahme (die Fixture folgt
 `models/champion.txt`).
+
+### par.11a FENSTER UND TRAINING v35-b01: ERGEBNIS (2026-10-04 19:41-20:37, `tools/night_v35_chain.sh`, exklusiv)
+
+**Fenster (Schritte 1-4, 19:41-20:00):** Traeger-Manifest 400 = 100 + 100 + 200 (Soll erfuellt); Fensterliste 1.200
+Dateien, eindeutig, 0 Sonden-Namen; Split Val 120 / Train 1.080; Bloecke 1.200 neu in 953,5 s (0,79 s je Datei, 6
+Worker); Monolith `data/.cache_ac852965e449.h5`, Zusammenfuegen 154 s, Stempel = Schluessel, 1.080 Dateien,
+2.025.784 Zustaende. **Masken-Abnahme GRUEN:** Schluessel mit Maske `ac852965e449`, ohne Maske `8531f0889293`,
+Marker `+maskdicephasevalue_v1` im Material, Fingerabdruck traegt `MOSAIC_MASK_DICE_PHASE_VALUE=1`; im Monolithen
+`value_weights` mit 67.171 Nullen von 2.025.784 (3,3 %, Grundmenge Trainingszustaende; passt zu rund 180 W-Dateien
+im Trainingsanteil mit je rund 370 Wuerfelphasen-Records, Stichprobe par.11). Traeger-Maske beim Zusammenfuegen:
+725 von 1.080 Bloecken policy-maskiert (= 355 Traeger im Trainingsanteil + 45 im Val-Anteil = 400).
+
+**Training (Schritt 5, 20:00-20:37):** Exit 0, `laufzeit` 2.198,0 s Wanduhr (cpu_s 9.871, 6 Threads, cuda,
+fast-loader, Datenaufbau 17,2 s, 12 Epochen, 2.025.784 Samples); v34-b01 2.956,6 s bei 2.328.960 Samples.
+Manifest `models/manifest_train_v35-b01_20261004_200022.json` (Commit `a193b409`, dirty = STATUS/Pitfalls-Edits).
+**Manifest-Diff gegen v34-b01: 0 unerwartete Abweichungen**; abweichend genau `cache_file, file_list, load, name,
+seed, val_frac, val_pool`; neu mit Default `margin_thresholds` False, `margin_threshold_weight` 1,0 (inaktiv).
+`mosaic_env` traegt Maske und Manifest v35; `policy_carriers`: 400 Traeger, value-Klassen 0.
+
+**Gegatetes Netz: `v35-b01_best`** (`tools/brier_best_checkpoint.py`: final 12, brier_best 2, best 2; kein
+`_brierbest`, weil Brier-Minimum = `best_epoch`). Kurven (Grundmenge Val 120 Dateien; Policy-Val nur auf den rund
+45 Traeger-Dateien im Val-Anteil; Einheit Verlust je Sample):
+
+| Epoche | 1 | 2 | 4 | 6 | 8 | 10 | 12 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Value-Brier v35 | 0,19506 | **0,19460** | 0,19509 | 0,19491 | 0,19490 | 0,19503 | 0,19508 |
+| Policy-Val v35 | 0,4292 | 0,4287 | 0,4331 | 0,4379 | 0,4425 | 0,4450 | 0,4464 |
+| Policy-Train v35 | 1,075 | 1,021 | 0,953 | 0,906 | 0,873 | 0,852 | 0,844 |
+
+Lesart: Brier flach (Spanne 0,0005, unter der Offline-Aufloesung `project_offline_metric_resolution_limit`);
+Policy-Val steigt monoton +4,1 % waehrend Policy-Train faellt, dieselbe Form wie bei v34-b01 (0,358 -> 0,3715,
++3,8 %). Das Niveau ist nicht gegen v34 lesbar (anderer Val-Satz: Modus-2-, @400- und W-Ziele, par.8b1 der
+Asym-Prereg: KL x2). Das gegatete Netz hat zwei Epochen vom Generator weg trainiert. **Netz-Gesundheit gegen den
+Warmstart (NaN/Inf, BN-Gamma, relative Gewichtsaenderung) folgt NACH Tor 1** (Torch-Last waehrend der Arena
+vermieden). Tor 1 gestartet 20:37:04, Seed 20261600.
+
+### par.11b OFFLINE-NACHMESSUNG "WARUM LERNT ES NICHTS MEHR" (REGISTRIERT 2026-10-04 abends VOR dem Lauf; Nutzer: *"ja, fahr beide messungen nach tor 1"*)
+
+Anlass: par.11a (Brier flach ab Epoche 1, Policy-Val steigt, gegatet wird Epoche 2) und die Nutzer-Frage, warum
+das Netz aus nachweislich staerkerem Sockel-Material (Modus 2, par.5e3 der Asym-Prereg) nichts lernt. Beide
+Messungen laufen NACH Tor 1 (Exklusivitaet), Werkzeug `tools/checkpoint_val_eval.py` (gebaut 2026-10-04 abends),
+Grundmenge der Val-Satz `data/window_v35_val.txt` (120 Dateien: value-deviate 34, value-excursion 41, policy 12,
+policy-s100 11, policy-dice-v2-r1 22; Einheit Verlust je Sample, Block = Datei), Checkpoints `v34-b01_brierbest`
+(Warmstart = "Epoche 0"), `v35-b01_best` (Epoche 2, gegatet), `v35-b01` (Epoche 12). Metriken zahlengleich zu
+train.py (Selbstpruefung des Werkzeugs: `v35-b01_best` auf der Val-Liste muss `value_val_brier` 0,1946 und
+`policy_val_loss` 0,42868 der Epochenzeile 2 treffen, Toleranz 1e-4; sonst ist das Werkzeug falsch, nicht das Netz).
+
+**M1 (Epoche 0):** gepaarte Differenz je Datei Brier(Warmstart) minus Brier(`v35-b01_best`) ueber 120 Dateien,
+Block-Bootstrap-CI 95 % (1.000 Ziehungen, Seed 20261004). **Leseregel:** CI ganz ueber 0 heisst, die zwei Epochen
+haben auf dem eigenen Material etwas gelernt (Groesse berichten); CI mit 0 heisst, das Fenster hat dem Wertkopf
+nichts beigebracht. Dasselbe fuer Epoche 12 (Verlauf). Policy-Val analog, nur berichtet: der Policy-Val ist als
+Staerke-Mass unbrauchbar (`project_offline_metric_resolution_limit`), und auch der Brier sagt hier nichts ueber
+Arena-Staerke, sondern nur, ob das Netz sich auf seiner eigenen Verteilung bewegt hat.
+
+**M2 (je Klasse):** Brier des Warmstarts je Klasse mit Block-Bootstrap-CI; Schwarm = deviate + excursion gepoolt.
+**Leseregel:** liegt das CI einer Sockel-Klasse (Modus 2 bzw. W) ganz ueber dem Schwarm-CI, traegt diese Klasse
+Material, das der Wertkopf schlechter vorhersagt (Kandidat fuer "Information, die das Netz nicht hat"; HERLEITUNG,
+denn ein Klassen-Brier kann auch strukturell hoeher liegen, etwa durch die W-Asymmetrie oder die Maske, die die
+Wuerfelphase aus dem Brier nimmt). Entscheidend ist darum **M2b:** die gepaarte Differenz Warmstart minus
+`v35-b01_best` JE KLASSE: nur wo sie ganz ueber 0 liegt, hat das Training aus dieser Klasse gelernt. Vorab benannt:
+n = 11 bis 22 Dateien je Sockel-Klasse, die CIs werden breit; ein CI mit 0 ist dann "nicht aufloesbar", nicht "kein
+Effekt". Folgerung, falls M2b nur auf den Sockel-Klassen positiv ist und auf dem Schwarm nicht: ein Fenster nur aus
+Modus-2-Material waere der Hebel; das ist ein Nutzer-Entscheid (v35 ist die letzte Generation).
+
+Kosten HERLEITUNG: drei Checkpoints auf 120 Dateien (rund 230.000 Zustaende), GPU, wenige Minuten; Klassen-Caches
+aus liegenden Bloecken. Laufzeit steht im Artefakt `evaluations/artifacts/checkpoint_val_eval_v35.json`.
+
+**Nachtrag par.11b (2026-10-04 22:25, am Code geprueft, vor dem Lauf):** der Val-Brier von train.py ist NICHT mit
+`value_weights` gewichtet; seine Maske ist allein `wdl_outcome >= 0` (`train.py:1046-1052`, Mittelwert `:1113`),
+`value_weights` geht erst in `value_val_loss` und Punkte ein (`train.py:934-936`). Folgen: (a) die Wuerfelphasen-
+Records der W-Klasse (rund 19 % ihrer Records, par.11) zaehlen im Brier voll, obwohl ihr Ausgang aus der Stellung
+per Konstruktion nicht erklaerbar ist (par.5d der Asym-Prereg); der W-Klassen-Brier liegt darum STRUKTURELL hoeher,
+M2 ist fuer W nicht als "fehlende Information" lesbar. (b) Dasselbe gilt fuer die Auswahlregel `--select-by-brier`
+des Trainings: rund 3,5 % der Val-Zustaende (22 W-Dateien x rund 370 Records von rund 230.000) sind unlernbar und
+gehen trotzdem in die Auswahl ein; fuer alle Epochen gleich, also ohne Wirkung auf die Rangfolge der Epochen
+(HERLEITUNG). Das Werkzeug gibt deshalb zusaetzlich `value_val_brier_vw` aus (Zeilen mit `value_weights` 0
+ausgeschlossen); fuer M2/M2b der W-Klasse gilt diese Groesse, fuer die Selbstpruefung gegen das Manifest die
+ungewichtete.
+
+### par.11c TOR 1, SEED 20261600 (2026-10-04 20:37-23:15, `gating_v35-b01_vs_v34-b01_s20261600.json`; GEBREMST, siehe unten)
+
+| Groesse | v35-b01 (A) | v34-b01 (B) |
+| --- | --- | --- |
+| Siege (400 Partien, 200 Paare) | **208** | 192 |
+| Siegquote A | 52,0 % | |
+| gepaarte Differenz je Paar | +0,08 [-0,11; +0,27] | McNemar p 0,47 |
+| Block-z (40 Bloecke a 5 Paare, Mittel 0,520, sd 0,138) | **+0,92** | |
+| SPRT | UNDECIDED_CAP_REACHED, LLR -1,86 | |
+| Paare: A-Sweep / B-Sweep / Split | 50 / 42 / 108 | |
+| eigene Punkte je Partie | 58,56 | 57,40 |
+| Marge je Partie (A minus B) | +2,33 [-1,03; +5,68] | |
+| Strafleiste (Steine je Partie) | 7,71 | 8,28 |
+| volle Spalten je Seite (`arena_column_probe`, n = 400) | **1,078 +- 0,074** | 1,128 +- 0,072 |
+| Spalten >= 4 / lange Reihen | 2,40 / 3,22 | 2,29 / 3,23 |
+| Plattenpunkte, Platzierung (gepaart, `plate_points_from_arena`) | +1,37 [+0,13; +2,60] | einziges Kriterium mit CI ohne 0 |
+
+Vollstaendigkeit: 400 von 400 Partien `completed`, 0 unvollstaendig. **Laufzeit 9.509,9 s Wanduhr (cpu_s 39.213,5,
+10 Threads, 23,8 s je Partie), GEBREMST:** neben der Arena lief ein Spiel des Nutzers (gemessen 20:50 ueber 10 s:
+Gating 38,9 %, Spiel 16,9 %, Claude-Prozesse rund 7 % der 12 Kerne), Referenz exklusiv 13,6 s je Partie
+(`docs/measured_runtimes.md` Z. 174). Nach `docs/working_rules.md` als gebremste Laufzeit markiert; Partien sind
+seit der Wheel-Runde vom 2026-10-02 schrittbegrenzt, nicht wanduhrbegrenzt, alle 400 vollstaendig.
+
+**Lesart Seed 1 (kein Verdikt, das faellt gepoolt ueber beide Seeds, par.11):** Block-z +0,92 liegt weit unter +1,96,
+die Siegquote 52,0 % unter 52,5 %; der Verlauf stieg bis Block 24 auf 55,0 % (132:108) und fiel bis zum Deckel auf
+52,0 % zurueck. Punkte und Marge zeigen in dieselbe Richtung, ohne Signifikanz. **Tor 2b** (volle Spalten je
+Seite): Punktschaetzer 1,078 gegen 1,128, also UNTER dem Vorgaenger (Differenz -0,05 bei SE rund 0,07 je Seite):
+nach `docs/generation_loop.md` ist das Tor am Punktschaetzer gerissen, nicht signifikant; Verdikt ebenfalls erst
+gepoolt ueber beide Seeds. Seed 20261601 gestartet 23:15:37.
+
+**NUTZER-ENTSCHEID 2026-10-04 23:4x: Seed 20261601 ABGEBROCHEN** (*"abbrechen, bei bedarf koennen wir immer noch den zweiten
+seed fahren"*; Vorlage des Koordinators: eine knappe Kante ist nicht das Ziel "staerker als v34", und Seed 2 blockiert
+gebremst 2,7 h lang par.11b und den naechsten Schritt). Stand beim Abbruch: Block 2, 8:12 (10 Paare), kein Artefakt,
+keine Wertung; Kette im Terminal beendet, keine verwaisten Prozesse (Prozessliste geprueft). **Abweichung von par.11,
+benannt:** Tor 1 fuer `v35-b01` liegt damit mit EINEM Seed vor (200 Paare, 52,0 %, Block-z +0,92) und ist NICHT
+entschieden, nicht gerissen; nach `docs/generation_loop.md` reicht n >= 150 Paare fuer eine Tor-Messung, das
+vorregistrierte Verdikt verlangte aber zwei Seeds gepoolt. Seed 20261601 kann mit identischen Einstellungen
+nachgeholt werden (`tools/night_v35_chain.sh` Schritt 6, `gate`-Funktion). Weiter mit par.11b, Netz-Gesundheit, dann
+Nutzer-Entscheid ueber einen Modus-2-Schwarm (STATUS, RICHTUNG).
+
+### par.11b ERGEBNIS (2026-10-04 23:25-23:27, `evaluations/artifacts/checkpoint_val_eval_v35.json`, 83,5 s Wanduhr, cuda)
+
+Selbstpruefung PASS: `v35-b01_best` auf der Val-Liste trifft die Manifest-Zeile Epoche 2 exakt (Brier 0,19460015,
+Policy-Val 0,42868324). Datei-Zuordnung: 224.893 Zeilen aus 120 Bloecken, 0 Feldabweichungen gegen den Monolithen
+`.cache_81bef1158189.h5`. Grundmenge Val-Satz (Dateien / Zustaende): all 120 / 224.893; deviate 34 / 67.030;
+excursion 41 / 68.436; policy @400 M2 12 / 23.936; policy-s100 M2 11 / 22.040; W 22 / 43.451 (davon 8.259
+Wuerfelphase, aus `brier_vw` ausgeschlossen). Einheit Verlust je Zustand; CI = Block-Bootstrap ueber Dateien, 95 %.
+
+**M1 (Epoche 0 gegen Epoche 2 und 12), gepaarte Differenz Warmstart minus Checkpoint (positiv = gelernt):**
+
+| Liste | Brier Warmstart | dBrier zu Epoche 2 [CI] | dBrier zu Epoche 12 [CI] | dPolicy-Val gepoolt zu Ep. 2 [CI] |
+| --- | --- | --- | --- | --- |
+| all | 0,19518 | +0,00058 [-0,00032; +0,00141] | +0,00010 [-0,00099; +0,00119] | **+0,068 [+0,055; +0,080]** |
+
+**Leseregel M1: CI mit 0, das Fenster hat dem Wertkopf nichts Messbares beigebracht**, weder in zwei noch in zwoelf
+Epochen (Epoche 12 liegt wieder auf dem Warmstart). Der Policy-Kopf hat sich dagegen messbar bewegt (CI ganz ueber
+0), auf Epoche 12 noch +0,023 [+0,015; +0,030] gegen den Warmstart, aber schlechter als Epoche 2.
+
+**M2 / M2b je Klasse** (Warmstart-Brier mit CI; gepaarte Differenz zu Epoche 2; Policy-Val gepoolt nur Traeger):
+
+| Klasse | Brier Warmstart [CI] | brier_vw | dBrier zu Ep. 2 [CI] | Policy-Val Warmstart -> Ep. 2, dPloss [CI] |
+| --- | --- | --- | --- | --- |
+| value-deviate | 0,2028 [0,1900; 0,2147] | = | +0,0008 [-0,0010; +0,0028] | -- |
+| value-excursion | 0,1873 [0,1764; 0,1984] | = | +0,0012 [-0,0001; +0,0025] | -- |
+| policy @400 M2 | 0,1987 [0,1776; 0,2205] | = | +0,0004 [-0,0016; +0,0023] | 1,380 -> 1,250, **+0,131 [+0,118; +0,143]** |
+| policy-s100 M2 | 0,1998 [0,1818; 0,2163] | = | +0,0002 [-0,0031; +0,0027] | 1,041 -> 1,003, +0,038 [+0,026; +0,051] |
+| W (policy-dice-v2-r1) | 0,1916 [0,1771; 0,2056] | 0,1791 | -0,0004 [-0,0023; +0,0013] | 1,066 -> 1,018, +0,048 [+0,039; +0,056] |
+
+**Leseregel M2: keine Sockel-Klasse liegt mit ihrem CI ueber dem Schwarm**; der hoechste Warmstart-Brier liegt auf
+`value-deviate` (0,2028), die Modus-2-Klassen liegen dazwischen, W ohne Wuerfelphase am niedrigsten (0,1791). **M2b:
+keine Klasse mit CI ueber 0**; die groessten Punktschaetzer liegen auf dem SCHWARM (excursion +0,0012, deviate +0,0008),
+die Modus-2-Klassen bei +0,0002 bis +0,0004, W negativ. Die Hypothese "Modus-2-Material traegt Information, die der
+Wertkopf noch nicht hat" wird NICHT gestuetzt; mit n = 11 bis 22 Dateien ist das "nicht aufloesbar", wie vorab benannt,
+aber die Richtung der Punktschaetzer spricht gegen sie. **Was das Netz gelernt hat, ist Policy, und am meisten auf
+der @400-Klasse** (Policy-Val 1,38 gegen 1,04 bei @100: die @400-Suchziele liegen am weitesten vom Prior, und dorthin
+bewegt sich der Kopf, +0,131). Ob das Arena-Staerke traegt, sagt die Offline-Metrik nicht
+(`project_offline_metric_resolution_limit`; bei 400 Sims traegt der Wertkopf, `project_hybrid_head_attribution`).
+
+**Folgerung fuer den Hebel "Schwarm mit Modus 2 neu erzeugen":** nach M2b nicht belegt, der Wertkopf lernt aus keiner
+Klasse messbar. Belegt ist nur ein Policy-Effekt aus tieferer Suche (@400). Nutzer-Entscheid offen.
+
+**Netz-Gesundheit gegen den Warmstart (2026-10-04 23:35, `tools/checkpoint_weight_health.py`, Artefakt
+`checkpoint_weight_health_v35-b01.json`, 2,9 s; nur Gewichte):** keine NaN/Inf in Warmstart, Epoche 2 und Epoche 12; BN-Gamma
+|g| < 1e-3 in 0 von 1.120 Einheiten (4 BN-Schichten) in allen drei Staenden. Relative Gewichtsaenderung
+(Frobenius, weight+bias je Schicht, gegen `v34-b01_brierbest`): Epoche 2 (gegatet) 0,8-5,2 % im Rumpf und Policy-Kopf,
+9,1-9,8 % in Wert-, Punkte- und Gegnerpunkte-Kopf; Epoche 12 8,6-13,2 % Rumpf, 11,9 % Policy, **22,9 % `value_head.0`**,
+22,0 % Punkte, 21,7 % Gegnerpunkte; moon- und ownership-Koepfe 0,0 % (Gewicht 0). Verdikt GESUND. Lesart: der Wertkopf
+hat sich in zwoelf Epochen um fast ein Viertel bewegt, ohne dass der Val-Brier sich bewegt (par.11b: Epoche 12 auf
+Warmstart-Niveau); das ist Anpassung an die Trainingsdateien, nicht an das Material (HERLEITUNG aus beiden Messungen).
