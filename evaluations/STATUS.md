@@ -18,100 +18,75 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**UEBERGABE 2026-10-04 09:30, NACHTPROGRAMM FERTIG. NICHTS LAEUFT.** (Nutzer 00:00: *"mach mir ein
-nachtprogramm indem du alles misst was notwendig ist und vorbereitest fuer das v35 self play. du selbst baust
-nichts sondern orchestrierst nur"*.) Alles registriert in `PREREG_asymmetric_selfplay.md` (Kopf, par.5c3, 5d1,
-5e1-5e3, 7, 7a, 8, 8a); Baum NICHT committet (siehe unten), Wheel = Exploiter-Bau (Anker gruen 01:29).
+**UEBERGABE 2026-10-04 18:40 (Nutzer: `/mosaic-handover`). NICHTS LAEUFT.** Geprueft 18:35: keine self_play-,
+train-, paired_gating-, cargo- oder Kettenprozesse; Baum committet (`de886409`, 12 Commits vor `origin/main`, nicht
+gepusht); Arbeitsbaum sauber bis auf `player_profiles.json` (nie committen). Installiertes Wheel = Stand `cb99977f`
+(W-v2 plus Gegner-Sims; Anker-Drift und -Konservierung gruen 11:18, `anchor_v2_*_20261004_chain3.json`). Im
+Projektordner arbeiten, KEIN Worktree (git-crypt, CLAUDE.md).
 
-**Ergebnisse der Nacht, gegen die vorab registrierten Leseregeln:**
+**v35 ist die LETZTE Generation** (Nutzer 12:00: *"v34 hat das projektziel bereits erreicht. ich kann das netz in den
+bisherigen spielen nicht mehr schlagen"*). Abschnitt RICHTUNG. Danach Promotion (falls die Kante faellt), Tessa,
+Projektabschluss nach `/mosaic-generation-turnover`. Keine v36.
 
-| Messung | Ergebnis | Regel | Folge |
-| --- | --- | --- | --- |
-| S5 Eroeffnungs-Wuerfel R1 (par.5d1) | W 51 %, +9,2 % Kosten, Versatz-CI um 0, G-KL +0,030 [-0,012; +0,071] | Maske reicht; "andere Stellungen" nicht nachweisbar | **Nutzer-Entscheid** ueber W (wenn, dann R1) |
-| S5 R1-2 | W 34 %, Marge -8,7 | wie oben | nicht empfohlen |
-| S4b neu, Stoerer B (par.5c3) | S 47-49 %, G hoechstens -2,0 Punkte, 6-11 % der Zuege | G-Senkung < 2 bzw. Rauschen | **Stoerer-Linie geschlossen** |
-| par.5e Frage 1 (par.5e2) | Gleichstand 14,8 %, Bestand != Besuche-dann-Q 10,1 %, != bestes Q 25 % | beschreibend | siehe Frage 3 |
-| **par.5e Frage 3 (par.5e3)** | **Knopf-Seite gewinnt 74,5 % (Modus 1) / 75,5 % [71,5; 79,5] (Modus 2), +16-18 Punkte, mehr Spalten** | CI ueber 0,50 und Marge > 0 | **Vorschlag: `tau_tiebreak_q` 2 in Sockel UND Schwarm; Nutzer-Entscheid** |
-| Sockel @400 Vortest (par.8a) | KL 0,316 -> 0,625 (CI klar), Kosten x2,07, **Punkte je Seite 46,9 -> 31,4**, volle Spalten 0,90 -> 0,445, Strafleiste +2,5 | beschreibend | Vorschlag Mischarm statt ganzer Sockel; **Nutzer-Entscheid** |
-| Exploiter (par.7a) | E_1 45,8 %, E_2 47,6 % gegen G; **Tor E_3 gegen G 185:215 = 46,25 %** (Ziel >= 55 %) | Tor faellt nicht | **keine Exploiter-Klasse**; Bau bleibt (AUS byte-gleich) |
+**ERZEUGUNG v35 KOMPLETT UND ABGENOMMEN** (`PREREG_v35_window.md` par.9, par.10a, par.10b), Generator `v34-b01`,
+alles in `data/`:
 
-**NACHTRAG 10:35 (Kette 2, par.7b1 / par.8b1):** (a) Weg 1, v32-b01 als Gegner mit anderem Stil: KL der G-Seite
-+0,010 [-0,009; +0,032], G gewinnt 64 %, Versatz G -0,10 (CI ohne 0) -> traegt nicht, keine Sockel-Klasse.
-(b) **Der Punkte-Einbruch @400 war der Stichentscheid:** @400 mit Modus 2 liefert KL 0,683 gegen 0,338 (@100,
-Modus 2) bei gleichen Punkten (50,3 gegen 52,4), gleichen vollen Spalten (0,845 gegen 0,88) und gleicher
-Strafleiste; Kosten 6,75 s je Partie. **Damit ist Sockel @400 mit Modus 2 die Form mit doppelter Zielinformation
-ohne Punkte- oder Spaltenpreis** (`ALT-policy-s400` im Entwurf, 2.000 Partien rund 3,75 h). Die Sims-Kurve vom
-2026-09-13 (Abschnitt 8 "Sims und Spaltenbau") wurde mit Modus 0 gemessen und ist neu zu bewerten. **Zustandsbasierte
-Neuheits-Pruefung FERTIG (par.5d2a):** G sieht in W-Partien auch zustandsbasiert keine anderen Stellungen (M1 G-Seite JS
-0,479 unter Permutations-q95 0,545; M2 bei 100 Partien gesaettigt; M3 G nicht unsicherer, `root_q` hoeher). **Bilanz
-der Asym-Linie: in fuenf Formen kein messbarer Gewinn an Stellungen fuer G; die Hebel sind Zugwahl (Modus 2) und
-Suchtiefe @400 mit Modus 2.** Sockel-Vorschlag des Koordinators: `ALT-policy-s400` (2.000 @400, Modus 2) als
-Hauptklasse, kein W, kein Exploiter; Schwarm: Entscheid Neu-Erzeugung mit Modus 2 (rund 5 h) oder Bestand.
+| Klasse | Partien | Dateien | Sims | Stichentscheid | Stand |
+| --- | --- | --- | --- | --- | --- |
+| `value-deviate` (Schwarm) | 4.000 | 400 | 100 | Bestand (Modus 0) | abgenommen par.9 |
+| `value-excursion` (Schwarm) | 4.000 | 400 | 100 | Bestand | abgenommen par.9 |
+| `policy` | 1.000 | 100 | 400 | Modus 2 | abgenommen par.10b |
+| `policy-s100` | 1.000 | 100 | 100 | Modus 2 | abgenommen par.10b |
+| `policy-dice-v2-r1` (W-v2 Runde 1, Platzsuche 600) | 2.000 | 200 | 100 | Modus 2 | abgenommen par.10b |
 
-**NUTZER-ENTSCHEID 11:05: W und Exploiter bleiben und werden weiterentwickelt** (*"kein W und kein exploiter ist
-keine option. da darfst noch etwas optimieren bis die zwei ihre gewuenschte wirkung entfalten"*). Registriert und im
-Bau (Agenten): **par.5d3** W-v2 = Platzwahl mit eps-Spielraum (`MOSAIC_DOME_DICE_PLACE_EPS` 0,02) plus Platte aus
-G's Prior mit Temperatur (`MOSAIC_DOME_DICE_PRIOR_TEMP` 2), Sonde 400 Partien je Arm (R1, R1-2) gegen Bezug
-`policy-m2-400g`, gepaarte Abweichungsmessung in `state_novelty_probe.py`; **par.7c** Exploiter-v2 = Policy nur aus
-E-Siegen (`policy_target_valid` false fuer verlorene Partien), E @200 gegen G @100 (`--opponent-sims`), 2 x 2.000
-Partien mit Vortor (>= 0,52 nach Zyklus 1), Tor >= 0,55. Kosten HERLEITUNG: W-Sonde rund 1,5 h; Exploiter rund 11 h.
-**NUTZER-ENTSCHEID 11:35: der v35-Schwarm BLEIBT wie erzeugt** (Bestands-Stichentscheid; Nutzer: *"der gibt eigentlich
-nur schwaches spiel fuer den value head"*), keine Neu-Erzeugung. **NUTZER-ENTSCHEID 11:40: Sockel-Hauptklasse = `policy` @400 mit Modus 2, 2.000 Partien** (Entwurf umgestellt, Seed 20260950). Offen: Ergebnisse W-v2 (par.5d3) und Exploiter-v2 (par.7c) fuer die Zusatzklassen.
+Rezepte `models/v35.recipe.json` (Schwarm) und `models/v35_sockel.recipe.json` (Sockel). Nutzer-Entscheide dazu:
+Schwarm bleibt wie erzeugt (11:35); Mischsockel statt rein @400, weil @400 nachweisbar 0,07 volle Spalten je Seite
+verliert (par.8c1 der Asym-Prereg); W mit Basis 100 und Platzsuche 600 (13:30); Exploiter bleibt AUSSEN VOR (15:20).
 
-**W-v2 TRAEGT (12:40, par.5d3a/5d3b):** Runde-1-Arm (eps 0,02, T 2, Modus 2, 400 Partien gegen gepaarten Bezug):
-G-KL +0,054 [+0,036; +0,073], Versatz beider Seiten um 0, W 44,5 % [40,5; 48,5], Mehrkosten +9,8 %; gepaart zweigt
-jede Partie in Runde 1 ab, G trifft in R2/R3 etwa doppelt so oft bezugsfremde Stellungen wie der Rauschbezug (CI
-ueberlappend). R1-2-Arm faellt durch (W 40,5 %, Versatz -0,032). **Vorschlag: `policy-dice-v2-r1` mit 2.000 Partien
-in den v35-Sockel** (im Entwurf eingetragen, Seed 20260953; offen: Sims 100 wie gemessen oder 400). Kette 4
-(Nachmessung @400, par.8c) laeuft seit 12:41.
+**ERSTE AUFGABE DER NEUEN SITZUNG (Reihenfolge; alles CPU bzw. GPU, Maschine seit 18:00 frei):**
+1. **Fenster bauen** nach `PREREG_v35_window.md` (par.1: Schwarm 8.000 + Sockel 4.000, G-1/G-2 fallen weg,
+   `PREREG_asymmetric_selfplay.md` par.4a) auf dem Muster `tools/night_v34_chain.sh` Z. 38-135 (Env, Fensterliste,
+   `window_train_split.py`, `build_cache_incremental.py`): neue Kette `tools/night_v35_chain.sh` als Datei, ohne
+   Traeger-Manifest (keine Alt-Generationen), Val-Pool `^selfplay_v34-b01-`, `MOSAIC_DATA_EXCLUDE` um alle Sonden-
+   und Probe-Praefixe (`selfplay_probe-`, `selfplay_x35`, `selfplay_x35e2`) erweitern, Datenordner `data/` (NICHT
+   `data/probe_asym`, `data/exploiter*`, `data/probe_v35sockel_smoke`). **Vor dem Lauf registrieren** (par.11 der
+   v35-Prereg): Fensterliste, Val-Frac, Trainings-Seed (Vierer-Schritt nach `docs/generation_loop.md`; v34 hatte
+   20260961, also 20260965, pruefen), und die **Wertmaske der Wuerfelphase** `MOSAIC_MASK_DICE_PHASE_VALUE=1`
+   (par.5d Records: Wertziele beider Seiten in Runde 1 der W-Partien maskiert; Knopf in corpus_dataset.py und
+   train.py, beide Cache-Schluessel, gebaut 2026-10-03). Abnahme: Fensterliste 1.200 Dateien, keine Sonden-Datei
+   darin (grep), Cache-Schluessel traegt die Maske.
+2. **Training `v35-b01`** warm vom Generator (`--load v34-b01_brierbest`), Flags wie `models/manifest_train_v34-b01_20261001_183258.json`
+   `cli_args` (12 Epochen, lr 5e-5 cosine `--lr-t-max 12`, WDL, nortv, lambda 0,7, `--select-by-brier`,
+   `--fast-loader`), Kosten rund 1 h (GPU). Abnahme: Manifest-Diff gegen v34-b01 (nur erwartete Felder), Netz-
+   Paritaets-Fixture, Diagnostiken wie `docs/promotion_checklist.md`.
+3. **Tor 1** gegen `v34-b01` (Generator = Champion): `tools/paired_gating.py`, Seeds nach v34-Muster (par.2 der
+   v34-Prereg: zwei Seeds a 200 Paare, Blockgroesse 5, `--log-games`, Spec `models/v34-b01_brierbest.spec.json` auf
+   beiden Seiten), Stufenregel; Tor 2a/2b (Spalten) wie dort. Rund 1,6 h je Seed. Vorher die Tore in par.11
+   registrieren.
+4. **Bei bestandener Kante:** `/mosaic-champion-promotion`, dann Tessa und `/mosaic-generation-turnover`.
+5. **Nur auf Nutzer-Aufruf:** Exploiter-v2 (`tools/night_v35_exploiter2_chain.sh`, `PREREG_asymmetric_selfplay.md`
+   par.7c, rund 5,5 h bis zum Vortor, 11 h gesamt). Startbefehl im Terminal-Tab (2-h-Grenze der
+   Hintergrundaufgaben; Git-bash aus `Git/bin/bash.exe`).
 
-**NACHMESSUNG @400 FERTIG (13:12, par.8c1):** gepoolt 400 @400 gegen 600 @100 (Modus 2): Punkte -1,6 [-3,4; +0,2]
-(kein Verlust nachweisbar), **volle Spalten -0,07 [-0,136; -0,006] (Verlust nachweisbar, rund 8 %)**, k1-Punkte -1,1,
-KL +0,35. Leseregel -> **Vorschlag Mischsockel 1.000 @100 plus 1.000 @400** (Entwurf umgestellt: `policy` 1.000 @400,
-`policy-s100` 1.000 @100). Nutzer-Entscheid; sein Entscheid 11:40 (rein @400) stand VOR dieser Zahl.
+**Nutzer-Freigaben und Verbote (woertlich bzw. stehend):** *"committe sobald es moeglich ist"* (2026-10-01; committen
+ja, pushen nein). **Kein Push ohne Anweisung.** Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
+Loeschungen nur mit restic-Beleg UND pfadgenauer Freigabe. Messungen exklusiv, ein Build ist Last, kein Commit
+waehrend eines Wanduhr-Laufs. *"lass den exploiter noch aussen vor"* (15:20). Subagenten Opus medium, Befunde
+nachpruefen; Koordinator baut nichts selbst (Nutzer 2026-10-04 00:00). Lange Ketten im Terminal-Tab starten.
 
-**v35-SOCKEL-ERZEUGUNG FERTIG 17:43** (`PREREG_v35_window.md` par.10a: policy 1.000 @400 in 6.208 s, policy-s100 1.000 @100 in 3.178 s, policy-dice-v2-r1 2.000 in 6.415 s; alle Exit 0). **ABNAHMEN 18:20 ALLE GRUEN** (`PREREG_v35_window.md` par.10b: Manifest-Diff, Tor 0, Spiegelknopf 48,6-49,2 %, 0 unvollstaendige Partien, W-Felder vollstaendig). Maschine seit 18:00 wieder frei (Nutzer). **Naechster Schritt: Traeger-Manifest, Fenster, Cache, Training v35-b01.** Urspruenglich: (Nutzer: *"den mischsockel kannst schon starten"*; `tools/v35_sockel_generate.sh`
-im Terminal-Tab, Rezept `models/v35_sockel.recipe.json`, `PREREG_v35_window.md` par.10): Smoke, dann `policy` 1.000 @400 und
-`policy-s100` 1.000 @100, beide Modus 2, nach `data/`; rund 2,6 h. **Dahinter wartet `tools/v35_sockel_w_generate.sh`**
-(Terminal-Tab, `wait_for_free_cpu`): `policy-dice-v2-r1` 2.000 Partien, Basis 100, Platzsuche 600 (Nutzer 13:30), rund
-1,8 h. **NUTZER 15:20: Exploiter-v2 bleibt AUSSEN VOR; nach der W-Klasse ist die Maschine bis auf Widerruf beim
-Nutzer** (*"lass den exploiter noch aussen vor. ich brauch die maschine bis auf widerruf nach der w-klasse"*): nach
-`v35_sockel_w_generate.sh` startet NICHTS mehr, auch kein Commit (Hook ist Last), bis der Nutzer freigibt. Abnahmen der
-Erzeugung nach par.8 der v35-Prereg dann ebenfalls erst nach Freigabe.
+**Offene Nutzer-Entscheide:** (a) Exploiter-v2 fahren oder streichen (par.7c; Chance nach Koordinator rund 1 zu 4);
+(b) nach Tor 1: Promotion und Projektabschluss; (c) Reste in `data/probe_asym` (Sonden), `data/exploiter`,
+`data/exploiter_smoke`, `data/exploiter2` (leer), `data/probe_v35sockel_smoke`, Modelle `alphazero_x35-e01/02/03*`:
+Loeschung nur auf Freigabe mit restic-Beleg; (d) Server-Neustart fuer v34-b01 in der GUI (seit 2026-10-03 offen).
 
-**Wichtigster Befund:** der Generator spielt seit `tau_argmax_from_move` 1 bei Besuchs-Gleichstand den ERSTEN
-Eintrag statt nach Q (par.5e); dieselbe Suche mit Q-Stichentscheid gewinnt 3 von 4 Partien gegen ihn. Das Policy-
-Ziel war nie betroffen, die Trajektorien und Wertziele aller bisherigen Fenster schon (auch der schon erzeugte
-v35-Schwarm). Konsumenten gegrept (par.5e3).
+**Befunde des Tages, registriert (Kurzform; Details in den Preregs):** Q-Stichentscheid der Erzeugungs-Zugwahl
+gewinnt 75 % gegen den Bestand (`PREREG_asymmetric_selfplay.md` par.5e2/5e3, `docs/pitfalls.md`); @400 mit Modus 2
+verdoppelt die KL bei gleichen Punkten, verliert aber 0,07 volle Spalten (par.8b1/8c1; Sims-Kurve par.8e der
+Sims-Prereg ist mit Modus 0 gemessen, par.8f dort); W-v2 Runde 1 traegt (par.5d3a/b: G-KL +0,054, kein Versatz,
+W 44,5 %); Stoerer, Exploiter v1 (46 %), v32 als Gegner tragen nicht (par.5c3, 7a, 7b1).
 
-**Rezept-Entwurf fuer den v35-Sockel:** `models/v35_sockel_draft.recipe.json` (loest sich ueber die Rezept-Schicht
-auf, nicht gestartet): `policy` 2.000 @100 mit Modus 2; `ALT-policy-s400` (1.000 @400) als Mischarm-Alternative;
-`policy-dice-r1` optional; `policy-exploiter` nur belassen, NICHT empfohlen. Seeds 20260953-55 VORSCHLAG,
-registrieren vor dem Lauf. Offen, ob der Schwarm mit Modus 2 NEU erzeugt wird (rund 5 h) oder der Bestand bleibt.
-
-**Nutzer-Entscheide fuer heute:** (1) `tau_tiebreak_q` 2 in die Erzeugung (Sockel; Schwarm neu oder Bestand);
-(2) Sockel @100, @400 oder Mischarm; (3) W R1 ja/nein; (4) E-Seiten-Records sind nicht entstanden (Tor gefallen),
-Punkt entfaellt; (5) Commit des Nachtbaus (unten).
-
-**Gebaut in der Nacht (Agenten, alles getestet, Lib 856 gruen, `--no-run` gruen, Anker-Drift/-Konservierung
-und Paritaets-Fixture gruen):** Spec-/Env-Feld `tau_tiebreak_q` (Modus 0/1/2) und Seitenknopf
-`MOSAIC_TAU_TIEBREAK_SIDE`; `tie_frequency_report` (`#[ignore]`); zweites Netz je Seite im Self-Play
-(`--opponent-model`, `--record-sides`, Felder `opponent_side`/`net_label`); Rezepte `v35_probes2`,
-`v35_exploiter`, `v35_sockel_draft`; Ketten `night_v35_prep_chain1.sh`, `night_v35_exploiter_chain.sh`
-(mit `EXPLOITER_FROM_CYCLE`); `tools/split_records_by_net_label.py`, `tools/probes/exploiter_cycle_report.py`;
-`asym_probe_report.py` mit `--kl-class` und `--side-class`. Bauplan `evaluations/exploiter_build_plan.md`.
-**Nicht committet** (Nutzer-Freigabe vom 2026-10-01 "committe sobald es moeglich ist" gilt; Commit folgt in
-dieser Sitzung, ohne `player_profiles.json`).
-
-**Betriebsbefunde:** (a) Hintergrundaufgaben enden nach max. 2 h; danach scheitern NEUE Subprozesse der verwaisten
-Kette mit 0xC0000142 (Zyklus 3 bei 70 Partien abgebrochen, Tail per Chunk-Seed nachgezogen, `--games 930
---seed 20261759`); lange Ketten im Terminal-Tab starten (Git-bash aus `Git/bin/bash.exe`, nicht `usr/bin`).
-(b) Zwei Netze je Partie kosten 6,1 s statt 2,9 s je Partie. (c) Zyklus-Basis-Seeds 20261750/51/52 ueberlappen
-ueber die Chunks (par.7 Chronik); kuenftig mindestens 100 Abstand.
-
-**Reste in `data/`:** `data/probe_asym` (Sonden-Klassen inkl. s400, tb1, tb2), `data/exploiter` (3.000 Partien plus
-drei `train_x35-e0k`-Kopien), `data/exploiter_smoke`; Modelle `alphazero_x35-e01/02/03*` plus Manifeste. Nichts
-davon im Fenster; Loeschung nur auf Freigabe mit restic-Beleg.
+**Betriebsbefunde:** Hintergrundaufgaben enden nach max. 2 h, danach scheitern NEUE Subprozesse der verwaisten Kette
+mit 0xC0000142 (Memory); zwei Netze je Partie kosten 6,1 statt 2,9 s; Zyklus-Basis-Seeds brauchen Abstand >= Chunkzahl.
 
 **FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
 `PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
