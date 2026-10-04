@@ -39,11 +39,11 @@
       }
     },
     "ALT-policy-s400": {
-      "description": "ALTERNATIVE zu policy (par.8a): Sockel @400. KL x2, aber Punkte je Seite 46,9 -> 31,4, volle Spalten 0,90 -> 0,445, Strafleiste +2,5; 6,0 s je Partie (2.000 Partien rund 3,3 h). Vorschlag Koordinator: wenn, dann als Mischarm 1.000 @100 (policy mit games 1000) plus 1.000 hier.",
+      "description": "ALTERNATIVE zu policy (par.8b1): Sockel @400 mit Modus 2. KL 0,338 -> 0,683 bei gleichen Punkten (50,3 gegen 52,4), gleichen vollen Spalten und gleicher Strafleiste; der Einbruch aus par.8a war der Bestands-Stichentscheid. 6,75 s je Partie, 2.000 Partien rund 3,75 h. Hier als 2.000 eingetragen; wer mischen will, setzt games hier und bei policy auf 1.000.",
       "version": "v34-b01-policy-s400",
       "seed": 20260954,
       "sims": 400,
-      "games": 1000,
+      "games": 2000,
       "tau_tiebreak_q": 2,
       "expect_engine_config": {
         "excursion_kl_weight": 0,

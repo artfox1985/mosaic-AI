@@ -1407,3 +1407,17 @@ v28-b02@100 gegen v22-b05@25; (b) Build des P.10-Fixes plus Record-Feld `tiled_m
 (d) Schwarm-Erzeugung v29 mit 100 Sims (`PREREG_v29_window.md` par.8 Punkt 8). Dieser Punkt ist
 zugleich der dritte Spiegelstrich von `PREREG_v29_window.md` par.7 Punkt 4 und Voraussetzung
 fuer den Sockel-Teil von par.1/par.6 dort.
+
+## par.8f NACHTRAG 2026-10-04: par.8e wurde mit dem Bestands-Stichentscheid gemessen
+
+Die Sims-Kurve par.8e (volle Spalten 1,098 / 0,958 / 0,895 / 0,820 bei 100 / 200 / 400 / 600 Sims) lief mit
+`tau_argmax_from_move` 1 und dem damaligen Stichentscheid "Gleichstand = erster Eintrag" (`argmax_index`,
+self_play.rs:559). `PREREG_asymmetric_selfplay.md` par.5e3 zeigt, dass dieser Stichentscheid gegen "bestes Q der
+Halving-Ueberlebenden" (Modus 2) 75 % der Partien verliert, und par.8b1, dass @400 MIT Modus 2 gegen @100 mit
+Modus 2 in Vollendung (0,845 gegen 0,88, CI ueberlappen), Punkten (50,3 gegen 52,4) und Strafleiste gleich liegt,
+waehrend @400 mit Modus 0 auf 0,445 volle Spalten und 31,4 Punkte faellt. HERLEITUNG: bei mehr Sims liegen nach dem
+Halving mehr Kinder gleichauf, der Fehler waechst mit den Sims; der monotone Abfall in par.8e ist damit mindestens
+teilweise Artefakt. Der Entscheid "Betriebspunkt 100 BLEIBT" ist dadurch nicht aufgehoben, aber seine Grundlage;
+eine Neumessung der Kurve mit Modus 2 ist vor der naechsten Sims-Entscheidung faellig (Kosten par.8e: rund 4,4 h fuer
+vier Punkte a 200 Partien, HERLEITUNG aus den dortigen Laufzeiten). Status-Kopf bleibt ENTSCHIEDEN.
+

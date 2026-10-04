@@ -391,6 +391,35 @@ class TiebreakSideClasses(unittest.TestCase):
             self.assertTrue(check_engine_config({k: v for k, v in want.items() if k != "tau_tiebreak_q"},
                                                 want), "altes Wheel ohne Feld")
 
+    def test_probe_classes_par7b_par8b(self):
+        """par.7b/par.8b: policy-m2, policy-vs-v32, policy-s400-m2 -- Modus 2 beide Seiten, ohne Seitenknopf."""
+        want = {"policy-m2": (200, 100, None), "policy-s400-m2": (100, 400, None),
+                "policy-vs-v32": (200, 100, "models/alphazero_v32-b01_brierbest.onnx")}
+        for cls, (games, sims, opp) in want.items():
+            ns = self._parse(cls)
+            self.assertEqual((ns.games, ns.sims, ns.seed, ns.tau_tiebreak_q, ns.tau_tiebreak_side),
+                             (games, sims, 20261720, 2, False), cls)
+            self.assertEqual((ns.opponent_model, ns.record_sides, ns.deviate_prob), (opp, "both", 1.0), cls)
+        self.assertTrue((REPO / want["policy-vs-v32"][2]).exists(), "Gegner-Netz liegt")
+
+    def test_guard_of_the_probe_classes(self):
+        import os
+        from tools.recipe_config import check_engine_config, expected_engine_config, load_recipe
+        recipe = load_recipe(self.PROBES2)
+        opp = "models/alphazero_v32-b01_brierbest.onnx"
+        engine = {"excursion_kl_weight": 0, "dome_dice": 0, "aggr_side": 0, "tau_tiebreak_side": 0,
+                  "tau_tiebreak_q": 2, "record_sides": "both", "tie_mirror_p": 0.5, "label_rng_split": True,
+                  "excursion_reshuffle": True, "single_pass_other_val": True, "r5_net_solver": False}
+        vs = expected_engine_config(recipe, "policy-vs-v32")
+        # self_play.py meldet den Pfad aus pathlib (unter Windows mit Rueckstrichen).
+        self.assertEqual(check_engine_config(dict(engine, opponent_model=os.path.normpath(opp)), vs), [])
+        self.assertTrue(check_engine_config(dict(engine, opponent_model=None), vs), "ohne Zweitnetz")
+        for cls in ("policy-m2", "policy-s400-m2"):
+            want = expected_engine_config(recipe, cls)
+            self.assertEqual(check_engine_config(dict(engine, opponent_model=None), want), [], cls)
+            self.assertTrue(check_engine_config(dict(engine, opponent_model=opp), want), cls)
+            self.assertTrue(check_engine_config(dict(engine, opponent_model=None, tau_tiebreak_q=0), want), cls)
+
     def test_env_variables_are_reserved_for_the_flags(self):
         reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
         self.assertEqual(reserved.get("MOSAIC_TAU_TIEBREAK_SIDE"), "tau_tiebreak_side")

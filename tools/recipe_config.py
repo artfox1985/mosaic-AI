@@ -769,6 +769,16 @@ def _values_match(expected, actual) -> bool:
     expected_number, actual_number = _as_float(expected), _as_float(actual)
     if expected_number is not None and actual_number is not None:
         return math.isclose(expected_number, actual_number, rel_tol=1e-9, abs_tol=1e-12)
+    # Pfade (2026-10-04, PREREG_asymmetric_selfplay.md par.7b): self_play.py loest
+    # `--opponent-model` ueber pathlib auf und meldet ihn unter Windows mit
+    # Rueckstrichen, das Rezept schreibt Vorwaertsstriche. Zwei Texte, von denen der
+    # erwartete einen Pfadtrenner enthaelt, werden darum normalisiert verglichen
+    # (`normpath` + `normcase`, wie die Manifest-Pruefung in
+    # tools/night_v35_exploiter_chain.sh). Relativ gegen absolut bleibt ungleich.
+    if (isinstance(expected, str) and isinstance(actual, str)
+            and ("/" in expected or "\\" in expected)):
+        return (os.path.normcase(os.path.normpath(expected))
+                == os.path.normcase(os.path.normpath(actual)))
     return expected == actual
 
 

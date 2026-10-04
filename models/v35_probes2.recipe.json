@@ -67,6 +67,60 @@
         "tau_tiebreak_side": 1,
         "tau_tiebreak_q": 2
       }
+    },
+    "policy-m2": {
+      "description": "par.7b/par.8b: Bezugsklasse unter Stichentscheid Modus 2 auf BEIDEN Seiten (vorgeschlagener v35-Sockel), G gegen G, 200 Partien @100, Seed wie policy.",
+      "version": "probe-v35-policy-m2",
+      "seed": 20261720,
+      "games": 200,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": null,
+        "record_sides": "both"
+      }
+    },
+    "policy-vs-v32": {
+      "description": "par.7b Weg 1: G (v34-b01) gegen den vorigen Champion v32-b01 als Zweitnetz auf einer Seite je Partie (opponent_side, Hash aus dem Partie-Seed), Records beider Seiten mit net_label, Modus 2 beide Seiten, 200 Partien @100, Seed wie policy.",
+      "version": "probe-v35-policy-vs-v32",
+      "seed": 20261720,
+      "games": 200,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "opponent_model": "models/alphazero_v32-b01_brierbest.onnx",
+      "record_sides": "both",
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": "models/alphazero_v32-b01_brierbest.onnx",
+        "record_sides": "both"
+      }
+    },
+    "policy-s400-m2": {
+      "description": "par.8b: wie policy-s400 (100 Partien @400, Seed wie policy), aber Stichentscheid Modus 2 auf beiden Seiten.",
+      "version": "probe-v35-policy-s400-m2",
+      "seed": 20261720,
+      "games": 100,
+      "sims": 400,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": null,
+        "record_sides": "both"
+      }
     }
   },
   "expect_engine_config": {

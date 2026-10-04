@@ -104,7 +104,18 @@ def main() -> None:
                          "Dateien), Punkte und Marge beider Seiten, Standard-Kennzahlen je Seite, Kosten je "
                          "Partie; S1-S4 entfallen")
     ap.add_argument("--side-field", default="tiebreak_side",
-                    help="Record-Feld mit dem Spielerindex der markierten Seite (Default tiebreak_side)")
+                    help="Record-Feld mit dem Spielerindex der markierten Seite (Default tiebreak_side; "
+                         "fuer ein Zweitnetz opponent_side, dann ist die 'sonderseite' das Zweitnetz)")
+    ap.add_argument("--side-names", default=None,
+                    help="Beschriftung 'sonderseite,G' im JSON, z. B. 'v32-b01 (Zweitnetz),v34-b01 (G)'")
+    ap.add_argument("--kl-baseline", default="policy",
+                    help="Bezugsklasse des KL-Vergleichs (Default policy; par.7b/par.8b: policy-m2)")
+    ap.add_argument("--kl-side-field", default=None,
+                    help="mit --kl-side-value: nur Records der KL-Klasse mit diesem Feldwert (z. B. net_label)")
+    ap.add_argument("--kl-side-value", default=None,
+                    help="Feldwert zu --kl-side-field (z. B. primary = Seite des Generators)")
+    ap.add_argument("--kl-extra-class", default=None,
+                    help="dritte Spalte: KL, Kosten und Standard-Kennzahlen einer weiteren Klasse (ohne Filter)")
     ap.add_argument("--dice-class", default="policy-dice",
                     help="W-Klasse fuer S1-S3 (par.5b: policy-dice-src4 nach der neuen Quellenregel)")
     ap.add_argument("--skip-s4", action="store_true", help="S4 (Stoerer-Stufen) auslassen")
@@ -134,7 +145,7 @@ def main() -> None:
             o = model(torch.stack([state_to_planes(d) for d in states]), flat) if encoder == "2d" else model(flat)
         return o[0].numpy(), ((o[1][:, 0] + 1.0) / 2.0).numpy()
 
-    def read_class(cls: str, side_field: str | None):
+    def read_class(cls: str, side_field: str | None, record_filter=None):
         """Je Drafting-Record (R1-4, completed, Ziel >= 2 IDs): Datei, Seite (0 = Sonderseite W/S, 1 = G,
         -1 ohne Sonderseite), Runde, forced_domes_before, Sieg der Seite am Zug, KL, p_head; dazu je
         Partie Endstand, Sieger, Sonderseite und gezahlte Wuerfel-Punkte; own_q_gap der Sonderseite."""
@@ -177,6 +188,8 @@ def main() -> None:
                         continue
                     if r.get("dice_place"):
                         continue  # Platzwahl-Records: kein Halbzug, Ziel nur ueber die Plaetze
+                    if record_filter is not None and not record_filter(r):
+                        continue  # --kl-side-field/--kl-side-value: nur Records dieser Seite
                     rnd = int(st.get("round", 0))
                     if rnd not in ROUNDS or "winner" not in r:
                         continue
@@ -256,18 +269,26 @@ def main() -> None:
         mark = sgs["sonderseite"]
         ci = mark["siegquote_ci95"]
         mar = mark["marge"]
-        if ci and ci[0] > 0.5 and mar is not None and mar > 0:
+        if sf != "tiebreak_side":
+            # Leseregel par.5e1 gilt nur fuer den Stichentscheid; fuer ein Zweitnetz (par.7b) entscheidet
+            # die KL der G-Seite zusammen mit dem Versatz unten.
+            lesart = None
+        elif ci and ci[0] > 0.5 and mar is not None and mar > 0:
             lesart = "CI ganz ueber 0,50 UND Marge > 0: Modus als Vorschlag ins v35-Sockel-Rezept (Nutzer-Entscheid)"
         elif ci and ci[1] < 0.5:
             lesart = "CI ganz unter 0,50: Bestand bleibt, par.5c1 war dann etwas anderes (zu klaeren)"
         else:
             lesart = "CI mit 0,50 (oder Marge <= 0): Bestand bleibt, berichtet"
         n_marked = sum(1 for g in sgames if g["special"] is not None)
+        names = (args.side_names.split(",", 1) if args.side_names
+                 else (["Seite mit Knopf", "Gegenseite (Modus 0)"] if sf == "tiebreak_side"
+                       else [f"Seite aus `{sf}`", "Gegenseite"]))
         out["side_class"] = args.side_class
         out["side_field"] = sf
+        out["beschriftung"] = {"sonderseite": names[0].strip(), "G": names[-1].strip()}
         out["seiten"] = {
             "grundmenge": (f"Partien der Klasse {args.side_class} mit eindeutigem `{sf}` ({n_marked} von "
-                           f"{len(sgames)}); 'sonderseite' = Seite mit Knopf, 'G' = Gegenseite (Modus 0)"),
+                           f"{len(sgames)}); 'sonderseite' = {names[0].strip()}, 'G' = {names[-1].strip()}"),
             "einheit": "Siegquote je Partie (CI Block-Bootstrap ueber Dateien), Punkte und Marge je Partie",
             "partien": sgs,
             "siegquote_gegen_050": {"siegquote": mark["siegquote"], "ci95": ci,
@@ -277,10 +298,19 @@ def main() -> None:
             "nicht_beendet": sum(1 for g in sgames if not g["completed"]),
             # Wertkopf-Versatz je Seite (vorhandene Groesse aus S3/S4, ohne Leseregel hier).
             "kalibrierung": {"sonderseite": calibration(sarr, nf, 0), "G": calibration(sarr, nf, 1)},
+            "kalibrierung_einheit": ("Wertkopf des Generators (--model) je Drafting-Record R1-4 der Seite am Zug: "
+                                     "mittlere Vorhersage P(Sieg) minus tatsaechliche Siegrate"),
         }
+        cal_g = out["seiten"]["kalibrierung"]["G"]
+        if cal_g:
+            cig = cal_g.get("versatz_ci95")
+            # par.7b-Regel fuer die G-Seite: |Versatz| <= 0,05 oder CI mit 0.
+            out["seiten"]["versatz_G_unverzerrt"] = bool(abs(cal_g["versatz"]) <= 0.05
+                                                         or (cig and cig[0] <= 0.0 <= cig[1]))
         out["kosten"] = {"grundmenge": "Partien, Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
                          args.side_class: manifest_runtime(data, args.side_class),
-                         "policy": manifest_runtime(data, "policy")}
+                         "policy": manifest_runtime(data, "policy"),
+                         "policy-m2": manifest_runtime(data, "policy-m2")}
 
         def side_of(rec):
             v = rec.get(sf)
@@ -301,47 +331,85 @@ def main() -> None:
         print(f"Ergebnis: {args.out} ({time.monotonic() - t_start:.1f} s)", flush=True)
         return
 
-    # --- Nur KL-Vergleich einer Klasse gegen den Sockel (--kl-class) ----------------------------
+    # --- Nur KL-Vergleich einer Klasse gegen eine Bezugsklasse (--kl-class) --------------------
     if args.kl_class:
         import corpus_sanity_check
-        pf, pa, _pg, _ = read_class("policy", None)
-        kf, ka, _kg, _ = read_class(args.kl_class, None)
+        base_name, cls_name, extra_name = args.kl_baseline, args.kl_class, args.kl_extra_class
+        if (args.kl_side_field is None) != (args.kl_side_value is None):
+            raise SystemExit("--kl-side-field und --kl-side-value gehoeren zusammen")
+        side_filter = None
+        if args.kl_side_field is not None:
+            side_filter = (lambda r, f=args.kl_side_field, v=args.kl_side_value:
+                           r.get(f) is not None and str(r.get(f)) == str(v))
+        pf, pa, _pg, _ = read_class(base_name, None)
+        kf, ka, _kg, _ = read_class(cls_name, None, record_filter=side_filter)
         base_bf = by_file(pa, np.ones(len(pa["kl"]), bool), "kl", len(pf))
-        cls_bf = by_file(ka, np.ones(len(ka["kl"]), bool), "kl", len(kf))
-        ci = boot_diff_ci(cls_bf, base_bf, np.median, rng) if len(ka["kl"]) and len(pa["kl"]) else None
-        kl = {"grundmenge": ("Drafting-Records R1-4 (Ziel >= 2 IDs, ohne Platzwahl-Records), alle Seiten; "
-                             f"Klasse {args.kl_class} gegen alle Records der Klasse policy"),
-              "einheit": "KL(Ziel || Prior des Generators) je Record, Median; CI Block-Bootstrap ueber Dateien",
-              "policy": {"n": int(len(pa["kl"])), "dateien": len(pf),
-                         "median": float(np.median(pa["kl"])) if len(pa["kl"]) else None},
-              args.kl_class: {"n": int(len(ka["kl"])), "dateien": len(kf),
-                              "median": float(np.median(ka["kl"])) if len(ka["kl"]) else None},
-              "median_diff_gegen_policy": (float(np.median(ka["kl"]) - np.median(pa["kl"]))
-                                           if len(ka["kl"]) and len(pa["kl"]) else None),
-              "ci95": ci,
-              "lesart": ("hoeher als policy" if ci and ci[0] > 0
-                         else "niedriger als policy" if ci and ci[1] < 0 else "nicht nachweisbar anders")}
-        kl["je_runde"] = {str(r): {"policy": float(np.median(pa["kl"][pa["round"] == r])) if (pa["round"] == r).any() else None,
-                                   args.kl_class: float(np.median(ka["kl"][ka["round"] == r])) if (ka["round"] == r).any() else None}
-                          for r in ROUNDS}
-        out["kl_class"] = args.kl_class
+
+        def kl_against_base(arr, nfiles):
+            """Median-KL einer Klasse, Differenz zur Bezugsklasse mit Block-Bootstrap-CI ueber Dateien."""
+            if not len(arr.get("kl", [])) or not len(pa["kl"]):
+                return {"n": int(len(arr.get("kl", []))), "dateien": nfiles, "median": None,
+                        f"median_diff_gegen_{base_name}": None, "ci95": None, "lesart": "keine Records"}
+            ci_ = boot_diff_ci(by_file(arr, np.ones(len(arr["kl"]), bool), "kl", nfiles), base_bf, np.median, rng)
+            return {"n": int(len(arr["kl"])), "dateien": nfiles, "median": float(np.median(arr["kl"])),
+                    f"median_diff_gegen_{base_name}": float(np.median(arr["kl"]) - np.median(pa["kl"])),
+                    "ci95": ci_,
+                    "lesart": (f"hoeher als {base_name}" if ci_ and ci_[0] > 0
+                               else f"niedriger als {base_name}" if ci_ and ci_[1] < 0
+                               else "nicht nachweisbar anders")}
+
+        def per_round(arr):
+            return {str(r): (float(np.median(arr["kl"][arr["round"] == r]))
+                             if len(arr.get("kl", [])) and (arr["round"] == r).any() else None) for r in ROUNDS}
+
+        cls_kl = kl_against_base(ka, len(kf))
+        sel = (f"nur Records mit {args.kl_side_field} == {args.kl_side_value!r}" if side_filter
+               else "alle Seiten")
+        kl = {"grundmenge": ("Drafting-Records R1-4 (Ziel >= 2 IDs, ohne Platzwahl-Records); "
+                             f"Klasse {cls_name} ({sel}) gegen alle Records der Klasse {base_name}"),
+              "einheit": "KL(Ziel || Prior des Generators --model) je Record, Median; CI Block-Bootstrap ueber Dateien",
+              base_name: {"n": int(len(pa["kl"])), "dateien": len(pf),
+                          "median": float(np.median(pa["kl"])) if len(pa["kl"]) else None},
+              cls_name: cls_kl,
+              # Bestandsschluessel (Artefakt probe_policy_s400_kl.json): Differenz, CI und Lesart der Klasse.
+              f"median_diff_gegen_{base_name}": cls_kl[f"median_diff_gegen_{base_name}"],
+              "ci95": cls_kl["ci95"], "lesart": cls_kl["lesart"],
+              "record_filter": ({"feld": args.kl_side_field, "wert": args.kl_side_value} if side_filter else None)}
+        kl["je_runde"] = {base_name: per_round(pa), cls_name: per_round(ka)}
+        files_by_class = {base_name: pf, cls_name: kf}
+        if extra_name:
+            xf, xa, _xg, _ = read_class(extra_name, None)
+            kl[extra_name] = kl_against_base(xa, len(xf))
+            kl["je_runde"][extra_name] = per_round(xa)
+            files_by_class[extra_name] = xf
+        out["kl_class"] = cls_name
+        out["kl_baseline"] = base_name
         out["KL"] = kl
-        lz_p, lz_k = manifest_runtime(data, "policy"), manifest_runtime(data, args.kl_class)
-        cost = {"grundmenge": "Partien je Klasse, Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
-                "policy": lz_p, args.kl_class: lz_k}
-        if lz_p and lz_k and lz_p.get("s_je_partie") and lz_k.get("s_je_partie"):
-            cost["kostenfaktor_gegen_policy"] = lz_k["s_je_partie"] / lz_p["s_je_partie"]
+        cost = {"grundmenge": "Partien je Klasse, Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest"}
+        for name in files_by_class:
+            cost[name] = manifest_runtime(data, name)
+        lz_b = cost[base_name]
+        for name in files_by_class:
+            lz = cost[name]
+            if name != base_name and lz and lz_b and lz.get("s_je_partie") and lz_b.get("s_je_partie"):
+                cost[f"kostenfaktor_{name}_gegen_{base_name}"] = lz["s_je_partie"] / lz_b["s_je_partie"]
         out["kosten"] = cost
-        # Standard-Kennzahlen (CLAUDE.md 2026-08-23) aus dem Endzustand je Partie; G gegen G, darum je
-        # Partie-Seite gemittelt (die Marge ist per Konstruktion 0 im Mittel, berichtet wird sie trotzdem).
-        std = {"quelle": "tools/corpus_sanity_check.py auswerten (score_geo / scoring_tile_points des Endzustands)",
-               "policy": corpus_sanity_check.auswerten(str(data), files=pf),
-               args.kl_class: corpus_sanity_check.auswerten(str(data), files=kf)}
+        # Standard-Kennzahlen (CLAUDE.md 2026-08-23) aus dem Endzustand je Partie, je Partie-Seite gemittelt
+        # ueber ALLE Seiten (auch bei --kl-side-field; je Seite getrennt: --side-class).
+        std = {"quelle": "tools/corpus_sanity_check.py auswerten (score_geo / scoring_tile_points des Endzustands), "
+                         "alle Seiten"}
+        for name, files in files_by_class.items():
+            std[name] = corpus_sanity_check.auswerten(str(data), files=files)
         diff_keys = ("zeilen_voll", "zeilen_fuell", "sp_voll", "sp_ge4", "sp_ge3", "sp_max", "floor", "punkte")
-        std["differenz_klasse_minus_policy"] = {k: std[args.kl_class][k] - std["policy"][k] for k in diff_keys}
+        for name in files_by_class:
+            if name != base_name:
+                std[f"differenz_{name}_minus_{base_name}"] = {k: std[name][k] - std[base_name][k] for k in diff_keys}
+        if base_name == "policy":
+            std["differenz_klasse_minus_policy"] = std[f"differenz_{cls_name}_minus_policy"]
         out["standard_kennzahlen"] = std
+        n_states = len(pa["kl"]) + len(ka.get("kl", []))
         out["laufzeit"] = laufzeit_block(t_start, cpu_start=c_start, threads=torch.get_num_threads(),
-                                         n_units=len(pa["kl"]) + len(ka["kl"]), unit="zustand")
+                                         n_units=n_states, unit="zustand")
         Path(BASE_DIR / args.out).parent.mkdir(parents=True, exist_ok=True)
         json.dump(out, open(BASE_DIR / args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         print(json.dumps({k: out[k] for k in ("KL", "kosten")}, ensure_ascii=False, indent=1)[:4000], flush=True)

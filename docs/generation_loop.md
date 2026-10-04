@@ -170,6 +170,12 @@ mehr, und es faellt allein die VOLLENDUNG: die Teilspalten (>= 3 und >= 4)
 bleiben ueber den ganzen Bereich unveraendert. Auch die BETRIEBSART zaehlt, nicht
 nur die Sims-Zahl: argmax ohne Wurzelrauschen und policy-aktiv mit Temperatur
 sind nicht gegeneinander ablesbar.
+**Nachtrag 2026-10-04:** diese Kurve wurde mit dem Bestands-Stichentscheid der
+Erzeugungs-Zugwahl gemessen (Gleichstand = erster Eintrag, `tau_tiebreak_q` 0).
+Mit Q-Stichentscheid (Modus 2) liegt @400 in Vollendung, Punkten und Strafleiste
+gleich mit @100 (`PREREG_asymmetric_selfplay.md` par.8b1, je 100 bzw. 200
+Partien); der monotone Abfall ist also mindestens teilweise ein Artefakt des
+Stichentscheids und vor der naechsten Sims-Entscheidung neu zu messen.
 
 **"Mindestens genauso viel" ist der Punktschaetzer** (Nutzer-Anweisung
 2026-08-31: "mindestens genauso viel Affinitaet zum Spaltenbau wie der

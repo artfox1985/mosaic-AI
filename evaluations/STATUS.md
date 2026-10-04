@@ -35,6 +35,19 @@ nichts sondern orchestrierst nur"*.) Alles registriert in `PREREG_asymmetric_sel
 | Sockel @400 Vortest (par.8a) | KL 0,316 -> 0,625 (CI klar), Kosten x2,07, **Punkte je Seite 46,9 -> 31,4**, volle Spalten 0,90 -> 0,445, Strafleiste +2,5 | beschreibend | Vorschlag Mischarm statt ganzer Sockel; **Nutzer-Entscheid** |
 | Exploiter (par.7a) | E_1 45,8 %, E_2 47,6 % gegen G; **Tor E_3 gegen G 185:215 = 46,25 %** (Ziel >= 55 %) | Tor faellt nicht | **keine Exploiter-Klasse**; Bau bleibt (AUS byte-gleich) |
 
+**NACHTRAG 10:35 (Kette 2, par.7b1 / par.8b1):** (a) Weg 1, v32-b01 als Gegner mit anderem Stil: KL der G-Seite
++0,010 [-0,009; +0,032], G gewinnt 64 %, Versatz G -0,10 (CI ohne 0) -> traegt nicht, keine Sockel-Klasse.
+(b) **Der Punkte-Einbruch @400 war der Stichentscheid:** @400 mit Modus 2 liefert KL 0,683 gegen 0,338 (@100,
+Modus 2) bei gleichen Punkten (50,3 gegen 52,4), gleichen vollen Spalten (0,845 gegen 0,88) und gleicher
+Strafleiste; Kosten 6,75 s je Partie. **Damit ist Sockel @400 mit Modus 2 die Form mit doppelter Zielinformation
+ohne Punkte- oder Spaltenpreis** (`ALT-policy-s400` im Entwurf, 2.000 Partien rund 3,75 h). Die Sims-Kurve vom
+2026-09-13 (Abschnitt 8 "Sims und Spaltenbau") wurde mit Modus 0 gemessen und ist neu zu bewerten. **Zustandsbasierte
+Neuheits-Pruefung FERTIG (par.5d2a):** G sieht in W-Partien auch zustandsbasiert keine anderen Stellungen (M1 G-Seite JS
+0,479 unter Permutations-q95 0,545; M2 bei 100 Partien gesaettigt; M3 G nicht unsicherer, `root_q` hoeher). **Bilanz
+der Asym-Linie: in fuenf Formen kein messbarer Gewinn an Stellungen fuer G; die Hebel sind Zugwahl (Modus 2) und
+Suchtiefe @400 mit Modus 2.** Sockel-Vorschlag des Koordinators: `ALT-policy-s400` (2.000 @400, Modus 2) als
+Hauptklasse, kein W, kein Exploiter; Schwarm: Entscheid Neu-Erzeugung mit Modus 2 (rund 5 h) oder Bestand.
+
 **Wichtigster Befund:** der Generator spielt seit `tau_argmax_from_move` 1 bei Besuchs-Gleichstand den ERSTEN
 Eintrag statt nach Q (par.5e); dieselbe Suche mit Q-Stichentscheid gewinnt 3 von 4 Partien gegen ihn. Das Policy-
 Ziel war nie betroffen, die Trajektorien und Wertziele aller bisherigen Fenster schon (auch der schon erzeugte
@@ -364,7 +377,8 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
   `mosaic_env`.
 - **`MOSAIC_ENVELOPE_REACH_W` und `_SLOT_W`** haben keine Spec-Entsprechung (heute inert).
 - **Sims und Spaltenbau:** die Kurve am Champion faellt ueber 100-600 Sims monoton, allein ueber
-  die VOLLENDUNG.
+  die VOLLENDUNG. **Gemessen mit Bestands-Stichentscheid (Modus 0); mit Modus 2 ist @400 gegen @100 in der
+  Vollendung gleich (par.8b1, 2026-10-04), die Kurve ist neu zu bewerten.**
 - **Kein zurueckgehaltener Satz der laufenden Aera** (jede Datei liegt in mindestens einem Fenster).
 - **Pfadform der Dateiliste im Cache-Schluessel:** Normalisierung auf Basenames entwertet jeden
   Monolithen; Nutzer-Entscheid an einem Generationswechsel (passt zu Review #23b).

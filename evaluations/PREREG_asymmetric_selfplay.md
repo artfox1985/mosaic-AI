@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W Vollform verliert 75-77 % (par.5a); Eroeffnungs-Wuerfel R1 ausgeglichen, G-KL +0,03 CI um 0 (par.5d1). Stoerer-Knopf traegt nicht (par.5c3). Exploiter E_3 gegen G 46 % statt >= 55 % (par.7a), geschlossen. TRAEGT: Q-Stichentscheid der Erzeugungs-Zugwahl 75 % gegen Bestand (par.5e3), Vorschlag Modus 2. Sockel @400: KL x2, aber -15 Punkte (par.8a). Offen: v35-Sockel (Nutzer). -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: NEIN in allen fuenf Formen (W Vollform par.5a, W Eroeffnung par.5d1 und zustandsbasiert par.5d2a, Stoerer par.5c3, Exploiter 46 % par.7a, v32 par.7b1). TRAEGT stattdessen: Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3), und @400 mit Modus 2 verdoppelt die KL bei gleichen Punkten und Spalten (par.8b1). Offen: v35-Sockel-Entscheid (Nutzer). -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -675,6 +675,68 @@ Mittels rund 1,5, also Rauschen). **Verdikt: Stoerer als Suchknopf (Blend UND le
 Linie geschlossen, Ersatz ist der trainierte Exploiter (par.7).** Nutzer-Entscheid 2026-10-04 00:00 (Exploiter
 statt Stoerer) damit bestaetigt.
 
+#### par.5d2 MESSPLAN "andere Stellungen" zustandsbasiert (REGISTRIERT 2026-10-04 vor der Auswertung; Nutzer: *"gib die auswertung an einen agenten"*)
+
+Zweifel am Instrument von S2/S5: KL(Ziel || Prior) misst die Korrektur des Priors je Entscheid, nicht die Neuheit
+der Stellung. Zustandsbasiertes Mass, OHNE neuen Lauf, aus den vorhandenen Dateien in `data/probe_asym`:
+* **Grundmengen:** `policy` (100 Partien, Bezug), `policy-dice-r1` (100), `policy-dice-r2` (100), zur Einordnung
+  `policy-dice-src4` (W Vollform) und `policy-s400`. Einheit je Mass unten.
+* **M1 Platzierungen Runde 1:** Verteilung der in Runde 1 gelegten Kuppelplatten je Seite (Platten-ID, Rotation,
+  Platz) aus den Record-Zustaenden am Ende von Runde 1; Jensen-Shannon-Distanz jeder Klasse und Seite gegen den
+  Sockel (beide Seiten gepoolt), Bootstrap-CI ueber Partien; dazu Anzahl distinkter (Platte, Rotation, Platz)-
+  Tripel und Entropie.
+* **M2 Brettzustaende zu Beginn von Runde 2 und Runde 3:** Anteil der Zustaende (Belegung aller Kuppelfelder je
+  Spieler, kanonisiert) einer Klasse, die im Sockel NICHT vorkommen, und umgekehrt; Zahl distinkter Zustaende je
+  100 Partien.
+* **M3 Entscheidungen der G-Seite nach der Wuerfelphase:** Anteil der G-Entscheide (R2-4), deren Zustand im
+  Sockel nie auftritt; mittlere Prior-Entropie und mittleres `root_q` je Runde gegen den Sockel (ist G in den
+  neuen Stellungen unsicherer?).
+**Leseregel (PRAEZISIERT vor dem Lauf, Agent-Einwand: eine JS-Distanz endlicher Stichproben ist per
+Konstruktion > 0, "CI ueber 0" greift immer):** M1 traegt, wenn die JS-Distanz der Klasse ueber dem 95-%-Quantil
+der Permutations-Nullverteilung liegt (Partien zufaellig auf Klasse/Sockel verteilt, 1.000 Permutationen) UND ueber
+dem Rauschbezug Sockel 1-5 gegen 6-10; M2 traegt, wenn der Anteil sockelfremder Bretter den Rauschbezug (Sockel-
+Haelfte gegen Haelfte, gleich grosse Bezugsmenge) mit CI ohne Ueberlappung uebersteigt; Feinheit `plates`
+(Platz, Platten-ID, Rotation) ist die massgebliche, `slots` und `full` Einordnung. M3 zeigt, ob G dort anders
+ENTSCHEIDET. Tragen M1/M2, aber nicht KL, ist S2/S5 das falsche Instrument und die Leseregel 2 von par.5d wird fuer
+kuenftige W-Varianten (par.5d3: Platzwahl mit eps-Spielraum, Platte aus dem Prior mit Temperatur, 400 Partien)
+durch M1-M3 ersetzt. Werkzeug `tools/probes/state_novelty_probe.py`, Artefakt
+`evaluations/artifacts/state_novelty_s5.json` mit `laufzeit`-Block.
+
+##### par.5d2a ERGEBNIS zustandsbasiert (2026-10-04 10:40, `tools/probes/state_novelty_probe.py`, Artefakt `evaluations/artifacts/state_novelty_s5.json`, 50 Dateien, 107 s)
+
+**M1, Platzierungen Runde 1** (Grundmenge 2 Platten je Partie und Seite, n = 200 je Klasse/Seite gegen 400 im Sockel;
+Einheit JS-Distanz log2 der Tripel Platte/Rotation/Platz; Null: 1.000 Permutationen ueber Partie-Seiten):
+
+| Zeile | distinkte Tripel | JS gegen Sockel | Permutations-Null Mittel / q95 / p | traegt? |
+| --- | --- | --- | --- | --- |
+| `policy-dice-r1`, W-Seite | 118 | **0,645** | 0,554 / 0,588 / 0,001 | ja, aber erzwungen (die Wuerfel setzen die R1-Platten) |
+| `policy-dice-r1`, G-Seite | 100 | **0,479** | 0,510 / 0,545 / 0,916 | **nein**, G liegt sogar UNTER der Null |
+| `policy-s400`, beide | 164 | 0,473 | 0,473 / 0,503 / 0,485 | nein |
+| Rauschbezug Sockel 1-5 gegen 6-10 | 114 | 0,560 | 0,578 / 0,621 / 0,761 | |
+
+r2 und src4 sind in Runde 1 mit r1 IDENTISCH (gleicher Seed 20261720, Runde 1 laeuft in allen drei Armen gleich),
+also kein unabhaengiger Beleg. Alle 100 Partien jeder Klasse haben dieselbe Auslage wie die Sockel-Partie gleichen
+Index: die Arme sind gepaart, die Permutations-Null ist fuer G darum eher zu weit, und G's R1-Platzierungen liegen
+naeher am Sockel als zwei Sockel-Haelften aneinander (HERLEITUNG: gleiche Auslage zieht G zum Sockel hin).
+
+**M2, Bretter zu Beginn von Runde 2 und 3:** in der massgeblichen Feinheit `plates` ist das Mass GESAETTIGT (100 von
+100 Brettern je Klasse distinkt, Rauschbezug Haelfte gegen Haelfte schon 1,000; R3 ueberall 1,000); in `slots`
+uebersteigt keine Zeile den Rauschbezug ohne CI-Ueberlappung (R2 r1/G 0,07 [0,04; 0,16] gegen Rauschbezug 0,05
+[0,01; 0,15]). **M3, G-Entscheide R2-4 nach der Wuerfelphase** (r1 n = 4.817): Anteil sockelfremder Zustaende in
+`slots` 0,122 gegen Rauschbezug 0,153 / 0,136; Prior-Entropie der G-Seite nicht verschieden (R2 -0,017 [-0,046;
++0,010] nat); `root_q` der G-Seite HOEHER (r1 R2 +0,061 [+0,025; +0,098]; r2 R3 +0,129, R4 +0,161): G ist nicht
+unsicherer, sondern vorn (passt zum Punktrueckstand von W, nicht zu neuen Stellungen). Bootstrap-Perzentil-CI der
+JS-Distanz sind nach oben verzerrt (Ziehen mit Zuruecklegen verkleinert den Traeger), deshalb zaehlt die
+Permutations-q95.
+
+**Verdikt:** auch zustandsbasiert sieht G in W-Partien keine nachweisbar anderen Stellungen; M1 traegt nur fuer W und
+dort per Konstruktion. Das Instrument KL (S2/S5) ist damit nicht widerlegt, die Lesart par.5d1 bleibt. Fuer eine
+kuenftige W-Variante (par.5d3, Platzwahl mit eps-Spielraum, Platte aus dem Prior) muesste die Messung gepaart
+(Klasse gegen Sockel je gleichem Spielindex) und mit groeberer Feinheit (Platten-ID-Menge, Plaetze je Platte) gebaut
+werden, sonst saettigt sie bei 100 Partien. **Nach vier Formen (W Vollform, W Eroeffnung, Stoerer, Exploiter, dazu
+v32 als Gegner) hat kein asymmetrischer Gegner fuer G messbar andere Stellungen erzeugt; der Hebel der Nacht liegt
+in der Zugwahl (par.5e3) und der Suchtiefe mit Modus 2 (par.8b1).**
+
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 
 Engine: Wuerfel-Seite und Wuerfel in der Self-Play-Schleife (Partie-RNG bzw. eigener Strom nach
@@ -805,6 +867,48 @@ v35 GESCHLOSSEN; Wiederaufnahme nur mit neuer Registrierung (Ziel und Material).
 **Kosten der Nacht fuer par.7 (gemessen):** Partien 3 x rund 6.200 s, Trainings 3 x rund 180 s, Tor 1.797 s;
 zusammen rund 5,9 h Maschine.
 
+### par.7b WEG 1: fremder Stil statt trainierter Exploiter (NUTZER 2026-10-04 *"fahr die weg-1 sonde gegen v32-b01"*, REGISTRIERT vor dem Lauf)
+
+Anlass par.7a: ein Exploiter aus einer Kopie von G findet G's Loecher nicht. Billigste Form eines Gegners mit
+anderem Stil, ohne Training: der vorige Champion `v32-b01` (Register: 1544 gegen 1595 bei gleicher Spec, G
+gewinnt rund 57 %, HERLEITUNG aus den Elo-Werten). Der Zweitnetz-Knopf aus par.7 wird dafuer unveraendert
+benutzt (`--opponent-model models/alphazero_v32-b01_brierbest.onnx`, Eingabeform [79,6,6] wie v34, geprueft).
+
+**Sonde (Rezept `models/v35_probes2.recipe.json`, je Klasse Seed 20261720, Erzeugungs-Rezept @100, Stichentscheid
+Modus 2 auf BEIDEN Seiten, weil das der vorgeschlagene v35-Sockel ist):**
+* `policy-m2`: G gegen G, 200 Partien. Bezugsklasse fuer KL und Kennzahlen unter Modus 2.
+* `policy-vs-v32`: G gegen v32-b01, 200 Partien, `--record-sides both`, Felder `opponent_side`/`net_label`.
+
+**Berichtet** (Grundmenge Drafting-Records R1-4 mit Ziel >= 2 IDs bzw. Partien; Einheit wie par.5a): Median-KL(Ziel ||
+Prior von G) der G-Seite (`net_label` primary) von `policy-vs-v32` gegen alle Records von `policy-m2`, Block-
+Bootstrap-CI ueber Dateien, je Runde; Versatz des Wertkopfs je Seite (G und v32); Siegquote G gegen v32 mit CI;
+Punkte und Marge; sechs Standard-Kennzahlen je Seite; Kosten je Partie. **Leseregel:** KL-CI der G-Seite ganz
+ueber 0 UND |Versatz G| <= 0,05 (oder CI mit 0) -> Vorschlag Sockel-Klasse `policy-vs-v32` (2.000 Partien, rund
+3,4 h bei 6 s je Partie) fuer den Nutzer-Entscheid; KL-CI mit 0 -> Weg 1 traegt nicht, berichtet; Versatz
+groesser -> Wertziele der G-Seite als verzerrt markiert, Maske als Vorlage (wie par.5 Regel b).
+
+#### par.7b1 ERGEBNIS WEG 1 (2026-10-04 09:44-10:32, Kette `tools/night_v35_prep_chain2.sh`, Artefakte `probe_vs_v32_kl.json`, `probe_vs_v32_sides.json`)
+
+Je 200 Partien @100, Modus 2 beide Seiten, Seed 20261720. **Grundmenge** Drafting-Records R1-4 mit Ziel >= 2 IDs
+(G-Seite von `policy-vs-v32`: 12.060; `policy-m2` beide Seiten: 24.018) bzw. 200 Partien; **Einheit** wie par.5a.
+
+| Groesse | `policy-m2` (G gegen G) | `policy-vs-v32`, G-Seite | `policy-vs-v32`, v32-Seite |
+| --- | --- | --- | --- |
+| Median-KL (R1 / R2 / R3 / R4) | 0,338 (0,24 / 0,35 / 0,39 / 0,39) | 0,347 (0,25 / 0,35 / 0,40 / 0,41) | -- |
+| Differenz gegen `policy-m2` [CI] | | **+0,010 [-0,009; +0,032]** | |
+| Siegquote [CI] | 0,50 | **0,64 [0,565; 0,725]** | 0,36 [0,28; 0,44] |
+| Punkte, Marge | 52,4 | 55,6, +7,0 | 48,5, -7,0 |
+| Versatz Wertkopf [CI] | | **-0,101 [-0,179; -0,026]** | +0,083 [+0,011; +0,155] |
+| volle Spalten / Strafleiste je Seite | 0,88 / 5,3 | 0,99 / 4,8 | 0,76 / 5,6 |
+| s je Partie (11 Threads) | 3,206 | 6,300 | |
+
+**Leseregel: Weg 1 traegt NICHT.** Die KL der G-Seite ist nicht nachweisbar anders (CI mit 0), und der Versatz der
+G-Seite liegt mit -0,10 ausserhalb der 0,05-Grenze mit CI ohne 0: G gewinnt gegen den schwaecheren Vorgaenger 64 %,
+der Wertkopf erwartet aber G-gegen-G, also sind die Wertziele der G-Seite systematisch zu optimistisch gegenueber
+der Vorhersage (dieselbe Form von verborgener Behinderung wie bei W, nur umgekehrt). Keine Sockel-Klasse. Lesart
+(HERLEITUNG): ein 50 Elo schwaecherer Vorgaenger aus derselben Linie spielt keinen anderen Stil, nur schwaecher.
+Die zustandsbasierte Pruefung (par.5d2) laeuft noch; sie kann die KL-Lesart fuer W und v32 noch kippen.
+
 ## par.8 SOCKEL @400 SIMS (NUTZER 2026-10-04: *"sockel mit 400 sims kann ich gut leben"*)
 
 Vorschlag des Koordinators: die 2.000 G-G-Partien des v35-Sockels @400 statt @100 (der Schwarm bleibt @100).
@@ -846,3 +950,42 @@ und Spaltenlehrer (Kopf `opp_points`, Spaltenziele der Kampagne) waere ein solch
 Kosten fuer 2.000 Partien: rund 3,3 h (HERLEITUNG aus 6,01 s). **Nutzer-Entscheid am Morgen**; Vorschlag des
 Koordinators: NICHT der ganze Sockel @400, sondern ein Mischarm (z. B. 1.000 @100 plus 1.000 @400, oder @200 als
 Zwischenpunkt mit eigener Sonde), damit der Punkte-Einbruch nicht das ganze Policy-Material praegt.
+
+### par.8b NUTZER-FRAGE 2026-10-04 (*"gleicht sich das aus mit dem q-stichentscheid?"*), REGISTRIERT vor dem Lauf
+
+Der Vortest par.8a lief mit Bestands-Stichentscheid (Modus 0). Ob der Punkte-Einbruch bei 400 Sims (46,9 -> 31,4)
+mit Modus 2 verschwindet, ist nicht ableitbar: Modus 2 behebt die Wahl unter Gleichstaenden (@100: +6 Punkte je
+Seite, par.7a Zyklus 1 gegen par.5a), der Einbruch @400 ist nach der HERLEITUNG in par.8a ein Stilwechsel der
+tieferen Nullsummen-Suche; beides kann sich addieren oder nicht. **Klasse `policy-s400-m2`:** wie `policy-s400`
+(100 Partien @400, Seed 20261720), aber Modus 2 beide Seiten. **Berichtet:** Punkte je Seite, volle Spalten,
+Strafleiste, Plattenpunkte, Median-KL gegen `policy-m2`, Kosten, jeweils neben `policy-s400` (par.8a) und
+`policy-m2`. **Leseregel:** Punkte je Seite von `policy-s400-m2` innerhalb von 3 Punkten von `policy-m2` -> der
+Einbruch war ein Stichentscheid-Artefakt, Sockel @400 wieder offen; bleibt der Abstand groesser als 8 Punkte ->
+Einbruch ist die Suchtiefe, par.8a-Lesart bestaetigt; dazwischen -> teilweise, berichtet. Keine Entscheidung
+ueber den Sockel durch die Sonde, die liegt beim Nutzer.
+
+#### par.8b1 ERGEBNIS: der Einbruch @400 war der Stichentscheid (2026-10-04 10:17-10:32, Artefakt `probe_s400_m2_kl.json`)
+
+100 Partien @400 mit Modus 2 (`policy-s400-m2`, Seed 20261720) gegen `policy-m2` (200 @100, Modus 2) und
+`policy-s400` (100 @400, Modus 0, par.8a). **Grundmenge** Drafting-Records R1-4 (12.047 / 24.018 / 12.095) bzw.
+Seiten (200 / 400 / 200); **Einheit** wie par.8a.
+
+| Groesse | `policy-m2` @100 | `policy-s400-m2` @400 | `policy-s400` @400, Modus 0 |
+| --- | --- | --- | --- |
+| Median-KL | 0,338 | **0,683** (+0,345 [+0,313; +0,382]) | 0,625 |
+| Punkte je Seite | 52,4 | **50,3** (-2,1; CI je 1,7 / 2,6) | 31,4 (-21,0) |
+| volle Spalten je Seite | 0,88 | **0,845** (-0,035; CI je 0,07 / 0,10) | 0,445 |
+| Strafleiste je Seite | 5,3 | 5,3 | 8,4 |
+| Spalten >= 4 je Seite | 2,33 | 2,23 | 1,88 |
+| s je Partie (11 Threads) | 3,206 | 6,754 (**Faktor 2,1**) | 6,010 |
+
+**Leseregel par.8b: Punkte innerhalb von 3 Punkten -> der Einbruch war ein Stichentscheid-Artefakt, der Sockel
+@400 ist wieder offen.** Mit Modus 2 verdoppelt die 400er-Suche die KL (0,338 -> 0,683) bei gleichen Punkten,
+gleichen vollen Spalten und gleicher Strafleiste; der Spalten-Tausch aus par.8e (Vollendung faellt mit den Sims)
+ist in dieser Anordnung NICHT sichtbar (CI ueberlappen). HERLEITUNG, warum: bei 400 Sims liegen nach dem Halving
+mehr Kinder gleichauf, und "erster Eintrag" verschenkt dann systematisch den Q-besseren Zug; der Effekt
+waechst also mit den Sims. Das heisst auch: die Sims-Kurve vom 2026-09-13 (par.8e) wurde mit Modus 0 gemessen
+und ist fuer die Vollendung neu zu bewerten (Rueckwaerts-Pruefung, Konsumenten: `PREREG_search_depth_column_optimum.md`,
+STATUS Abschnitt 8 "Sims und Spaltenbau", Memory). **Fuer den v35-Sockel ist @400 mit Modus 2 damit die Form, die
+beides liefert: doppelte Zielinformation ohne Punkte- oder Spaltenpreis; Kosten 2.000 Partien rund 3,75 h.**
+Nutzer-Entscheid.

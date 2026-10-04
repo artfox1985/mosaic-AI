@@ -590,6 +590,17 @@ class CheckEngineConfig(unittest.TestCase):
     def test_bool_is_not_a_number(self):
         self.assertEqual(len(check_engine_config({"flag": 1}, {"flag": True})), 1)
 
+    def test_paths_are_compared_normalized(self):
+        """par.7b: `opponent_model` kommt unter Windows mit Rueckstrichen aus pathlib,
+        das Rezept schreibt Vorwaertsstriche; ein anderes Modell bleibt eine Abweichung."""
+        import os
+        got = {"opponent_model": os.path.normpath("models/alphazero_v32-b01_brierbest.onnx")}
+        self.assertEqual(check_engine_config(got, {"opponent_model": "models/alphazero_v32-b01_brierbest.onnx"}), [])
+        self.assertEqual(len(check_engine_config(got, {"opponent_model": "models/alphazero_v33-b01.onnx"})), 1)
+        self.assertEqual(len(check_engine_config({"opponent_model": None},
+                                                 {"opponent_model": "models/x.onnx"})), 1)
+        self.assertEqual(check_engine_config({"opponent_model": None}, {"opponent_model": None}), [])
+
     def test_error_dict_is_not_green(self):
         """Das `_error`-dict aus selfplay_manifest._engine_config darf nicht
         als gruen durchgehen."""

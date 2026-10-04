@@ -632,3 +632,31 @@ eine Kette, die nach `_brierbest.onnx` sucht und sonst das finale Netz nimmt, ha
 (Code-Review 2, Befund 1). **Handgriff:** das Netz nie aus dem Dateinamen raten, sondern
 `python tools/brier_best_checkpoint.py <name> --ext onnx` (liest `epoch_history` aus dem Trainings-Manifest,
 dieselbe Regel wie train.py, Exit 2 wenn die Datei fehlt).
+
+## Ein Knopf an der ZUGWAHL der Erzeugung braucht einen Arm, der der Erzeugungs-Spieler selbst ist (2026-10-04)
+
+**Fund:** der tau-Zweig der Self-Play-Zugwahl (`argmax_index`, self_play.rs:559, gebaut 2026-08-07 fuer
+`MOSAIC_TAU_ARGMAX_FROM_MOVE`) nimmt bei Gleichstand der Besuche den ERSTEN Eintrag und dokumentierte das als
+Vorteil ("stabil, reproduzierbar, kein RNG-Verbrauch"). Der Arena- und GUI-Pfad hatte seit dem Regelbuch-Audit
+vom 2026-07-21 (Fund 2 B2) den Stichentscheid "Besuche, dann Q"; der tau-Zweig uebernahm ihn nicht. Seit die
+Erzeugung am 2026-09-07/08 (v25) auf argmax ab Halbzug 1 wechselte, spielte jeder Generator mit diesem Fehler
+(v25 bis v35-Schwarm). Gemessen (`PREREG_asymmetric_selfplay.md` par.5e2/5e3): Gleichstand auf der maximalen
+Besuchszahl in 14,8 Prozent der Drafting-Entscheide (n = 2.833); dieselbe Suche mit Q-Stichentscheid gewinnt
+gegen den Bestand 74,5 Prozent (Modus 1) bzw. 75,5 Prozent (Modus 2, n = 200 Partien je Modus), +16 bis +18
+Punkte je Partie.
+
+**Warum kein Tor es sah:** (1) symmetrischer Defekt, beide Seiten im Self-Play waehlen gleich; (2) Tor 1,
+Promotion und Elo-Leiter messen auf dem Arena-Pfad, also einen Spieler, der in der Erzeugung nie spielte; (3) das
+Policy-Ziel (completed-Q) war korrekt, nur Trajektorien und Wertziele waren betroffen, deshalb blieben alle
+Offline-Metriken unauffaellig; (4) Gleichstand galt als Randfall, ist aber unter Gumbel mit Sequential Halving
+die Regel, weil die Ueberlebenden der letzten Stufe gleiche Budgets bekommen; "erster Eintrag" heisst dort:
+hoechstes Gumbel plus Logit, also entscheidet der Prior statt Q. Gefunden durch Zufall ueber die Konfundierung
+des Stoerers B (par.5c1), der gegen das hoechste Q unter den Ueberlebenden mass und damit 77 bis 81 Prozent gewann.
+
+**Regel:** wer einen Knopf baut oder aendert, der die GESPIELTE Aktion der Erzeugung bestimmt (Stichentscheid,
+Temperatur, argmax-Umschaltpunkt, Abweichung), misst ihn in der Anordnung von par.5e1: asymmetrisches Self-Play,
+eine Seite je Partie mit dem Knopf, die andere mit dem Bestand, Erzeugungs-Rezept, Siegquote der Knopf-Seite
+gegen 0,50 mit Block-CI. Eine gepaarte Arena taugt dafuer NICHT, sie laeuft ueber `net_arena_choose_action`
+(self_play.rs:4975) und nie durch die Erzeugungs-Zugwahl. Und: ein Zweig, der einen bestehenden Zweig
+"deterministisch nachbaut", kopiert dessen Stichentscheid mit, oder begruendet, warum nicht.
+
