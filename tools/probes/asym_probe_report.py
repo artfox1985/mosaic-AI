@@ -114,6 +114,11 @@ def main() -> None:
                     help="mit --kl-side-value: nur Records der KL-Klasse mit diesem Feldwert (z. B. net_label)")
     ap.add_argument("--kl-side-value", default=None,
                     help="Feldwert zu --kl-side-field (z. B. primary = Seite des Generators)")
+    ap.add_argument("--group-a", default=None,
+                    help="par.8c: gepoolte Klassengruppe A, kommagetrennt (mit --group-b): Kennzahlen, Differenz "
+                         "A minus B mit Block-CI und Lesart aus tools/probes/sims_points_check.py, dazu Median-KL "
+                         "je Gruppe; S1-S4 entfallen")
+    ap.add_argument("--group-b", default=None, help="par.8c: gepoolte Bezugsgruppe B, kommagetrennt")
     ap.add_argument("--kl-extra-class", default=None,
                     help="dritte Spalte: KL, Kosten und Standard-Kennzahlen einer weiteren Klasse (ohne Filter)")
     ap.add_argument("--dice-class", default="policy-dice",
@@ -258,6 +263,45 @@ def main() -> None:
         args.out = (f"evaluations/artifacts/probe_{args.kl_class}_kl.json" if args.kl_class
                     else f"evaluations/artifacts/probe_{args.side_class}_side.json" if args.side_class
                     else "evaluations/artifacts/asym_probes_s1_s4.json")
+
+    # --- Zwei gepoolte Klassengruppen (--group-a/--group-b, par.8c) ----------------------------
+    if args.group_a or args.group_b:
+        if not (args.group_a and args.group_b):
+            raise SystemExit("--group-a und --group-b gehoeren zusammen")
+        import sims_points_check
+        groups = {"A": args.group_a.split(","), "B": args.group_b.split(",")}
+        out_g = sims_points_check.compare_groups(data, groups["A"], groups["B"], N_BOOT, args.seed)
+        kl_by_file, kl_all = {}, {}
+        for name, classes in groups.items():
+            kl_by_file[name], parts = [], []
+            for cls in classes:
+                gf, ga, _gg, _ = read_class(cls, None)
+                if len(ga.get("kl", [])):
+                    kl_by_file[name] += by_file(ga, np.ones(len(ga["kl"]), bool), "kl", len(gf))
+                    parts.append(ga["kl"])
+            kl_all[name] = np.concatenate(parts) if parts else np.array([])
+        ci = (boot_diff_ci(kl_by_file["A"], kl_by_file["B"], np.median, rng)
+              if len(kl_all["A"]) and len(kl_all["B"]) else None)
+        out_g["kl"] = {
+            "grundmenge": "Drafting-Records R1-4 (Ziel >= 2 IDs) der gepoolten Klassen",
+            "einheit": "KL(Ziel || Prior des Generators --model) je Record, Median; CI Block-Bootstrap ueber Dateien",
+            "A": {"n": int(len(kl_all["A"])), "median": float(np.median(kl_all["A"])) if len(kl_all["A"]) else None},
+            "B": {"n": int(len(kl_all["B"])), "median": float(np.median(kl_all["B"])) if len(kl_all["B"]) else None},
+            "median_diff_a_minus_b": (float(np.median(kl_all["A"]) - np.median(kl_all["B"]))
+                                      if len(kl_all["A"]) and len(kl_all["B"]) else None),
+            "ci95": ci,
+        }
+        out_g["model"] = args.model
+        out_g["laufzeit"] = laufzeit_block(t_start, cpu_start=c_start, threads=torch.get_num_threads(),
+                                           n_units=out_g["gruppen"]["A"]["seiten"] + out_g["gruppen"]["B"]["seiten"],
+                                           unit="seite")
+        if args.out is None or args.out.endswith("asym_probes_s1_s4.json"):
+            args.out = "evaluations/artifacts/probe_s400_points_check.json"
+        Path(BASE_DIR / args.out).parent.mkdir(parents=True, exist_ok=True)
+        json.dump(out_g, open(BASE_DIR / args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print(json.dumps({k: out_g[k] for k in ("lesart", "kl")}, ensure_ascii=False, indent=1), flush=True)
+        print(f"Ergebnis: {args.out} ({time.monotonic() - t_start:.1f} s)", flush=True)
+        return
 
     # --- Nur Seitenauswertung einer asymmetrischen Klasse (--side-class, par.5e1 Frage 3) --------
     if args.side_class:

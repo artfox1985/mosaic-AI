@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v35-Fenster erzeugt und zugeschnitten (Schwarm sofort, Sockel nach dem asymmetrischen Bau), und traegt ein Arm? | Beleg: Generator v34-b01, Runde 5 per Netz @400, Spiegelknopf an (par.5). Schwarm erzeugt 2026-10-03 (value-deviate, value-excursion je 4.000), alle Abnahmen GRUEN (par.9). Offen: Sockel nach PREREG_asymmetric_selfplay.md, Fenster, Arme, Tore. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v35-Fenster erzeugt und zugeschnitten (Schwarm sofort, Sockel nach dem asymmetrischen Bau), und traegt ein Arm? | Beleg: Generator v34-b01, Runde 5 per Netz @400, Spiegelknopf an (par.5). Schwarm 2 x 4.000 erzeugt und abgenommen (par.9). Sockel 2026-10-04 erzeugt und abgenommen (par.10a/10b): policy 1.000 @400 + policy-s100 1.000 @100 + W-v2 R1 2.000, alle Modus 2, alle Abnahmen GRUEN. Offen: Traeger-Manifest, Fenster, Training v35-b01, Tore. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -101,3 +101,64 @@ Konstruktion 0), v34 zum Vergleich (`PREREG_v34_window.md` par.9):
 mehr volle Spalten, weniger Strafleiste, mehr Punkte). Volle Spalten weiter fast nur links (c0/c1),
 gespiegelt wie ungespiegelt. Kein Befund, der die Erzeugung in Frage stellt. Offen: Sockel-Klassen nach
 dem asymmetrischen Bau, dann Fenster, Training, Tore.
+
+## par.10 SOCKEL (REGISTRIERT 2026-10-04 13:25 vor dem Start; Nutzer: *"den mischsockel kannst schon starten"*)
+
+Rezept `models/v35_sockel.recipe.json` (aus dem Entwurf der Nacht umbenannt), Generator `v34-b01_brierbest`, Spec
+`models/v35_generation.spec.json`, Env wie der Schwarm, Weg C, **Stichentscheid `tau_tiebreak_q` 2 in allen
+Sockel-Klassen** (`PREREG_asymmetric_selfplay.md` par.5e3; der Schwarm bleibt mit Bestand, Nutzer 11:35).
+
+| Klasse | Partien | Sims | Seed | Grund |
+| --- | --- | --- | --- | --- |
+| `policy` | 1.000 | 400 | 20260950 | KL x2 gegen @100 bei gleichen Punkten (par.8b1/8c1) |
+| `policy-s100` | 1.000 | 100 | 20260954 | haelt die Spaltenkultur: @400 verliert 0,07 volle Spalten je Seite (par.8c1) |
+| `policy-dice-v2-r1` | 2.000 | 100 (Basis), Platzsuche 600 (Nutzer 13:30: *"ich meinte die platzsuche, basis 100 passt"*) | 20260953 | W-v2 Runde 1 traegt (par.5d3a/b); Start `tools/v35_sockel_w_generate.sh` nach dem Mischsockel |
+| `policy-exploiter` | 2.000 | 100 | 20260955 | nur nach bestandenem Tor par.7c |
+
+Start `tools/v35_sockel_generate.sh` (Smoke 10 Partien je Klasse nach `data/probe_v35sockel_smoke`, dann die zwei
+Haelften nach `data/`). Kosten HERLEITUNG aus par.8c1: 1.000 x 6,0 s + 1.000 x 3,2 s = rund 2,6 h. Abnahmen wie par.8
+nach der Erzeugung. Fenster: Schwarm (8.000) + Sockel (2.000 + W 2.000 + ggf. Exploiter); Traeger-Manifest nach der
+Erzeugung.
+
+### par.10a ERZEUGUNG DES SOCKELS (2026-10-04 13:17-17:43, Terminal-Tab-Ketten, Exit 0, Smokes gruen)
+
+| Klasse | Partien | Dateien | Wanduhr | s je Partie (11 Threads) | Manifest |
+| --- | --- | --- | --- | --- | --- |
+| `policy` (@400, Modus 2) | 1.000 | 100 | 6.207,6 s | 6,21 | `manifest_v34-b01-policy_20261004_131853.json` |
+| `policy-s100` (@100, Modus 2) | 1.000 | 100 | 3.177,6 s | 3,18 | `manifest_v34-b01-policy-s100_20261004_150226.json` |
+| `policy-dice-v2-r1` (W-v2 R1, Basis 100, Platzsuche 600) | 2.000 | 200 | 6.415,0 s | 3,21 | `manifest_v34-b01-policy-dice-v2-r1_20261004_155639.json` |
+
+Zusammen 4.000 Partien in 4,4 h. Keine Watchdog-, Deadline- oder Haenger-Zeile gesehen (Terminal-Ausgabe, nicht
+vollstaendig gelesen; Abnahmen par.8 stehen aus). **Abnahmen, Traeger-Manifest, Fenster und Training folgen nach
+Freigabe der Maschine durch den Nutzer** (Nutzer 15:20: Maschine bis auf Widerruf beim Nutzer). Exploiter-Klasse:
+nicht erzeugt (par.7c der Asym-Prereg offen, Nutzer: *"lass den exploiter noch aussen vor"*).
+
+### par.10b ABNAHMEN DES SOCKELS (2026-10-04 18:05-18:20, nach Freigabe der Maschine; Nutzer: *"mach die abnahmen und committe"*)
+
+| Abnahme (par.8) | Ergebnis |
+| --- | --- |
+| Smoke vor dem Start | GRUEN (10 Partien je Klasse, Waechter 10 bzw. 14 Knoepfe je Klasse) |
+| Manifest-Diff gegen v34 (`manifest_v33-b01-policy_20261001_100644`) | **GRUEN**: `mosaic_env` identisch; in `cli_args`/`engine_config` nur die neuen Knoepfe der Nacht (Wuerfel, Stoerer, Stichentscheid, Zweitnetz) mit ihren Defaults bzw. den registrierten Werten (par.10) sowie model/spec/seed/version/games/sims wie beabsichtigt |
+| Tor 0 je Klasse (`corpus_sanity_check.py data --pattern`) | Exit 0 in allen drei Klassen; Artefakte `corpus_sanity_v34-b01-{policy,policy-s100,policy-dice-v2-r1}.json` |
+| Vollstaendigkeit | 1.000 / 1.000 / 2.000 Partien, 0 unvollstaendige (Feld `completed`), 198.667 / 198.612 / 395.446 Records; W-Klasse: `dome_dice_side` auf allen 395.446 Records, 4.000 Platzwahl-Records (2 je Partie) |
+| Spiegelknopf (`tie_mirror_acceptance.py --prefix v34-b01`) | **GRUEN**: 48,8 % (policy, SE 1,6), 49,2 % (policy-s100, SE 1,6), 48,55 % (policy-dice-v2-r1, SE 1,1); keine uneinheitliche Partie, keine ohne Feld |
+| Watchdog-/Deadline-/Haenger-Zeilen | 0 im gelesenen Terminal-Rest (letzte 1.000 Zeilen der Sockelkette) und 0 unvollstaendige Partien in allen drei Klassen; die vollstaendige Kettenausgabe lag nur im Terminal |
+| KL-Abnahme am Ausflug | entfaellt (keine Ausflug-Klasse im Sockel) |
+
+**Sechs Standard-Kennzahlen** (Grundmenge Seiten: 2.000 / 2.000 / 4.000; Einheit je Seite; v34-Sockel `v33-b01-policy`
+zum Vergleich aus `PREREG_v34_window.md` par.9 nicht hier wiederholt):
+
+| Kennzahl | `policy` @400 M2 | `policy-s100` @100 M2 | `policy-dice-v2-r1` @100 M2 |
+| --- | --- | --- | --- |
+| volle Reihen / Fuellstand | 0,081 / 2,91 | 0,094 / 2,94 | 0,084 / 2,92 |
+| volle Spalten / >= 4 / >= 3 | 0,826 / 2,29 / 3,24 | 0,907 / 2,31 / 3,21 | 0,835 / 2,29 / 3,24 |
+| Strafleiste (Steine je Seite) | 5,47 | 5,08 | 5,25 |
+| eigene Punkte | 50,94 | 53,05 | 51,48 |
+| Plattenpunkte k1 / k3 / k4 / k5 / k6 | 6,06 / 3,76 / 9,83 / 8,38 / -9,70 | 6,59 / 3,69 / 10,10 / 9,04 / -9,47 | 6,26 / 3,74 / 9,95 / 8,55 / -9,63 |
+
+Lesart: der @400-Teil liegt wie in par.8c1 der Asym-Prereg bei 0,08 weniger vollen Spalten und 2 Punkten weniger als
+der @100-Teil (hier 1.000 gegen 1.000 Partien, Richtung und Groesse wie gemessen); die W-Klasse liegt dazwischen
+(W-Seite und G-Seite gepoolt, W gewinnt rund 44 %, par.5d3a). Kein Befund, der die Erzeugung in Frage stellt.
+**Naechste Schritte:** Traeger-Manifest, Fenster (Schwarm 8.000 + Sockel 4.000), Cache, Training `v35-b01`,
+Tor 1 gegen `v34-b01`, Promotion falls die Kante faellt. Exploiter-Klasse offen (par.7c der Asym-Prereg).
+

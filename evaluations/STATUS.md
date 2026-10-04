@@ -55,7 +55,29 @@ G's Prior mit Temperatur (`MOSAIC_DOME_DICE_PRIOR_TEMP` 2), Sonde 400 Partien je
 `policy-m2-400g`, gepaarte Abweichungsmessung in `state_novelty_probe.py`; **par.7c** Exploiter-v2 = Policy nur aus
 E-Siegen (`policy_target_valid` false fuer verlorene Partien), E @200 gegen G @100 (`--opponent-sims`), 2 x 2.000
 Partien mit Vortor (>= 0,52 nach Zyklus 1), Tor >= 0,55. Kosten HERLEITUNG: W-Sonde rund 1,5 h; Exploiter rund 11 h.
-Sockel-Entscheid (Hauptklasse @400 Modus 2, Schwarm neu oder Bestand) weiter offen beim Nutzer.
+**NUTZER-ENTSCHEID 11:35: der v35-Schwarm BLEIBT wie erzeugt** (Bestands-Stichentscheid; Nutzer: *"der gibt eigentlich
+nur schwaches spiel fuer den value head"*), keine Neu-Erzeugung. **NUTZER-ENTSCHEID 11:40: Sockel-Hauptklasse = `policy` @400 mit Modus 2, 2.000 Partien** (Entwurf umgestellt, Seed 20260950). Offen: Ergebnisse W-v2 (par.5d3) und Exploiter-v2 (par.7c) fuer die Zusatzklassen.
+
+**W-v2 TRAEGT (12:40, par.5d3a/5d3b):** Runde-1-Arm (eps 0,02, T 2, Modus 2, 400 Partien gegen gepaarten Bezug):
+G-KL +0,054 [+0,036; +0,073], Versatz beider Seiten um 0, W 44,5 % [40,5; 48,5], Mehrkosten +9,8 %; gepaart zweigt
+jede Partie in Runde 1 ab, G trifft in R2/R3 etwa doppelt so oft bezugsfremde Stellungen wie der Rauschbezug (CI
+ueberlappend). R1-2-Arm faellt durch (W 40,5 %, Versatz -0,032). **Vorschlag: `policy-dice-v2-r1` mit 2.000 Partien
+in den v35-Sockel** (im Entwurf eingetragen, Seed 20260953; offen: Sims 100 wie gemessen oder 400). Kette 4
+(Nachmessung @400, par.8c) laeuft seit 12:41.
+
+**NACHMESSUNG @400 FERTIG (13:12, par.8c1):** gepoolt 400 @400 gegen 600 @100 (Modus 2): Punkte -1,6 [-3,4; +0,2]
+(kein Verlust nachweisbar), **volle Spalten -0,07 [-0,136; -0,006] (Verlust nachweisbar, rund 8 %)**, k1-Punkte -1,1,
+KL +0,35. Leseregel -> **Vorschlag Mischsockel 1.000 @100 plus 1.000 @400** (Entwurf umgestellt: `policy` 1.000 @400,
+`policy-s100` 1.000 @100). Nutzer-Entscheid; sein Entscheid 11:40 (rein @400) stand VOR dieser Zahl.
+
+**v35-SOCKEL-ERZEUGUNG FERTIG 17:43** (`PREREG_v35_window.md` par.10a: policy 1.000 @400 in 6.208 s, policy-s100 1.000 @100 in 3.178 s, policy-dice-v2-r1 2.000 in 6.415 s; alle Exit 0). **ABNAHMEN 18:20 ALLE GRUEN** (`PREREG_v35_window.md` par.10b: Manifest-Diff, Tor 0, Spiegelknopf 48,6-49,2 %, 0 unvollstaendige Partien, W-Felder vollstaendig). Maschine seit 18:00 wieder frei (Nutzer). **Naechster Schritt: Traeger-Manifest, Fenster, Cache, Training v35-b01.** Urspruenglich: (Nutzer: *"den mischsockel kannst schon starten"*; `tools/v35_sockel_generate.sh`
+im Terminal-Tab, Rezept `models/v35_sockel.recipe.json`, `PREREG_v35_window.md` par.10): Smoke, dann `policy` 1.000 @400 und
+`policy-s100` 1.000 @100, beide Modus 2, nach `data/`; rund 2,6 h. **Dahinter wartet `tools/v35_sockel_w_generate.sh`**
+(Terminal-Tab, `wait_for_free_cpu`): `policy-dice-v2-r1` 2.000 Partien, Basis 100, Platzsuche 600 (Nutzer 13:30), rund
+1,8 h. **NUTZER 15:20: Exploiter-v2 bleibt AUSSEN VOR; nach der W-Klasse ist die Maschine bis auf Widerruf beim
+Nutzer** (*"lass den exploiter noch aussen vor. ich brauch die maschine bis auf widerruf nach der w-klasse"*): nach
+`v35_sockel_w_generate.sh` startet NICHTS mehr, auch kein Commit (Hook ist Last), bis der Nutzer freigibt. Abnahmen der
+Erzeugung nach par.8 der v35-Prereg dann ebenfalls erst nach Freigabe.
 
 **Wichtigster Befund:** der Generator spielt seit `tau_argmax_from_move` 1 bei Besuchs-Gleichstand den ERSTEN
 Eintrag statt nach Q (par.5e); dieselbe Suche mit Q-Stichentscheid gewinnt 3 von 4 Partien gegen ihn. Das Policy-
@@ -228,6 +250,12 @@ Schwarm 4.000 Weg C plus 4.000 Ausflug, G-1/G-2 fallen weg; grob 12 h (HERLEITUN
 den Sonden S1-S4 (par.4). Bau in der Wheel-Runde nach der v34-Erzeugung.
 
 ### RICHTUNG (Nutzer-Entscheid 2026-09-27)
+
+**NUTZER 2026-10-04 12:00: v35 wird WIRKLICH die letzte Generation.** *"v34 hat das projektziel meiner meinung nach
+bereits erreicht. ich kann das netz in den bisherigen spielen nicht mehr schlagen."* Folge: v35 ist die
+Abschluss-Generation (Sockel @400 Modus 2, Schwarm wie erzeugt, W/Exploiter nur falls sie ihre Leseregeln bestehen);
+danach Promotion (falls die Kante faellt), Schlussmodell Tessa, Projektabschluss nach `/mosaic-generation-turnover`.
+Keine v36.
 
 *"Mir scheint wir kommen mit unserer aktuellen Suche und Netz Architektur an die Decke. Somit werden
 wir v34 noch fahren und uns dann ueberlegen welche alternativen Ansaetze es gibt."* v34 ist die

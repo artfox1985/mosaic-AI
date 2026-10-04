@@ -402,6 +402,14 @@ class TiebreakSideClasses(unittest.TestCase):
             self.assertEqual((ns.opponent_model, ns.record_sides, ns.deviate_prob), (opp, "both", 1.0), cls)
         self.assertTrue((REPO / want["policy-vs-v32"][2]).exists(), "Gegner-Netz liegt")
 
+    def test_s400_m2_b_class_par8c(self):
+        """par.8c: wie policy-s400-m2, aber 300 Partien und eigener Seed."""
+        a, b = self._parse("policy-s400-m2"), self._parse("policy-s400-m2-b")
+        self.assertEqual((b.games, b.seed, b.version), (300, 20261730, "probe-v35-policy-s400-m2-b"))
+        for key in ("sims", "tau_tiebreak_q", "deviate_prob", "spec", "model", "chunk", "per_file",
+                    "dome_dice", "opponent_model", "tau_tiebreak_side"):
+            self.assertEqual(getattr(a, key), getattr(b, key), key)
+
     def test_dice_v2_classes_par5d3(self):
         """par.5d3: Bezug und zwei W-Klassen, gleicher Seed und gleiche Chunkung (gepaart)."""
         ref = self._parse("policy-m2-400g")

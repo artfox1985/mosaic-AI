@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: NEIN in allen fuenf Formen (W Vollform par.5a, W Eroeffnung par.5d1 und zustandsbasiert par.5d2a, Stoerer par.5c3, Exploiter 46 % par.7a, v32 par.7b1). TRAEGT stattdessen: Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3), und @400 mit Modus 2 verdoppelt die KL bei gleichen Punkten und Spalten (par.8b1). Offen: v35-Sockel-Entscheid (Nutzer). -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W-v2 Runde 1 TRAEGT: G-KL +0,054 [+0,036; +0,073], kein Versatz, W 44,5 % (par.5d3a/b) -> Sockel-Vorschlag. Stoerer, Exploiter v1 (46 %), v32-Gegner tragen nicht. Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3). @400 mit Modus 2: KL x2, Punkte gleich, aber -0,07 volle Spalten (par.8c1) -> Mischsockel-Vorschlag. Exploiter v2 (par.7c) offen. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -599,7 +599,8 @@ Trajektorie und damit die Wertziele. Der Versatz des Wertkopfs (Knopf-Seite -0,1
 Spieler mit korrektem Stichentscheid) passt dazu: der Kopf ist auf Trajektorien des Bestands geeicht.
 **Nutzer-Entscheid am Morgen:** Modus 2 (oder 1) in das v35-Sockel-Rezept und in die Schwarm-Klassen (die
 `value-*`-Klassen laufen ebenfalls mit `tau_argmax_from_move` 1 und sind betroffen; der schon erzeugte v35-Schwarm
-traegt den Bestand). **Annahme fuer die Nacht (Koordinator):** die Exploiter-Zyklen (par.7) laufen mit Modus 2 auf
+traegt den Bestand). **ENTSCHIEDEN 2026-10-04 11:35 (Nutzer): der v35-Schwarm bleibt wie erzeugt** (*"der gibt
+eigentlich nur schwaches spiel fuer den value head"*); Modus 2 betrifft damit nur den Sockel. **Annahme fuer die Nacht (Koordinator):** die Exploiter-Zyklen (par.7) laufen mit Modus 2 auf
 BEIDEN Seiten, weil ein Exploiter gegen den Bestand eine Schwaeche ausnutzen wuerde, die der v35-Sockel voraus-
 sichtlich nicht mehr hat; faellt der Entscheid anders, sind die Zyklen zu wiederholen (rund 3,5 h).
 **Rueckwaerts-Pruefung (Konsumenten von `tau_argmax_from_move` 1, Grep 01:30):** `models/v34.recipe.json` und
@@ -768,6 +769,53 @@ Zustand abweicht, und der Anteil der G-Entscheide in R2-4, deren (eigenes Brett,
 ganz ueber 0) oder (d) (ueber dem Rauschbezug ohne Ueberlappung) greift; dann geht der bestandene Arm mit 2.000
 Partien in den v35-Sockel-Vorschlag. Greift keines, berichtet der Koordinator die naechste Stellschraube (eps,
 T, beide Seiten) als Vorlage; W wird nicht gestrichen (Nutzer).
+
+##### par.5d3a ERGEBNIS W-v2 (2026-10-04 11:19-12:29, Kette `tools/night_v35_prep_chain3.sh`; Lib 861 gruen, Anker-Drift und -Konservierung GRUEN auf dem neuen Wheel; Artefakte `asym_probe_dice_v2_r1.json`, `_r2.json`)
+
+Je Arm 400 Partien, Seed 20261760, Modus 2 beide Seiten, eps 0,02, T 2; Bezug `policy-m2-400g` (400 Partien, gleicher
+Seed). **Grundmenge** Drafting-Records R1-4 nach der Wuerfelphase (G-Seite R1-Arm 17.910, R2-Arm 11.694; Bezug 47.898)
+bzw. 400 Partien; **Einheit** wie par.5a.
+
+| Groesse | `policy-dice-v2-r1` (R_dice 1) | `policy-dice-v2-r2` (R_dice 1-2) |
+| --- | --- | --- |
+| Siegquote W [CI] | 0,445 [0,405; 0,485] | 0,405 [0,370; 0,438] |
+| Punkte W / G, Marge | 50,1 / 53,5, -3,4 | 46,3 / 52,0, -5,7 |
+| gezahlte Wuerfelpunkte je Partie | 0,65 | 1,29 |
+| Mehrkosten je Partie gegen Bezug (2,90 s) | +9,8 % | +22,6 % |
+| Versatz W / G [CI] | -0,011 [-0,049; +0,029] / -0,006 [-0,044; +0,031] | **-0,032 [-0,055; -0,007]** / +0,010 [-0,017; +0,037] |
+| **KL-Differenz G-Seite gegen Bezug [CI]** | **+0,054 [+0,036; +0,073]** | +0,041 [+0,009; +0,067] |
+| KL-Differenz W-Seite [CI] | +0,053 [+0,033; +0,071] | +0,030 [+0,002; +0,054] |
+
+**Leseregel par.5d3:** (b) Versatz haelt im R1-Arm (beide CI mit 0); im R2-Arm faellt W mit -0,032 knapp durch (CI ohne
+0, |x| > 0,03), und (a) W 0,405 liegt unter 0,42 (Temperatur fuer Runde 2 zu hoch). (c) KL der G-Seite: **R1-Arm CI ganz
+ueber 0, +0,054 = rund 16 % hoehere KL** (par.5d1 hatte +0,030 mit CI um 0 bei 100 Partien; die Richtung war dieselbe, die
+Aufloesung fehlte). **W-v2 R1 TRAEGT nach der Regel (b UND c).** Zum ersten Mal sieht G in einer W-Klasse nachweisbar
+anders korrigierte Entscheide; der Preis ist eine Marge von -3,4 fuer W (44,5 %), also ein mildes Handicap ohne
+Wertverzerrung. Vorschlag: `policy-dice-v2-r1` mit 2.000 Partien in den v35-Sockel (bei @100 rund 1,8 h; die Frage
+@400 fuer die W-Klasse ist offen, Nutzer). Der R2-Arm ist nicht empfohlen; Stellschraube waere T 1,5 oder eps 0,01.
+Punkt (d) der Regel (gepaarte Abweichung, `state_novelty_probe.py --paired-baseline`): Ergebnis folgt in par.5d3b.
+
+##### par.5d3b ERGEBNIS Punkt (d), gepaart (2026-10-04 12:35-12:40, `state_novelty_probe.py --paired-baseline policy-m2-400g`, Artefakt `state_novelty_dice_v2.json`, 120 Dateien, 226 s)
+
+Paarung 400 von 400 je Arm (gleiche Auslage im ersten Record). **P1 (erste Abweichung):** jede Partie zweigt in
+Runde 1 ab (Anteil 1,000; G-Seite nach Median 4 eigenen Entscheiden [Q25 0; Q75 6], W-Seite nach 3), beide Arme
+identisch, weil Runde 1 gleich laeuft. **P2 (Anteil der G-Entscheide R2-4 nach der Wuerfelphase, deren Paar aus
+eigenem Brett und Gegnerbrett in Feinheit `slots` im Bezug fehlt; Bezug 38.120 Entscheide):**
+
+| Zeile | n | Anteil | CI (Abfrage fest) |
+| --- | --- | --- | --- |
+| Rauschbezug Haelfte A in B / B in A | 19.017 / 19.103 | 0,034 / 0,052 | [0,021; 0,049] / [0,034; 0,070] |
+| r1, G gegen Haelfte B / A | 19.207 | 0,068 / 0,074 | [0,055; 0,083] / [0,061; 0,089] |
+| r2, G (nur R3-4) gegen Haelfte B / A | 12.631 | 0,107 / 0,114 | [0,093; 0,124] / [0,097; 0,134] |
+
+Je Runde gegen den ganzen Bezug: r1 R2 0,069, R3 0,070, R4 0,015; r2 R3 0,134, R4 0,035. **Lesart (d):** r2 liegt in
+beiden Paarungen ohne Ueberlappung ueber dem Rauschbezug (Vorbehalt: seine Entscheide stammen nur aus R3-4, der
+Rauschbezug mischt R2-4, HERLEITUNG des Agenten, ein rundengleicher Rauschbezug fehlt); r1 liegt in Runde 2 und 3
+etwa doppelt so hoch wie der Rauschbezug, mit Ueberlappung der weiten CI, also "nicht eindeutig". M1 fuer G traegt
+weiter nicht (JS 0,290 unter q95 0,312). M3: Prior-Entropie der G-Seite unveraendert (alle CI mit 0), `root_q`
+hoeher (+0,07 bis +0,15, G ist vorn, passend zur W-Marge). Die KL-Lesart (c) wird durch (d) nicht widerlegt, sondern
+in der Richtung gestuetzt: G trifft nach der Wuerfelphase etwas haeufiger Stellungen, die der Bezug nicht kennt, und
+korrigiert dort seinen Prior staerker. **Gesamt par.5d3: W-v2 R1 traegt (b, c); R2 scheitert an (a) und (b).**
 
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 
@@ -1045,4 +1093,50 @@ waechst also mit den Sims. Das heisst auch: die Sims-Kurve vom 2026-09-13 (par.8
 und ist fuer die Vollendung neu zu bewerten (Rueckwaerts-Pruefung, Konsumenten: `PREREG_search_depth_column_optimum.md`,
 STATUS Abschnitt 8 "Sims und Spaltenbau", Memory). **Fuer den v35-Sockel ist @400 mit Modus 2 damit die Form, die
 beides liefert: doppelte Zielinformation ohne Punkte- oder Spaltenpreis; Kosten 2.000 Partien rund 3,75 h.**
-Nutzer-Entscheid.
+**ENTSCHIEDEN 2026-10-04 11:40 (Nutzer): @400 mit Modus 2 wird Sockel-Hauptklasse von v35** (2.000 Partien,
+`models/v35_sockel_draft.recipe.json` Klasse `policy`).
+
+### par.8c NACHMESSUNG Punkte und Spalten @400 (NUTZER 2026-10-04 11:55 *"plan die nachmessung ein. mischsockel koennen wir bei bedarf noch immer machen"*; REGISTRIERT vor dem Lauf)
+
+Anlass: par.8b1 hatte 100 Partien @400 (Punkte 50,3 +- 2,6, volle Spalten 0,845 +- 0,10) gegen 200 @100 (52,4 +- 1,7,
+0,88 +- 0,07); ein echter Verlust von 2 Punkten oder 0,04 Spalten ist damit nicht ausgeschlossen. Nutzer-Sorge:
+*"ich will nur nicht die spalten und punkte verlieren durch die 400 sims"*.
+
+**Lauf:** Klasse `policy-s400-m2-b` (300 Partien @400, Modus 2, Seed 20261730, sonst wie `policy-s400-m2`),
+Rezept `models/v35_probes2.recipe.json`, Kette `tools/night_v35_prep_chain4.sh`, rund 35 min.
+**Auswertung (gepoolt):** @400 = `policy-s400-m2` + `policy-s400-m2-b` (400 Partien, 800 Seiten); @100 =
+`policy-m2` + `policy-m2-400g` (600 Partien, 1.200 Seiten); alle Modus 2, Erzeugungs-Rezept. Grundmenge Seiten,
+Einheit Punkte je Seite bzw. volle Spalten je Seite; Differenz @400 minus @100 mit Block-Bootstrap-CI ueber
+Dateien; dazu Strafleiste, Spalten >= 4, Zeilen voll, Plattenpunkte je Kriterium, Median-KL, Kosten je Partie.
+**Leseregel:** Punktdifferenz-CI enthaelt 0 ODER Schaetzer > -1,0 Punkte, UND Spaltendifferenz-CI enthaelt 0 ODER
+Schaetzer > -0,03 -> kein Verlust nachweisbar, Hauptklasse bleibt rein @400. Punktdifferenz-CI ganz unter 0 mit
+Schaetzer <= -1,0 ODER Spaltendifferenz-CI ganz unter 0 mit Schaetzer <= -0,03 -> Mischsockel 1.000 @100 plus
+1.000 @400 (beide Modus 2) als Vorschlag, Nutzer-Entscheid. Artefakt `evaluations/artifacts/probe_s400_points_check.json`
+mit `laufzeit`-Block.
+
+#### par.8c1 ERGEBNIS Nachmessung (2026-10-04 12:41-13:12, Kette `tools/night_v35_prep_chain4.sh`, Artefakt `probe_s400_points_check.json`)
+
+Gepoolt: @400 = `policy-s400-m2` + `policy-s400-m2-b` (400 Partien, 800 Seiten, 40 Dateien) gegen @100 = `policy-m2` +
+`policy-m2-400g` (600 Partien, 1.200 Seiten, 60 Dateien), alle Modus 2. **Grundmenge** Seiten, **Einheit** je Seite,
+Differenz @400 minus @100, Block-Bootstrap-CI ueber Dateien (2.000 Ziehungen):
+
+| Groesse | Differenz @400 minus @100 [CI] | Regel par.8c |
+| --- | --- | --- |
+| Punkte je Seite | **-1,6 [-3,4; +0,2]** | CI enthaelt 0: kein Verlust nachweisbar |
+| volle Spalten je Seite | **-0,07 [-0,136; -0,006]** | CI ganz unter 0 und <= -0,03: **Verlust nachweisbar** |
+| Spalten >= 4 je Seite | -0,05 [-0,107; +0,008] | |
+| volle Zeilen je Seite | +0,015 [-0,010; +0,042] | |
+| Strafleiste je Seite | +0,14 [-0,07; +0,33] | |
+| k1-Plattenpunkte | -1,07 [-1,81; -0,32] | passt zu den fehlenden Spalten |
+| k5-Plattenpunkte | -0,62 [-1,27; +0,02] | |
+| Median-KL | +0,346 [+0,328; +0,364] (0,680 gegen 0,334) | |
+
+Kosten @400 gemessen 6,00 s je Partie (300 Partien) bzw. 6,75 (100); @100 3,2 s.
+
+**Verdikt nach Leseregel: Spaltenverlust nachweisbar (rund 8 % weniger volle Spalten je Seite bei @400), Punkte
+nicht; damit Vorschlag Mischsockel 1.000 @100 plus 1.000 @400 (beide Modus 2), Nutzer-Entscheid.** Die Lesart von
+par.8b1 ("gleiche Spalten") war bei 100 Partien nicht aufloesbar und ist hiermit korrigiert: der Spalten-Tausch aus
+par.8e besteht auch mit Modus 2, abgeschwaecht (par.8e: -0,20 Spalten @100 zu @400 mit Modus 0; jetzt -0,07).
+Rueckwaerts-Pruefung: par.8b1-Satz "Spalten-Tausch nicht sichtbar" ist durch diesen Absatz ueberholt; par.8f und
+`docs/generation_loop.md` sprechen von "mindestens teilweise Artefakt", das bleibt richtig.
+

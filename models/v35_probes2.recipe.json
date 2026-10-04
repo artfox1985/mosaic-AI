@@ -122,6 +122,24 @@
         "record_sides": "both"
       }
     },
+    "policy-s400-m2-b": {
+      "description": "par.8c: Nachmessung Punkte und Spalten @400, wie policy-s400-m2 (400 Sims, Modus 2 beide Seiten), aber 300 Partien mit eigenem Seed; gepoolt mit policy-s400-m2 gegen policy-m2 + policy-m2-400g.",
+      "version": "probe-v35-policy-s400-m2-b",
+      "seed": 20261730,
+      "games": 300,
+      "sims": 400,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": null,
+        "record_sides": "both"
+      }
+    },
     "policy-m2-400g": {
       "description": "par.5d3: Bezug der W-Klassen v2, G gegen G, 400 Partien @100, Modus 2 beide Seiten; derselbe Seed und dieselbe Chunkung wie policy-dice-v2-r1/-r2, damit Partie i hier und dort gepaart ist.",
       "version": "probe-v35-policy-m2-400g",
