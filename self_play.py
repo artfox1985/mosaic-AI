@@ -71,6 +71,9 @@ RECIPE_RESERVED_ENV = {
     "MOSAIC_DOME_DICE_SIMS": "dome_dice_sims",
     # Eroeffnungs-Wuerfel (PREREG_asymmetric_selfplay.md par.5d).
     "MOSAIC_DOME_DICE_LAST_ROUND": "dome_dice_last_round",
+    # W, naechste Form (PREREG_asymmetric_selfplay.md par.5d3).
+    "MOSAIC_DOME_DICE_PLACE_EPS": "dome_dice_place_eps",
+    "MOSAIC_DOME_DICE_PRIOR_TEMP": "dome_dice_prior_temp",
     # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a).
     "MOSAIC_AGGR_SIDE": "aggr_side",
     "MOSAIC_AGGR_SIDE_W": "aggr_side_w",
@@ -83,6 +86,8 @@ RECIPE_RESERVED_ENV = {
     # Exploiter-Gegner, zwei Netze je Partie (PREREG_asymmetric_selfplay.md par.7).
     "MOSAIC_OPPONENT_MODEL": "opponent_model",
     "MOSAIC_RECORD_SIDES": "record_sides",
+    # par.7c: Sims der Gegner-Netz-Seite.
+    "MOSAIC_OPPONENT_SIMS": "opponent_sims",
 }
 
 _RECIPE_PRE = None
@@ -233,7 +238,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       dome_dice=False, dome_dice_sims=600, dome_dice_last_round=4,
                       aggr_side=False, aggr_side_w=0.1, aggr_side_lambda=None,
                       aggr_side_eps=None, tau_tiebreak_side=False, tau_tiebreak_q=0,
-                      opponent_model=None, record_sides="both",
+                      opponent_model=None, record_sides="both", opponent_sims=None,
+                      dome_dice_place_eps=0.0, dome_dice_prior_temp=0.0,
                       engine_config_only=False):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
@@ -329,6 +335,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     zweites Netz je Partie (eine Seite je Partie, Hash aus dem Partie-Seed) und
     der Seitenfilter der Records. Beide Variablen IMMER gesetzt (leer = aus,
     `both` = Bestand), Rust liest sie per OnceLock.
+    `opponent_sims` (par.7c): Sims der Gegner-Netz-Seite; `MOSAIC_OPPONENT_SIMS`
+    IMMER gesetzt, leer = `--sims` (Bestand, byte-gleich).
     `engine_config_only` (Rezept-Waechter, `check_engine_config`): nach dem
     Setzen der Umgebung und dem Import NUR `engine_config_json()` melden und
     ohne Partie enden -- so sieht der Waechter genau die Konfiguration, die ein
@@ -360,6 +368,10 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     os.environ["MOSAIC_DOME_DICE_SIMS"] = str(dome_dice_sims)
     # par.5d: ebenso immer gesetzt; Rust liest sie nur bei MOSAIC_DOME_DICE=1.
     os.environ["MOSAIC_DOME_DICE_LAST_ROUND"] = str(dome_dice_last_round)
+    # par.5d3: eps-Fenster der Platzwahl und Temperatur der Quellenregel, immer
+    # gesetzt (0 = Bestand); Rust liest beide per OnceLock.
+    os.environ["MOSAIC_DOME_DICE_PLACE_EPS"] = repr(float(dome_dice_place_eps))
+    os.environ["MOSAIC_DOME_DICE_PRIOR_TEMP"] = repr(float(dome_dice_prior_temp))
     # Klasse S: wie Klasse W immer gesetzt, lambda nur mit Wert. Modus B
     # (par.5c): eps gesetzt, W entfernt (dort verboten), lambda nie.
     os.environ["MOSAIC_AGGR_SIDE"] = "1" if aggr_side else "0"
@@ -375,6 +387,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     # par.7: immer gesetzt (leer = kein Gegner-Netz, both = Bestand).
     os.environ["MOSAIC_OPPONENT_MODEL"] = opponent_model or ""
     os.environ["MOSAIC_RECORD_SIDES"] = record_sides
+    os.environ["MOSAIC_OPPONENT_SIMS"] = "" if opponent_sims is None else str(int(opponent_sims))
     try:
         import mosaic_rust as mr
         if engine_config_only:
@@ -491,7 +504,9 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           aggr_side=False, aggr_side_w=0.1,
                           aggr_side_lambda=None, aggr_side_eps=None,
                           tau_tiebreak_side=False, tau_tiebreak_q=0,
-                          opponent_model=None, record_sides="both") -> str | None:
+                          opponent_model=None, record_sides="both",
+                          opponent_sims=None,
+                          dome_dice_place_eps=0.0, dome_dice_prior_temp=0.0) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -513,7 +528,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               return_order_random_p, tie_mirror_p, label_rng_split,
               excursion_reshuffle, excursion_kl_weight, dome_dice, dome_dice_sims,
               dome_dice_last_round, aggr_side, aggr_side_w, aggr_side_lambda, aggr_side_eps,
-              tau_tiebreak_side, tau_tiebreak_q, opponent_model, record_sides),
+              tau_tiebreak_side, tau_tiebreak_q, opponent_model, record_sides, opponent_sims,
+              dome_dice_place_eps, dome_dice_prior_temp),
     )
     proc.start()
     t_start = time.time()
@@ -636,6 +652,9 @@ def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
             "tau_tiebreak_q": knobs.get("tau_tiebreak_q", 0),
             "opponent_model": knobs.get("opponent_model"),
             "record_sides": knobs.get("record_sides", "both"),
+            "opponent_sims": knobs.get("opponent_sims"),
+            "dome_dice_place_eps": knobs.get("dome_dice_place_eps", 0.0),
+            "dome_dice_prior_temp": knobs.get("dome_dice_prior_temp", 0.0),
             "engine_config_only": True,
         },
     )
@@ -747,6 +766,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   tau_tiebreak_q: int = 0,
                   opponent_model: str | None = None,
                   record_sides: str = "both",
+                  opponent_sims: int | None = None,
+                  dome_dice_place_eps: float = 0.0,
+                  dome_dice_prior_temp: float = 0.0,
                   recipe_info: dict | None = None):
     # `recipe_info` (Rezeptdatei, docs/working_rules.md): None ohne Rezept,
     # sonst {"recipe": Recipe, "class": str|None, "overrides": dict} aus
@@ -888,6 +910,21 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         if _have is not None and _have != _want:
             raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
                              f"(--dome-dice/--dome-dice-sims -> {_want!r}); Variable entfernen.")
+    # W, naechste Form (PREREG_asymmetric_selfplay.md par.5d3): Bereiche wie Rust
+    # (self_play.rs dome_dice_place_eps [0, 1], dome_dice_prior_temp [0, 1000]); beide
+    # wirken nur mit --dome-dice (sonst waeren sie still wirkungslos).
+    if not (0.0 <= dome_dice_place_eps <= 1.0):
+        raise SystemExit(f"❌ --dome-dice-place-eps muss in [0, 1] liegen, ist {dome_dice_place_eps}.")
+    if not (0.0 <= dome_dice_prior_temp <= 1000.0):
+        raise SystemExit(f"❌ --dome-dice-prior-temp muss in [0, 1000] liegen, ist {dome_dice_prior_temp}.")
+    if (dome_dice_place_eps or dome_dice_prior_temp) and not dome_dice:
+        raise SystemExit("❌ --dome-dice-place-eps/--dome-dice-prior-temp wirken nur mit --dome-dice.")
+    for _env, _want in (("MOSAIC_DOME_DICE_PLACE_EPS", repr(float(dome_dice_place_eps))),
+                        ("MOSAIC_DOME_DICE_PRIOR_TEMP", repr(float(dome_dice_prior_temp)))):
+        _have = os.environ.get(_env)
+        if _have is not None and _have != _want:
+            raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
+                             f"(--dome-dice-place-eps/--dome-dice-prior-temp -> {_want!r}); Variable entfernen.")
     # Klasse S (PREREG_asymmetric_selfplay.md par.3/par.3a): Stoerer auf einer
     # Seite je Partie. Harte Fehler wie bei W. Bereiche wie Rust
     # (self_play.rs parse_aggr_side_w/_lambda, net_mcts.rs set_aggression_params).
@@ -971,6 +1008,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     # (self_play.rs opponent_conflict), harte Fehler VOR dem Lauf.
     if record_sides not in ("both", "primary", "opponent"):
         raise SystemExit(f"❌ --record-sides muss both, primary oder opponent sein, ist {record_sides!r}.")
+    if opponent_sims is not None:
+        if not opponent_model:
+            raise SystemExit("❌ --opponent-sims verlangt --opponent-model (par.7c).")
+        if opponent_sims < 1:
+            raise SystemExit(f"❌ --opponent-sims muss >= 1 sein, ist {opponent_sims}.")
     if record_sides != "both" and not opponent_model:
         raise SystemExit(f"❌ --record-sides {record_sides} verlangt --opponent-model: ohne Gegner-Netz "
                          "gibt es keine Seiten zu filtern.")
@@ -989,11 +1031,12 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         opponent_model = _resolve_model_path(opponent_model, "Gegner-Modell")
     # Doppelquelle: der Worker setzt beide Variablen immer.
     for _env, _want in (("MOSAIC_OPPONENT_MODEL", opponent_model or ""),
-                        ("MOSAIC_RECORD_SIDES", record_sides)):
+                        ("MOSAIC_RECORD_SIDES", record_sides),
+                        ("MOSAIC_OPPONENT_SIMS", "" if opponent_sims is None else str(int(opponent_sims)))):
         _have = os.environ.get(_env)
         if _have is not None and _have != _want:
             raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
-                             f"(--opponent-model/--record-sides -> {_want!r}); Variable entfernen.")
+                             f"(--opponent-model/--record-sides/--opponent-sims -> {_want!r}); Variable entfernen.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -1048,6 +1091,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                 "aggr_side_eps": aggr_side_eps,
                 "tau_tiebreak_side": tau_tiebreak_side, "tau_tiebreak_q": tau_tiebreak_q,
                 "opponent_model": opponent_model, "record_sides": record_sides,
+                "opponent_sims": opponent_sims,
+                "dome_dice_place_eps": dome_dice_place_eps,
+                "dome_dice_prior_temp": dome_dice_prior_temp,
             })
     if recipe_info is not None:
         if _expected:
@@ -1141,6 +1187,13 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # des Chunk-Prozesses meldet `opponent_model` und `record_sides`.
         "opponent_model": opponent_model,
         "record_sides": record_sides,
+        # par.7c: Sims der Gegner-Netz-Seite (None = --sims); engine_config meldet
+        # `opponent_sims` (null = --sims).
+        "opponent_sims": opponent_sims,
+        # par.5d3: W, naechste Form; engine_config meldet `dome_dice_place_eps`,
+        # `dome_dice_prior_temp` und die gueltige `dome_dice_source_rule`.
+        "dome_dice_place_eps": dome_dice_place_eps,
+        "dome_dice_prior_temp": dome_dice_prior_temp,
     }, recipe=_recipe_block, engine_config=_worker_cfg)
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -1226,7 +1279,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"Stoerer {aggr_side_status} | "
               f"tau-Stichentscheid Modus {tau_tiebreak_q}"
               f"{' nur auf einer Seite je Partie' if tau_tiebreak_side else ''} | "
-              f"Gegner-Netz {(opponent_model + ' auf einer Seite je Partie') if opponent_model else 'AUS (Standard)'}, Records {record_sides} | "
+              f"Gegner-Netz {(opponent_model + ' auf einer Seite je Partie') if opponent_model else 'AUS (Standard)'}, Records {record_sides}"
+              f"{f', Gegner-Sims {opponent_sims}' if opponent_sims is not None else ''} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -1280,6 +1334,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             aggr_side_eps=aggr_side_eps,
             tau_tiebreak_side=tau_tiebreak_side, tau_tiebreak_q=tau_tiebreak_q,
             opponent_model=opponent_model, record_sides=record_sides,
+            opponent_sims=opponent_sims,
+            dome_dice_place_eps=dome_dice_place_eps, dome_dice_prior_temp=dome_dice_prior_temp,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1673,6 +1729,17 @@ if __name__ == "__main__":
                              "Record-Feld dice_phase (Runde <= Grenze) auf jedem Record einer "
                              "W-Partie. Setzt MOSAIC_DOME_DICE_LAST_ROUND; nur mit --dome-dice "
                              "von 4 verschieden.")
+    parser.add_argument("--dome-dice-place-eps", dest="dome_dice_place_eps", type=float, default=0.0,
+                        help="PREREG_asymmetric_selfplay.md par.5d3 Punkt 1: Platzwahl der Wuerfel-Seite "
+                             "mit eps-Spielraum; unter den besuchten Plaetzen mit Q >= Q_best - eps wird "
+                             "gleichverteilt aus dem Wuerfelstrom gezogen. 0 = Bestand (Platz der Suche). "
+                             "Record-Feld dice_place_eps_pick. Setzt MOSAIC_DOME_DICE_PLACE_EPS; nur mit "
+                             "--dome-dice.")
+    parser.add_argument("--dome-dice-prior-temp", dest="dome_dice_prior_temp", type=float, default=0.0,
+                        help="PREREG_asymmetric_selfplay.md par.5d3 Punkt 2: Quellenregel prior_tempered, "
+                             "die Wahl unter Auslageplaetzen und oberster Stapelplatte folgt "
+                             "softmax(ln prior / T) des Netzes; im Suchbaum dieselbe Regel. 0 = Bestand "
+                             "(gleichverteilt). Setzt MOSAIC_DOME_DICE_PRIOR_TEMP; nur mit --dome-dice.")
     parser.add_argument("--aggr-side", dest="aggr_side", action="store_true",
                         help="PREREG_asymmetric_selfplay.md par.3/par.3a, Klasse S (Stoerer): je "
                              "Partie ist EINE Seite der Stoerer (Hash aus dem Partie-Seed; mit "
@@ -1719,6 +1786,11 @@ if __name__ == "__main__":
                         help="par.7: welche Seite Records schreibt (both = Bestand, primary = --model-Seite, "
                              "opponent = Seite des --opponent-model). Ungleich both nur mit --opponent-model. "
                              "Setzt MOSAIC_RECORD_SIDES.")
+    parser.add_argument("--opponent-sims", dest="opponent_sims", type=int, default=None,
+                        help="PREREG_asymmetric_selfplay.md par.7c: Sims ALLER Suchen der Gegner-Netz-Seite "
+                             "(Drafting, Startsetzung, Platz-/Rueckgabesuchen; Runde 5 nach Spec). Ohne Flag "
+                             "= --sims (Bestand, byte-gleich). Nur mit --opponent-model. Setzt "
+                             "MOSAIC_OPPONENT_SIMS.")
     parser.add_argument("--tau-tiebreak-side", dest="tau_tiebreak_side", action="store_true",
                         help="PREREG_asymmetric_selfplay.md par.5e1 Frage 3: der Modus aus "
                              "--tau-tiebreak-q gilt je Partie nur fuer EINE Seite (Hash aus dem "
@@ -1815,6 +1887,9 @@ if __name__ == "__main__":
         tau_tiebreak_q=args.tau_tiebreak_q,
         opponent_model=args.opponent_model,
         record_sides=args.record_sides,
+        opponent_sims=args.opponent_sims,
+        dome_dice_place_eps=args.dome_dice_place_eps,
+        dome_dice_prior_temp=args.dome_dice_prior_temp,
         recipe_info=(None if _RECIPE_PRE is None else
                      {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
                       "overrides": _recipe_overrides}),

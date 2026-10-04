@@ -417,13 +417,15 @@ def main() -> None:
         return
 
     # --- Sockel (Bezug) und W ------------------------------------------------------------------
-    pf, pa, pg, _ = read_class("policy", None)
+    pf, pa, pg, _ = read_class(args.kl_baseline, None)
     wa = {"kl": np.array([])}
     if not args.skip_s2:
         wf, wa, wg, _ = read_class(args.dice_class, "dome_dice_side")
-        lz_p, lz_w = manifest_runtime(data, "policy"), manifest_runtime(data, args.dice_class)
+        lz_p, lz_w = manifest_runtime(data, args.kl_baseline), manifest_runtime(data, args.dice_class)
         out["dice_class"] = args.dice_class
-        s1 = {"grundmenge": "Partien je Klasse (100), Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
+        # par.5d3: Bezug der W-Klasse (Schluessel "policy"/"sockel" unten bleiben, gemeint ist dieser Bezug).
+        out["bezug"] = args.kl_baseline
+        s1 ={"grundmenge": "Partien je Klasse (100), Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
               "policy": lz_p, "policy_dice": lz_w}
         if lz_p and lz_w and lz_p.get("s_je_partie") and lz_w.get("s_je_partie"):
             s1["mehrkosten_w"] = lz_w["s_je_partie"] / lz_p["s_je_partie"] - 1.0

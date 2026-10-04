@@ -48,6 +48,15 @@ der Asym-Linie: in fuenf Formen kein messbarer Gewinn an Stellungen fuer G; die 
 Suchtiefe @400 mit Modus 2.** Sockel-Vorschlag des Koordinators: `ALT-policy-s400` (2.000 @400, Modus 2) als
 Hauptklasse, kein W, kein Exploiter; Schwarm: Entscheid Neu-Erzeugung mit Modus 2 (rund 5 h) oder Bestand.
 
+**NUTZER-ENTSCHEID 11:05: W und Exploiter bleiben und werden weiterentwickelt** (*"kein W und kein exploiter ist
+keine option. da darfst noch etwas optimieren bis die zwei ihre gewuenschte wirkung entfalten"*). Registriert und im
+Bau (Agenten): **par.5d3** W-v2 = Platzwahl mit eps-Spielraum (`MOSAIC_DOME_DICE_PLACE_EPS` 0,02) plus Platte aus
+G's Prior mit Temperatur (`MOSAIC_DOME_DICE_PRIOR_TEMP` 2), Sonde 400 Partien je Arm (R1, R1-2) gegen Bezug
+`policy-m2-400g`, gepaarte Abweichungsmessung in `state_novelty_probe.py`; **par.7c** Exploiter-v2 = Policy nur aus
+E-Siegen (`policy_target_valid` false fuer verlorene Partien), E @200 gegen G @100 (`--opponent-sims`), 2 x 2.000
+Partien mit Vortor (>= 0,52 nach Zyklus 1), Tor >= 0,55. Kosten HERLEITUNG: W-Sonde rund 1,5 h; Exploiter rund 11 h.
+Sockel-Entscheid (Hauptklasse @400 Modus 2, Schwarm neu oder Bestand) weiter offen beim Nutzer.
+
 **Wichtigster Befund:** der Generator spielt seit `tau_argmax_from_move` 1 bei Besuchs-Gleichstand den ERSTEN
 Eintrag statt nach Q (par.5e); dieselbe Suche mit Q-Stichentscheid gewinnt 3 von 4 Partien gegen ihn. Das Policy-
 Ziel war nie betroffen, die Trajektorien und Wertziele aller bisherigen Fenster schon (auch der schon erzeugte

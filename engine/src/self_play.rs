@@ -2951,6 +2951,135 @@ pub(crate) const DOME_DICE_SEARCH_SEED_DISTINGUISHER: u64 = 0xD1CE_5EA2_5EED_C0D
 /// `dome_dice_source_rule`).
 pub(crate) const DOME_DICE_SOURCE_RULE: &str = "uniform_over_display_slots_and_stack_top";
 
+/// Quellenregel bei `MOSAIC_DOME_DICE_PRIOR_TEMP > 0` (Prereg par.5d3 Punkt 2):
+/// dieselben Optionen wie [`DOME_DICE_SOURCE_RULE`], gezogen nach
+/// softmax(log prior / T) ueber die Plattenpriors des Netzes je Option
+/// ([`tempered_source_weights`]). Im Manifest ueber [`dome_dice_source_rule`].
+pub(crate) const DOME_DICE_SOURCE_RULE_PRIOR_TEMPERED: &str = "prior_tempered_over_display_slots_and_stack_top";
+
+/// Untergrenze eines Plattenpriors vor dem Logarithmus (eine Option ohne
+/// Prior-Masse bliebe sonst bei jeder Temperatur unziehbar).
+pub(crate) const DOME_DICE_PRIOR_FLOOR: f64 = 1e-9;
+
+/// Gueltige Quellenregel dieses Prozesses (Manifest `dome_dice_source_rule`).
+pub(crate) fn dome_dice_source_rule() -> &'static str {
+    if dome_dice_prior_temp() > 0.0 {
+        DOME_DICE_SOURCE_RULE_PRIOR_TEMPERED
+    } else {
+        DOME_DICE_SOURCE_RULE
+    }
+}
+
+/// Nicht-negative endliche Zahl mit Obergrenze `max`, sonst `None` (reine
+/// Pruefung fuer `MOSAIC_DOME_DICE_PLACE_EPS` und `MOSAIC_DOME_DICE_PRIOR_TEMP`).
+fn parse_nonneg_f64_upto(raw: &str, max: f64) -> Option<f64> {
+    raw.trim().parse::<f64>().ok().filter(|v| v.is_finite() && (0.0..=max).contains(v))
+}
+
+/// Liest einen Zahlen-Knopf der Klasse W; ungesetzt oder leer = 0 (Bestand),
+/// ungueltig -> 0 mit Warnung (die Aufrufer cachen per OnceLock).
+fn read_dice_f64_env(name: &str, max: f64) -> f64 {
+    match std::env::var(name) {
+        Err(_) => 0.0,
+        Ok(raw) if raw.trim().is_empty() => 0.0,
+        Ok(raw) => parse_nonneg_f64_upto(&raw, max).unwrap_or_else(|| {
+            eprintln!("WARNUNG: {name}={raw:?} ist keine Zahl in [0, {max}] -- 0 (Bestand) gilt.");
+            0.0
+        }),
+    }
+}
+
+/// Prereg par.5d3 Punkt 1, `MOSAIC_DOME_DICE_PLACE_EPS` (Default 0 = Bestand):
+/// Spielraum an Siegwahrscheinlichkeit der Platzwahl der Wuerfel-Seite. Bei
+/// > 0 wird unter den besuchten Plaetzen mit `Q >= Q_best - eps`
+/// ([`place_eps_candidates`]) gleichverteilt aus dem Wuerfelstrom gezogen.
+pub(crate) fn dome_dice_place_eps() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_dice_f64_env("MOSAIC_DOME_DICE_PLACE_EPS", 1.0))
+}
+
+/// Prereg par.5d3 Punkt 2, `MOSAIC_DOME_DICE_PRIOR_TEMP` (Default 0 = Bestand,
+/// Quelle gleichverteilt): Temperatur T der Quellenregel `prior_tempered`.
+pub(crate) fn dome_dice_prior_temp() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| read_dice_f64_env("MOSAIC_DOME_DICE_PRIOR_TEMP", 1000.0))
+}
+
+/// Gewichte je Wuerfeloption bei Temperatur `temp` (par.5d3 Punkt 2), Reihenfolge
+/// wie in [`roll_dome_dice`]: die belegten Auslageplaetze, dann (falls der
+/// Stapel nicht leer ist) die oberste Stapelplatte. Prior je Option = Summe der
+/// Priors aller Plattenaktionen dieser Platte (`ChooseDomeSlot` mit ihrer
+/// `dome_tile_id`, ueber alle Plaetze und Rotationen) bzw. aller
+/// `DrawStackPeek`; Gewicht = softmax(ln(max(prior, Untergrenze)) / T),
+/// numerisch im Log-Raum. `None` bei `temp <= 0`, ohne Optionen oder ohne
+/// endliche Gewichte (dann zieht der Wuerfel gleichverteilt).
+pub(crate) fn tempered_source_weights(state: &GameState, plate_priors: &[(Action, f32)], temp: f64) -> Option<Vec<f64>> {
+    if !(temp > 0.0) {
+        return None;
+    }
+    let mut prior: Vec<f64> = state
+        .dome_display
+        .iter()
+        .map(|t| {
+            plate_priors
+                .iter()
+                .filter(|(a, _)| matches!(a, Action::ChooseDomeSlot(m) if m.dome_tile_id == t.tile_id))
+                .map(|(_, p)| f64::from(*p))
+                .sum()
+        })
+        .collect();
+    if !state.dome_tile_pool.is_empty() {
+        prior.push(
+            plate_priors.iter().filter(|(a, _)| matches!(a, Action::DrawStackPeek)).map(|(_, p)| f64::from(*p)).sum(),
+        );
+    }
+    tempered_weights(&prior, temp)
+}
+
+/// softmax(ln(max(p, Untergrenze)) / T) ueber `prior`, im Log-Raum (reine
+/// Funktion, Kern von [`tempered_source_weights`]).
+pub(crate) fn tempered_weights(prior: &[f64], temp: f64) -> Option<Vec<f64>> {
+    if prior.is_empty() || !(temp > 0.0) {
+        return None;
+    }
+    let logs: Vec<f64> = prior.iter().map(|p| p.max(DOME_DICE_PRIOR_FLOOR).ln() / temp).collect();
+    let top = logs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !top.is_finite() {
+        return None;
+    }
+    let w: Vec<f64> = logs.iter().map(|l| (l - top).exp()).collect();
+    let s: f64 = w.iter().sum();
+    (s.is_finite() && s > 0.0).then(|| w.iter().map(|x| x / s).collect())
+}
+
+/// Ein Index nach normierten Gewichten, EINE Gleitkommazahl aus `rng`.
+fn weighted_pick_normalized<R: Rng + ?Sized>(weights: &[f64], rng: &mut R) -> usize {
+    let mut r: f64 = rng.random::<f64>();
+    for (i, w) in weights.iter().enumerate() {
+        if r < *w {
+            return i;
+        }
+        r -= w;
+    }
+    weights.len().saturating_sub(1)
+}
+
+/// Prereg par.5d3 Punkt 1: Indizes (in `stats`) der besuchten Plaetze mit
+/// `Q >= Q_best - eps`, `Q_best` = hoechstes Q unter den besuchten. `stats` =
+/// (Aktion, Besuche, Q) der Platzsuche. Leer, wenn kein Platz besucht wurde.
+pub(crate) fn place_eps_candidates(stats: &[(Action, u32, f64)], eps: f64) -> Vec<usize> {
+    let best = stats.iter().filter(|(_, v, _)| *v > 0).map(|(_, _, q)| *q).fold(f64::NEG_INFINITY, f64::max);
+    if !best.is_finite() {
+        return Vec::new();
+    }
+    stats
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, v, q))| *v > 0 && *q >= best - eps)
+        .map(|(i, _)| i)
+        .collect()
+}
+
 /// Default von `MOSAIC_DOME_DICE_SIMS` (Prereg par.2 Punkt 4: 600 Sims).
 pub(crate) const DOME_DICE_SIMS_DEFAULT: u32 = 600;
 
@@ -3122,10 +3251,17 @@ pub(crate) struct DiceRoll {
 /// `gate_on` = `extended_action_nodes` der Wuerfel-Seite: an -> Kopf als
 /// Position (`ChooseReturnFirst`), aus -> volle Reihenfolge fuer
 /// `ChooseDrawStackSlot` (Muster [`sample_random_return_order`]).
+///
+/// `source_weights` (par.5d3 Punkt 2, `prior_tempered`): `None` = Bestand,
+/// gleichverteilt mit `random_range(0..optionen)`; `Some(w)` mit einem
+/// normierten Gewicht je Option ([`tempered_source_weights`]) = Ziehung nach
+/// diesen Gewichten mit EINER Gleitkommazahl. Passt die Laenge nicht, gilt der
+/// Bestand (darf nicht vorkommen, `debug_assert`).
 pub(crate) fn roll_dome_dice<R: Rng + ?Sized>(
     state: &GameState,
     gate_on: bool,
     return_p: f64,
+    source_weights: Option<&[f64]>,
     rng: &mut R,
 ) -> Option<DiceRoll> {
     let display_n = state.dome_display.len();
@@ -3133,7 +3269,11 @@ pub(crate) fn roll_dome_dice<R: Rng + ?Sized>(
     if options == 0 {
         return None;
     }
-    let pick = rng.random_range(0..options);
+    debug_assert!(source_weights.is_none_or(|w| w.len() == options), "Gewichte je Wuerfeloption");
+    let pick = match source_weights {
+        Some(w) if w.len() == options => weighted_pick_normalized(w, rng),
+        _ => rng.random_range(0..options),
+    };
     let source = if pick < display_n {
         DiceRollSource::Display { tile_id: state.dome_display[pick].tile_id }
     } else {
@@ -3309,13 +3449,16 @@ fn dice_search_choice(
     sims: u32,
     seed: u64,
     move_number: u64,
-) -> (Action, usize, Option<DiceSearchTargets>) {
+) -> (Action, usize, Option<DiceSearchTargets>, Vec<(Action, u32, f64)>) {
     let actions = drafting_actions(&game.state);
     if actions.len() == 1 {
-        return (actions[0].clone(), 1, None);
+        return (actions[0].clone(), 1, None, Vec::new());
     }
     let mut rng = StdRng::seed_from_u64(seed);
-    let (chosen, policy, root_q, child_q, fallback, _kl) = net_drafting_policy_with_fallback_flag(
+    // par.5d3 Punkt 1: derselbe Rumpf wie `net_drafting_policy_with_fallback_flag`
+    // (gleiche Suche, gleicher RNG-Verbrauch), zusaetzlich die Wurzelstatistik
+    // (Aktion, Besuche, Q) fuer das eps-Fenster der Platzwahl.
+    let (chosen, policy, root_q, child_q, fallback, _kl, _gap, _disruptor, stats) = net_drafting_policy_with_stats(
         cfg.net,
         &game.state,
         &actions,
@@ -3328,7 +3471,7 @@ fn dice_search_choice(
         None,
         &cfg.search_config,
     );
-    (chosen, actions.len(), Some((policy, root_q, child_q, fallback)))
+    (chosen, actions.len(), Some((policy, root_q, child_q, fallback)), stats)
 }
 
 /// par.3c: der Platzwahl-Record der gewuerfelten Platte. `state` ist der
@@ -3397,7 +3540,16 @@ pub(crate) fn apply_forced_dome_move(
     // (1) Wuerfeln aus dem eigenen Strom, Zaehler = Index der erzwungenen Platte.
     let mut dice_rng =
         StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEED_DISTINGUISHER, forced_index));
-    let roll = roll_dome_dice(&game.state, gate_on, return_order_random_p(), &mut dice_rng)
+    // par.5d3 Punkt 2: bei Temperatur > 0 die Plattenpriors EINES Forward-Passes
+    // am Zustand (kein RNG-Zug); bei 0 (Default) wird nichts gerechnet.
+    let prior_temp = dome_dice_prior_temp();
+    let source_weights = if prior_temp > 0.0 {
+        let priors = crate::net_mcts::dome_plate_priors(cfg.net, &game.state);
+        tempered_source_weights(&game.state, &priors, prior_temp)
+    } else {
+        None
+    };
+    let roll = roll_dome_dice(&game.state, gate_on, return_order_random_p(), source_weights.as_deref(), &mut dice_rng)
         .ok_or_else(|| "Wuerfel: Auslage und Stapel leer bei offener Pflicht".to_string())?;
     // (2)-(4) Quelle ausfuehren, Pin mit Rotation und (falls gefallen)
     // Rueckgabe setzen -- derselbe Helfer wie im Zufallsknoten der Suche
@@ -3415,21 +3567,40 @@ pub(crate) fn apply_forced_dome_move(
     let search_seed = |ctr: u64| {
         crate::net_mcts::derive_search_seed(game_seed ^ DOME_DICE_SEARCH_SEED_DISTINGUISHER, ctr)
     };
-    let (place, slots, targets) =
+    let (mut place, slots, targets, place_stats) =
         dice_search_choice(game, cfg, cfg.place_sims, search_seed(forced_index * 2), move_number);
     debug_assert!(matches!(place, Action::ChooseDomeSlot(_) | Action::ChooseDrawStackSlot(_)));
+    // par.5d3 Punkt 1: Platz aus dem eps-Fenster, gleichverteilt aus dem
+    // WUERFELstrom (hinter dem Wurf). Bei eps 0 (Default) kein Zug, kein Feld.
+    // Das Policy-Ziel des Platzwahl-Records bleibt die Suche.
+    let place_eps = dome_dice_place_eps();
+    let mut eps_pick: Option<usize> = None;
+    if place_eps > 0.0 && slots > 1 {
+        let cands = place_eps_candidates(&place_stats, place_eps);
+        if !cands.is_empty() {
+            let k = dice_rng.random_range(0..cands.len());
+            place = place_stats[cands[k]].0.clone();
+            eps_pick = Some(cands.len());
+        }
+    }
     // par.3c: Platzwahl-Record aus dem Zustand VOR der Platzwahl, nur bei einer
     // echten Suche (mehr als ein Platz).
-    let place_record = targets.as_ref().map(|t| dice_place_record(&game.state, t));
+    let place_record = targets.as_ref().map(|t| {
+        let mut m = dice_place_record(&game.state, t);
+        if let Some(n) = eps_pick {
+            m.insert("dice_place_eps_pick".into(), json!(n));
+        }
+        m
+    });
     game.apply_drafting(&place)?;
     // (6) Rueckgabeknoten, nur falls er sich oeffnet (game.rs `return_order_node_applies`).
     let return_mode = if game.state.pending_return_order.is_some() {
         if roll.return_first.is_some() {
-            let (a, _, _) = dice_search_choice(game, cfg, cfg.return_sims, 0, move_number);
+            let (a, _, _, _) = dice_search_choice(game, cfg, cfg.return_sims, 0, move_number);
             game.apply_drafting(&a)?;
             "random"
         } else {
-            let (a, n, _) =
+            let (a, n, _, _) =
                 dice_search_choice(game, cfg, cfg.return_sims, search_seed(forced_index * 2 + 1), move_number);
             game.apply_drafting(&a)?;
             if n == 1 { "single" } else { "search" }
@@ -4036,6 +4207,38 @@ pub(crate) fn opponent_model_path() -> Option<String> {
     .clone()
 }
 
+/// Parser fuer `MOSAIC_OPPONENT_SIMS` (par.7c): leer = `None` (= `--sims`,
+/// Bestand), sonst eine ganze Zahl >= 1; alles andere `Err`.
+pub(crate) fn parse_opponent_sims(raw: &str) -> Result<Option<u32>, String> {
+    let t = raw.trim();
+    if t.is_empty() {
+        return Ok(None);
+    }
+    match t.parse::<u32>() {
+        Ok(n) if n >= 1 => Ok(Some(n)),
+        _ => Err(format!("MOSAIC_OPPONENT_SIMS={raw:?} ist keine ganze Zahl >= 1")),
+    }
+}
+
+/// `MOSAIC_OPPONENT_SIMS` (OnceLock): Sims ALLER Suchen der Gegner-Netz-Seite
+/// (Drafting, Startsetzung; Runde 5 nach Spec ueber `r5_adjusted_base_sims`).
+/// Ungesetzt/leer = `Ok(None)` = `--sims` (Bestand); ungueltig = `Err`
+/// (run_net_self_play lehnt ab).
+pub(crate) fn opponent_sims() -> Result<Option<u32>, String> {
+    static CELL: std::sync::OnceLock<Result<Option<u32>, String>> = std::sync::OnceLock::new();
+    CELL.get_or_init(|| match std::env::var("MOSAIC_OPPONENT_SIMS") {
+        Err(_) => Ok(None),
+        Ok(raw) => parse_opponent_sims(&raw),
+    })
+    .clone()
+}
+
+/// Sims je Spielerindex (par.7c): ohne Gegner beide `base_sims`; mit Gegner die
+/// Gegner-Seite `sims`, die andere `base_sims`. Reine Funktion.
+pub(crate) fn side_sims(base_sims: u32, opponent: Option<(usize, u32)>) -> [u32; 2] {
+    side_assign(base_sims, opponent)
+}
+
 /// Welche Seite (0/1) spielt in DIESER Partie das Gegner-Netz? Hash aus
 /// `game_seed ^ OPPONENT_SIDE_DISTINGUISHER`, 50:50 ueber die Seeds.
 pub(crate) fn opponent_side_for(game_seed: u64) -> usize {
@@ -4097,6 +4300,7 @@ pub(crate) fn filter_record_sides(records: Vec<Value>, opponent_side: usize, sid
 pub(crate) fn opponent_conflict(
     opponent: bool,
     sides: RecordSides,
+    opponent_sims_set: bool,
     dome_dice: bool,
     aggr_side: bool,
     tiebreak_side: bool,
@@ -4104,6 +4308,11 @@ pub(crate) fn opponent_conflict(
     record_rtv: bool,
 ) -> Option<String> {
     if !opponent {
+        if opponent_sims_set {
+            return Some(
+                "MOSAIC_OPPONENT_SIMS verlangt MOSAIC_OPPONENT_MODEL (PREREG_asymmetric_selfplay.md par.7c)".into(),
+            );
+        }
         if sides != RecordSides::Both {
             return Some(format!(
                 "MOSAIC_RECORD_SIDES={} verlangt MOSAIC_OPPONENT_MODEL: ohne Gegner-Netz gibt es keine \
@@ -4144,6 +4353,8 @@ pub(crate) struct OpponentConfig<'n> {
     pub net: &'n Net,
     pub side: usize,
     pub record_sides: RecordSides,
+    /// par.7c: Sims der Gegner-Seite (Default = `base_sims`, Bestand).
+    pub sims: u32,
 }
 
 // ── Weg C: Abweichungsregel der Self-Play-Erzeugung ──────────────────────────
@@ -8110,6 +8321,45 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     add_root_noise: bool,
     deterministic: bool,
     move_number: u64,
+    tau_argmax_override: Option<usize>,
+    search_config: &crate::net_mcts::SearchConfig,
+) -> (
+    Action,
+    Vec<Value>,
+    Option<f64>,
+    Vec<f64>,
+    bool,
+    Option<f64>,
+    Option<f64>,
+    Option<crate::net_mcts::DisruptorPick>,
+) {
+    // Duenner Wrapper (par.5d3): derselbe Rumpf, derselbe RNG-Verbrauch, die
+    // Wurzelstatistik (neunter Wert) wird verworfen.
+    let (chosen, policy, root_q, child_q, fallback, policy_kl, own_q_gap, disruptor, _stats) =
+        net_drafting_policy_with_stats(
+            net, state, actions, base_sims, c_puct, rng, add_root_noise, deterministic, move_number,
+            tau_argmax_override, search_config,
+        );
+    (chosen, policy, root_q, child_q, fallback, policy_kl, own_q_gap, disruptor)
+}
+
+/// Rumpf von [`net_drafting_policy_with_own_gap`] mit NEUNTEM Rueckgabewert
+/// (`PREREG_asymmetric_selfplay.md` par.5d3 Punkt 1): die Wurzelstatistik der
+/// Suche `(Aktion, Besuche, Q)` in Kinderreihenfolge (im Rueckfall-Zweig die
+/// unbrauchbare Statistik, wie sie kam). Reines Durchreichen, Zugwahl, Ziele
+/// und RNG-Verbrauch unveraendert. Einziger Verbraucher mit Statistik:
+/// `dice_search_choice` (eps-Fenster der Platzwahl der Wuerfel-Seite).
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub(crate) fn net_drafting_policy_with_stats<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    base_sims: u32,
+    c_puct: f64,
+    rng: &mut R,
+    add_root_noise: bool,
+    deterministic: bool,
+    move_number: u64,
     // Weg B (`PREREG_start_position_seeding.md` par.9f): `Some(k)` ersetzt
     // das GLOBALE `net_mcts::tau_argmax_from_move()` fuer DIESEN Aufruf --
     // der Ausflug braucht einen vom Hauptpartie-Umschaltpunkt (Weg A)
@@ -8127,6 +8377,7 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     Option<f64>,
     Option<f64>,
     Option<crate::net_mcts::DisruptorPick>,
+    Vec<(Action, u32, f64)>,
 ) {
     let sims = net_effective_sims(base_sims, actions.len());
     // PREREG_targeted_branching.md par.7: dieselbe Suche wie ueber
@@ -8186,6 +8437,8 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
             None,
             // Modus B: keine Wurzelwahl.
             None,
+            // par.5d3: die (unbrauchbare) Statistik, wie sie kam.
+            stats,
         );
     }
     // Task #35: `root_child_q` MUSS exakt dieselbe Reihenfolge/Länge wie
@@ -8331,7 +8584,7 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     } else {
         None
     };
-    (chosen, policy, root_q, child_q, false, policy_kl, own_q_gap, disruptor)
+    (chosen, policy, root_q, child_q, false, policy_kl, own_q_gap, disruptor, stats)
 }
 
 /// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive
@@ -8571,6 +8824,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         net,
         side: opponent_side_for(game_seed),
         record_sides: record_sides().unwrap_or(RecordSides::Both),
+        // par.7c: ungueltig ist in `run_net_self_play` VOR dem Lauf abgelehnt.
+        sims: opponent_sims().ok().flatten().unwrap_or(base_sims),
     });
     // Klasse W (`PREREG_asymmetric_selfplay.md` par.2): der Knopf wird HIER
     // gelesen, die Schleife bekommt nur das Ergebnis. Nie im Ausflug (F8: die
@@ -8673,9 +8928,11 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     let (search_config, agent_configs) =
         tiebreak_side_configs(search_config, agent_configs, tiebreak_on, tiebreak_side);
     let agent_config =|player: usize| -> crate::net_mcts::SearchConfig { agent_configs[player] };
+    // par.7c: Sims je Seite (Gegner-Seite `opponent.sims`, sonst `base_sims`).
+    let sims: [u32; 2] = side_sims(base_sims, opponent.map(|o| (o.side, o.sims)));
     let agent0 = NetSelfPlayAgent {
         net: nets[0],
-        base_sims,
+        base_sims: sims[0],
         c_puct,
         add_root_noise,
         deterministic,
@@ -8687,7 +8944,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     };
     let agent1 = NetSelfPlayAgent {
         net: nets[1],
-        base_sims,
+        base_sims: sims[1],
         c_puct,
         add_root_noise,
         deterministic,
@@ -8710,7 +8967,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         // Self-Play. `add_root_noise` folgt dem Drafting-Knopf dieses Laufs
         // -- die Erzeugung darf an der Wurzel streuen, die Arena nicht.
         start_search: StartSearchParams::for_net(
-            Some(nets[0]), base_sims, &search_config, add_root_noise, game_seed),
+            Some(nets[0]), sims[0], &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
         // par.16.10, Traegerprinzip wie bei `start_search`: was die Arena
         // spielt, erzeugt das Self-Play.
@@ -8726,7 +8983,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         column_build_trace: false,
         return_order_mode: search_config.return_order_mode,
         start_search: StartSearchParams::for_net(
-            Some(nets[1]), base_sims, &search_config, add_root_noise, game_seed),
+            Some(nets[1]), sims[1], &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
         net_tiling_tiebreak: search_config.net_tiling_tiebreak,
     };
@@ -8744,8 +9001,9 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     let excursion_deviated: std::cell::Cell<bool> = std::cell::Cell::new(false);
     let cfg = GameLoopConfig {
         // Self-Play: Bestandswert als Haenger-Alarm; der Watchdog in
-        // `run_net_self_play` liegt `WATCHDOG_MARGIN_SECS` darueber.
-        hang_alarm_secs: net_game_timeout_secs(base_sims)
+        // `run_net_self_play` liegt `WATCHDOG_MARGIN_SECS` darueber. par.7c:
+        // nach der groesseren Sims-Zahl beider Seiten (ohne Gegner = Bestand).
+        hang_alarm_secs: net_game_timeout_secs(sims[0].max(sims[1]))
             + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS,
         max_steps: MAX_GAME_STEPS,
         seed_from_steps: false,
@@ -9043,9 +9301,11 @@ pub fn run_net_self_play(
     // Lauf (Bauplan D5); ein ungueltiger Filter ist ein harter Fehler.
     let opponent_path = opponent_model_path();
     let sides = record_sides()?;
+    let opp_sims = opponent_sims()?;
     if let Some(msg) = opponent_conflict(
         opponent_path.is_some(),
         sides,
+        opp_sims.is_some(),
         dome_dice_enabled(),
         aggr_side_enabled(),
         tau_tiebreak_side_enabled(),
@@ -9122,8 +9382,10 @@ pub fn run_net_self_play(
     // `WATCHDOG_MARGIN_SECS` immer zuerst die Chance, sauber abzubrechen --
     // erst wenn das nicht einmal das schafft (Hänger tief in einem
     // EINZELNEN Zug, siehe Kommentar oben), greift dieser harte Deckel.
+    // par.7c: nach der groesseren Sims-Zahl (Gegner-Seite kann tiefer suchen).
+    let watchdog_sims = base_sims.max(opp_sims.unwrap_or(base_sims));
     let watchdog_deadline = std::time::Duration::from_secs(
-        net_game_timeout_secs(base_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS + WATCHDOG_MARGIN_SECS,
+        net_game_timeout_secs(watchdog_sims) + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS + WATCHDOG_MARGIN_SECS,
     );
     // Review #23c: Panics und Deadline-Abbrueche dieses Laufs getrennt zaehlen.
     let abort_counts = SelfPlayAbortCounts::default();
@@ -15986,7 +16248,7 @@ mod dome_dice_tests {
             game_seed ^ DOME_DICE_SEED_DISTINGUISHER,
             forced_index,
         ));
-        roll_dome_dice(state, state.extended_action_nodes[state.current_player], return_order_random_p(), &mut rng)
+        roll_dome_dice(state, state.extended_action_nodes[state.current_player], return_order_random_p(), None, &mut rng)
     }
 
     /// Erster Partie-Seed, dessen Wurf `pred` erfuellt (der Wuerfel ist eine
@@ -16234,6 +16496,94 @@ mod dome_dice_tests {
                 assert_ne!(all[i].1, all[j].1, "{} kollidiert mit {}", all[i].0, all[j].0);
             }
         }
+    }
+
+    // ── par.5d3: eps-Fenster der Platzwahl und Quelle aus dem Prior ──────────
+
+    /// eps-Fenster: nur besuchte Plaetze, Q >= Q_best - eps; eps 0 laesst nur
+    /// die Q-Besten; ohne Besuche leer.
+    #[test]
+    fn place_eps_candidates_window() {
+        let a = |i: usize| Action::BonusChip(crate::moves::TakeBonusChipMove { factory_id: i });
+        let stats = vec![(a(0), 300, 0.60), (a(1), 200, 0.59), (a(2), 50, 0.575), (a(3), 0, 0.99), (a(4), 40, 0.50)];
+        assert_eq!(place_eps_candidates(&stats, 0.02), vec![0, 1], "0,575 liegt 0,025 unter dem Besten");
+        assert_eq!(place_eps_candidates(&stats, 0.03), vec![0, 1, 2]);
+        assert_eq!(place_eps_candidates(&stats, 0.0), vec![0], "eps 0: nur das hoechste Q");
+        assert_eq!(place_eps_candidates(&stats, 1.0), vec![0, 1, 2, 4], "unbesucht (Q 0,99) nie");
+        let unvisited = vec![(a(0), 0, 0.5), (a(1), 0, 0.4)];
+        assert!(place_eps_candidates(&unvisited, 0.5).is_empty());
+    }
+
+    /// Temperatur: klein -> (fast) argmax des Priors, 1 -> der Prior selbst,
+    /// gross -> (fast) gleichverteilt; 0 und leer -> `None` (Bestand).
+    #[test]
+    fn tempered_weights_interpolate_between_argmax_and_uniform() {
+        let prior = [0.6, 0.3, 0.1];
+        let cold = tempered_weights(&prior, 0.01).unwrap();
+        assert!(cold[0] > 0.999, "T klein: argmax, {cold:?}");
+        let one = tempered_weights(&prior, 1.0).unwrap();
+        for (w, p) in one.iter().zip(prior) {
+            assert!((w - p).abs() < 1e-12, "T 1: der Prior selbst, {one:?}");
+        }
+        let hot = tempered_weights(&prior, 1000.0).unwrap();
+        for w in &hot {
+            assert!((w - 1.0 / 3.0).abs() < 0.01, "T gross: gleichverteilt, {hot:?}");
+        }
+        let two = tempered_weights(&prior, 2.0).unwrap();
+        assert!(two[0] < one[0] && two[2] > one[2], "T 2 flacher als der Prior");
+        assert!((two.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        assert_eq!(tempered_weights(&prior, 0.0), None);
+        assert_eq!(tempered_weights(&[], 2.0), None);
+        let zero = tempered_weights(&[0.0, 1.0], 1.0).unwrap();
+        assert!(zero[0] > 0.0 && zero[0] < 1e-8, "Untergrenze statt Gewicht 0");
+    }
+
+    /// Prior je Option: Auslageplaetze in Reihenfolge (Summe ueber Plaetze und
+    /// Rotationen der Platte), dann der Stapel (Summe der `DrawStackPeek`).
+    /// Mit Gewichten zieht der Wuerfel nach ihnen (T klein -> immer die
+    /// Prior-staerkste Option), ohne bleibt er beim Bestand.
+    #[test]
+    fn tempered_source_weights_sum_priors_per_plate() {
+        let st = round_one_game(10, true).state;
+        assert_eq!(st.dome_display.len(), 3);
+        assert!(!st.dome_tile_pool.is_empty());
+        let slot = |tile: usize, row: usize, rot: u32| {
+            Action::ChooseDomeSlot(crate::moves::PlaceDomeTileMove { dome_tile_id: tile, slot_row: row, slot_col: 0, rotation: rot })
+        };
+        let t = [st.dome_display[0].tile_id, st.dome_display[1].tile_id, st.dome_display[2].tile_id];
+        let priors = vec![
+            (slot(t[0], 0, 0), 0.10f32),
+            (slot(t[0], 1, 90), 0.10),
+            (slot(t[1], 0, 0), 0.05),
+            (slot(t[2], 2, 180), 0.05),
+            (Action::DrawStackPeek, 0.70),
+        ];
+        let w = tempered_source_weights(&st, &priors, 1.0).unwrap();
+        let want = [0.2, 0.05, 0.05, 0.7];
+        assert_eq!(w.len(), 4);
+        for (x, y) in w.iter().zip(want) {
+            assert!((x - y).abs() < 1e-6, "{w:?}");
+        }
+        assert_eq!(tempered_source_weights(&st, &priors, 0.0), None);
+        // T klein: der Wuerfel nimmt jedes Mal den Stapel (Prior 0,7).
+        let cold = tempered_source_weights(&st, &priors, 0.01).unwrap();
+        for seed in 0..50u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let roll = roll_dome_dice(&st, true, 0.0, Some(&cold), &mut rng).unwrap();
+            assert!(matches!(roll.source, DiceRollSource::Stack { .. }), "Seed {seed}: {roll:?}");
+        }
+        // Ohne Gewichte: Bestand, dieselbe Ziehung wie bisher.
+        let mut r1 = StdRng::seed_from_u64(3);
+        let mut r2 = StdRng::seed_from_u64(3);
+        let options = st.dome_display.len() + 1;
+        let roll = roll_dome_dice(&st, true, 0.0, None, &mut r1).unwrap();
+        let pick = r2.random_range(0..options);
+        let want_source = if pick < 3 {
+            DiceRollSource::Display { tile_id: st.dome_display[pick].tile_id }
+        } else {
+            DiceRollSource::Stack { depth: 1, depth_max: 1 }
+        };
+        assert_eq!(roll.source, want_source);
     }
 
     /// Test 15 (Teil 2): der Wurf ist reproduzierbar je (Partie, Index) und je
@@ -17339,7 +17689,7 @@ mod opponent_net_tests {
             primary, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
             (seed % 2) as usize, "opp_test", &mut rng, false, true, false, None, None, 0, seed, None,
             SearchConfig::from_env(), false, None, DOME_DICE_LAST_ROUND_DEFAULT, None,
-            opponent.map(|(net, side, record_sides)| OpponentConfig { net, side, record_sides }),
+            opponent.map(|(net, side, record_sides)| OpponentConfig { net, side, record_sides, sims: 8 }),
         );
         set_label_rng_split_for_test(None);
         assert!(!records.is_empty(), "Partie ohne Records");
@@ -17443,16 +17793,69 @@ mod opponent_net_tests {
     #[test]
     fn opponent_conflicts_are_rejected() {
         let b = RecordSides::Both;
-        assert_eq!(opponent_conflict(false, b, true, true, true, true, true), None, "AUS: Bestand, nichts geprueft");
-        assert!(opponent_conflict(false, RecordSides::Opponent, false, false, false, false, false).is_some());
-        assert!(opponent_conflict(false, RecordSides::Primary, false, false, false, false, false).is_some());
-        assert_eq!(opponent_conflict(true, b, false, false, false, false, false), None);
-        assert_eq!(opponent_conflict(true, RecordSides::Opponent, false, false, false, false, false), None);
-        assert!(opponent_conflict(true, b, true, false, false, false, false).unwrap().contains("DOME_DICE"));
-        assert!(opponent_conflict(true, b, false, true, false, false, false).is_some());
-        assert!(opponent_conflict(true, b, false, false, true, false, false).is_some());
-        assert!(opponent_conflict(true, b, false, false, false, true, false).unwrap().contains("EXCURSION"));
-        assert!(opponent_conflict(true, b, false, false, false, false, true).unwrap().contains("rtv"));
+        assert_eq!(opponent_conflict(false, b, false, true, true, true, true, true), None, "AUS: Bestand, nichts geprueft");
+        assert!(opponent_conflict(false, RecordSides::Opponent, false, false, false, false, false, false).is_some());
+        assert!(opponent_conflict(false, RecordSides::Primary, false, false, false, false, false, false).is_some());
+        assert!(opponent_conflict(false, b, true, false, false, false, false, false).unwrap().contains("OPPONENT_SIMS"));
+        assert_eq!(opponent_conflict(true, b, false, false, false, false, false, false), None);
+        assert_eq!(opponent_conflict(true, b, true, false, false, false, false, false), None);
+        assert_eq!(opponent_conflict(true, RecordSides::Opponent, false, false, false, false, false, false), None);
+        assert!(opponent_conflict(true, b, false, true, false, false, false, false).unwrap().contains("DOME_DICE"));
+        assert!(opponent_conflict(true, b, false, false, true, false, false, false).is_some());
+        assert!(opponent_conflict(true, b, false, false, false, true, false, false).is_some());
+        assert!(opponent_conflict(true, b, false, false, false, false, true, false).unwrap().contains("EXCURSION"));
+        assert!(opponent_conflict(true, b, false, false, false, false, false, true).unwrap().contains("rtv"));
+    }
+
+    // ── par.7c: Sims der Gegner-Seite ──────────────────────────────────────
+
+    #[test]
+    fn opponent_sims_parser_default_and_side_assignment() {
+        assert_eq!(parse_opponent_sims(""), Ok(None));
+        assert_eq!(parse_opponent_sims(" 200 "), Ok(Some(200)));
+        assert!(parse_opponent_sims("0").is_err());
+        assert!(parse_opponent_sims("-5").is_err());
+        assert!(parse_opponent_sims("2.5").is_err());
+        assert!(parse_opponent_sims("x").is_err());
+        assert_eq!(opponent_sims(), Ok(None), "Test laeuft ohne MOSAIC_OPPONENT_SIMS");
+        assert_eq!(side_sims(100, None), [100, 100], "Bestand");
+        assert_eq!(side_sims(100, Some((0, 200))), [200, 100]);
+        assert_eq!(side_sims(100, Some((1, 200))), [100, 200], "G-Seite behaelt --sims");
+    }
+
+    fn play_with_sims(primary: &Net, base_sims: u32, opponent: &Net, side: usize, opp_sims: u32, seed: u64) -> Vec<Value> {
+        set_label_rng_split_for_test(Some(true));
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (records, _x, _d) = play_net_self_play_game_with_dice(
+            primary, base_sims, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize, "opp_test", &mut rng, false, true, false, None, None, 0, seed, None,
+            SearchConfig::from_env(), false, None, DOME_DICE_LAST_ROUND_DEFAULT, None,
+            Some(OpponentConfig { net: opponent, side, record_sides: RecordSides::Both, sims: opp_sims }),
+        );
+        set_label_rng_split_for_test(None);
+        records
+    }
+
+    /// (1) Gegner-Sims = `--sims` ist byte-gleich zur Partie ohne eigenen Wert
+    /// (Default). (2) Rollentausch bei gleichen Gewichten: Seite s mit 16 Sims
+    /// (Gegner) und die andere mit 8 (`--sims`) ergibt dieselbe Partie wie
+    /// `--sims` 16 mit dem Gegner auf Seite 1-s bei 8 -- das gilt nur, wenn
+    /// GENAU die Gegner-Seite die eigenen Sims bekommt (Drafting UND
+    /// Startsetzung). (3) Die Sims wirken ueberhaupt (16 statt 8 aendert die Partie).
+    #[test]
+    fn opponent_sims_apply_to_the_opponent_side_only() {
+        let a = champion_net();
+        let b = champion_net();
+        let seed = 41u64;
+        for side in 0..2 {
+            let base = play(&a, Some((&b, side, RecordSides::Both)), seed);
+            assert_eq!(play_with_sims(&a, 8, &b, side, 8, seed), base, "Seite {side}: Default muss byte-gleich sein");
+            let deeper = play_with_sims(&a, 8, &b, side, 16, seed);
+            let swapped = play_with_sims(&b, 16, &a, 1 - side, 8, seed);
+            assert_eq!(strip(&deeper), strip(&swapped), "Seite {side}: Sims sitzen nicht auf der Gegner-Seite");
+            assert_ne!(strip(&deeper), strip(&base), "Seite {side}: 16 Sims auf der Gegner-Seite ohne Wirkung");
+        }
     }
 
     // ── mit Netz ───────────────────────────────────────────────────────────

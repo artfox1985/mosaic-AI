@@ -84,6 +84,8 @@ NOT_IN_KEY = {
                              "opponent_side/net_label, die kein Trainingsziel speisen",
     "MOSAIC_RECORD_SIDES": "Erzeugungsknopf (par.7); waehlt, welche Records geschrieben werden, "
                            "nicht wie sie kodiert werden",
+    "MOSAIC_OPPONENT_SIMS": "Erzeugungsknopf (par.7c); Sims der Gegner-Netz-Seite, aendert die Zuege, "
+                            "nicht die Kodierung",
     "moon_loss_weight": "GEWICHT im Loss, kein Datenfeld -- b05 laeuft bewusst auf b03s Monolith",
     "margin_threshold_weight": "GEWICHT des E2-Terms im Loss, kein Datenfeld (das Feld haengt am "
                                "Cache-Knopf _final_margin_key)",

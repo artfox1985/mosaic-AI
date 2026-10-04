@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -61,6 +62,7 @@ def class_files(data: Path, cls: str) -> list[str]:
 
 BASELINE = "policy"
 DEFAULT_CLASSES = ("policy-dice-r1", "policy-dice-r2", "policy-dice-src4", "policy-s400")
+DEFAULT_PAIRED_CLASSES = ("policy-dice-v2-r1", "policy-dice-v2-r2")  # par.5d3, Bezug policy-m2-400g
 SIDE_FIELD = "dome_dice_side"
 LEVELS = ("slots", "plates", "full")
 M3_ROUNDS = (2, 3, 4)
@@ -199,6 +201,54 @@ def round1_placements(rs: list, p: int):
     if b2 is None or ss is None or ss not in occupied(b2):
         return None
     return [(b2[i][0], b2[i][1], i) for i in sorted(occupied(b2) - {ss})]
+
+
+def pair_key(gid: str):
+    """Partie-Index `_cX_gY` am Ende der game_id (Chunk und Partie im Chunk) oder None."""
+    m = re.search(r"_c(\d+)_g(\d+)$", str(gid))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def display_ids(state: dict) -> tuple:
+    return tuple(int(t["id"]) for t in (state.get("dome_display") or []) if t)
+
+
+def game_sequence(rs: list) -> list:
+    """Records einer Partie in Aufzeichnungsreihenfolge, ohne Platzwahl-Records (die gibt es nur in W-Klassen,
+    sie wuerden die Folge gegen die Bezugspartie verschieben): je Eintrag (Spieler, Runde, Brett 0, Brett 1,
+    Auslage-IDs). Erzwungene Wuerfelzuege tragen keinen Record (self_play.rs, par.3c)."""
+    out = []
+    for r in rs:
+        s = _state(r)
+        if not s or r.get("dice_place") or "player" not in r:
+            continue
+        out.append((int(r["player"]), int(s.get("round", 0)), raw_board(s["players"][0]),
+                    raw_board(s["players"][1]), display_ids(s)))
+    return out
+
+
+def side_view(entry: tuple, p: int) -> tuple:
+    """Zustand aus Sicht von Spieler p: (eigenes Brett, Gegnerbrett, Auslage)."""
+    return (entry[2 + p], entry[3 - p], entry[4])
+
+
+def first_divergence(seq_a: list, seq_b: list, p: int):
+    """Erster eigener Entscheid von p, an dem sein Zustand in Partie A von Partie B abweicht.
+
+    Ausgerichtet wird ueber die Ordnungszahl der Records von p (k-ter Entscheid von p in A gegen den k-ten in B),
+    weil die Gesamtfolge in W-Partien durch die unaufgezeichneten erzwungenen Zuege verschoben ist. Rueckgabe
+    None (keine Abweichung, gleiche Laenge) oder dict mit `k` (eigene Entscheide vor der Abweichung), `index`
+    (Record-Index in A, beide Spieler, ohne Platzwahl-Records) und `round` (Runde in A)."""
+    ia = [i for i, e in enumerate(seq_a) if e[0] == p]
+    ib = [i for i, e in enumerate(seq_b) if e[0] == p]
+    for k in range(min(len(ia), len(ib))):
+        if side_view(seq_a[ia[k]], p) != side_view(seq_b[ib[k]], p):
+            return {"k": k, "index": ia[k], "round": seq_a[ia[k]][1]}
+    if len(ia) != len(ib):
+        k = min(len(ia), len(ib))
+        idx = ia[k] if k < len(ia) else (ia[-1] + 1 if ia else 0)
+        return {"k": k, "index": idx, "round": seq_a[ia[k]][1] if k < len(ia) else None}
+    return None
 
 
 def decision_records(rs: list, players: set, rounds=M3_ROUNDS, post_dice: bool = True):
@@ -422,7 +472,7 @@ def extract_class(files: list, side_field: str | None, catalog: dict, conflicts:
                 continue
             sp = special_side(rs, side_field)
             g = {"file": fi, "group": f"{fi}:{gid}", "special": sp, "r1": {}, "start": {2: {}, 3: {}},
-                 "decisions": []}
+                 "decisions": [], "pair_key": pair_key(gid), "seq": game_sequence(rs)}
             if side_field is not None and sp is None:
                 unresolved["ohne_wuerfelseite"] += 1
                 continue
@@ -605,15 +655,24 @@ def m3_block(decs, n_files, base_decs, base_n_files, half_a_decs, half_b_decs, c
     return res
 
 
-def analyze(data: dict, classes: list, catalog: dict, rng, n_boot: int, n_perm: int) -> dict:
-    """Alle drei Masse aus den gelesenen Klassen (`data[klasse]` aus `extract_class`); `classes` ohne Sockel."""
-    base = data[BASELINE]
+def noise_key(baseline: str, nb: int) -> str:
+    """Schluessel des Rauschbezugs (erste gegen zweite Haelfte der Bezugsdateien)."""
+    h = nb // 2
+    return f"rauschbezug_{'sockel' if baseline == BASELINE else 'bezug'}_1-{h}_gegen_{h + 1}-{nb}"
+
+
+def analyze(data: dict, classes: list, catalog: dict, rng, n_boot: int, n_perm: int, baseline: str = BASELINE,
+            m2_levels=LEVELS) -> dict:
+    """Alle drei Masse aus den gelesenen Klassen (`data[klasse]` aus `extract_class`); `classes` ohne Bezug.
+    `baseline` ist die Bezugsklasse (Default Sockel `policy`), `m2_levels` die Feinheiten von M2."""
+    base = data[baseline]
     nb = base["n_files"]
+    nkey = noise_key(baseline, nb)
     half_a_files, half_b_files = set(range(nb // 2)), set(range(nb // 2, nb))
     half_a, half_b = subset_games(base, half_a_files), subset_games(base, half_b_files)
     base_units = m1_units(base["games"], "beide", catalog)
     out = {"M1": {"grundmenge": "in Runde 1 gelegte Kuppelplatten (ohne Startplatte), je Partie und Seite; "
-                                "Sockel `policy` beide Seiten gepoolt",
+                                f"Bezug `{baseline}` beide Seiten gepoolt",
                   "einheit": "Jensen-Shannon-Distanz (log2, 0-1) der Verteilung der Tripel (Platten-ID, Rotation, "
                              "Platz); Entropie in bit; CI Bootstrap ueber Partien",
                   "zeilen": {}},
@@ -628,9 +687,9 @@ def analyze(data: dict, classes: list, catalog: dict, rng, n_boot: int, n_perm: 
                              "auftritt; Prior-Entropie in nat (Generator, Softmax ueber gueltige IDs); root_q wie "
                              "im Record; Differenzen Klasse minus Sockel, CI Bootstrap ueber Dateien",
                   "zeilen": {}}}
-    out["M1"]["zeilen"][f"{BASELINE}/beide"] = m1_row(base_units)
+    out["M1"]["zeilen"][f"{baseline}/beide"] = m1_row(base_units)
     ua, ub = m1_units(half_a["games"], "beide", catalog), m1_units(half_b["games"], "beide", catalog)
-    out["M1"]["rauschbezug_sockel_1-5_gegen_6-10"] = {**m1_full(ua, ub, rng, n_boot, n_perm),
+    out["M1"][nkey] = {**m1_full(ua, ub, rng, n_boot, n_perm),
                                                       "haelfte_a": m1_row(ua), "haelfte_b": m1_row(ub)}
     for cls in classes:
         d = data[cls]
@@ -639,15 +698,15 @@ def analyze(data: dict, classes: list, catalog: dict, rng, n_boot: int, n_perm: 
             out["M1"]["zeilen"][f"{cls}/{side}"] = {**m1_row(units),
                                                    **m1_full(units, base_units, rng, n_boot, n_perm)}
     # M2
-    noise2 = out["M2"]["rauschbezug_sockel_1-5_gegen_6-10"] = {}
+    noise2 = out["M2"][nkey] = {}
     for k in (2, 3):
-        for level in LEVELS:
+        for level in m2_levels:
             bk = board_keys_by_file(base["games"], "beide", k, level, catalog, nb)
             ha = [bk[i] for i in sorted(half_a_files)]
             hb = [bk[i] for i in sorted(half_b_files)]
             key = f"runde{k}/{level}"
             flat_b = _flat(bk)
-            out["M2"]["zeilen"].setdefault(f"{BASELINE}/beide", {})[key] = {
+            out["M2"]["zeilen"].setdefault(f"{baseline}/beide", {})[key] = {
                 "n_bretter": len(flat_b), "n_partien": len(base["games"]),
                 "distinkt_je_100_partien": 100.0 * len(set(flat_b)) / max(1, len(base["games"])),
                 "distinkt_je_100_bretter": 100.0 * len(set(flat_b)) / max(1, len(flat_b))}
@@ -667,8 +726,8 @@ def analyze(data: dict, classes: list, catalog: dict, rng, n_boot: int, n_perm: 
     base_decs = m3_decisions(base, post_only=False)
     ha_decs = [(f, x) for f, x in base_decs if f in half_a_files]
     hb_decs = [(f, x) for f, x in base_decs if f in half_b_files]
-    out["M3"]["zeilen"][f"{BASELINE}/beide"] = {"n_entscheide": len(base_decs)}
-    noise3 = out["M3"]["rauschbezug_sockel_1-5_gegen_6-10"] = {}
+    out["M3"]["zeilen"][f"{baseline}/beide"] = {"n_entscheide": len(base_decs)}
+    noise3 = out["M3"][nkey] = {}
     for level in LEVELS:
         ka = [decision_key(x, level, catalog) for _f, x in ha_decs]
         kb = [decision_key(x, level, catalog) for _f, x in hb_decs]
@@ -686,7 +745,179 @@ def analyze(data: dict, classes: list, catalog: dict, rng, n_boot: int, n_perm: 
         if note:
             row["hinweis"] = note
         out["M3"]["zeilen"][f"{cls}/{'G' if side else 'beide'}"] = row
+    out["rauschbezug_schluessel"] = nkey
+    out["bezug"] = baseline
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Gepaarter Modus (par.5d3 Leseregel d)
+# ---------------------------------------------------------------------------------------------------------------
+
+class PairingError(SystemExit):
+    """Abbruch, wenn Klasse und Bezug nicht Partie fuer Partie gepaart sind."""
+
+
+def games_by_pair_key(cls_data: dict, cls: str) -> dict:
+    out, missing, dup = {}, 0, []
+    for g in cls_data["games"]:
+        k = g["pair_key"]
+        if k is None:
+            missing += 1
+        elif k in out:
+            dup.append(k)
+        else:
+            out[k] = g
+    if missing or dup:
+        raise PairingError(f"[novelty] PAARUNG: Klasse {cls}: {missing} Partien ohne Index _cX_gY, "
+                           f"doppelte Indizes {dup[:5]}")
+    return out
+
+
+def check_pairing(base: dict, base_name: str, cls_data: dict, cls: str) -> dict:
+    """Prueft die Paarung ueber den Partie-Index und die Auslage im ersten Record (gleicher Seed, gleiche Chunkung
+    ergeben dieselbe Auslage, so in S5 fuer 4 x 100 Partien gesehen). Bricht mit klarer Meldung ab."""
+    a, b = games_by_pair_key(cls_data, cls), games_by_pair_key(base, base_name)
+    only_a, only_b = sorted(set(a) - set(b)), sorted(set(b) - set(a))
+    if only_a or only_b:
+        raise PairingError(f"[novelty] PAARUNG: {cls} gegen {base_name}: Indizes nur in der Klasse {len(only_a)} "
+                           f"(z. B. {only_a[:5]}), nur im Bezug {len(only_b)} (z. B. {only_b[:5]}). Gleicher Seed "
+                           f"und gleiche Chunkung noetig.")
+    bad = [k for k in a if not a[k]["seq"] or not b[k]["seq"] or a[k]["seq"][0][4] != b[k]["seq"][0][4]]
+    if bad:
+        raise PairingError(f"[novelty] PAARUNG: {cls} gegen {base_name}: {len(bad)} von {len(a)} Partien mit "
+                           f"anderer Auslage im ersten Record (z. B. {sorted(bad)[:5]}). Seeds verschieden?")
+    return {"n_paare": len(a), "auslage_erster_record_gleich": len(a)}
+
+
+def boot_mean_ci(by_file: list, rng, n_boot) -> list | None:
+    s = np.array([float(np.sum(x)) for x in by_file])
+    n = np.array([len(x) for x in by_file], float)
+    if n.sum() == 0:
+        return None
+    draws = rng.integers(0, len(by_file), size=(n_boot, len(by_file)))
+    c = n[draws].sum(1)
+    ok = c > 0
+    vals = s[draws].sum(1)[ok] / c[ok]
+    return [float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5))] if vals.size else None
+
+
+def _quartiles(x: list) -> dict:
+    if not x:
+        return {"median": None, "q25": None, "q75": None}
+    return {"median": float(np.median(x)), "q25": float(np.percentile(x, 25)), "q75": float(np.percentile(x, 75))}
+
+
+def divergence_summary(cls_data: dict, base_by_key: dict, side: str, rng, n_boot) -> dict:
+    """P1 fuer eine Seite: erster eigener Entscheid, an dem der Zustand (eigenes Brett, Gegnerbrett, Auslage)
+    von der Bezugspartie gleichen Index abweicht."""
+    nf = cls_data["n_files"]
+    flags = [[] for _ in range(nf)]
+    ks, idxs, rounds = [], [], Counter()
+    for g in cls_data["games"]:
+        p = g["special"] if side == "W" else 1 - g["special"]
+        dv = first_divergence(g["seq"], base_by_key[g["pair_key"]]["seq"], p)
+        flags[g["file"]].append(1.0 if dv is not None else 0.0)
+        if dv is not None:
+            ks.append(dv["k"])
+            idxs.append(dv["index"])
+            rounds[str(dv["round"])] += 1
+    n = sum(len(f) for f in flags)
+    return {"n_partien": n, "anteil_abweichend": float(np.mean(_flat(flags))) if n else None,
+            "anteil_abweichend_ci95": boot_mean_ci(flags, rng, n_boot),
+            "eigene_entscheide_bis_abweichung": _quartiles(ks),
+            "record_index_bis_abweichung": _quartiles(idxs),
+            "runde_der_abweichung": dict(sorted(rounds.items()))}
+
+
+def novelty_boot_fixed_ref(q_by_file: list, reference: list, rng, n_boot) -> list | None:
+    """95-%-Intervall des Neuheitsanteils, nur die Abfrage ueber Dateien gezogen, Bezug fest (ohne die
+    Aufwaertsverzerrung durch einen verkleinerten Bezugstraeger)."""
+    ref = set(reference)
+    flags = [[0.0 if k in ref else 1.0 for k in xs] for xs in q_by_file]
+    return boot_mean_ci(flags, rng, n_boot)
+
+
+def paired_analysis(data: dict, classes: list, baseline: str, catalog: dict, rng, n_boot: int) -> dict:
+    """Leseregel (d) aus par.5d3: P1 erste Abweichung je Seite, P2 Anteil der G-Entscheide R2-4 nach der
+    Wuerfelphase, deren Paar (eigenes Brett, Gegnerbrett) in Feinheit `slots` im gesamten Bezug fehlt."""
+    base = data[baseline]
+    nb = base["n_files"]
+    half_a_files, half_b_files = set(range(nb // 2)), set(range(nb // 2, nb))
+    base_by_key = games_by_pair_key(base, baseline)
+    level = "slots"
+
+    def key(d):
+        return decision_key(d, level, catalog)
+    base_decs = m3_decisions(base, post_only=False)
+    ref_by_file = by_file_values(base_decs, nb, key)
+    ha = [ref_by_file[i] for i in sorted(half_a_files)]
+    hb = [ref_by_file[i] for i in sorted(half_b_files)]
+    out = {"P1": {"grundmenge": "Partien der W-Klasse mit Bezugspartie gleichen Index (_cX_gY); je Seite die Folge "
+                                "ihrer eigenen Records (Drafting und Tiling, ohne Platzwahl-Records)",
+                  "einheit": "eigene Entscheide der Seite bis zur ersten Abweichung des Zustands (eigenes Brett, "
+                             "Gegnerbrett, Auslage-IDs; volle Belegung), dazu Record-Index beider Spieler und Runde; "
+                             "Anteil abweichender Partien mit CI Bootstrap ueber Dateien",
+                  "zeilen": {}},
+           "P2": {"grundmenge": "Drafting-Entscheide Runde 2-4 der G-Seite nach der Wuerfelphase (dice_phase nicht "
+                                "true, ohne Platzwahl-Records); Bezug: alle Entscheide Runde 2-4 beider Seiten der "
+                                f"GESAMTEN Klasse `{baseline}`",
+                  "einheit": "Anteil der Entscheide, deren Paar (eigenes Brett, Gegnerbrett) in Feinheit `slots` im "
+                             "Bezug fehlt; CI Bootstrap ueber Dateien (ci95: Abfrage und Bezug gezogen; "
+                             "ci95_bezug_fest: nur die Abfrage)",
+                  "rauschbezug_bezug_haelften": {
+                      "dateien_a": f"1-{nb // 2}", "dateien_b": f"{nb // 2 + 1}-{nb}",
+                      "n_a": len(_flat(ha)), "n_b": len(_flat(hb)),
+                      "anteil_a_fremd_in_b": novelty(_flat(ha), _flat(hb)),
+                      "anteil_a_fremd_in_b_ci95": novelty_boot(ha, hb, rng, n_boot),
+                      "anteil_a_fremd_in_b_ci95_bezug_fest": novelty_boot_fixed_ref(ha, _flat(hb), rng, n_boot),
+                      "anteil_b_fremd_in_a": novelty(_flat(hb), _flat(ha)),
+                      "anteil_b_fremd_in_a_ci95": novelty_boot(hb, ha, rng, n_boot),
+                      "anteil_b_fremd_in_a_ci95_bezug_fest": novelty_boot_fixed_ref(hb, _flat(ha), rng, n_boot)},
+                  "zeilen": {}},
+           "paarung": {}}
+    for cls in classes:
+        d = data[cls]
+        out["paarung"][cls] = check_pairing(base, baseline, d, cls)
+        if not has_special(d):
+            continue
+        out["P1"]["zeilen"][cls] = {side: divergence_summary(d, base_by_key, side, rng, n_boot) for side in ("G", "W")}
+        decs = m3_decisions(d, post_only=True)
+        q_by = by_file_values(decs, d["n_files"], key)
+        q = _flat(q_by)
+        row = {"n_entscheide": len(q), "n_bezug": len(_flat(ref_by_file)),
+               "anteil_bezugsfremd": novelty(q, _flat(ref_by_file)),
+               "ci95": novelty_boot(q_by, ref_by_file, rng, n_boot),
+               "ci95_bezug_fest": novelty_boot_fixed_ref(q_by, _flat(ref_by_file), rng, n_boot),
+               "je_runde": {str(k): novelty(_flat(by_file_values(decs, d["n_files"], key, (k,))),
+                                            _flat(ref_by_file)) for k in M3_ROUNDS}}
+        for name, half in (("gegen_bezugshaelfte_a", ha), ("gegen_bezugshaelfte_b", hb)):
+            row[name] = {"anteil": novelty(q, _flat(half)), "ci95": novelty_boot(q_by, half, rng, n_boot),
+                         "ci95_bezug_fest": novelty_boot_fixed_ref(q_by, _flat(half), rng, n_boot),
+                         "n_bezug": len(_flat(half))}
+        out["P2"]["zeilen"][cls] = row
+    return out
+
+
+def print_paired(pres: dict) -> None:
+    print("\nP1 erste Abweichung gegen die Bezugspartie (eigene Entscheide der Seite; Median [Q25; Q75])", flush=True)
+    for cls, sides in pres["P1"]["zeilen"].items():
+        for side, r in sides.items():
+            kq, iq = r["eigene_entscheide_bis_abweichung"], r["record_index_bis_abweichung"]
+            print(f"  {cls:24s} {side}: n={r['n_partien']} abweichend {_fmt(r['anteil_abweichend'])} "
+                  f"{_ci(r['anteil_abweichend_ci95'])} k {_fmt(kq['median'], 1)} [{_fmt(kq['q25'], 1)}; "
+                  f"{_fmt(kq['q75'], 1)}] Record-Index {_fmt(iq['median'], 1)} Runden {r['runde_der_abweichung']}",
+                  flush=True)
+    nz = pres["P2"]["rauschbezug_bezug_haelften"]
+    print("\nP2 G-Entscheide R2-4 nach der Wuerfelphase, Paar in `slots` im Bezug fehlend", flush=True)
+    print(f"  Rauschbezug Haelften A in B {_fmt(nz['anteil_a_fremd_in_b'])} {_ci(nz['anteil_a_fremd_in_b_ci95'])} "
+          f"(fest {_ci(nz['anteil_a_fremd_in_b_ci95_bezug_fest'])}), B in A {_fmt(nz['anteil_b_fremd_in_a'])} "
+          f"{_ci(nz['anteil_b_fremd_in_a_ci95'])} (n {nz['n_a']}/{nz['n_b']})", flush=True)
+    for cls, r in pres["P2"]["zeilen"].items():
+        a, b = r["gegen_bezugshaelfte_a"], r["gegen_bezugshaelfte_b"]
+        print(f"  {cls:24s} n={r['n_entscheide']} gesamt {_fmt(r['anteil_bezugsfremd'])} {_ci(r['ci95'])} | "
+              f"gg Haelfte A {_fmt(a['anteil'])} {_ci(a['ci95'])} | gg Haelfte B {_fmt(b['anteil'])} {_ci(b['ci95'])}",
+              flush=True)
 
 
 def _fmt(x, nd=3):
@@ -699,11 +930,11 @@ def _ci(c, nd=3):
 
 def print_tables(res: dict) -> None:
     m1 = res["M1"]
-    print("\nM1 Platzierungen Runde 1, JS-Distanz gegen Sockel (Grundmenge R1-Platten je Partie und Seite)", flush=True)
+    print("\nM1 Platzierungen Runde 1, JS-Distanz gegen den Bezug (Grundmenge R1-Platten je Partie und Seite)", flush=True)
     print(f"{'Zeile':28s} {'n_part':>6s} {'n_pl':>5s} {'dist':>5s} {'H_bit':>6s} {'JS':>6s} {'CI95':>17s} "
           f"{'null_q95':>8s} {'p':>6s}", flush=True)
     rows = dict(m1["zeilen"])
-    rows["Rausch Sockel 1-5/6-10"] = m1["rauschbezug_sockel_1-5_gegen_6-10"]
+    rows["Rauschbezug Haelften"] = m1[res["rauschbezug_schluessel"]]
     for name, r in rows.items():
         hz = r.get("haelfte_a", r)
         pn = r.get("perm_null") or {}
@@ -711,7 +942,7 @@ def print_tables(res: dict) -> None:
               f"{hz.get('distinkte_tripel', 0):5d} {_fmt(hz.get('entropie_bit'), 2):>6s} {_fmt(r.get('js')):>6s} "
               f"{_ci(r.get('js_ci95')):>17s} {_fmt(pn.get('q95')):>8s} {_fmt(pn.get('p')):>6s}", flush=True)
     print("\nM2 Bretter zu Rundenbeginn, Anteil sockelfremd (Feinheit slots/plates/full)", flush=True)
-    noise = res["M2"]["rauschbezug_sockel_1-5_gegen_6-10"]
+    noise = res["M2"][res["rauschbezug_schluessel"]]
     for key in noise:
         print(f"  {key}: Rauschbezug A->B {_fmt(noise[key]['anteil_a_fremd_in_b'])} "
               f"B->A {_fmt(noise[key]['anteil_b_fremd_in_a'])}", flush=True)
@@ -726,7 +957,7 @@ def print_tables(res: dict) -> None:
                   f"umgekehrt {_fmt(c['anteil_sockel_klassenfremd'])} distinkt/100 Bretter "
                   f"{_fmt(c['distinkt_je_100_bretter'], 1)}", flush=True)
     print("\nM3 Entscheide R2-4 (G nach der Wuerfelphase) gegen Sockel", flush=True)
-    noise = res["M3"]["rauschbezug_sockel_1-5_gegen_6-10"]
+    noise = res["M3"][res["rauschbezug_schluessel"]]
     print("  Rauschbezug A->B/B->A: " + ", ".join(
         f"{lv} {_fmt(v['anteil_a_fremd_in_b'])}/{_fmt(v['anteil_b_fremd_in_a'])}" for lv, v in noise.items()), flush=True)
     for name, r in res["M3"]["zeilen"].items():
@@ -747,7 +978,13 @@ def print_tables(res: dict) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-dir", default="data/probe_asym")
-    ap.add_argument("--classes", default=",".join(DEFAULT_CLASSES), help="Klassen neben dem Sockel `policy`")
+    ap.add_argument("--classes", default=None,
+                    help="Klassen neben dem Bezug; Default die S5-Klassen, mit --paired-baseline "
+                         + ",".join(DEFAULT_PAIRED_CLASSES))
+    ap.add_argument("--paired-baseline", default=None,
+                    help="par.5d3 (d): GEPAARTER Modus gegen diese Bezugsklasse (gleicher Seed, gleiche Chunkung, "
+                         "Paarung ueber _cX_gY; Abbruch, wenn sie nicht stimmt): P1 erste Abweichung je Seite, P2 "
+                         "G-Entscheide mit im Bezug fehlendem slots-Paar; M1/M3 gegen diesen Bezug, M2 nur slots")
     ap.add_argument("--model", default="models/alphazero_v34-b01_brierbest.pth",
                     help="Generator (.pth) fuer die Prior-Entropie (Manifeste der Klassen: v34-b01 brierbest)")
     ap.add_argument("--no-prior", action="store_true", help="Prior-Entropie auslassen (kein Netz)")
@@ -783,26 +1020,36 @@ def main() -> None:
         action_id = action_to_id
 
     data_dir = BASE_DIR / args.data_dir
-    classes = [c for c in args.classes.split(",") if c]
+    baseline = args.paired_baseline or BASELINE
+    default_classes = DEFAULT_PAIRED_CLASSES if args.paired_baseline else DEFAULT_CLASSES
+    classes = [c for c in (args.classes or ",".join(default_classes)).split(",") if c and c != baseline]
     catalog, conflicts, data, n_files_total = {}, set(), {}, 0
-    for cls in [BASELINE] + classes:
+    for cls in [baseline] + classes:
         files = class_files(data_dir, cls)
         if not files:
             raise SystemExit(f"keine Dateien fuer Klasse {cls} in {args.data_dir}")
         n_files_total += len(files)
-        side_field = None if cls in (BASELINE, "policy-s400") else SIDE_FIELD
+        side_field = None if cls in (baseline, "policy-s400") else SIDE_FIELD
         data[cls] = extract_class(files, side_field, catalog, conflicts, load_records, cls, t_start,
                                   action_id=action_id, net_eval=net_eval, batch=args.batch)
         data[cls]["files"] = [os.path.basename(f) for f in files]
     print(f"[novelty] Lesen fertig, Auswertung ({args.n_boot} Bootstrap, {args.n_perm} Permutationen), "
           f"{time.monotonic() - t_start:.0f} s", flush=True)
-    res = analyze(data, classes, catalog, rng, args.n_boot, args.n_perm)
-    out = {"prereg": "evaluations/PREREG_asymmetric_selfplay.md par.5d2", "data_dir": args.data_dir,
+    paired = None
+    if args.paired_baseline:
+        for cls in classes:  # Paarung VOR jeder Rechnung pruefen
+            check_pairing(data[baseline], baseline, data[cls], cls)
+        paired = paired_analysis(data, classes, baseline, catalog, rng, args.n_boot)
+    res = analyze(data, classes, catalog, rng, args.n_boot, args.n_perm, baseline=baseline,
+                  m2_levels=("slots",) if args.paired_baseline else LEVELS)
+    out = {"prereg": "evaluations/PREREG_asymmetric_selfplay.md "
+                     + ("par.5d3 Leseregel (d), gepaart" if args.paired_baseline else "par.5d2"),
+           "data_dir": args.data_dir, "bezug": baseline, "gepaart": bool(args.paired_baseline),
            "model": None if args.no_prior else args.model, "seed": args.seed, "n_boot": args.n_boot,
            "n_perm": args.n_perm,
            "klassen": {c: {"n_dateien": data[c]["n_files"], "n_partien": len(data[c]["games"]),
                            "dateien": data[c]["files"], "nicht_aufloesbar": data[c]["unresolved"]}
-                       for c in [BASELINE] + classes},
+                       for c in [baseline] + classes},
            "katalog": {"platten_mit_lage": len(catalog), "konflikte": sorted(conflicts)},
            "kanonisierung": "3x3 Plaetze zeilenweise; slots = belegt ja/nein; plates = (Platten-ID, Rotation); "
                             "full = plates plus gelegte Farbe je Feld (gedrehte Reihenfolge)",
@@ -810,12 +1057,16 @@ def main() -> None:
                                        "und Randverteilungen; M2/M3 groessengleicher Vergleich gegen je eine "
                                        "Sockel-Haelfte",
            **res}
+    if paired is not None:
+        out.update(paired)
     out["laufzeit"] = laufzeit_block(t_start, cpu_start=c_start, threads=threads, n_units=n_files_total,
                                      unit="datei")
     out_path = BASE_DIR / args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     print_tables(res)
+    if paired is not None:
+        print_paired(paired)
     print(f"\n[novelty] Artefakt {args.out}, laufzeit {out['laufzeit']}", flush=True)
 
 

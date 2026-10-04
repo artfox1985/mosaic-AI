@@ -4042,6 +4042,24 @@ pub(crate) fn net_leaf_eval_with(net: &Net, state: &GameState, single_pass: bool
 /// ist der dünne Produktions-Wrapper dafür. Liefert eine leere Liste bei
 /// `terminal`-Zuständen (kein Policy-Kopf-Bedarf außerhalb Drafting).
 pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Action, f32)> {
+    drafting_action_priors_with(net, state, false)
+}
+
+/// Klasse W, Quellenregel `prior_tempered` (`PREREG_asymmetric_selfplay.md`
+/// par.5d3 Punkt 2): die Priors der Plattenaktionen (`ChooseDomeSlot`,
+/// `DrawStackPeek`) am Zustand, aus EINEM Forward-Pass, OHNE Masse-Cutoff
+/// (wie die Sammelkante im Baum ihre `dice_members` vor dem Cutoff sammelt;
+/// sonst bekaeme eine seltene Platte Gewicht 0). Nur von
+/// `self_play::apply_forced_dome_move` bei Temperatur > 0 aufgerufen.
+pub(crate) fn dome_plate_priors(net: &Net, state: &GameState) -> Vec<(Action, f32)> {
+    drafting_action_priors_with(net, state, true)
+        .into_iter()
+        .filter(|(a, _)| crate::self_play::is_dome_plate_action(a))
+        .collect()
+}
+
+/// Rumpf von [`drafting_action_priors`] mit `skip_cutoff` (Bestand: `false`).
+fn drafting_action_priors_with(net: &Net, state: &GameState, skip_cutoff: bool) -> Vec<(Action, f32)> {
     if state.phase != Phase::Drafting {
         return Vec::new();
     }
@@ -4071,7 +4089,7 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     // erzeugen und keine Zuege; sie fuehren keine `SearchConfig` mit. par.4
     // nennt als Wirkort des Knopfs die Expansion des Suchbaums, und die
     // sitzt in `node_from_net_outputs`.
-    build_untried_actions(state, &logits, &moon_scores, false, MOON_ORDER_VARIANTS_DEFAULT).0
+    build_untried_actions(state, &logits, &moon_scores, skip_cutoff, MOON_ORDER_VARIANTS_DEFAULT).0
 }
 
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
@@ -6530,10 +6548,24 @@ fn dice_chance_choice<R: Rng + ?Sized>(
     }
     let state = &nodes[cid].state;
     let player = state.current_player;
+    // par.5d3 Punkt 2 (`prior_tempered`): dieselbe Quellenregel wie der echte
+    // Wuerfel. Die Priors stehen schon im Elternknoten (Sammelkante,
+    // `Node::dice_members`, vor dem Masse-Cutoff gesammelt), kein Netzaufruf.
+    // Temperatur 0 (Default): `None`, gleichverteilt wie bisher.
+    let temp = crate::self_play::dome_dice_prior_temp();
+    let weights = if temp > 0.0 {
+        nodes[cid]
+            .parent
+            .and_then(|pid| nodes[pid].dice_members.as_deref())
+            .and_then(|members| crate::self_play::tempered_source_weights(state, members, temp))
+    } else {
+        None
+    };
     let roll = crate::self_play::roll_dome_dice(
         state,
         state.extended_action_nodes[player],
         crate::self_play::return_order_random_p(),
+        weights.as_deref(),
         rng,
     )?;
     match children.iter().find(|&&o| matches!(&nodes[o].dice, DiceNodeKind::Outcome(r) if *r == roll)) {

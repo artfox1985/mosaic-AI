@@ -402,6 +402,33 @@ class TiebreakSideClasses(unittest.TestCase):
             self.assertEqual((ns.opponent_model, ns.record_sides, ns.deviate_prob), (opp, "both", 1.0), cls)
         self.assertTrue((REPO / want["policy-vs-v32"][2]).exists(), "Gegner-Netz liegt")
 
+    def test_dice_v2_classes_par5d3(self):
+        """par.5d3: Bezug und zwei W-Klassen, gleicher Seed und gleiche Chunkung (gepaart)."""
+        ref = self._parse("policy-m2-400g")
+        self.assertEqual((ref.games, ref.seed, ref.tau_tiebreak_q, ref.dome_dice), (400, 20261760, 2, False))
+        self.assertEqual((ref.dome_dice_place_eps, ref.dome_dice_prior_temp), (0.0, 0.0))
+        for cls, last in (("policy-dice-v2-r1", 1), ("policy-dice-v2-r2", 2)):
+            ns = self._parse(cls)
+            self.assertEqual((ns.games, ns.seed, ns.chunk, ns.per_file, ns.sims),
+                             (ref.games, ref.seed, ref.chunk, ref.per_file, ref.sims), f"{cls} gepaart")
+            self.assertEqual((ns.dome_dice, ns.dome_dice_sims, ns.dome_dice_last_round, ns.tau_tiebreak_q),
+                             (True, 600, last, 2), cls)
+            self.assertEqual((ns.dome_dice_place_eps, ns.dome_dice_prior_temp), (0.02, 2.0), cls)
+
+    def test_guard_of_the_dice_v2_classes(self):
+        from tools.recipe_config import check_engine_config, expected_engine_config, load_recipe
+        recipe = load_recipe(self.PROBES2)
+        want = expected_engine_config(recipe, "policy-dice-v2-r1")
+        engine = {k: v for k, v in want.items()}
+        self.assertEqual(check_engine_config(engine, want), [])
+        self.assertEqual(want["dome_dice_source_rule"], "prior_tempered_over_display_slots_and_stack_top")
+        self.assertTrue(check_engine_config(dict(engine, dome_dice_prior_temp=0.0), want), "Temperatur fehlt")
+        self.assertTrue(check_engine_config(dict(engine, dome_dice_place_eps=0.0), want), "eps fehlt")
+        self.assertTrue(check_engine_config(
+            dict(engine, dome_dice_source_rule="uniform_over_display_slots_and_stack_top"), want), "alte Regel")
+        old = {k: v for k, v in engine.items() if k not in ("dome_dice_place_eps", "dome_dice_prior_temp")}
+        self.assertTrue(check_engine_config(old, want), "altes Wheel ohne die Felder")
+
     def test_guard_of_the_probe_classes(self):
         import os
         from tools.recipe_config import check_engine_config, expected_engine_config, load_recipe
@@ -508,6 +535,49 @@ class ExploiterClasses(unittest.TestCase):
             for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
                           "make_chunk(n, chunk_idx"):
                 self.assertLess(at, body.index(later), f"{guard} vor {later}")
+
+
+class Exploiter2Classes(unittest.TestCase):
+    """par.7c: E @200 gegen G @100, 2 x 2.000 Partien, Basis-Seeds 20261800/20262000 (200 Chunks je Zyklus),
+    Waechter auf opponent_sims; die Smoke-Klassen pruefen den Default (null = --sims)."""
+
+    EXPLOITER = REPO / "models" / "v35_exploiter.recipe.json"
+
+    def _parse(self, cls, extra=()):
+        argv = ["--recipe", str(self.EXPLOITER), "--class", cls, *extra]
+        return apply_to_parser(fresh_parser(), argv, str(self.EXPLOITER), cls, tool="self_play")[0]
+
+    def test_classes_set_the_flags(self):
+        for cls, version, seed in (("exploiter2-c1", "x35e2-e00-cycle", 20261800),
+                                   ("exploiter2-c2", "x35e2-e01-cycle", 20262000)):
+            ns = self._parse(cls, ["--opponent-model", "models/x.onnx"])
+            self.assertEqual((ns.version, ns.seed, ns.games, ns.sims, ns.opponent_sims, ns.record_sides,
+                              ns.tau_tiebreak_q, ns.tau_tiebreak_side),
+                             (version, seed, 2000, 100, 200, "both", 2, False), cls)
+        self.assertEqual(self._parse("exploiter2-smoke-s200", ["--opponent-model", "m"]).opponent_sims, 200)
+        self.assertIsNone(self._parse("exploiter-smoke", ["--opponent-model", "m"]).opponent_sims)
+
+    def test_guard_checks_opponent_sims(self):
+        from tools.recipe_config import check_engine_config, expected_engine_config, load_recipe
+        recipe = load_recipe(self.EXPLOITER)
+        for cls in ("exploiter2-c1", "exploiter2-c2", "exploiter2-smoke-s200"):
+            want = expected_engine_config(recipe, cls)
+            self.assertEqual(want.get("opponent_sims"), 200, cls)
+            self.assertTrue(check_engine_config(dict(want, opponent_sims=None), want), "Default statt 200")
+        for cls in ("exploiter-smoke-ref", "exploiter-smoke"):
+            want = expected_engine_config(recipe, cls)
+            self.assertIn("opponent_sims", want)
+            self.assertIsNone(want["opponent_sims"])
+
+    def test_env_reserved_and_guard_before_any_run(self):
+        self.assertEqual(module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV").get("MOSAIC_OPPONENT_SIMS"),
+                         "opponent_sims")
+        body = SELF_PLAY.read_text(encoding="utf-8")
+        body = body[body.index("def generate_data("):]
+        at = body.index('raise SystemExit("❌ --opponent-sims verlangt --opponent-model (par.7c).")')
+        for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
+                      "make_chunk(n, chunk_idx"):
+            self.assertLess(at, body.index(later))
 
 
 class WithoutRecipeUnchanged(unittest.TestCase):

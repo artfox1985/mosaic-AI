@@ -121,6 +121,77 @@
         "opponent_model": null,
         "record_sides": "both"
       }
+    },
+    "policy-m2-400g": {
+      "description": "par.5d3: Bezug der W-Klassen v2, G gegen G, 400 Partien @100, Modus 2 beide Seiten; derselbe Seed und dieselbe Chunkung wie policy-dice-v2-r1/-r2, damit Partie i hier und dort gepaart ist.",
+      "version": "probe-v35-policy-m2-400g",
+      "seed": 20261760,
+      "games": 400,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": null,
+        "record_sides": "both",
+        "dome_dice_place_eps": 0.0,
+        "dome_dice_prior_temp": 0.0
+      }
+    },
+    "policy-dice-v2-r1": {
+      "description": "par.5d3: W, naechste Form: Platzwahl mit eps-Spielraum 0,02 und Platte aus G's Prior mit Temperatur 2, Wuerfelphase bis Runde 1, 400 Partien @100, Modus 2 beide Seiten; Seed wie policy-m2-400g (gepaart).",
+      "version": "probe-v35-policy-dice-v2-r1",
+      "seed": 20261760,
+      "games": 400,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "dome_dice_last_round": 1,
+      "dome_dice_place_eps": 0.02,
+      "dome_dice_prior_temp": 2.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "dome_dice_last_round": 1,
+        "dome_dice_source_rule": "prior_tempered_over_display_slots_and_stack_top",
+        "dome_dice_place_eps": 0.02,
+        "dome_dice_prior_temp": 2.0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": null
+      }
+    },
+    "policy-dice-v2-r2": {
+      "description": "par.5d3: wie policy-dice-v2-r1, Wuerfelphase bis Runde 2.",
+      "version": "probe-v35-policy-dice-v2-r2",
+      "seed": 20261760,
+      "games": 400,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_q": 2,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "dome_dice_last_round": 2,
+      "dome_dice_place_eps": 0.02,
+      "dome_dice_prior_temp": 2.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "dome_dice_last_round": 2,
+        "dome_dice_source_rule": "prior_tempered_over_display_slots_and_stack_top",
+        "dome_dice_place_eps": 0.02,
+        "dome_dice_prior_temp": 2.0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2,
+        "opponent_model": null
+      }
     }
   },
   "expect_engine_config": {

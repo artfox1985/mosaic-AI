@@ -277,6 +277,109 @@ class MainSmokeTest(unittest.TestCase):
         self.assertAlmostEqual(res["M2"]["zeilen"]["policy-dice-r1/G"]["runde2/full"]["anteil_sockelfremd"], 0.0)
 
 
+def paired_game(cls, fi, gi, w_first_plate=None, display=None):
+    """Partie mit Index _c{fi}_g{gi}; mit `w_first_plate` eine W-Partie (W = Spieler 0), deren erste R1-Platte
+    anders liegt als im Bezug."""
+    gid = f"probe-v35-{cls}_20261004_c{fi}_g{gi}"
+    first = w_first_plate if w_first_plate is not None else ((0, 1), tile(3))
+    rs = game_records(gid, ((1, 1), tile(1)), ((1, 1), tile(2)), [first, ((2, 0), tile(5))],
+                      [((0, 1), tile(3)), ((2, 0), tile(5))], dice_side=0 if w_first_plate is not None else None)
+    if display is not None:
+        for r in rs:
+            r["state"] = dict(r["state"], dome_display=[tile(t) for t in display])
+    return rs
+
+
+def paired_classes(n_files=4, per_file=2, w_plate=((2, 2), tile(4)), base_display=None):
+    store, data, cat = {}, {}, {}
+    for cls, wp in (("ref", None), ("wcls", w_plate)):
+        files = [f"{cls}{i}" for i in range(n_files)]
+        for fi, f in enumerate(files):
+            store[f] = [r for gi in range(per_file)
+                        for r in paired_game(cls, fi, gi, wp, base_display if cls == "ref" else None)]
+        data[cls] = snp.extract_class(files, None if cls == "ref" else snp.SIDE_FIELD, cat, set(),
+                                      store.__getitem__, cls, time.monotonic())
+    return data, cat
+
+
+class PairedModeTest(unittest.TestCase):
+    def test_pair_key(self):
+        self.assertEqual(snp.pair_key("probe-v35-policy-m2-400g_20261004_0944_c3_g17"), (3, 17))
+        self.assertIsNone(snp.pair_key("b1_2"))
+
+    def test_first_divergence(self):
+        base = paired_game("ref", 0, 0)
+        w = paired_game("wcls", 0, 0, ((2, 2), tile(4)))
+        sb, sw = snp.game_sequence(base), snp.game_sequence(w)
+        self.assertIsNone(snp.first_divergence(sb, sb, 1))
+        g = snp.first_divergence(sw, sb, 1)  # G = Spieler 1 sieht das andere W-Brett ab seinem 2. Record
+        self.assertEqual((g["k"], g["index"], g["round"]), (1, 2, 1))
+        wv = snp.first_divergence(sw, sb, 0)
+        self.assertEqual((wv["k"], wv["index"]), (1, 3))
+
+    def test_pairing_check_aborts(self):
+        data, _cat = paired_classes()
+        data["wcls"]["games"] = data["wcls"]["games"][:-1]
+        with self.assertRaises(snp.PairingError) as cm:
+            snp.check_pairing(data["ref"], "ref", data["wcls"], "wcls")
+        self.assertIn("nur im Bezug 1", str(cm.exception))
+        data, _cat = paired_classes(base_display=(5, 4, 3, 2, 1))
+        with self.assertRaises(snp.PairingError) as cm:
+            snp.check_pairing(data["ref"], "ref", data["wcls"], "wcls")
+        self.assertIn("anderer Auslage", str(cm.exception))
+
+    def test_paired_analysis(self):
+        data, cat = paired_classes()
+        rng = np.random.default_rng(5)
+        res = snp.paired_analysis(data, ["wcls"], "ref", cat, rng, 50)
+        self.assertEqual(res["paarung"]["wcls"]["n_paare"], 8)
+        p1 = res["P1"]["zeilen"]["wcls"]
+        self.assertAlmostEqual(p1["G"]["anteil_abweichend"], 1.0)
+        self.assertEqual(p1["G"]["eigene_entscheide_bis_abweichung"]["median"], 1.0)
+        self.assertEqual(p1["W"]["record_index_bis_abweichung"]["median"], 3.0)
+        p2 = res["P2"]["zeilen"]["wcls"]
+        # G-Entscheide R2/R3: eigenes Brett wie im Bezug, W-Brett mit Platz 8 statt 1 -> slots-Paar fehlt im Bezug
+        self.assertEqual(p2["n_entscheide"], 16)
+        self.assertAlmostEqual(p2["anteil_bezugsfremd"], 1.0)
+        self.assertEqual(p2["ci95_bezug_fest"], [1.0, 1.0])
+        nz = res["P2"]["rauschbezug_bezug_haelften"]
+        self.assertAlmostEqual(nz["anteil_a_fremd_in_b"], 0.0)
+        self.assertEqual((nz["dateien_a"], nz["dateien_b"]), ("1-2", "3-4"))
+        # identische Klasse: keine Abweichung, nichts bezugsfremd
+        same, cat2 = paired_classes(w_plate=((0, 1), tile(3)))
+        res2 = snp.paired_analysis(same, ["wcls"], "ref", cat2, rng, 20)
+        self.assertAlmostEqual(res2["P1"]["zeilen"]["wcls"]["G"]["anteil_abweichend"], 0.0)
+        self.assertAlmostEqual(res2["P2"]["zeilen"]["wcls"]["anteil_bezugsfremd"], 0.0)
+
+    def test_main_paired_writes_artifact(self):
+        import gzip
+        import json
+        import pickle
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory(dir=REPO / "tools" / "tests") as tmp:
+            tmp = Path(tmp)
+            for cls, wp in (("policy-m2-400g", None), ("policy-dice-v2-r1", ((2, 2), tile(4)))):
+                for fi in range(4):
+                    recs = [r for gi in range(2) for r in paired_game(cls, fi, gi, wp)]
+                    with gzip.open(tmp / f"selfplay_probe-v35-{cls}_20261004_0944_g{fi:02d}.pkl", "wb") as f:
+                        pickle.dump(recs, f)
+            out = tmp / "paired.json"
+            argv = ["x", "--data-dir", str(tmp), "--paired-baseline", "policy-m2-400g", "--classes",
+                    "policy-dice-v2-r1", "--no-prior", "--n-boot", "20", "--n-perm", "20", "--out", str(out)]
+            with mock.patch.object(sys, "argv", argv):
+                snp.main()
+            res = json.loads(out.read_text(encoding="utf-8"))
+        self.assertTrue(res["gepaart"])
+        self.assertEqual(res["bezug"], "policy-m2-400g")
+        self.assertIn("policy-dice-v2-r1", res["P1"]["zeilen"])
+        self.assertIn("grundmenge", res["P2"])
+        self.assertEqual(set(res["M2"]["zeilen"]["policy-dice-v2-r1/G"]), {"runde2/slots", "runde3/slots"})
+        self.assertIn("rauschbezug_bezug_1-2_gegen_3-4", res["M1"])
+        self.assertIn("s_je_datei", res["laufzeit"])
+
+
 class EnvironmentLeakTest(unittest.TestCase):
     def test_no_mosaic_env_left_behind(self):
         MainSmokeTest("test_main_writes_artifact").test_main_writes_artifact()

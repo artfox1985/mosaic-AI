@@ -855,7 +855,13 @@ fn engine_config_json() -> String {
         // je Klasse ueber `expect_engine_config` pruefen. OnceLock-Regel wie oben.
         "dome_dice": u8::from(crate::self_play::dome_dice_enabled()),
         "dome_dice_sims": crate::self_play::dome_dice_sims(),
-        "dome_dice_source_rule": crate::self_play::DOME_DICE_SOURCE_RULE,
+        // par.5d3 Punkt 2: die gueltige Regel (bei MOSAIC_DOME_DICE_PRIOR_TEMP > 0
+        // `prior_tempered_...`, sonst der Bestand `uniform_...`).
+        "dome_dice_source_rule": crate::self_play::dome_dice_source_rule(),
+        // par.5d3: eps-Fenster der Platzwahl und Temperatur der Quellenregel
+        // (0 = Bestand). Gelesen auch ohne Klasse W (dann ohne Wirkung).
+        "dome_dice_place_eps": crate::self_play::dome_dice_place_eps(),
+        "dome_dice_prior_temp": crate::self_play::dome_dice_prior_temp(),
         // par.5d (Eroeffnungs-Wuerfel): letzte Wuerfelrunde. Wie in der Erzeugung
         // NUR bei `dome_dice = 1` gelesen; sonst null (ohne Klasse W ohne Wirkung).
         "dome_dice_last_round": crate::self_play::dome_dice_enabled()
@@ -918,6 +924,9 @@ fn engine_config_json() -> String {
         // Records (null = ungueltiger Wert; run_net_self_play lehnt dann ab).
         "opponent_model": crate::self_play::opponent_model_path(),
         "record_sides": crate::self_play::record_sides().ok().map(|s| s.as_str()),
+        // par.7c: Sims der Gegner-Netz-Seite (null = --sims, Bestand; ungueltig ebenfalls
+        // null, run_net_self_play lehnt dann ab).
+        "opponent_sims": crate::self_play::opponent_sims().ok().flatten(),
         // PREREG_round_transition_search_sampling.md par.9: Variante B des
         // Rundenuebergangs (Tiling im Suchblatt, EINE Neubefuellung). Gehoert aus
         // demselben Grund ins Manifest wie die Knoepfe darueber -- er aendert die
@@ -2782,6 +2791,7 @@ mod contract_stamp_tests {
         // par.7: Exploiter-Knoepfe im Testprozess aus (Bestand).
         assert!(parsed["opponent_model"].is_null());
         assert_eq!(parsed["record_sides"].as_str(), Some("both"));
+        assert!(parsed["opponent_sims"].is_null());
     }
 }
 

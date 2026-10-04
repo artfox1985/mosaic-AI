@@ -68,6 +68,11 @@ WORKER_ENV = {
     # Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7): beide immer gesetzt.
     "opponent-model": "MOSAIC_OPPONENT_MODEL",
     "record-sides": "MOSAIC_RECORD_SIDES",
+    # par.7c: immer gesetzt (leer = --sims).
+    "opponent-sims": "MOSAIC_OPPONENT_SIMS",
+    # W, naechste Form (PREREG_asymmetric_selfplay.md par.5d3): beide immer gesetzt.
+    "dome-dice-place-eps": "MOSAIC_DOME_DICE_PLACE_EPS",
+    "dome-dice-prior-temp": "MOSAIC_DOME_DICE_PRIOR_TEMP",
 }
 
 

@@ -737,6 +737,38 @@ werden, sonst saettigt sie bei 100 Partien. **Nach vier Formen (W Vollform, W Er
 v32 als Gegner) hat kein asymmetrischer Gegner fuer G messbar andere Stellungen erzeugt; der Hebel der Nacht liegt
 in der Zugwahl (par.5e3) und der Suchtiefe mit Modus 2 (par.8b1).**
 
+#### par.5d3 W, naechste Form (NUTZER 2026-10-04 *"kein W und kein exploiter ist keine option ... optimieren bis die zwei ihre gewuenschte wirkung entfalten"*; REGISTRIERT vor Bau und Lauf)
+
+**Diagnose aus par.5d1/5d2a:** die 600er-Platzsuche legt jede gewuerfelte Platte an den normalsten Platz und
+"repariert" die Stellung; die Wuerfel aendern nur W's zwei R1-Platten, G's Runde 1 bleibt wie im Sockel; danach
+laufen die Partien zusammen. Zwei Hebel, zusammen als EINE Variante `policy-dice-v2`:
+1. **Platzwahl mit eps-Spielraum:** unter den Plaetzen der gewuerfelten Platte, deren Q hoechstens
+   `MOSAIC_DOME_DICE_PLACE_EPS` (Default 0 = Bestand, byte-gleich; Sonde 0,02) unter dem besten liegt, wird
+   gleichverteilt aus dem Wuerfelstrom gezogen. Das ist ein ausdrueckliches Budget an Siegwahrscheinlichkeit je
+   Platzierung, per Konstruktion kein Handicap ueber eps, aber Streuung genau an der Stelle, die heute alles
+   zusammenzieht. Record-Feld `dice_place_eps_pick` (Zahl der Kandidaten im Fenster) am Platzwahl-Record.
+2. **Platte aus G's Prior mit Temperatur statt gleichverteilt:** `MOSAIC_DOME_DICE_SOURCE_RULE` bekommt die
+   Variante `prior_tempered` (Knopf `MOSAIC_DOME_DICE_PRIOR_TEMP`, Default 0 = Bestand gleichverteilt; Sonde
+   T = 2): die Wahl unter Auslageplaetzen und oberster Stapelplatte folgt softmax(log prior / T) ueber die
+   Plattenaktionen des Netzes am Zustand (Prior der Plattenkante je Platte summiert). Plausible, aber andere
+   Platten; damit kann die Wuerfelphase auf Runde 1-2 ausgedehnt werden, ohne den 34-%-Einbruch von R2 (par.5d1).
+Alles andere wie par.5d (eine Seite, Wertmaske der Wuerfelphase, Baum kennt die Regel).
+
+**Sonde (vor dem Lauf registriert, Rezept `models/v35_probes2.recipe.json`, je Klasse 400 Partien statt 100, weil
+die KL-Differenz von 0,03 bei 100 Partien nicht aufloesbar war; Seeds 20261760 ff., Modus 2 beide Seiten):**
+* `policy-m2-400g`: G gegen G, 400 Partien (Bezug; derselbe Seed wie die W-Klassen fuer die gepaarte Auswertung).
+* `policy-dice-v2-r1`: eps 0,02, T 2, R_dice 1. `policy-dice-v2-r2`: dasselbe, R_dice 2.
+**Berichtet und Leseregeln:** (a) Siegquote W [CI] und Marge (R2-Arm muss ueber 0,42 liegen, sonst ist die
+Temperatur zu hoch); (b) Versatz je Seite nach der Wuerfelphase (|Versatz| <= 0,03 oder CI mit 0, wie par.5d);
+(c) Median-KL der G-Seite nach der Wuerfelphase gegen den Bezug, Block-Bootstrap, bei 400 Partien CI-Breite rund
+0,04; (d) NEU, gepaart: fuer jede W-Partie und ihre Bezugspartie gleichen Index der erste Halbzug, an dem G's
+Zustand abweicht, und der Anteil der G-Entscheide in R2-4, deren (eigenes Brett, Gegnerbrett) in Feinheit
+`slots` im Bezug fehlt, gegen den Rauschbezug Bezug-Haelften (`state_novelty_probe.py`, gepaart erweitert);
+(e) sechs Standard-Kennzahlen je Seite, Kosten. **W traegt**, wenn (b) haelt UND mindestens eines von (c) (CI
+ganz ueber 0) oder (d) (ueber dem Rauschbezug ohne Ueberlappung) greift; dann geht der bestandene Arm mit 2.000
+Partien in den v35-Sockel-Vorschlag. Greift keines, berichtet der Koordinator die naechste Stellschraube (eps,
+T, beide Seiten) als Vorlage; W wird nicht gestrichen (Nutzer).
+
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 
 Engine: Wuerfel-Seite und Wuerfel in der Self-Play-Schleife (Partie-RNG bzw. eigener Strom nach
@@ -908,6 +940,31 @@ der Wertkopf erwartet aber G-gegen-G, also sind die Wertziele der G-Seite system
 der Vorhersage (dieselbe Form von verborgener Behinderung wie bei W, nur umgekehrt). Keine Sockel-Klasse. Lesart
 (HERLEITUNG): ein 50 Elo schwaecherer Vorgaenger aus derselben Linie spielt keinen anderen Stil, nur schwaecher.
 Die zustandsbasierte Pruefung (par.5d2) laeuft noch; sie kann die KL-Lesart fuer W und v32 noch kippen.
+
+### par.7c EXPLOITER, naechste Form (NUTZER 2026-10-04, siehe par.5d3; REGISTRIERT vor Bau und Lauf)
+
+**Diagnose aus par.7a:** Imitation der eigenen Suche auf 99.000 Records erzeugt eine verrauschte Kopie, kein
+Gegner im Ziel, E_0 = G teilt G's blinde Flecken. Drei Aenderungen GLEICHZEITIG:
+1. **Ziel mit Gegner (REINFORCE-Filter):** E trainiert Policy NUR aus Partien, die E gewonnen hat; Records aus
+   verlorenen Partien behalten das Wertziel, ihr Policy-Ziel wird stummgeschaltet ueber das vorhandene Record-Feld
+   `policy_target_valid = false` (corpus_dataset.py:1798 setzt dann Policy-Gewicht 0; Training OHNE
+   `--ignore-policy-target-valid`, anders als v34). Umsetzung in `tools/split_records_by_net_label.py`
+   (`--policy-only-won`), kein Datenschicht-Umbau.
+2. **E sucht tiefer als G in den Zyklus-Partien:** E @200, G @100 (Sims je Seite fuer das Zweitnetz, Knopf
+   `--opponent-sims`, Default = `--sims`, byte-gleich). E's Policy-Ziele stammen damit aus einer staerkeren Suche
+   als G's Spiel (Register: @400 gegen @100 rund 77 %; @200 ungemessen, HERLEITUNG dazwischen); ob das Wissen ins
+   Netz uebergeht, prueft das Tor bei GLEICHEN Sims.
+3. **Volumen mit Vortor:** 2 Zyklen a 2.000 Partien (statt 3 x 1.000), nach Zyklus 1 ein Vortor: E_1 gegen G in
+   einer gepaarten Arena @100, 100 Paare, muss >= 0,52 erreichen, sonst Abbruch (spart Zyklus 2); Basis-Seeds
+   mit Abstand >= Chunkzahl: Zyklus 1 20261800, Zyklus 2 **20262000** (KORRIGIERT vor dem Lauf: 200 Chunks je
+   Zyklus, Chunk-Seed = Basis + Index, 100 Abstand haette wieder ueberlappt; Agent-Befund); Trainings-Seeds
+   20261860 und 20262060, Vortor 20261850, Tor 20261950. Training wie par.7 (6 Epochen,
+   finales Modell), E_0 = G.
+**Tor unveraendert:** E_2 gegen G @100, 200 Paare, >= 55 %. Danach die Sockel-Klasse `policy-exploiter`
+(G gegen E_2, Records beider Seiten) wie par.7. Kosten HERLEITUNG: Zyklus 2.000 Partien mit E @200 rund 2.000 x
+9 s = 5 h (ungemessen, aus 6,1 s bei @100/@100 plus E-Haelfte doppelt), Training 5 min, Vortor 15 min, Tor 30
+min; zwei Zyklen rund 11 h. Falls das Vortor faellt, wird vor Zyklus 2 berichtet. Scheitert auch diese Form,
+ist die naechste Stellschraube ein anderer Startpunkt fuer E_0 (`v32-b01`) oder ein Gewicht statt Filter.
 
 ## par.8 SOCKEL @400 SIMS (NUTZER 2026-10-04: *"sockel mit 400 sims kann ich gut leben"*)
 
