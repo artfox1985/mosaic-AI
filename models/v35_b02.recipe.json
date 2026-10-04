@@ -1,0 +1,98 @@
+{
+  "recipe_version": 1,
+  "tool": "self_play",
+  "description": "ARM v35-b02 (evaluations/PREREG_v35_window.md par.12; Nutzer-Entscheid 2026-10-04 spaet: 'b02 voll'; Grundlage par.11b und par.11d: die Erzeugungs-Suche @100 ist dem Netz beim Wert in Runde 1-3 nicht mehr voraus, @400 schon). Das v35-Fenster wird KOMPLETT mit 400 Sims und Stichentscheid Modus 2 (tau_tiebreak_q 2) neu erzeugt; die vorhandenen 1.000 `policy`-Partien (@400, Modus 2, models/v35_sockel.recipe.json) laufen im b02-Fenster mit. Generator v34-b01 (Champion), Spec models/v35_generation.spec.json (r5_net_solver 0, r5_net_sims 400), Env wie Schwarm und Sockel. Vier NEUE Klassennamen mit Suffix -s400, damit die @100-Klassen in data/ nicht kollidieren. Seeds: Chunk-Seed = Basis + Chunk-Index (self_play.py:1315), Chunkzahl = Partien/10; Basen 20262100 (400 Chunks), 20262600 (400), 20263100 (100), 20263300 (200), Abstaende 500/500/200 >= Chunkzahl der jeweils unteren Klasse, keine Ueberschneidung mit den v35-Basen 20260950-20260955 (+ <= 199). Start: tools/v35_b02_generate.sh (Smoke je Klasse, dann Erzeugung, Abnahmen par.8), Kette tools/night_v35_b02_chain.sh. Aufruf je Klasse: python -X utf8 -u self_play.py --recipe models/v35_b02.recipe.json --class <name>.",
+  "common": {
+    "mode": "network",
+    "model": "models/alphazero_v34-b01_brierbest.onnx",
+    "spec": "models/v35_generation.spec.json",
+    "games": 4000,
+    "sims": 400,
+    "tau_tiebreak_q": 2,
+    "threads": 11,
+    "chunk": 10,
+    "per_file": 10,
+    "return_order_random_p": 0.81,
+    "tau_argmax_from_move": 1,
+    "start_slot_random_p": 0.15,
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true
+  },
+  "env": {
+    "MOSAIC_STACK_DRAW_RESEARCH": "1",
+    "MOSAIC_SINGLE_PASS_OTHER_VAL": "1",
+    "MOSAIC_R5_NET_SOLVER": "0"
+  },
+  "classes": {
+    "value-deviate-s400": {
+      "description": "Schwarm @400, Modus 2: value-only, Weg C, Huellenknopf AN; Flags wie value-deviate (models/v35.recipe.json), nur Sims 400 und Stichentscheid 2. 4.000 Partien, 400 Chunks.",
+      "version": "v34-b01-value-deviate-s400",
+      "seed": 20262100,
+      "value_only": true,
+      "deviate_prob": 1.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "tau_tiebreak_q": 2
+      }
+    },
+    "value-excursion-s400": {
+      "description": "Schwarm @400, Modus 2: value-only, Ausflug (Weg B), KL-Abzweig an (PREREG_targeted_branching.md par.7); Flags wie value-excursion (models/v35.recipe.json), nur Sims 400 und Stichentscheid 2. 4.000 Hauptpartien, 400 Chunks.",
+      "version": "v34-b01-value-excursion-s400",
+      "seed": 20262600,
+      "value_only": true,
+      "excursion_prob": 1.0,
+      "no_root_noise": true,
+      "excursion_kl_weight": true,
+      "expect_engine_config": {
+        "excursion_kl_weight": 1,
+        "tau_tiebreak_q": 2
+      }
+    },
+    "policy-s400": {
+      "description": "Sockel @400, Modus 2: Einstellung identisch mit Klasse `policy` aus models/v35_sockel.recipe.json (Weg C, deviate_prob 1.0), nur anderer Seed; die vorhandenen 1.000 `policy`-Partien laufen im b02-Fenster mit. 1.000 Partien, 100 Chunks.",
+      "version": "v34-b01-policy-s400",
+      "seed": 20263100,
+      "games": 1000,
+      "deviate_prob": 1.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2
+      }
+    },
+    "policy-dice-v2-r1-s400": {
+      "description": "Sockel-W @400, Modus 2: G gegen Eroeffnungs-Wuerfel W-v2 (nur Runde 1) wie policy-dice-v2-r1 in models/v35_sockel.recipe.json (Platzwahl eps 0,02, Platte aus dem Prior mit T 2, Platzsuche @600), nur Basis-Sims 400 statt 100. 2.000 Partien, 200 Chunks. Wertmaske der Wuerfelphase im Training (MOSAIC_MASK_DICE_PHASE_VALUE).",
+      "version": "v34-b01-policy-dice-v2-r1-s400",
+      "seed": 20263300,
+      "games": 2000,
+      "deviate_prob": 1.0,
+      "dome_dice": true,
+      "dome_dice_sims": 600,
+      "dome_dice_last_round": 1,
+      "dome_dice_place_eps": 0.02,
+      "dome_dice_prior_temp": 2.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 1,
+        "dome_dice_sims": 600,
+        "dome_dice_last_round": 1,
+        "dome_dice_place_eps": 0.02,
+        "dome_dice_prior_temp": 2.0,
+        "dome_dice_source_rule": "prior_tempered_over_display_slots_and_stack_top",
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2
+      }
+    }
+  },
+  "expect_engine_config": {
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true,
+    "single_pass_other_val": true,
+    "r5_net_solver": false
+  }
+}

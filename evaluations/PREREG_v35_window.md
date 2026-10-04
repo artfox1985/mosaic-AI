@@ -441,3 +441,82 @@ komplett mit 400 Sims und Modus 2 neu erzeugen (Schwarm 2 x 4.000, policy 2.000 
 @400-Partie (par.10a) und dem Verhaeltnis @400/@100 von 1,95: Schwarm rund 4,9 bzw. 3,4 s, W rund 6,3 s je Partie,
 zusammen rund 14 h Erzeugung plus 20 min Bloecke, 37 min Training, 1,5 h Tor 1. Bekannter Preis: @400 kostet im
 Self-Play 0,07 volle Spalten je Seite (`PREREG_asymmetric_selfplay.md` par.8c1).
+
+## par.12 ARM v35-b02: FENSTER KOMPLETT MIT 400 SIMS UND MODUS 2 (NUTZER-ENTSCHEID 2026-10-04 spaet: *"b02 voll"*; REGISTRIERT VOR dem Lauf)
+
+**Grund:** par.11d (die Erzeugungs-Suche @100 ist dem Netz beim Wert in Runde 1 unterlegen und bis Runde 3 nicht
+ueberlegen; @400 ab Runde 2 klar voraus) und par.11b (der Policy-Kopf lernt nur aus @400-Zielen). Hypothese: mit
+400 Sims in der GESAMTEN Erzeugung bekommt die Schleife ihren Vorsprung zurueck, Wert (30 % root_q im Ziel) wie
+Policy. Alternativen zu "mehr Sims" (Nutzer-Frage) sind in STATUS/RICHTUNG festgehalten und NICHT Teil dieses Arms.
+
+**Erzeugung (`models/v35_b02.recipe.json`, `tools/v35_b02_generate.sh`; Generator `v34-b01_brierbest`, Spec
+`v35_generation.spec.json`, Env wie par.6, Runde 5 per Netz @400, Spiegelknopf an, E1 an):**
+
+| Klasse (neu) | Partien | Sims | Stichentscheid | Seed | Flags |
+| --- | --- | --- | --- | --- | --- |
+| `policy-s400` | 1.000 | 400 | Modus 2 | 20263100 | wie `policy` (par.10); zusammen mit den vorhandenen 1.000 `policy`-Partien = 2.000 |
+| `policy-dice-v2-r1-s400` | 2.000 | 400 (Basis), Platzsuche 600 | Modus 2 | 20263300 | W-v2 Runde 1 wie par.10 |
+| `value-deviate-s400` | 4.000 | 400 | Modus 2 | 20262100 | Weg C, value-only, wie par.6 |
+| `value-excursion-s400` | 4.000 | 400 | Modus 2 | 20262600 | Ausflug, KL-Abzweig an, value-only, wie par.6 |
+
+Seeds: Chunk-Seed = Basis + Chunk-Index, Chunkzahl 100 / 200 / 400 / 400, Abstaende der Basen >= 200 (STATUS
+Betriebsbefund 2026-10-04); keine der vier Basen ist je als Self-Play-Seed benutzt; 20262100 und 20262600 kommen als ARENA-Seeds in
+`champion2_v31-b01_vs_v29-b09_s20262100.json` und `champion2_v34-b01_vs_v31-b01.json` vor (anderer Strom, Agent-Befund
+2026-10-05, harmlos). Reihenfolge: policy-s400,
+W-s400, deviate-s400, excursion-s400. Smoke je Klasse (10 Partien nach `data/probe_v35b02_smoke`) mit
+Manifest-Abnahme: Sims 400, `tau_tiebreak_q` 2, `r5_net_sims` 400, Klassen-Knoepfe wie erwartet; rot = STOPP.
+**Cache-Waechter laeuft daneben** (Nutzer: *"lass den cache waechter gleich mitlaufen"*; `build_cache_incremental.py
+--watch`, 3 Worker, gemessen ohne Durchsatzverlust, `docs/measured_runtimes.md` Z. 93) mit derselben Umgebung
+wie das Training (Wertmaske an), damit die Bloecke den Trainings-Schluessel treffen. Abnahmen nach par.8 je Klasse
+(Tor 0, Spiegelknopf, KL-Abnahme am Ausflug, Vollstaendigkeit), berichtet, nicht fatal.
+
+**Fenster `v35-b02` (1.200 Dateien, 12.000 Partien, alles @400 Modus 2):** `policy` 100 (vorhanden) + `policy-s400`
+100 + `policy-dice-v2-r1-s400` 200 + `value-deviate-s400` 400 + `value-excursion-s400` 400. Traeger-Manifest
+`policy_carrier_manifest_v35_b02.json` = 400 (policy 100, policy-s400 100, W-s400 200); Schwarm ohne Policy. Val
+120, Val-Pool `^selfplay_v34-b01-`, Wertmaske an, Seed 20260965 (alle Arme einer Generation teilen den Seed),
+Rezept byte-gleich v34-b01/v35-b01, Warmstart `v34-b01_brierbest`, gegatet das Brier-beste Netz
+(`brier_best_checkpoint.py`). Die @100-Klassen (`policy-s100`, `value-deviate`, `value-excursion`,
+`policy-dice-v2-r1`) bleiben in `data/` und sind NICHT im Fenster.
+
+**Tore:** Tor 1 = Champion-Kante gegen `v34-b01` wie par.11 (Seeds 20261600/20261601, 200 Paare, Blockgroesse 5,
+`--log-games`, Spec `v34-b01_brierbest.spec.json` beidseits, Kriterium z >= +1,96 oder gepoolt >= 52,5 % ohne
+Gegenbefund, Stufenregel 20261602). Zuordnung vorab: ein Gewinn gehoert der Suchtiefe der Erzeugung (400 statt
+100) plus Modus 2 im Schwarm, bei unveraendertem Rezept. **Tor 2a** ex post aus `corpus_sanity` der Policy-Klassen
+gegen 0,826 (`policy` @400 M2, par.10b), gleich bedingt; bekannter Preis @400: -0,07 volle Spalten je Seite gegen
+@100 (Asym-Prereg par.8c1), vom Nutzer in Kauf genommen. **Tor 2b** aus den Tor-1-Logs gegen v34-b01 wie par.11.
+Vergleich mit b01 (par.11c) nur deskriptiv: gleiche Seeds, aber b01 hat einen Seed und lief gebremst.
+
+**Kosten (HERLEITUNG):** policy-s400 1.000 x 6,21 s = 1,7 h (gemessen par.10a), W-s400 2.000 x rund 6,3 s = 3,5 h,
+deviate-s400 4.000 x rund 4,9 s = 5,4 h, excursion-s400 4.000 x rund 3,4 s = 3,8 h (Schwarm: Faktor 1,95 aus
+policy @400/@100 auf die @100-Zeiten aus par.9), zusammen rund 14,4 h Erzeugung; Bloecke durch den Waechter
+nebenher; Merge, Training rund 40 min; Tor 1 rund 1,5 h je Seed exklusiv. Kette `tools/night_v35_b02_chain.sh`
+im Terminal-Tab, Start 2026-10-05 nach Mitternacht; Laufzeiten aus den Artefakten werden nachgetragen.
+
+### par.12a SCRATCH-MESSUNG (2026-10-05 00:05, NICHT vorregistriert, auf Nutzer-Frage *"35 % eigene Vorhersage, wie verbessern?"*): heutiger Bootstrap gegen den echten Suchwert zwei Runden spaeter
+
+Grundmenge: Val-Satz `data/window_v35_val.txt`, Records mit `bootstrap_value` UND einem spaeteren Record derselben Seite
+mindestens zwei Runden spaeter mit `root_q`, ohne Wuerfelphase, vollstaendige Partien; n = 91.490 (Runde 1-3 unten);
+Einheit Brier gegen den Partieausgang. Der heutige Bootstrap ist ein SIMULIERTER Rollout des Netzes zwei Runden voraus
+(`round_transition_deep.rs:802-840`: eine gezogene Rundenueberleitung plus `simulate_one_round` mit den Prioren des
+Netzes, "Label-Rollout, keine Partie-Streuung"), nicht die echte Trajektorie.
+
+| Liste (Sims) | Runde | n | Bootstrap heute (Netz-Rollout) | root_q des echten Records >= 2 Runden spaeter | root_q jetzt | Raten |
+| --- | --- | --- | --- | --- | --- | --- |
+| alle | 1 | 24.004 | 0,2547 | **0,2131** | 0,2553 | 0,2500 |
+| alle | 2 | 33.217 | 0,2356 | **0,1875** | 0,2363 | 0,2500 |
+| alle | 3 | 34.269 | 0,1976 | **0,1343** | 0,2048 | 0,2500 |
+| policy @400 | 3 | 3.606 | 0,2266 | **0,1238** | 0,1968 | 0,2499 |
+| policy-s100 @100 | 3 | 3.339 | 0,2319 | **0,1450** | 0,2089 | 0,2499 |
+
+Lesart: der heutige Bootstrap ist in Runde 1 schlechter als Raten und liegt in Runde 1-3 praktisch auf dem rohen
+Netzwert JETZT (0,2547 gegen 0,2553 usw.): der simulierte Rollout fuegt dem Wertziel keine Information hinzu, er
+wiederholt die Vorhersage des Netzes. Der Suchwert des ECHTEN Records zwei Runden spaeter trifft den Ausgang um
+0,04 bis 0,10 besser (echte Zuege, echte Kuppelplatten, Suche statt Prior). Ein TD-Ziel aus der echten Trajektorie
+(n-Schritt-TD mit Such-Bootstrap, MuZero-Form) waere damit ein Wertziel, das ueber dem liegt, was das Netz schon
+weiss. Reine Datenschicht (Bauschleife `corpus_dataset.py` um 1635-1690, Knopf in BEIDE Cache-Schluessel), keine
+Erzeugungsaenderung: `bootstrap_value` und `root_q` liegen in jedem Record. Vorschlag: Arm `v35-b03` auf dem
+b02-Fenster mit diesem Ziel, getrennt von b02 (Rezept unveraendert), damit Suchtiefe und Zielform einzeln
+zuordenbar bleiben; Nutzer-Entscheid. Grenzen dieser Scratch-Messung: ungepaart, ohne CI, der spaetere Suchwert
+kennt zwei Runden echten Spiels mehr (das ist der Sinn eines TD-Ziels, aber auch seine Varianzquelle), und die
+Arena war bei Zielform-Aenderungen achtmal invariant (`archive/history.md` Z. 9185-9229); hier aendert sich die
+INFORMATION des Ziels, nicht nur die Form.

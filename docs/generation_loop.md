@@ -55,6 +55,21 @@ ein Modell aus N beides, darf das Self-Play fuer N+1 starten. Die
 Kante gegen den amtierenden Champion faellt (Schritt 8). Eine Linie darf also
 mehrere Generationen ratschen, bevor sie den Champion einholt.
 
+## Vor der Erzeugung: hat die Suche dem Netz noch etwas voraus? (seit 2026-10-04)
+
+Die Schleife ist ein Verbesserungsoperator: das Netz lernt Verteilung und Wert seiner eigenen
+Suche. Hat es sie bei festem Sim-Budget eingeholt, traegt die naechste Generation bei diesem
+Budget nichts mehr; das war v35-b01 (`PREREG_v35_window.md` par.11b/par.11d: Wertkopf lernt aus
+keiner Klasse, die 100-Sim-Suche ist dem rohen Netz beim Wert in Runde 1 unterlegen und bis
+Runde 3 nicht ueberlegen, bei 400 Sims ab Runde 2 voraus). **Darum vor jeder Erzeugung messen,
+nicht erst nach dem Training:** `tools/checkpoint_val_eval.py` mit dem Generator als Checkpoint
+auf dem Val-Satz der Vorgeneration, Block `root_q_compare` (rohes Netz gegen Suchwert der Wurzel
+auf identischen Zustaenden, je Runde und Klasse, Block-Bootstrap ueber Dateien; 33 s auf der GPU).
+Fehlt der Vorsprung der Suche in Runde 1 bis 3 (CI der Differenz Netz minus root_q mit 0 oder
+negativ), ist das Sim-Budget der Erzeugung fuer dieses Netz zu klein; dann Sims erhoehen oder
+andere Stellungen liefern, aber nicht mit demselben Budget weiter erzeugen. Dasselbe gilt fuer die
+Policy (par.11b: gelernt wird nur aus den Zielen der tieferen Suche).
+
 ## Tor 0 -- traegt der Korpus das Signal?
 
 Wortlaut und Herleitung: `PREREG_heuristic_v2_long_rows.md` par.3b.12

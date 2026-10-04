@@ -52,6 +52,15 @@ und kam auf 46,25 % (185:215, n = 400, gepaarte Arena @100) gegen Schwelle 55 %,
 (`PREREG_asymmetric_selfplay.md` par.7a/7b1); v2 HERLEITUNG rund 11 h, Vortor nach 5,5 h; v35 ist die letzte
 Generation, eine korrigierte Form wuerde nie geerntet. Nutzer fragt selbst, ob der Nutzen den Aufwand rechtfertigt.
 
+**LOESCHPROTOKOLL 2026-10-05 00:00 (Nutzer: *"freigegeben, mit Modellen"*; restic-Snapshot `46be756f` 23:57, check
+ohne Fehler, 7.330 Dateien; Trefferzahlen je Gruppe im Snapshot = Dateizahl):** A `selfplay_v31-b01-*` 496,
+`v32-b01-*` 496, `v33-b01-*` 1.200 (1,91 GB); B `data/probe_asym`, `probe_asym_rep`, `exploiter`, `exploiter_smoke`,
+`probe_v35sockel_smoke` (1.070 Dateien, 0,90 GB; `exploiter2` gab es nicht); C sechs Monolithen der v34-Aera (2,23 GB);
+D 5.058 verwaiste Bloecke (2,72 GB); Modelle `alphazero_x35-e01/02/03*`, `v34-b02*`, `v34-b03*` (44 Netzdateien, 0,30 GB;
+die fuenf Trainings-Manifeste bleiben im Git). Rest in `data/`: 1.200 `selfplay_v34-b01-*`, 1.200 Bloecke, Monolithen
+`.cache_ac852965e449.h5` und `.cache_81bef1158189.h5`, `frozen_substrates/`, `seed_positions/`. Offener Entscheid (c) ist
+damit erledigt.
+
 **Stand des Baums:** `a193b409`, 1 Commit vor `origin/main` (der Stand `be5bb104` wurde zwischen Uebergabe und
 Uebernahme gepusht, Reflog "update by push"; nicht von dieser Sitzung). `player_profiles.json` veraendert, nie committen.
 

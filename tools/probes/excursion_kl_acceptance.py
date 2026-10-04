@@ -80,6 +80,10 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--classes", nargs="+", default=list(CLASSES),
                     help="Klassen der Erzeugung (v35: value-deviate statt value-wegc, ohne policy)")
+    # v35-b02 (PREREG_v35_window.md par.12): die Ausflug-Klasse heisst dort value-excursion-s400;
+    # der Glob unten war auf value-excursion fest. Default unveraendert.
+    ap.add_argument("--excursion-class", default="value-excursion",
+                    help="Klasse, deren Records den Abzweig (branch_kl) tragen")
     args = ap.parse_args()
     t_start, c_start = time.monotonic(), time.process_time()
 
@@ -107,7 +111,7 @@ def main() -> None:
 
     data = BASE_DIR / "data"
     # --- Abzweig: Records mit branch_kl in der Ausflug-Klasse ---------------------------------
-    exc_files = sorted(glob.glob(str(data / f"selfplay_{args.prefix}-value-excursion_*.pkl")))
+    exc_files = sorted(glob.glob(str(data / f"selfplay_{args.prefix}-{args.excursion_class}_*.pkl")))
     branch, branch_engine, branch_round, n_branch_all, n_branch_filtered = [], [], [], 0, 0
     for k, f in enumerate(exc_files):
         for step in load_records(f):
