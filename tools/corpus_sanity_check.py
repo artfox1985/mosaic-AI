@@ -34,7 +34,7 @@ def ci(v):
     return 1.96 * sd / len(v) ** 0.5
 
 
-def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
+def auswerten(verzeichnis, *, pattern="*.pkl", files=None, side_filter=None):
     """Standard-Kennzahlen eines Korpus-Verzeichnisses.
 
     `pattern` (2026-08-30) filtert INNERHALB des Verzeichnisses. Grund: die
@@ -47,6 +47,12 @@ def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
     das rund 1,3 GB Kopie fuer eine reine Leseauswertung. Keyword-only und
     mit Default `*.pkl`, damit der vorhandene Aufrufer (ebendieser
     stage_arm-Pfad) unveraendert weiterlaeuft.
+
+    `side_filter` (2026-10-04, PREREG_asymmetric_selfplay.md par.5e1): optional
+    `(letzter_record, spieler) -> bool`; nur Partie-Seiten mit `True` gehen in die
+    Kennzahlen ein. So rechnet eine asymmetrische Klasse die Kennzahlen je Seite
+    (z. B. `tiebreak_side`), ohne zweite Kopie dieser Auswertung. `None` = alle
+    Seiten (Bestand).
     """
     files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(verzeichnis, pattern)))
     partien = {}       # game_id -> letzter Record
@@ -91,6 +97,8 @@ def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
             aktiv[i] += 1
         sc = r.get("scores") or [p.get("score") for p in st["players"]]
         for pi, p in enumerate(st["players"]):
+            if side_filter is not None and not side_filter(r, pi):
+                continue
             g = p.get("score_geo") or {}
             rf = g.get("row_fill") or []
             cf = g.get("col_fill") or []

@@ -118,6 +118,9 @@ fn main() {
         // par.11 Weg C3: aus, aus demselben Grund -- diese Sonde ist ein
         // Byte-Identitaets-Nachweis und darf keinen Knopf mitfuehren.
         moon_order_search_scale: mosaic_rust::net_mcts::MOON_ORDER_SEARCH_SCALE_DEFAULT,
+        // PREREG_asymmetric_selfplay.md par.5e1: Stichentscheid der tau-Zugwahl
+        // aus (Bestand), aus demselben Grund wie die Knoepfe darueber.
+        tau_tiebreak_q: mosaic_rust::net_mcts::TAU_TIEBREAK_Q_DEFAULT,
         // Variante B des Rundenuebergangs (PREREG_round_transition_search_
         // sampling.md par.9): AUS, aus demselben Grund wie die Knoepfe darueber.
         // Der Pro-Suche-Kontext ist `None` -- er entsteht ohnehin erst an der

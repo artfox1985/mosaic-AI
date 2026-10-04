@@ -99,6 +99,23 @@ def _spec_block(spec_path) -> dict | None:
         return {"path": str(spec_path), "_error": repr(e)}
 
 
+def _file_block(file_path) -> dict | None:
+    """Pfad und sha256 einer Modelldatei (Exploiter-Gegner,
+    PREREG_asymmetric_selfplay.md par.7): das zweite Netz eines Laufs soll nicht
+    nur am Namen haengen -- `_brierbest` und finales Modell eines Arms koennen
+    beide existieren, und ein Name kann neu belegt werden. Best-effort wie
+    `_spec_block`: ein Lesefehler landet als `_error` im Block."""
+    if not file_path:
+        return None
+    path = Path(file_path)
+    if not path.is_absolute() and not path.exists():
+        path = BASE_DIR / path
+    try:
+        return {"path": str(file_path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    except Exception as e:
+        return {"path": str(file_path), "_error": repr(e)}
+
+
 def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict,
                         recipe: dict | None = None, engine_config: dict | None = None) -> None:
     """Schreibt `data/manifest_<version>_<timestamp>.json` neben die
@@ -124,6 +141,8 @@ def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict,
         "engine_config": engine_config if engine_config is not None else _engine_config(),
         "engine_config_parent": _engine_config() if engine_config is not None else None,
         "spec_file": _spec_block(cli_args.get("spec")),
+        # par.7: Identitaet des Gegner-Netzes (None ohne --opponent-model).
+        "opponent_model_file": _file_block(cli_args.get("opponent_model")),
         "recipe": recipe,
         "mosaic_env": mosaic_env_snapshot(),
     }

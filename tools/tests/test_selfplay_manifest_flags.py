@@ -62,6 +62,12 @@ WORKER_ENV = {
     "aggr-side-lambda": "MOSAIC_AGGR_SIDE_LAMBDA",
     # Modus B (par.5c): nur mit Wert gesetzt; der Worker entfernt dann W.
     "aggr-side-eps": "MOSAIC_AGGR_SIDE_EPS",
+    # Stichentscheid der tau-Zugwahl (PREREG_asymmetric_selfplay.md par.5e1): beide immer gesetzt.
+    "tau-tiebreak-side": "MOSAIC_TAU_TIEBREAK_SIDE",
+    "tau-tiebreak-q": "MOSAIC_TAU_TIEBREAK_Q",
+    # Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7): beide immer gesetzt.
+    "opponent-model": "MOSAIC_OPPONENT_MODEL",
+    "record-sides": "MOSAIC_RECORD_SIDES",
 }
 
 

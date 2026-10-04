@@ -81,6 +81,9 @@ SPEC_TO_ENV = {
     "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
     "moon_order_search_sims": "MOSAIC_MOON_ORDER_SEARCH_SIMS",
     "moon_order_search_scale": "MOSAIC_MOON_ORDER_SEARCH_SCALE",
+    # PREREG_asymmetric_selfplay.md par.5e1: OPTIONAL, Default 0 (Bestand).
+    # Wirkt nur im tau-Zweig der Self-Play-Zugwahl, nie in Arena/GUI.
+    "tau_tiebreak_q": "MOSAIC_TAU_TIEBREAK_Q",
     # PREREG_round_transition_search_sampling.md par.9: OPTIONAL, Default 0.
     # NACHGETRAGEN 2026-09-21.
     "round_transition_leaf": "MOSAIC_ROUND_TRANSITION_LEAF",

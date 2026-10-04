@@ -77,6 +77,12 @@ RECIPE_RESERVED_ENV = {
     "MOSAIC_AGGR_SIDE_LAMBDA": "aggr_side_lambda",
     # Klasse S, Modus B (PREREG_asymmetric_selfplay.md par.5c).
     "MOSAIC_AGGR_SIDE_EPS": "aggr_side_eps",
+    # Stichentscheid der tau-Zugwahl, Seitenknopf (PREREG_asymmetric_selfplay.md par.5e1).
+    "MOSAIC_TAU_TIEBREAK_SIDE": "tau_tiebreak_side",
+    "MOSAIC_TAU_TIEBREAK_Q": "tau_tiebreak_q",
+    # Exploiter-Gegner, zwei Netze je Partie (PREREG_asymmetric_selfplay.md par.7).
+    "MOSAIC_OPPONENT_MODEL": "opponent_model",
+    "MOSAIC_RECORD_SIDES": "record_sides",
 }
 
 _RECIPE_PRE = None
@@ -226,7 +232,9 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       excursion_reshuffle=False, excursion_kl_weight=False,
                       dome_dice=False, dome_dice_sims=600, dome_dice_last_round=4,
                       aggr_side=False, aggr_side_w=0.1, aggr_side_lambda=None,
-                      aggr_side_eps=None, engine_config_only=False):
+                      aggr_side_eps=None, tau_tiebreak_side=False, tau_tiebreak_q=0,
+                      opponent_model=None, record_sides="both",
+                      engine_config_only=False):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -312,6 +320,15 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     lehnt ein gesetztes W in Modus B ab, `self_play.rs
     resolve_aggr_side_params`); lambda kommt dann nicht vor (generate_data
     lehnt die Kombination ab).
+    `tau_tiebreak_side` / `tau_tiebreak_q` (PREREG_asymmetric_selfplay.md
+    par.5e1 Frage 3): Stichentscheid der tau-Zugwahl, mit Seitenknopf nur auf
+    einer Seite je Partie. Beide Variablen IMMER gesetzt (Rust liest den
+    Seitenknopf per OnceLock, den Modus ueber `SearchConfig::from_env` bzw. als
+    Env-Default eines fehlenden Spec-Felds).
+    `opponent_model` / `record_sides` (PREREG_asymmetric_selfplay.md par.7):
+    zweites Netz je Partie (eine Seite je Partie, Hash aus dem Partie-Seed) und
+    der Seitenfilter der Records. Beide Variablen IMMER gesetzt (leer = aus,
+    `both` = Bestand), Rust liest sie per OnceLock.
     `engine_config_only` (Rezept-Waechter, `check_engine_config`): nach dem
     Setzen der Umgebung und dem Import NUR `engine_config_json()` melden und
     ohne Partie enden -- so sieht der Waechter genau die Konfiguration, die ein
@@ -352,6 +369,12 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     if aggr_side_eps is not None:
         os.environ["MOSAIC_AGGR_SIDE_EPS"] = repr(float(aggr_side_eps))
         os.environ.pop("MOSAIC_AGGR_SIDE_W", None)
+    # par.5e1: wie Klasse W/S immer gesetzt (0 = Bestand).
+    os.environ["MOSAIC_TAU_TIEBREAK_SIDE"] = "1" if tau_tiebreak_side else "0"
+    os.environ["MOSAIC_TAU_TIEBREAK_Q"] = str(int(tau_tiebreak_q))
+    # par.7: immer gesetzt (leer = kein Gegner-Netz, both = Bestand).
+    os.environ["MOSAIC_OPPONENT_MODEL"] = opponent_model or ""
+    os.environ["MOSAIC_RECORD_SIDES"] = record_sides
     try:
         import mosaic_rust as mr
         if engine_config_only:
@@ -466,7 +489,9 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           excursion_kl_weight=False,
                           dome_dice=False, dome_dice_sims=600, dome_dice_last_round=4,
                           aggr_side=False, aggr_side_w=0.1,
-                          aggr_side_lambda=None, aggr_side_eps=None) -> str | None:
+                          aggr_side_lambda=None, aggr_side_eps=None,
+                          tau_tiebreak_side=False, tau_tiebreak_q=0,
+                          opponent_model=None, record_sides="both") -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -487,7 +512,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               excursion_prob, excursion_profile, start_slot_random_p,
               return_order_random_p, tie_mirror_p, label_rng_split,
               excursion_reshuffle, excursion_kl_weight, dome_dice, dome_dice_sims,
-              dome_dice_last_round, aggr_side, aggr_side_w, aggr_side_lambda, aggr_side_eps),
+              dome_dice_last_round, aggr_side, aggr_side_w, aggr_side_lambda, aggr_side_eps,
+              tau_tiebreak_side, tau_tiebreak_q, opponent_model, record_sides),
     )
     proc.start()
     t_start = time.time()
@@ -606,6 +632,10 @@ def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
             "aggr_side_w": knobs.get("aggr_side_w", 0.1),
             "aggr_side_lambda": knobs.get("aggr_side_lambda"),
             "aggr_side_eps": knobs.get("aggr_side_eps"),
+            "tau_tiebreak_side": knobs.get("tau_tiebreak_side", False),
+            "tau_tiebreak_q": knobs.get("tau_tiebreak_q", 0),
+            "opponent_model": knobs.get("opponent_model"),
+            "record_sides": knobs.get("record_sides", "both"),
             "engine_config_only": True,
         },
     )
@@ -621,6 +651,26 @@ def _probe_worker_engine_config(mode, model, knobs: dict) -> dict:
     if status != "engine_config":
         raise SystemExit(f"❌ Rezept-Waechter: Probe-Prozess meldete {status!r}: {payload}")
     return json.loads(payload)
+
+
+def _resolve_model_path(model: str, what: str) -> str:
+    """Modellname gegen den models/-Ordner aufloesen (gilt fuer --model und
+    --opponent-model). Reihenfolge (Kurzname genuegt, wie bei train.py --load):
+    1. woertlicher Pfad, 2. models/<name>, 3. models/<name>.onnx,
+    4. models/alphazero_<name>.onnx (z.B. --model v14b_best). Ein
+    existierender expliziter Pfad bleibt, wie er ist."""
+    from pathlib import Path
+    candidates = [Path(model), MODELS_DIR / model,
+                  MODELS_DIR / f"{model}.onnx",
+                  MODELS_DIR / f"alphazero_{model}.onnx"]
+    model_path = next((p for p in candidates if p.exists()), None)
+    if model_path is None:
+        raise SystemExit(
+            f"❌ {what} nicht gefunden: '{model}', geprüft wurden: "
+            + ", ".join(str(p) for p in candidates))
+    if str(model_path) != model:
+        print(f"🔎 {what} aufgelöst: {model} -> {model_path}")
+    return str(model_path)
 
 
 def _group_by_game(steps: list[dict]) -> list[list[dict]]:
@@ -693,6 +743,10 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   aggr_side_w: float = 0.1,
                   aggr_side_lambda: float | None = None,
                   aggr_side_eps: float | None = None,
+                  tau_tiebreak_side: bool = False,
+                  tau_tiebreak_q: int = 0,
+                  opponent_model: str | None = None,
+                  record_sides: str = "both",
                   recipe_info: dict | None = None):
     # `recipe_info` (Rezeptdatei, docs/working_rules.md): None ohne Rezept,
     # sonst {"recipe": Recipe, "class": str|None, "overrides": dict} aus
@@ -877,6 +931,69 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
                              f"(--aggr-side/--aggr-side-w/--aggr-side-lambda/--aggr-side-eps "
                              f"-> {_want!r}); Variable entfernen.")
+    # Stichentscheid der tau-Zugwahl (PREREG_asymmetric_selfplay.md par.5e1 Frage 3).
+    # Bereich und Ausschluesse wie Rust (net_mcts.rs sanitize_tau_tiebreak_q,
+    # self_play.rs tiebreak_side_conflict); harte Fehler wie bei W und S.
+    if tau_tiebreak_q not in (0, 1, 2):
+        raise SystemExit(f"❌ --tau-tiebreak-q muss 0, 1 oder 2 sein, ist {tau_tiebreak_q}.")
+    if tau_tiebreak_q and not tau_argmax_from_move:
+        print(f"  ⚠️  --tau-tiebreak-q={tau_tiebreak_q} wirkt nur im tau-Zweig "
+              "(--tau-argmax-from-move > 0); ohne ihn wird gesampelt, der Knopf ist ein No-Op.")
+    if tau_tiebreak_side:
+        if mode != "network":
+            raise SystemExit("❌ --tau-tiebreak-side wirkt nur bei --mode network.")
+        # Ein Spec-Feld `tau_tiebreak_q` geht dem Flag vor (net_mcts.rs from_spec_file).
+        _spec_q = 0
+        if spec:
+            try:
+                with open(spec, encoding="utf-8") as _f:
+                    _spec_q = int(json.load(_f).get("tau_tiebreak_q", 0) or 0)
+            except (OSError, ValueError, TypeError):
+                _spec_q = 0
+        if not (_spec_q or tau_tiebreak_q):
+            raise SystemExit("❌ --tau-tiebreak-side verlangt --tau-tiebreak-q 1 oder 2 (oder das "
+                             "Spec-Feld tau_tiebreak_q); mit 0 waeren beide Seiten gleich (par.5e1).")
+        if dome_dice or aggr_side:
+            raise SystemExit("❌ --tau-tiebreak-side schliesst --dome-dice und --aggr-side aus "
+                             "(par.5e1 misst G gegen G mit nur einem Unterschied).")
+        if excursion_prob > 0:
+            raise SystemExit(f"❌ --tau-tiebreak-side und --excursion-prob={excursion_prob} schliessen "
+                             "sich aus (wie F8): ein Ausflug erbte die Seite nicht.")
+    # Doppelquelle wie bei W und S: der Worker setzt beide Variablen immer.
+    for _env, _want in (("MOSAIC_TAU_TIEBREAK_SIDE", "1" if tau_tiebreak_side else "0"),
+                        ("MOSAIC_TAU_TIEBREAK_Q", str(int(tau_tiebreak_q)))):
+        _have = os.environ.get(_env)
+        if _have is not None and _have != _want:
+            raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
+                             f"(--tau-tiebreak-side/--tau-tiebreak-q -> {_want!r}); Variable entfernen.")
+    # Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7, Bauplan
+    # evaluations/exploiter_build_plan.md D5): Ausschluesse wie Rust
+    # (self_play.rs opponent_conflict), harte Fehler VOR dem Lauf.
+    if record_sides not in ("both", "primary", "opponent"):
+        raise SystemExit(f"❌ --record-sides muss both, primary oder opponent sein, ist {record_sides!r}.")
+    if record_sides != "both" and not opponent_model:
+        raise SystemExit(f"❌ --record-sides {record_sides} verlangt --opponent-model: ohne Gegner-Netz "
+                         "gibt es keine Seiten zu filtern.")
+    if opponent_model:
+        if mode != "network":
+            raise SystemExit("❌ --opponent-model wirkt nur bei --mode network.")
+        if dome_dice or aggr_side or tau_tiebreak_side:
+            raise SystemExit("❌ --opponent-model schliesst --dome-dice, --aggr-side und --tau-tiebreak-side "
+                             "aus (die Exploiter-Partie hat genau einen Unterschied, das Netz).")
+        if excursion_prob > 0:
+            raise SystemExit(f"❌ --opponent-model und --excursion-prob={excursion_prob} schliessen sich "
+                             "aus (wie F8): ein Ausflug erbte die Seite nicht.")
+        if record_rtv:
+            raise SystemExit("❌ --opponent-model und --rtv schliessen sich aus: das rtv-Label ist nicht "
+                             "je Seite gebaut (Bauplan D5).")
+        opponent_model = _resolve_model_path(opponent_model, "Gegner-Modell")
+    # Doppelquelle: der Worker setzt beide Variablen immer.
+    for _env, _want in (("MOSAIC_OPPONENT_MODEL", opponent_model or ""),
+                        ("MOSAIC_RECORD_SIDES", record_sides)):
+        _have = os.environ.get(_env)
+        if _have is not None and _have != _want:
+            raise SystemExit(f"❌ {_env}={_have!r} aus Kette/Shell widerspricht den Flags "
+                             f"(--opponent-model/--record-sides -> {_want!r}); Variable entfernen.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -889,21 +1006,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # (z.B. "alphazero_s100.onnx"). Ein existierender expliziter Pfad bleibt.
         # Gilt jetzt auch für --mode mcts (siehe unten, Netz-Rundenübergangs-
         # Labels) -- nicht mehr nur für --mode network.
-        from pathlib import Path
-        # Auflösungsreihenfolge (Kurzname genügt, wie bei train.py --load):
-        # 1. wörtlicher Pfad, 2. models/<name>, 3. models/<name>.onnx,
-        # 4. models/alphazero_<name>.onnx (z.B. --model v14b_best)
-        candidates = [Path(model), MODELS_DIR / model,
-                      MODELS_DIR / f"{model}.onnx",
-                      MODELS_DIR / f"alphazero_{model}.onnx"]
-        model_path = next((p for p in candidates if p.exists()), None)
-        if model_path is None:
-            raise SystemExit(
-                f"❌ Modell nicht gefunden: '{model}' — geprüft wurden: "
-                + ", ".join(str(p) for p in candidates))
-        if str(model_path) != model:
-            print(f"🔎 Modell aufgelöst: {model} -> {model_path}")
-        model = str(model_path)
+        model = _resolve_model_path(model, "Modell")
 
     import random as _random
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -943,6 +1046,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                 "aggr_side": aggr_side, "aggr_side_w": aggr_side_w,
                 "aggr_side_lambda": aggr_side_lambda,
                 "aggr_side_eps": aggr_side_eps,
+                "tau_tiebreak_side": tau_tiebreak_side, "tau_tiebreak_q": tau_tiebreak_q,
+                "opponent_model": opponent_model, "record_sides": record_sides,
             })
     if recipe_info is not None:
         if _expected:
@@ -1026,6 +1131,16 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "aggr_side_w": aggr_side_w,
         "aggr_side_lambda": aggr_side_lambda,
         "aggr_side_eps": aggr_side_eps,
+        # par.5e1 Frage 3: die engine_config des Chunk-Prozesses meldet dazu
+        # `tau_tiebreak_side` und `tau_tiebreak_q` (Env-Wert; ein Spec-Feld geht vor).
+        "tau_tiebreak_side": tau_tiebreak_side,
+        "tau_tiebreak_q": tau_tiebreak_q,
+        # Exploiter-Gegner (par.7): Pfad des zweiten Netzes (None = aus) und der
+        # Seitenfilter; Pfad plus sha256 stehen zusaetzlich im Block
+        # `opponent_model_file` (selfplay_manifest._file_block), die engine_config
+        # des Chunk-Prozesses meldet `opponent_model` und `record_sides`.
+        "opponent_model": opponent_model,
+        "record_sides": record_sides,
     }, recipe=_recipe_block, engine_config=_worker_cfg)
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -1109,6 +1224,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"Startslot-Streuung {start_slot_status} | "
               f"Wuerfel-Kuppelplatten {dome_dice_status} | "
               f"Stoerer {aggr_side_status} | "
+              f"tau-Stichentscheid Modus {tau_tiebreak_q}"
+              f"{' nur auf einer Seite je Partie' if tau_tiebreak_side else ''} | "
+              f"Gegner-Netz {(opponent_model + ' auf einer Seite je Partie') if opponent_model else 'AUS (Standard)'}, Records {record_sides} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -1160,6 +1278,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             dome_dice_last_round=dome_dice_last_round,
             aggr_side=aggr_side, aggr_side_w=aggr_side_w, aggr_side_lambda=aggr_side_lambda,
             aggr_side_eps=aggr_side_eps,
+            tau_tiebreak_side=tau_tiebreak_side, tau_tiebreak_q=tau_tiebreak_q,
+            opponent_model=opponent_model, record_sides=record_sides,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1580,6 +1700,32 @@ if __name__ == "__main__":
                              "--aggr-side-lambda (nicht zusammen; --aggr-side-w bleibt auf dem "
                              "Default). Setzt MOSAIC_AGGR_SIDE_EPS und entfernt "
                              "MOSAIC_AGGR_SIDE_W im Worker; wirkt nur mit --aggr-side.")
+    parser.add_argument("--tau-tiebreak-q", dest="tau_tiebreak_q", type=int, default=0,
+                        choices=(0, 1, 2),
+                        help="PREREG_asymmetric_selfplay.md par.5e1: Stichentscheid der gespielten "
+                             "Aktion im tau-Zweig (ab --tau-argmax-from-move). 0 = Bestand (argmax der "
+                             "Besuche, Gleichstand erster Eintrag), 1 = Besuche, dann Q, 2 = hoechstes Q "
+                             "unter den Halving-Ueberlebenden. Policy-Ziel unberuehrt. Setzt "
+                             "MOSAIC_TAU_TIEBREAK_Q (Env-Default eines fehlenden Spec-Felds).")
+    parser.add_argument("--opponent-model", dest="opponent_model", type=str, default=None,
+                        help="PREREG_asymmetric_selfplay.md par.7 (Exploiter-Gegner): zweites ONNX-Netz. "
+                             "Je Partie spielt EINE Seite (Hash aus dem Partie-Seed) mit diesem Netz, die "
+                             "andere mit --model; jede Netzstelle nimmt das Netz ihrer Seite. Record-Felder "
+                             "opponent_side und net_label. Nur --mode network; nicht mit --dome-dice, "
+                             "--aggr-side, --tau-tiebreak-side, --excursion-prob > 0 oder --rtv. Setzt "
+                             "MOSAIC_OPPONENT_MODEL (ohne Flag leer = aus, Bestand).")
+    parser.add_argument("--record-sides", dest="record_sides", type=str, default="both",
+                        choices=("both", "primary", "opponent"),
+                        help="par.7: welche Seite Records schreibt (both = Bestand, primary = --model-Seite, "
+                             "opponent = Seite des --opponent-model). Ungleich both nur mit --opponent-model. "
+                             "Setzt MOSAIC_RECORD_SIDES.")
+    parser.add_argument("--tau-tiebreak-side", dest="tau_tiebreak_side", action="store_true",
+                        help="PREREG_asymmetric_selfplay.md par.5e1 Frage 3: der Modus aus "
+                             "--tau-tiebreak-q gilt je Partie nur fuer EINE Seite (Hash aus dem "
+                             "Partie-Seed), die andere spielt Modus 0. Record-Feld tiebreak_side auf "
+                             "jedem Record. Setzt MOSAIC_TAU_TIEBREAK_SIDE=1 (ohne Flag 0). Nur --mode "
+                             "network, verlangt Modus 1 oder 2, nicht mit --dome-dice, --aggr-side oder "
+                             "--excursion-prob > 0.")
     # Rezeptdatei: EIN zusaetzlicher Schritt statt `parser.parse_args()`. Ohne
     # --recipe ist `apply_to_parser` ein normaler parse_args (plus die zwei
     # Flags --recipe/--class), `_recipe_overrides` bleibt leer.
@@ -1665,6 +1811,10 @@ if __name__ == "__main__":
         aggr_side_w=args.aggr_side_w,
         aggr_side_lambda=args.aggr_side_lambda,
         aggr_side_eps=args.aggr_side_eps,
+        tau_tiebreak_side=args.tau_tiebreak_side,
+        tau_tiebreak_q=args.tau_tiebreak_q,
+        opponent_model=args.opponent_model,
+        record_sides=args.record_sides,
         recipe_info=(None if _RECIPE_PRE is None else
                      {"recipe": _RECIPE_PRE["recipe"], "class": _RECIPE_PRE["class"],
                       "overrides": _recipe_overrides}),

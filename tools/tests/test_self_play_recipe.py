@@ -360,6 +360,127 @@ class AsymmetricClassesGuard(unittest.TestCase):
                 self.assertLess(at, body.index(later), f"{guard} vor {later}")
 
 
+class TiebreakSideClasses(unittest.TestCase):
+    """Stichentscheid-Seite (PREREG_asymmetric_selfplay.md par.5e1 Frage 3): die Klassen
+    `policy-tb1/-tb2` in models/v35_probes2.recipe.json setzen die zwei Flags, der
+    Waechter kennt beide Knoepfe, und die Ausschluesse stehen vor Probe, Manifest und Chunk."""
+
+    PROBES2 = REPO / "models" / "v35_probes2.recipe.json"
+
+    def _parse(self, cls):
+        ns, _ = apply_to_parser(fresh_parser(), ["--recipe", str(self.PROBES2), "--class", cls],
+                                str(self.PROBES2), cls, tool="self_play")
+        return ns
+
+    def test_classes_set_the_flags(self):
+        for cls, mode, seed in (("policy-tb1", 1, 20261740), ("policy-tb2", 2, 20261741)):
+            ns = self._parse(cls)
+            self.assertEqual((ns.tau_tiebreak_side, ns.tau_tiebreak_q, ns.seed, ns.games, ns.sims),
+                             (True, mode, seed, 200, 100), cls)
+            self.assertEqual((ns.dome_dice, ns.aggr_side, ns.excursion_prob), (False, False, 0.0), cls)
+        ns = self._parse("policy-s400")
+        self.assertEqual((ns.tau_tiebreak_side, ns.tau_tiebreak_q, ns.sims), (False, 0, 400))
+
+    def test_guard_expects_both_knobs(self):
+        from tools.recipe_config import check_engine_config, expected_engine_config, load_recipe
+        recipe = load_recipe(self.PROBES2)
+        for cls, mode in (("policy-tb1", 1), ("policy-tb2", 2)):
+            want = expected_engine_config(recipe, cls)
+            self.assertEqual((want.get("tau_tiebreak_side"), want.get("tau_tiebreak_q")), (1, mode), cls)
+            self.assertTrue(check_engine_config(dict(want, tau_tiebreak_side=0), want), "Seite aus")
+            self.assertTrue(check_engine_config({k: v for k, v in want.items() if k != "tau_tiebreak_q"},
+                                                want), "altes Wheel ohne Feld")
+
+    def test_env_variables_are_reserved_for_the_flags(self):
+        reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
+        self.assertEqual(reserved.get("MOSAIC_TAU_TIEBREAK_SIDE"), "tau_tiebreak_side")
+        self.assertEqual(reserved.get("MOSAIC_TAU_TIEBREAK_Q"), "tau_tiebreak_q")
+
+    def test_guards_run_before_any_run(self):
+        text = SELF_PLAY.read_text(encoding="utf-8")
+        body = text[text.index("def generate_data("):]
+        for guard in ("if tau_tiebreak_q not in (0, 1, 2):",
+                      "if dome_dice or aggr_side:",
+                      '("MOSAIC_TAU_TIEBREAK_SIDE", "1" if tau_tiebreak_side else "0")'):
+            at = body.index(guard)
+            for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
+                          "make_chunk(n, chunk_idx"):
+                self.assertLess(at, body.index(later), f"{guard} vor {later}")
+
+
+class ExploiterClasses(unittest.TestCase):
+    """Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7, Bauplan
+    evaluations/exploiter_build_plan.md): die Klassen in models/v35_exploiter.recipe.json
+    setzen Version, Seed, Partien und den Seitenfilter; das Gegner-Netz kommt als Flag
+    (Bauplan D7) und landet ohne Override-Protokoll im Namespace; Waechter und
+    Ausschluesse stehen vor Probe, Manifest und Chunk."""
+
+    EXPLOITER = REPO / "models" / "v35_exploiter.recipe.json"
+    CYCLES = (("exploiter-c1", "x35-e00-cycle", 20261750), ("exploiter-c2", "x35-e01-cycle", 20261751),
+              ("exploiter-c3", "x35-e02-cycle", 20261752))
+
+    def _parse(self, cls, extra=()):
+        argv = ["--recipe", str(self.EXPLOITER), "--class", cls, *extra]
+        return apply_to_parser(fresh_parser(), argv, str(self.EXPLOITER), cls, tool="self_play")
+
+    def test_classes_set_the_flags(self):
+        for cls, version, seed in self.CYCLES:
+            ns, overrides = self._parse(cls, ["--opponent-model", "models/x.onnx"])
+            self.assertEqual((ns.version, ns.seed, ns.games, ns.sims, ns.record_sides),
+                             (version, seed, 1000, 100, "both"), cls)
+            self.assertEqual((ns.dome_dice, ns.aggr_side, ns.tau_tiebreak_side, ns.excursion_prob),
+                             (False, False, False, 0.0), cls)
+            self.assertEqual((ns.deviate_prob, ns.label_rng_split), (1.0, True), cls)
+            # Koordinator 2026-10-04 (par.5e3): Stichentscheid Modus 2 auf BEIDEN Seiten,
+            # also Modus gesetzt und Seitenknopf aus.
+            self.assertEqual((ns.tau_tiebreak_q, ns.tau_tiebreak_side), (2, False), cls)
+            self.assertEqual(ns.opponent_model, "models/x.onnx")
+            self.assertNotIn("opponent_model", overrides, "Flag ohne Rezeptwert ist kein Override")
+        ns, _ = self._parse("exploiter-smoke-ref")
+        self.assertIsNone(ns.opponent_model)
+        self.assertEqual((ns.games, ns.seed), (10, 20261756))
+
+    def test_without_flag_the_knobs_are_off(self):
+        ns = fresh_parser().parse_args(["--mode", "network", "--version", "v-x"])
+        self.assertEqual((ns.opponent_model, ns.record_sides), (None, "both"))
+
+    def test_record_sides_rejects_unknown_values(self):
+        with self.assertRaises(SystemExit):
+            fresh_parser().parse_args(["--mode", "network", "--version", "v-x", "--record-sides", "e"])
+
+    def test_guard_checks_record_sides_and_reference_has_no_opponent(self):
+        from tools.recipe_config import check_engine_config, expected_engine_config, load_recipe
+        recipe = load_recipe(self.EXPLOITER)
+        for cls, _v, _s in self.CYCLES:
+            want = expected_engine_config(recipe, cls)
+            self.assertEqual(want.get("record_sides"), "both", cls)
+            self.assertEqual((want.get("tau_tiebreak_q"), want.get("tau_tiebreak_side")), (2, 0), cls)
+            self.assertTrue(check_engine_config(dict(want, record_sides="opponent"), want), "Filter falsch")
+            self.assertTrue(check_engine_config({k: v for k, v in want.items() if k != "record_sides"},
+                                                want), "altes Wheel ohne Feld")
+        ref = expected_engine_config(recipe, "exploiter-smoke-ref")
+        self.assertIn("opponent_model", ref)
+        self.assertIsNone(ref["opponent_model"])
+        self.assertEqual(check_engine_config(dict(ref, opponent_model=None), ref), [])
+        self.assertTrue(check_engine_config(dict(ref, opponent_model="models/x.onnx"), ref))
+
+    def test_env_variables_are_reserved_for_the_flags(self):
+        reserved = module_literal(SELF_PLAY, "RECIPE_RESERVED_ENV")
+        self.assertEqual(reserved.get("MOSAIC_OPPONENT_MODEL"), "opponent_model")
+        self.assertEqual(reserved.get("MOSAIC_RECORD_SIDES"), "record_sides")
+
+    def test_guards_run_before_any_run(self):
+        text = SELF_PLAY.read_text(encoding="utf-8")
+        body = text[text.index("def generate_data("):]
+        for guard in ('if record_sides != "both" and not opponent_model:',
+                      "if dome_dice or aggr_side or tau_tiebreak_side:",
+                      '("MOSAIC_OPPONENT_MODEL", opponent_model or "")'):
+            at = body.index(guard)
+            for later in ("_probe_worker_engine_config(mode", "_write_run_manifest(version_name",
+                          "make_chunk(n, chunk_idx"):
+                self.assertLess(at, body.index(later), f"{guard} vor {later}")
+
+
 class WithoutRecipeUnchanged(unittest.TestCase):
     V33_LIKE = ["--mode", "network", "--model", "m.onnx", "--spec", "s.spec.json",
                 "--games", "4000", "--sims", "100", "--value-only", "--version", "v-x",
@@ -409,9 +530,12 @@ class ManifestCarriesRecipe(unittest.TestCase):
 
     def test_without_recipe_old_fields_plus_null_recipe_and_env(self):
         manifest = self._write(None)
-        self.assertEqual(set(manifest) - self.OLD_KEYS, {"recipe", "mosaic_env", "engine_config_parent"})
+        # `opponent_model_file` (par.7, Exploiter-Gegner): additiv, null ohne --opponent-model.
+        self.assertEqual(set(manifest) - self.OLD_KEYS,
+                         {"recipe", "mosaic_env", "engine_config_parent", "opponent_model_file"})
         self.assertTrue(self.OLD_KEYS <= set(manifest))
         self.assertIsNone(manifest["recipe"])
+        self.assertIsNone(manifest["opponent_model_file"])
         self.assertEqual(manifest["mosaic_env"], mosaic_env_snapshot())
         self.assertEqual(manifest["cli_args"], {"games": 1, "spec": None})
 

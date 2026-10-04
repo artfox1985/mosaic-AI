@@ -543,6 +543,60 @@ pub(crate) fn read_moon_order_search_scale_env() -> u32 {
     }
 }
 
+// ── Stichentscheid der tau-Zugwahl (MOSAIC_TAU_TIEBREAK_Q) ──────────────────
+//
+// `PREREG_asymmetric_selfplay.md` par.5e/par.5e1 (Frage 3). Wirkt NUR im
+// tau-Zweig der Self-Play-Zugwahl (`self_play::net_drafting_policy_with_own_gap`,
+// der Zweig ab `MOSAIC_TAU_ARGMAX_FROM_MOVE` bzw. ab dem Ausflug-Override): dort
+// entscheidet er, welche Aktion GESPIELT wird. Policy-Ziel (`completed_q_policy`),
+// `root_q` und `root_child_q` bleiben unberuehrt (derselbe Grundsatz wie bei
+// `MOSAIC_ACTION_TEMP`). Der Arena-Pfad (`net_search_drafting_action`, Zugwahl
+// `select_final_root_child`) betritt den tau-Zweig nie; dort ist der Knopf
+// wirkungslos.
+
+/// `0` = Bestand: `argmax_index` der Besuche, Gleichstand = ERSTER Eintrag in
+/// Kinderreihenfolge, ohne Q. Der Zweig der Modi 1/2 wird nicht betreten.
+pub const TAU_TIEBREAK_Q_DEFAULT: u8 = 0;
+/// Modus 1: argmax der Besuche, Gleichstand nach Q gebrochen -- dieselbe
+/// Ordnung wie der `deterministic`-Zweig (`self_play::visits_then_q_index`).
+pub const TAU_TIEBREAK_Q_VISITS_THEN_Q: u8 = 1;
+/// Modus 2: unter den Halving-Ueberlebenden (`visits > 0 && visits >= n_min`,
+/// [`RootOwnStats`]) das hoechste Q; ohne Ueberlebende Rueckfall auf Modus 1.
+pub const TAU_TIEBREAK_Q_SURVIVORS: u8 = 2;
+
+/// Gueltigkeitspruefung des Env-Textes: `0`, `1` oder `2` (getrimmt), leer =
+/// Default. `None` = ungueltig. Reine Funktion, damit sie ohne Prozess-Umgebung
+/// testbar ist.
+pub(crate) fn sanitize_tau_tiebreak_q(raw: &str) -> Option<u8> {
+    let t = raw.trim();
+    if t.is_empty() {
+        return Some(TAU_TIEBREAK_Q_DEFAULT);
+    }
+    t.parse::<u8>().ok().filter(|v| *v <= TAU_TIEBREAK_Q_SURVIVORS)
+}
+
+/// `MOSAIC_TAU_TIEBREAK_Q` (par.5e1). Ungueltig -> Default plus einmalige
+/// Warnung, gleiche Disziplin wie [`read_moon_order_search_scale_env`]. Kein
+/// OnceLock-Cache: `SearchConfig::from_env` liest je Agent-Konstruktion frisch.
+pub(crate) fn read_tau_tiebreak_q_env() -> u8 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_TAU_TIEBREAK_Q") else {
+        return TAU_TIEBREAK_Q_DEFAULT;
+    };
+    match sanitize_tau_tiebreak_q(&raw) {
+        Some(v) => v,
+        None => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "WARNUNG: MOSAIC_TAU_TIEBREAK_Q={raw:?} ungueltig (0, 1 oder 2) -- \
+                     {TAU_TIEBREAK_Q_DEFAULT} gilt."
+                );
+            });
+            TAU_TIEBREAK_Q_DEFAULT
+        }
+    }
+}
+
 // ── Variante B: Rundenuebergang im Suchblatt (MOSAIC_ROUND_TRANSITION_LEAF) ──
 //
 // `PREREG_round_transition_search_sampling.md` par.9 (fuer v29 eingetaktet),
@@ -1105,6 +1159,18 @@ pub struct SearchConfig {
     /// par.11 Weg C3: Budget der Nachsuche mit der Rundenrestlaenge gewichten
     /// (0 = aus/Bestand, 1 = an). Siehe [`moon_order_scale_factor`].
     pub moon_order_search_scale: u32,
+    /// Stichentscheid der tau-Zugwahl im Self-Play (`PREREG_asymmetric_
+    /// selfplay.md` par.5e1): [`TAU_TIEBREAK_Q_DEFAULT`] = Bestand,
+    /// [`TAU_TIEBREAK_Q_VISITS_THEN_Q`], [`TAU_TIEBREAK_Q_SURVIVORS`]. Aendert
+    /// nur die gespielte Aktion, nie das Policy-Ziel; die Suche selbst liest das
+    /// Feld nicht. Einzige Nebenwirkung von Modus 2: die Wurzelstatistik
+    /// [`RootOwnStats`] wird ausgelesen (reines Auslesen, kein RNG, kein Netz).
+    ///
+    /// Spec-Feld je Seite (`tau_tiebreak_q`, OPTIONAL; fehlt es, gilt der
+    /// Env-Default `MOSAIC_TAU_TIEBREAK_Q`, ungesetzt [`TAU_TIEBREAK_Q_DEFAULT`]).
+    /// Im Self-Play kann `self_play::tiebreak_side_configs` den Modus je Seite
+    /// auf 0 setzen (`MOSAIC_TAU_TIEBREAK_SIDE`).
+    pub tau_tiebreak_q: u8,
     /// Variante B des Rundenuebergangs (`PREREG_round_transition_search_
     /// sampling.md` par.9): `0` = aus, Bestand und bitidentisch;
     /// [`ROUND_TRANSITION_LEAF_ON`] = am pseudo-terminalen Blatt der Runden 1-4
@@ -1435,6 +1501,7 @@ impl SearchConfig {
             moon_order_variants: read_moon_order_variants_env(),
             moon_order_search_sims: read_moon_order_search_sims_env(),
             moon_order_search_scale: read_moon_order_search_scale_env(),
+            tau_tiebreak_q: read_tau_tiebreak_q_env(),
             round_transition_leaf: read_round_transition_leaf_env(),
             // Kein Env-Knopf und kein Spec-Feld: der Kontext entsteht erst an
             // der Wurzel einer Suche (`with_round_transition_leaf_context`).
@@ -1514,6 +1581,8 @@ impl SearchConfig {
             "moon_order_variants",
             "moon_order_search_sims",
             "moon_order_search_scale",
+            // PREREG_asymmetric_selfplay.md par.5e1: Stichentscheid der tau-Zugwahl.
+            "tau_tiebreak_q",
             "round_transition_leaf",
             "net_tiling_tiebreak",
             "single_pass_other_val",
@@ -1811,6 +1880,30 @@ impl SearchConfig {
                 x as u32
             }
         };
+        // par.5e1 (`PREREG_asymmetric_selfplay.md`): OPTIONAL. Fehlt das Feld, gilt
+        // der ENV-DEFAULT (`MOSAIC_TAU_TIEBREAK_Q`, Muster `r5_net_solver` unten),
+        // nicht eine feste Konstante: die Sonden-Klassen `policy-tb1/-tb2` setzen
+        // den Modus ueber den Erzeugungs-Worker, waehrend die Spec der Erzeugung
+        // fest bleibt -- eine Konstante liesse ihn dort still verpuffen, und die
+        // `engine_config` (Env-Wert) behauptete einen Modus, der nie spielte. Bei
+        // ungesetzter Variable ist das der Bestand 0, jede eingefrorene Spec tut
+        // also weiter dasselbe. Ein Wert ausser 0/1/2 ist hier ein HARTER Fehler
+        // (Spec-Disziplin wie bei `moon_order_search_scale`); die Warnung mit
+        // Rueckfall gilt nur fuer die Umgebung (`read_tau_tiebreak_q_env`).
+        let tau_tiebreak_q = match obj.get("tau_tiebreak_q") {
+            None => read_tau_tiebreak_q_env(),
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'tau_tiebreak_q' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=f64::from(TAU_TIEBREAK_Q_SURVIVORS)).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'tau_tiebreak_q' muss 0, 1 oder 2 sein, ist {x}"
+                    ));
+                }
+                x as u8
+            }
+        };
         // Variante B (`PREREG_round_transition_search_sampling.md` par.9):
         // OPTIONAL mit Default 0, damit jede eingefrorene Spec weiter laedt UND
         // weiter bitgenau dasselbe beschreibt, was sie schon immer beschrieben
@@ -2058,6 +2151,7 @@ impl SearchConfig {
             moon_order_variants,
             moon_order_search_sims,
             moon_order_search_scale,
+            tau_tiebreak_q,
             round_transition_leaf,
             round_transition_leaf_ctx: None,
             net_tiling_tiebreak,
@@ -7955,7 +8049,8 @@ fn root_own_stats(nodes: &[Node]) -> RootOwnStats {
 
 /// Wie [`net_root_child_stats_policy_and_prior`], liefert ZUSAETZLICH als
 /// sechstes Element die Eigenwert-Statistik der Wurzel ([`RootOwnStats`]) --
-/// NUR bei gesetztem Seiten-Blend (`search_config.aggr_player`, Klasse S) und
+/// NUR bei gesetztem Seiten-Blend (`search_config.aggr_player`, Klasse S) oder
+/// bei `tau_tiebreak_q == `[`TAU_TIEBREAK_Q_SURVIVORS`] (par.5e1), und
 /// nur aus einer EINZELWELT-Suche (Bestand `NUM_DETERMINIZATIONS = 1`); im
 /// Runde-5-Loeser-Zweig und im Mehrwelten-Wald `None` (kein einzelner Baum,
 /// dessen Halving-Stufe die Schwelle definiert). Keine zusaetzliche Rechnung
@@ -8027,7 +8122,13 @@ pub(crate) fn net_root_child_stats_policy_prior_and_own<R: Rng + ?Sized>(
             build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None, search_config);
         let root_visits = nodes[0].visits.max(1) as f64;
         let root_q = Some(nodes[0].value / root_visits);
-        let own = search_config.aggr_player.map(|_| root_own_stats(&nodes));
+        // par.5e1: Modus 2 des tau-Stichentscheids braucht die Halving-
+        // Ueberlebenden auch OHNE Seiten-Blend. Reines Auslesen; die Aufrufer
+        // geben `own_q_gap` und die Stoerer-Wahl weiter nur bei gesetztem
+        // `aggr_player` heraus (`self_play::net_drafting_policy_with_own_gap`).
+        let own = (search_config.aggr_player.is_some()
+            || search_config.tau_tiebreak_q == TAU_TIEBREAK_Q_SURVIVORS)
+            .then(|| root_own_stats(&nodes));
         return (
             root_child_stats_from_nodes(&nodes),
             root_completed_q_policy(&nodes),
@@ -10399,6 +10500,7 @@ mod tests {
             // braucht.
             moon_order_search_sims: MOON_ORDER_SEARCH_SIMS_DEFAULT,
             moon_order_search_scale: MOON_ORDER_SEARCH_SCALE_DEFAULT,
+            tau_tiebreak_q: TAU_TIEBREAK_Q_DEFAULT,
             round_transition_leaf: ROUND_TRANSITION_LEAF_DEFAULT,
             round_transition_leaf_ctx: None,
             // ZWEITE AUSNAHME von "nichts ist an" (wie `moon_order_variants`
@@ -10613,6 +10715,56 @@ mod tests {
             .expect_err("2 muss hart abgewiesen werden");
         std::fs::remove_file(&p_bad).ok();
         assert!(msg.contains("round_transition_leaf"), "Fehlermeldung nennt das Feld: {msg}");
+    }
+
+    /// par.5e1 (`PREREG_asymmetric_selfplay.md`): eine Spec OHNE
+    /// `tau_tiebreak_q` laedt weiter und nimmt den Env-Default, im Testprozess
+    /// (ohne `MOSAIC_TAU_TIEBREAK_Q`) also den Bestand 0; 1 und 2 kommen an;
+    /// 3, 1.5 und Text sind harte Fehler.
+    #[test]
+    fn search_config_spec_tau_tiebreak_q_is_optional_and_validated() {
+        let dir = std::env::temp_dir();
+        let write = |tag: &str, extra: &str| {
+            let path = dir.join(format!("mosaic_test_spec_tautb_{tag}_{}.json", std::process::id()));
+            std::fs::write(&path, format!("{{{SPEC_MIN_FIELDS}{extra}}}")).unwrap();
+            path
+        };
+        let p_missing = write("missing", "");
+        let cfg = SearchConfig::from_spec_file(p_missing.to_str().unwrap())
+            .expect("eine Spec ohne das Feld muss weiter laden");
+        std::fs::remove_file(&p_missing).ok();
+        assert_eq!(cfg.tau_tiebreak_q, TAU_TIEBREAK_Q_DEFAULT);
+        assert_eq!(cfg.tau_tiebreak_q, 0, "der Default IST der Bestand");
+        for (tag, v) in [("one", TAU_TIEBREAK_Q_VISITS_THEN_Q), ("two", TAU_TIEBREAK_Q_SURVIVORS)] {
+            let p = write(tag, &format!(r#", "tau_tiebreak_q": {v}"#));
+            let c = SearchConfig::from_spec_file(p.to_str().unwrap()).expect("1 und 2 sind gueltig");
+            std::fs::remove_file(&p).ok();
+            assert_eq!(c.tau_tiebreak_q, v);
+        }
+        for (tag, extra) in [
+            ("three", r#", "tau_tiebreak_q": 3"#),
+            ("frac", r#", "tau_tiebreak_q": 1.5"#),
+            ("text", r#", "tau_tiebreak_q": "x""#),
+        ] {
+            let p = write(tag, extra);
+            let msg = SearchConfig::from_spec_file(p.to_str().unwrap()).expect_err("muss hart abgewiesen werden");
+            std::fs::remove_file(&p).ok();
+            assert!(msg.contains("tau_tiebreak_q"), "Fehlermeldung nennt das Feld: {msg}");
+        }
+    }
+
+    /// Env-Text des Knopfs: 0/1/2 (auch mit Leerraum), leer = Default, alles
+    /// andere ungueltig (der Leser faellt dann mit Warnung auf 0 zurueck).
+    #[test]
+    fn tau_tiebreak_q_env_text_is_sanitized() {
+        assert_eq!(sanitize_tau_tiebreak_q(""), Some(0));
+        assert_eq!(sanitize_tau_tiebreak_q(" 0 "), Some(0));
+        assert_eq!(sanitize_tau_tiebreak_q("1"), Some(1));
+        assert_eq!(sanitize_tau_tiebreak_q("2"), Some(2));
+        assert_eq!(sanitize_tau_tiebreak_q("3"), None);
+        assert_eq!(sanitize_tau_tiebreak_q("-1"), None);
+        assert_eq!(sanitize_tau_tiebreak_q("1.0"), None);
+        assert_eq!(sanitize_tau_tiebreak_q("ja"), None);
     }
 
     /// Tor (c) des Knopf-Auftrags zu `net_tiling_tiebreak`

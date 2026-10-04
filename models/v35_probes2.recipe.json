@@ -1,0 +1,79 @@
+{
+  "recipe_version": 1,
+  "tool": "self_play",
+  "description": "Vortest policy-s400 (evaluations/PREREG_asymmetric_selfplay.md, Auftrag 2026-10-04): Sockel G gegen G wie die Klasse policy aus models/v35_probes.recipe.json, aber mit 400 Sims; Vergleich der Policy-Diskrepanz KL(Ziel||Prior) gegen probe-v35-policy (100 Sims, gleicher Seed). Dazu par.5e1 Frage 3 (GEAENDERT): policy-tb1/-tb2, asymmetrisches Self-Play mit dem tau-Stichentscheid auf einer Seite je Partie (Seitenknopf MOSAIC_TAU_TIEBREAK_SIDE ueber --tau-tiebreak-side, Modus ueber --tau-tiebreak-q). Eigene Datei, weil ein laufender Lauf v35_probes.recipe.json liest. Datenordner MOSAIC_DATA_DIR=data/probe_asym. Generator, Spec und Env wie models/v35.recipe.json (v34-b01, R5 per Netz @400, Spiegelknopf, E1).",
+  "common": {
+    "mode": "network",
+    "model": "models/alphazero_v34-b01_brierbest.onnx",
+    "spec": "models/v35_generation.spec.json",
+    "games": 100,
+    "sims": 100,
+    "threads": 11,
+    "chunk": 10,
+    "per_file": 10,
+    "return_order_random_p": 0.81,
+    "tau_argmax_from_move": 1,
+    "start_slot_random_p": 0.15,
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true
+  },
+  "env": {
+    "MOSAIC_STACK_DRAW_RESEARCH": "1",
+    "MOSAIC_SINGLE_PASS_OTHER_VAL": "1",
+    "MOSAIC_R5_NET_SOLVER": "0"
+  },
+  "classes": {
+    "policy-s400": {
+      "description": "Wie policy (Sockel G gegen G, Weg C, Seed 20261720), aber 400 Sims je Drafting-Suche.",
+      "version": "probe-v35-policy-s400",
+      "seed": 20261720,
+      "sims": 400,
+      "deviate_prob": 1.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0
+      }
+    },
+    "policy-tb1": {
+      "description": "par.5e1 Frage 3 (GEAENDERT): wie policy, aber je Partie spielt EINE Seite (tiebreak_side, Hash aus dem Partie-Seed) den tau-Stichentscheid Modus 1 (Besuche, dann Q), die andere den Bestand (Modus 0). 200 Partien.",
+      "version": "probe-v35-policy-tb1",
+      "seed": 20261740,
+      "games": 200,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_side": true,
+      "tau_tiebreak_q": 1,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 1,
+        "tau_tiebreak_q": 1
+      }
+    },
+    "policy-tb2": {
+      "description": "par.5e1 Frage 3 (GEAENDERT): wie policy-tb1, aber Modus 2 (hoechstes Q unter den Halving-Ueberlebenden) auf der markierten Seite. 200 Partien.",
+      "version": "probe-v35-policy-tb2",
+      "seed": 20261741,
+      "games": 200,
+      "deviate_prob": 1.0,
+      "tau_tiebreak_side": true,
+      "tau_tiebreak_q": 2,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 1,
+        "tau_tiebreak_q": 2
+      }
+    }
+  },
+  "expect_engine_config": {
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true,
+    "single_pass_other_val": true,
+    "r5_net_solver": false
+  }
+}

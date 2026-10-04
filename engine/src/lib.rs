@@ -906,6 +906,18 @@ fn engine_config_json() -> String {
         // unterscheiden.
         "moon_order_search_sims": crate::net_mcts::SearchConfig::from_env().moon_order_search_sims,
         "moon_order_search_scale": crate::net_mcts::SearchConfig::from_env().moon_order_search_scale,
+        // PREREG_asymmetric_selfplay.md par.5e1: Stichentscheid der tau-Zugwahl
+        // (0 = Bestand). Aendert die GESPIELTEN Zuege der Erzeugung, darum im
+        // Manifest; Env-Default der Seiten ohne Spec-Feld, wie der Knopf darueber.
+        "tau_tiebreak_q": crate::net_mcts::SearchConfig::from_env().tau_tiebreak_q,
+        // par.5e1 Frage 3: Seitenknopf (eine Seite je Partie mit dem Modus darueber,
+        // Record-Feld `tiebreak_side`). Als Zahl wie `excursion_kl_weight`.
+        "tau_tiebreak_side": u8::from(crate::self_play::tau_tiebreak_side_enabled()),
+        // PREREG_asymmetric_selfplay.md par.7 (Exploiter-Gegner): Pfad des
+        // zweiten Netzes, wie gesetzt (null = aus), und der Seitenfilter der
+        // Records (null = ungueltiger Wert; run_net_self_play lehnt dann ab).
+        "opponent_model": crate::self_play::opponent_model_path(),
+        "record_sides": crate::self_play::record_sides().ok().map(|s| s.as_str()),
         // PREREG_round_transition_search_sampling.md par.9: Variante B des
         // Rundenuebergangs (Tiling im Suchblatt, EINE Neubefuellung). Gehoert aus
         // demselben Grund ins Manifest wie die Knoepfe darueber -- er aendert die
@@ -2767,6 +2779,9 @@ mod contract_stamp_tests {
             parsed["num_planes_channels"].as_u64(),
             Some(crate::features::NUM_PLANES_CHANNELS as u64)
         );
+        // par.7: Exploiter-Knoepfe im Testprozess aus (Bestand).
+        assert!(parsed["opponent_model"].is_null());
+        assert_eq!(parsed["record_sides"].as_str(), Some("both"));
     }
 }
 

@@ -568,6 +568,61 @@ fn argmax_index(weights: &[f64]) -> usize {
     best_i
 }
 
+/// Zugwahl "Besuche, dann Q": `max_by` ueber `(visits, Q)` (Fund 2, B2,
+/// Vollaudit 2026-07-21, gleiches Muster wie `net_mcts::best_root_child`). Bei
+/// vollem Gleichstand (gleiche Besuche UND gleiches Q) gewinnt der LETZTE
+/// Eintrag (Eigenschaft von `Iterator::max_by`). Einzige Quelle fuer den
+/// `deterministic`-Zweig und fuer Modus 1 des tau-Stichentscheids
+/// (`PREREG_asymmetric_selfplay.md` par.5e1), damit beide nicht auseinanderlaufen.
+/// Leeres `stats` -> `0`.
+fn visits_then_q_index(stats: &[(Action, u32, f64)]) -> usize {
+    stats
+        .iter()
+        .enumerate()
+        .max_by(|(_, (_, v1, q1)), (_, (_, v2, q2))| {
+            v1.cmp(v2).then(q1.partial_cmp(q2).unwrap_or(std::cmp::Ordering::Equal))
+        })
+        .map(|(i, _)| i)
+        .unwrap_or(0)
+}
+
+/// Modus 2 des tau-Stichentscheids (par.5e1): unter den Halving-Ueberlebenden
+/// (`own.children` mit `visits > 0 && visits >= own.n_min`, dieselbe Menge wie
+/// `RootOwnStats::own_q_gap`) das Kind mit dem hoechsten Q (`Q_own`, ohne
+/// Seiten-Blend gleich dem Such-Q); Gleichstand: mehr Besuche, dann der
+/// fruehere Eintrag. Rueckgabe = Index in `stats` (Suche ueber die Aktion).
+/// `None` ohne Wurzelstatistik (Runde-5-Loeser, Mehrwelten-Wald), ohne
+/// Ueberlebende oder wenn die Aktion nicht in `stats` steht.
+fn survivor_best_q_index(
+    stats: &[(Action, u32, f64)],
+    own: Option<&crate::net_mcts::RootOwnStats>,
+) -> Option<usize> {
+    let own = own?;
+    let best = own
+        .children
+        .iter()
+        .filter(|(_, v, _, _)| *v > 0 && *v >= own.n_min)
+        .reduce(|b, c| if c.2 > b.2 || (c.2 == b.2 && c.1 > b.1) { c } else { b })?;
+    stats.iter().position(|(a, _, _)| *a == best.0)
+}
+
+/// Index der GESPIELTEN Aktion im tau-Zweig fuer die Modi 1 und 2 von
+/// `SearchConfig::tau_tiebreak_q` (par.5e1). Modus 0 ruft diese Funktion NICHT
+/// (Bestand bleibt `argmax_index`). Modus 2 faellt ohne Ueberlebende auf Modus 1
+/// zurueck. Kein RNG, kein Netz.
+fn tau_tiebreak_index(
+    stats: &[(Action, u32, f64)],
+    own: Option<&crate::net_mcts::RootOwnStats>,
+    mode: u8,
+) -> usize {
+    if mode == crate::net_mcts::TAU_TIEBREAK_Q_SURVIVORS {
+        if let Some(i) = survivor_best_q_index(stats, own) {
+            return i;
+        }
+    }
+    visits_then_q_index(stats)
+}
+
 /// Aktionsabhaengige Temperatur `T(n)` der Zugwahl: je weniger legale
 /// Aktionen zur Wahl stehen, desto schaerfer wird gesampelt. Port von
 /// `self_play.py:172`; `n` ist die Zahl der LEGALEN AKTIONEN
@@ -3810,6 +3865,287 @@ pub(crate) fn side_search_configs(
     (base, [agent(0), agent(1)])
 }
 
+// ── Stichentscheid-Seite (PREREG_asymmetric_selfplay.md par.5e1 Frage 3) ─────
+//
+// Asymmetrisches Self-Play statt Arena (die Arena betritt den tau-Zweig nie,
+// par.5e1 "GEAENDERT"): bei `MOSAIC_TAU_TIEBREAK_SIDE=1` spielt je Partie EINE
+// Seite mit dem `tau_tiebreak_q`-Modus der Spec bzw. Umgebung, die andere mit
+// Modus 0 (Bestand). Seite = Hash aus `game_seed` (Muster [`aggr_side_for`]);
+// der Partie-RNG wird weder bei AUS noch bei AN beruehrt. Jeder Record einer
+// solchen Partie traegt `tiebreak_side`. Knopf AUS (Default): keine Seitenwahl,
+// keine Config-Aenderung, kein Feld. Nicht zusammen mit Klasse W, Klasse S oder
+// Ausfluegen (`tiebreak_side_conflict`).
+
+/// Strom der Stichentscheid-Seitenwahl. Eigener Wert, Pruefung in
+/// `dome_dice_distinguishers_are_unique`.
+pub(crate) const TIEBREAK_SIDE_DISTINGUISHER: u64 = 0x71E8_5EED_B4EA_C0DE;
+
+/// Erzeugungsknopf `MOSAIC_TAU_TIEBREAK_SIDE` (0/1, Default 0 = Bestand).
+/// Ungueltig -> AUS mit EINMALIGER Warnung (Parser wie `MOSAIC_AGGR_SIDE`).
+pub(crate) fn tau_tiebreak_side_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_TAU_TIEBREAK_SIDE") {
+        Err(_) => false,
+        Ok(raw) => parse_aggr_side_flag(&raw).unwrap_or_else(|| {
+            eprintln!("WARNUNG: MOSAIC_TAU_TIEBREAK_SIDE={raw:?} ist weder 0 noch 1 -- Seitenknopf bleibt AUS.");
+            false
+        }),
+    })
+}
+
+/// Welche Seite (0/1) spielt in DIESER Partie mit dem Stichentscheid-Modus?
+/// Hash aus `game_seed ^ TIEBREAK_SIDE_DISTINGUISHER`, 50:50 ueber die Seeds.
+pub(crate) fn tiebreak_side_for(game_seed: u64) -> usize {
+    let w = crate::net_mcts::game_weight_from_seed(game_seed ^ TIEBREAK_SIDE_DISTINGUISHER, 1.0);
+    usize::from(w >= 0.5)
+}
+
+/// Seitenzuordnung des Stichentscheids (reine Funktion). `enabled = false`:
+/// Identitaet (Bestand). `enabled = true`: der Modus kommt aus `base`
+/// (Spec bzw. `MOSAIC_TAU_TIEBREAK_Q`); Basis und alle Agenten bekommen Modus
+/// 0, nur der Agent der Seite `side` den Modus. `side = None` bei `enabled`
+/// (kein Seitenwurf in dieser Partie) laesst beide Agenten auf 0.
+pub(crate) fn tiebreak_side_configs(
+    base: SearchConfig,
+    agents: [SearchConfig; 2],
+    enabled: bool,
+    side: Option<usize>,
+) -> (SearchConfig, [SearchConfig; 2]) {
+    if !enabled {
+        return (base, agents);
+    }
+    let mode = base.tau_tiebreak_q;
+    let with = |c: SearchConfig, m: u8| SearchConfig { tau_tiebreak_q: m, ..c };
+    let off = crate::net_mcts::TAU_TIEBREAK_Q_DEFAULT;
+    let agent = |p: usize| with(agents[p], if side == Some(p) { mode } else { off });
+    (with(base, off), [agent(0), agent(1)])
+}
+
+/// Verbotene Kombinationen des Seitenknopfs, VOR dem Lauf geprueft (reine
+/// Funktion). `None` = in Ordnung. Ein Seitenlauf mit Modus 0 waere ein falsch
+/// etikettierter Korpus (Feld da, kein Unterschied); W, S und Ausflug wuerden
+/// den Vergleich der beiden Seiten konfundieren bzw. die Seite nicht erben.
+pub(crate) fn tiebreak_side_conflict(
+    enabled: bool,
+    mode: u8,
+    dome_dice: bool,
+    aggr_side: bool,
+    excursion: bool,
+) -> Option<String> {
+    if !enabled {
+        return None;
+    }
+    if mode == crate::net_mcts::TAU_TIEBREAK_Q_DEFAULT {
+        return Some(
+            "MOSAIC_TAU_TIEBREAK_SIDE=1 verlangt einen Stichentscheid-Modus 1 oder 2 \
+             (MOSAIC_TAU_TIEBREAK_Q bzw. Spec-Feld tau_tiebreak_q); mit 0 waeren beide Seiten gleich \
+             (PREREG_asymmetric_selfplay.md par.5e1)"
+                .into(),
+        );
+    }
+    if dome_dice || aggr_side {
+        return Some(
+            "MOSAIC_TAU_TIEBREAK_SIDE=1 schliesst MOSAIC_DOME_DICE=1 und MOSAIC_AGGR_SIDE=1 aus: \
+             par.5e1 misst G gegen G mit nur einem Unterschied"
+                .into(),
+        );
+    }
+    if excursion {
+        return Some(
+            "MOSAIC_TAU_TIEBREAK_SIDE=1 und MOSAIC_EXCURSION_PROB > 0 schliessen sich aus (wie F8): \
+             ein Ausflug erbte die Seite nicht"
+                .into(),
+        );
+    }
+    None
+}
+
+// ── Exploiter-Gegner: zwei Netze je Partie (PREREG_asymmetric_selfplay.md par.7) ──
+//
+// Bei gesetztem `MOSAIC_OPPONENT_MODEL` spielt je Partie EINE Seite mit dem
+// Gegner-Netz (E), die andere mit dem `--model`-Netz (G). Seite = Hash aus dem
+// Partie-Seed (Muster [`tiebreak_side_for`]); der Partie-RNG wird weder bei AUS
+// noch bei AN beruehrt (Bauplan evaluations/exploiter_build_plan.md D2). Jede
+// Stelle, an der die Partie ein Netz befragt (Drafting-Suche inkl. Runde 5,
+// Startsetzung, Tiling, Rueckgabe-Reihenfolge, Weg C, Bootstrap-Label), nimmt
+// das Netz der Seite, um die es geht (Bauplan 2b). Jeder Record traegt
+// `opponent_side` und `net_label`; `MOSAIC_RECORD_SIDES` waehlt, welche Seite
+// Records schreibt. Knopf AUS (Default): kein zweites Netz, keine Seitenwahl,
+// kein Feld, kein Filter.
+
+/// Strom der Exploiter-Seitenwahl. Eigener Wert, Pruefung in
+/// `dome_dice_distinguishers_are_unique`.
+pub(crate) const OPPONENT_SIDE_DISTINGUISHER: u64 = 0x0E8F_101E_5EED_51DE;
+
+/// Welche Seite eines Laufs schreibt Records (`MOSAIC_RECORD_SIDES`)?
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RecordSides {
+    /// Beide Seiten (Default, Bestand).
+    Both,
+    /// Nur die `--model`-Seite.
+    Primary,
+    /// Nur die Gegner-Netz-Seite.
+    Opponent,
+}
+
+impl RecordSides {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            RecordSides::Both => "both",
+            RecordSides::Primary => "primary",
+            RecordSides::Opponent => "opponent",
+        }
+    }
+}
+
+/// Parser fuer `MOSAIC_RECORD_SIDES` (getrimmt, leer = `both`). Unbekannt ->
+/// `None`; der Lauf lehnt dann ab ([`record_sides`]), statt still beide Seiten
+/// zu schreiben.
+pub(crate) fn parse_record_sides(raw: &str) -> Option<RecordSides> {
+    match raw.trim() {
+        "" | "both" => Some(RecordSides::Both),
+        "primary" => Some(RecordSides::Primary),
+        "opponent" => Some(RecordSides::Opponent),
+        _ => None,
+    }
+}
+
+/// `MOSAIC_RECORD_SIDES` (OnceLock, Variable VOR dem ersten Lesen setzen).
+/// Ungesetzt = `both`; ungueltig = `Err` (run_net_self_play lehnt ab).
+pub(crate) fn record_sides() -> Result<RecordSides, String> {
+    static CELL: std::sync::OnceLock<Result<RecordSides, String>> = std::sync::OnceLock::new();
+    CELL.get_or_init(|| match std::env::var("MOSAIC_RECORD_SIDES") {
+        Err(_) => Ok(RecordSides::Both),
+        Ok(raw) => parse_record_sides(&raw).ok_or_else(|| {
+            format!("MOSAIC_RECORD_SIDES={raw:?} ist weder both, primary noch opponent")
+        }),
+    })
+    .clone()
+}
+
+/// `MOSAIC_OPPONENT_MODEL` (OnceLock): Pfad des Gegner-Netzes, leer oder
+/// ungesetzt = `None` (Knopf aus, Bestand).
+pub(crate) fn opponent_model_path() -> Option<String> {
+    static CELL: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    CELL.get_or_init(|| {
+        std::env::var("MOSAIC_OPPONENT_MODEL")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    })
+    .clone()
+}
+
+/// Welche Seite (0/1) spielt in DIESER Partie das Gegner-Netz? Hash aus
+/// `game_seed ^ OPPONENT_SIDE_DISTINGUISHER`, 50:50 ueber die Seeds.
+pub(crate) fn opponent_side_for(game_seed: u64) -> usize {
+    let w = crate::net_mcts::game_weight_from_seed(game_seed ^ OPPONENT_SIDE_DISTINGUISHER, 1.0);
+    usize::from(w >= 0.5)
+}
+
+/// Netz (oder beliebiger Wert) je Spielerindex: ohne Gegner beide `primary`,
+/// mit Gegner `(side, opp)` die Seite `side` mit `opp`. Generisch, damit die
+/// Zuordnung ohne Netz testbar ist.
+pub(crate) fn side_assign<T: Copy>(primary: T, opponent: Option<(usize, T)>) -> [T; 2] {
+    let mut out = [primary, primary];
+    if let Some((side, opp)) = opponent {
+        out[side] = opp;
+    }
+    out
+}
+
+/// `net_label` eines Records von Spieler `player` bei Gegner-Seite `opponent_side`.
+pub(crate) fn net_label_for(player: usize, opponent_side: usize) -> &'static str {
+    if player == opponent_side {
+        "opponent"
+    } else {
+        "primary"
+    }
+}
+
+/// Bleibt ein Record von Spieler `player` unter dem Seitenfilter stehen?
+pub(crate) fn record_keep(player: usize, opponent_side: usize, sides: RecordSides) -> bool {
+    match sides {
+        RecordSides::Both => true,
+        RecordSides::Opponent => player == opponent_side,
+        RecordSides::Primary => player != opponent_side,
+    }
+}
+
+/// Seitenfilter auf die Records EINER Partie. Ein Record ohne `player` ist ein
+/// Programmfehler (jeder Record-Typ schreibt das Feld) -> panic; der Watchdog
+/// faengt das als Panic und verwirft die Partie gezaehlt, statt still einen
+/// Record falscher Seite durchzulassen oder zu verlieren.
+pub(crate) fn filter_record_sides(records: Vec<Value>, opponent_side: usize, sides: RecordSides) -> Vec<Value> {
+    if sides == RecordSides::Both {
+        return records;
+    }
+    records
+        .into_iter()
+        .filter(|r| {
+            let player = r
+                .get("player")
+                .and_then(|p| p.as_u64())
+                .unwrap_or_else(|| panic!("Record ohne `player` im Seitenfilter: {r}"));
+            record_keep(player as usize, opponent_side, sides)
+        })
+        .collect()
+}
+
+/// Verbotene Kombinationen des Gegner-Netzes, VOR dem Lauf geprueft (reine
+/// Funktion, Bauplan D5). `None` = in Ordnung.
+pub(crate) fn opponent_conflict(
+    opponent: bool,
+    sides: RecordSides,
+    dome_dice: bool,
+    aggr_side: bool,
+    tiebreak_side: bool,
+    excursion: bool,
+    record_rtv: bool,
+) -> Option<String> {
+    if !opponent {
+        if sides != RecordSides::Both {
+            return Some(format!(
+                "MOSAIC_RECORD_SIDES={} verlangt MOSAIC_OPPONENT_MODEL: ohne Gegner-Netz gibt es keine \
+                 Seiten zu filtern (PREREG_asymmetric_selfplay.md par.7)",
+                sides.as_str()
+            ));
+        }
+        return None;
+    }
+    if dome_dice || aggr_side || tiebreak_side {
+        return Some(
+            "MOSAIC_OPPONENT_MODEL schliesst MOSAIC_DOME_DICE=1, MOSAIC_AGGR_SIDE=1 und \
+             MOSAIC_TAU_TIEBREAK_SIDE=1 aus: die Exploiter-Partie hat genau einen Unterschied, das Netz \
+             (PREREG_asymmetric_selfplay.md par.7)"
+                .into(),
+        );
+    }
+    if excursion {
+        return Some(
+            "MOSAIC_OPPONENT_MODEL und MOSAIC_EXCURSION_PROB > 0 schliessen sich aus (wie F8): \
+             ein Ausflug erbte die Seite nicht"
+                .into(),
+        );
+    }
+    if record_rtv {
+        return Some(
+            "MOSAIC_OPPONENT_MODEL und record_rtv schliessen sich aus: das rtv-Label ist nicht je Seite \
+             gebaut (evaluations/exploiter_build_plan.md D5)"
+                .into(),
+        );
+    }
+    None
+}
+
+/// Gegner-Netz EINER Partie: Netz, Seite, Seitenfilter.
+#[derive(Clone, Copy)]
+pub(crate) struct OpponentConfig<'n> {
+    pub net: &'n Net,
+    pub side: usize,
+    pub record_sides: RecordSides,
+}
+
 // ── Weg C: Abweichungsregel der Self-Play-Erzeugung ──────────────────────────
 //
 // `PREREG_start_position_seeding.md` par.9c (Quelle: KataGo, Wu 2019,
@@ -5047,6 +5383,22 @@ struct LabelSamplingConfig<'n> {
     net: &'n Net,
     record_rtv: bool,
     profiled: bool,
+    /// Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7, Bauplan D4):
+    /// `Some` = die Records der Gegner-Seite (`GameLoopConfig::opponent_side`) bekommen ein EIGENES
+    /// Bootstrap-Label aus dem Netz dieser Seite. `None` = Bestand (EIN Label je
+    /// Runde fuer beide Seiten aus `net`).
+    opponent: Option<OpponentLabels<'n>>,
+}
+
+/// Bootstrap-Label der Gegner-Netz-Seite. Zieht IMMER aus dem abgeleiteten
+/// Label-Strom ([`label_rng`]) mit demselben Seed wie das Primaer-Label unter
+/// `MOSAIC_LABEL_RNG_SPLIT` (gemeinsame Zufallszahlen: bei gleichen Gewichten
+/// gleiche Werte); der Partie-RNG wird nie beruehrt. `needed = false` (die
+/// Gegner-Seite schreibt keine Records): kein Sampling.
+#[derive(Clone, Copy)]
+struct OpponentLabels<'n> {
+    net: &'n Net,
+    needed: bool,
 }
 
 // ── #13: eigener Zufallsstrom fuer das Label-Sampling ────────────────────────
@@ -5098,8 +5450,27 @@ const LABEL_STREAMS_PER_ROUND: u64 = 2;
 /// Prozessweit gecacht (OnceLock): die Variable MUSS vor dem ersten Lesen
 /// gesetzt sein, gleiche Regel wie `return_order_random_p`.
 pub(crate) fn label_rng_split_enabled() -> bool {
+    #[cfg(test)]
+    if let Some(v) = LABEL_RNG_SPLIT_OVERRIDE.with(|c| c.get()) {
+        return v;
+    }
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| read_flag01_env("MOSAIC_LABEL_RNG_SPLIT", false))
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Test-Override fuer [`label_rng_split_enabled`] -- thread-lokal, Muster
+    /// `ROOT_CHILD_Q_OVERRIDE` (net_mcts.rs): die Exploiter-Tests (par.7) brauchen
+    /// den Label-Strom AN, ohne die prozessweite OnceLock-Variable fuer alle
+    /// parallelen Test-Threads festzulegen.
+    static LABEL_RNG_SPLIT_OVERRIDE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Nur Tests: setzt (oder mit `None` loescht) den Label-Strom-Schalter fuer DIESEN Thread.
+#[cfg(test)]
+pub(crate) fn set_label_rng_split_for_test(v: Option<bool>) {
+    LABEL_RNG_SPLIT_OVERRIDE.with(|c| c.set(v));
 }
 
 /// Der abgeleitete Label-Strom EINER Label-Ziehung (Runde `round`, Art
@@ -5302,7 +5673,11 @@ struct GameLoopConfig<'a> {
     /// eine mitten in einer Runde geseedete Fortsetzung zaehlt ihre erste
     /// Entscheidung als Index 1, nicht als den Index, den sie in der
     /// Ursprungspartie haette.
-    deviate_net: Option<&'a Net>,
+    ///
+    /// Je Spielerindex ein Netz (Exploiter-Gegner, PREREG_asymmetric_selfplay.md
+    /// par.7): die Kandidaten bewertet das Netz der Seite, die gerade abweicht.
+    /// Ohne Gegner tragen beide Eintraege dasselbe Netz (Bestand).
+    deviate_net: Option<[&'a Net; 2]>,
     /// Weg B (`PREREG_start_position_seeding.md` par.9f): ist DIESER Aufruf
     /// selbst ein Ausflug? `true` NUR fuer den Ausflug-Aufruf in
     /// `run_net_self_play` -- dann weicht die Schleife an Halbzug
@@ -5348,6 +5723,18 @@ struct GameLoopConfig<'a> {
     /// `aggr_side` auf JEDEN Record der Partie; der Seiten-Blend selbst sitzt in
     /// der `SearchConfig` des Stoerer-Agenten. `None` = Bestand, kein Feld.
     aggr_side: Option<usize>,
+    /// Stichentscheid-Seite (`PREREG_asymmetric_selfplay.md` par.5e1 Frage 3):
+    /// Spielerindex der Seite mit `tau_tiebreak_q`-Modus, `Some` NUR im
+    /// Netz-Self-Play bei `MOSAIC_TAU_TIEBREAK_SIDE=1`. Die Schleife stempelt
+    /// daraus `tiebreak_side` auf JEDEN Record der Partie; der Modus selbst sitzt
+    /// in der `SearchConfig` des Agenten. `None` = Bestand, kein Feld.
+    tiebreak_side: Option<usize>,
+    /// Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7): Spielerindex der
+    /// Gegner-Netz-Seite, `Some` NUR im Netz-Self-Play bei gesetztem
+    /// `MOSAIC_OPPONENT_MODEL`. Die Schleife stempelt daraus `opponent_side` und
+    /// je Record `net_label`; die Netze selbst sitzen in `players` und
+    /// `deviate_net`. `None` = Bestand, kein Feld.
+    opponent_side: Option<usize>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -5412,6 +5799,11 @@ fn unified_game_loop<R: Rng + ?Sized>(
     // Punkt 6 (`evaluations/value head tests.txt`): TD-Bootstrap-Ziel
     // zusätzlich zum vollen `round_transition_value`.
     let mut bootstrap_values: std::collections::HashMap<u32, [f64; 2]> =
+        std::collections::HashMap::new();
+    // Exploiter-Gegner (par.7, Bauplan D4): Bootstrap-Label aus dem Netz der
+    // Gegner-Seite, gestempelt nur auf deren Records. Ohne Gegner bleibt die
+    // Map leer (Bestand).
+    let mut bootstrap_values_opponent: std::collections::HashMap<u32, [f64; 2]> =
         std::collections::HashMap::new();
     // τ-Annealing (`net_mcts::tau_argmax_from_move`): fortlaufender
     // 1-BASIERTER Halbzug-Zaehler NUR echter Drafting-Entscheide (beide
@@ -5706,7 +6098,8 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         };
                     if let Some((distinguisher, seed_counter, quelle)) = deviate_stream {
                         if d.vorzug.is_none() {
-                            if let Some(net) = cfg.deviate_net {
+                            // par.7 (Exploiter): das Netz der abweichenden Seite.
+                            if let Some(net) = cfg.deviate_net.map(|nets| nets[player]) {
                                 let want = deviate_candidates();
                                 let mut deviate_rng =
                                     StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
@@ -5974,6 +6367,20 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                     None => sample_bootstrap_label(lbl, &pre, rng),
                                 };
                                 bootstrap_values.insert(round_before, bv);
+                                // par.7 (Exploiter, Bauplan D4): Label der Gegner-Seite
+                                // aus IHREM Netz, immer aus dem abgeleiteten Strom mit
+                                // demselben Seed wie oben (Partie-RNG unberuehrt).
+                                if let Some(opp) = lbl.opponent.filter(|o| o.needed) {
+                                    let opp_lbl = LabelSamplingConfig {
+                                        net: opp.net,
+                                        record_rtv: false,
+                                        profiled: lbl.profiled,
+                                        opponent: None,
+                                    };
+                                    let mut label_stream = label_rng(cfg.game_seed, round_before, LABEL_STREAM_BOOTSTRAP);
+                                    let bv_opp = sample_bootstrap_label(&opp_lbl, &pre, &mut label_stream);
+                                    bootstrap_values_opponent.insert(round_before, bv_opp);
+                                }
                             }
                         }
                     }
@@ -6229,6 +6636,12 @@ fn unified_game_loop<R: Rng + ?Sized>(
             let dice_side: Option<usize> = cfg.dome_dice.as_ref().map(|dd| dd.side);
             // Klasse S: `aggr_side` ebenso auf JEDEM Record einer S-Partie.
             let aggr_side: Option<usize> = cfg.aggr_side;
+            // par.5e1 Frage 3: `tiebreak_side` ebenso auf JEDEM Record.
+            let tiebreak_side: Option<usize> = cfg.tiebreak_side;
+            // par.7 (Exploiter): `opponent_side` auf JEDEM Record, `net_label` aus
+            // dem `player` des Records; dessen Bootstrap-Label kommt bei der
+            // Gegner-Seite aus deren Netz (Bauplan D4).
+            let opponent_side: Option<usize> = cfg.opponent_side;
             LoopOutput::Records(
                 records
                     .into_iter()
@@ -6239,6 +6652,20 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         if let Some(side) = aggr_side {
                             m.insert("aggr_side".into(), json!(side));
                         }
+                        if let Some(side) = tiebreak_side {
+                            m.insert("tiebreak_side".into(), json!(side));
+                        }
+                        // `Some(true)` = Record der Gegner-Netz-Seite.
+                        let is_opponent_record: Option<bool> = opponent_side.map(|side| {
+                            let player = m
+                                .get("player")
+                                .and_then(|p| p.as_u64())
+                                .unwrap_or_else(|| panic!("Record ohne `player` in einer Exploiter-Partie"))
+                                as usize;
+                            m.insert("opponent_side".into(), json!(side));
+                            m.insert("net_label".into(), json!(net_label_for(player, side)));
+                            player == side
+                        });
                         m.insert("game_id".into(), json!(game_id));
                         m.insert("scores".into(), json!(scores));
                         m.insert("scores_unclamped".into(), json!(scores_unclamped));
@@ -6261,7 +6688,12 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         if let Some(v) = round.and_then(|r| round_transition_values.get(&(r as u32))) {
                             m.insert("round_transition_value".into(), json!(v));
                         }
-                        if let Some(v) = round.and_then(|r| bootstrap_values.get(&(r as u32))) {
+                        let bootstrap_source = if is_opponent_record == Some(true) {
+                            &bootstrap_values_opponent
+                        } else {
+                            &bootstrap_values
+                        };
+                        if let Some(v) = round.and_then(|r| bootstrap_source.get(&(r as u32))) {
                             m.insert("bootstrap_value".into(), json!(v));
                         }
                         Value::Object(m)
@@ -6446,7 +6878,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         seed_from_steps: false,
         game_seed,
         move_heartbeat,
-        labels: net.map(|n| LabelSamplingConfig { net: n, record_rtv, profiled: false }),
+        labels: net.map(|n| LabelSamplingConfig { net: n, record_rtv, profiled: false, opponent: None }),
         mode: LoopMode::Records { game_id },
         players: [player, player],
         preference_hits: None,
@@ -6463,6 +6895,8 @@ pub fn play_one_game<R: Rng + ?Sized>(
         // Klasse W: nur im Netz-Self-Play.
         dome_dice: None,
         aggr_side: None,
+        tiebreak_side: None,
+        opponent_side: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -7012,6 +7446,8 @@ fn play_net_game<R: Rng + ?Sized>(
         // Klasse W: nur im Netz-Self-Play.
         dome_dice: None,
         aggr_side: None,
+        tiebreak_side: None,
+        opponent_side: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -7204,6 +7640,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         // Klasse W: nur im Netz-Self-Play.
         dome_dice: None,
         aggr_side: None,
+        tiebreak_side: None,
+        opponent_side: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -7775,15 +8213,10 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
         // Fund 2 (B2, Vollaudit 2026-07-21): Tie-Break visits, dann Q --
         // gleiches Muster wie net_mcts::best_root_child. Nacktes
         // max_by(visits) ließe bei Gleichstand den LETZTEN Eintrag
-        // (= niedrigster Prior) gewinnen.
-        stats
-            .iter()
-            .enumerate()
-            .max_by(|(_, (_, v1, q1)), (_, (_, v2, q2))| {
-                v1.cmp(v2).then(q1.partial_cmp(q2).unwrap_or(std::cmp::Ordering::Equal))
-            })
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+        // (= niedrigster Prior) gewinnen. Seit par.5e1 als
+        // `visits_then_q_index` ausgelagert (wortgleicher Rumpf), weil Modus 1
+        // des tau-Stichentscheids dieselbe Ordnung braucht.
+        visits_then_q_index(&stats)
     } else if tau_argmax_override
         .or_else(crate::net_mcts::tau_argmax_from_move)
         .is_some_and(|n| move_number as usize >= n)
@@ -7803,7 +8236,19 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
         // explizit gesetzt ist (Nicht-Default). Bei AUS (Default, `None`)
         // bleibt dieser `else if` immer falsch -- Parität gilt nur fuer
         // Default AUS, siehe `net_mcts::tau_argmax_from_move`-Doku.
-        argmax_index(&weights)
+        //
+        // Stichentscheid (`PREREG_asymmetric_selfplay.md` par.5e/par.5e1,
+        // `search_config.tau_tiebreak_q`): 0 = Bestand, `argmax_index` der
+        // Besuche (Gleichstand = ERSTER Eintrag in Kinderreihenfolge, ohne Q),
+        // der neue Zweig wird nicht betreten. 1 = Besuche, dann Q (Ordnung des
+        // `deterministic`-Zweigs); 2 = hoechstes Q unter den Halving-
+        // Ueberlebenden, ohne Ueberlebende wie 1. Wie bei der Temperatur unten
+        // aendert das NUR die gespielte Aktion: `policy`, `root_q`, `child_q`
+        // sind oben fertig, kein RNG-Zug in keinem Modus.
+        match search_config.tau_tiebreak_q {
+            crate::net_mcts::TAU_TIEBREAK_Q_DEFAULT => argmax_index(&weights),
+            mode => tau_tiebreak_index(&stats, root_own.as_ref(), mode),
+        }
     } else if let Some((tempered, tempered_total)) =
         action_temp_weights(&weights, actions.len(), crate::net_mcts::action_temp_mode())
     {
@@ -7839,7 +8284,14 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     // Zufallsstrom derselbe bleibt, und GEGEN diesen Index als Bezugszug (nur
     // Abweichungen nach unten). Greift nur mit Einzelbaum-Statistik (`root_own`)
     // und wenn die gewaehlte Aktion in `stats` steht; sonst bleibt der Bestandsindex.
-    let disruptor = match (search_config.aggr_eps, root_own.as_ref()) {
+    //
+    // par.5e1: `root_own` ist seit dem tau-Stichentscheid (Modus 2) auch OHNE
+    // Seiten-Blend gefuellt. Stoerer-Wahl und `own_q_gap` (Record-Feld) bleiben
+    // an `aggr_player` gebunden, sonst bekaeme ein Modus-2-Lauf ohne Klasse S
+    // ein neues Record-Feld. Mit gesetztem `aggr_player` ist `aggr_own` exakt
+    // das bisherige `root_own`, ohne war `root_own` bisher immer `None`.
+    let aggr_own = root_own.as_ref().filter(|_| search_config.aggr_player.is_some());
+    let disruptor = match (search_config.aggr_eps, aggr_own) {
         (Some(eps), Some(own)) => own
             .disruptor_pick(eps, &stats[idx].0)
             .and_then(|p| stats.iter().position(|(a, _, _)| *a == p.action).map(|i| (i, p))),
@@ -7860,7 +8312,7 @@ pub(crate) fn net_drafting_policy_with_own_gap<R: Rng + ?Sized>(
     // par.12.6, hat die Reihenfolge eigene IDs, dann laeuft dieser Zweig aber gar nicht).
     // Klasse S: `own_q_gap` des Suchzugs, bevor die Nachsuche ihn verschiebt
     // (in Modus B der Zug der Wurzelwahl, also der tatsaechlich gespielte).
-    let own_q_gap = root_own.as_ref().and_then(|o| o.own_q_gap(&stats[idx].0));
+    let own_q_gap = aggr_own.and_then(|o| o.own_q_gap(&stats[idx].0));
     let chosen = crate::net_mcts::moon_order_post_search(
         net,
         None,
@@ -8107,7 +8559,19 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // auseinanderlaufen koennen. `false` fuer die Hauptpartie und alle
     // uebrigen Aufrufer = byte-identisches Bestandsverhalten.
     excursion_run: bool,
+    // Exploiter-Gegner (PREREG_asymmetric_selfplay.md par.7): das geladene
+    // Gegner-Netz des Laufs, `None` = Bestand (alle Tests, der Ausflug, der
+    // Paritaets-Hash). Seite und Seitenfilter werden HIER bestimmt.
+    opponent_net: Option<&Net>,
 ) -> (Vec<Value>, Option<ExcursionBranch>, bool) {
+    // par.7: Seite aus dem Partie-Seed (kein RNG-Zug), Filter aus der Umgebung.
+    // Ein ungueltiger Filter ist in `run_net_self_play` VOR dem Lauf abgelehnt;
+    // hier bleibt dann `both`. Nie im Ausflug (Ablehnung dort).
+    let opponent = opponent_net.filter(|_| !excursion_run).map(|net| OpponentConfig {
+        net,
+        side: opponent_side_for(game_seed),
+        record_sides: record_sides().unwrap_or(RecordSides::Both),
+    });
     // Klasse W (`PREREG_asymmetric_selfplay.md` par.2): der Knopf wird HIER
     // gelesen, die Schleife bekommt nur das Ergebnis. Nie im Ausflug (F8: die
     // Kombination ist verboten, `run_net_self_play` lehnt sie ab; der Ausflug
@@ -8125,6 +8589,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         net, base_sims, c_puct, scoring_ids, names, first_player, game_id, rng, add_root_noise,
         deterministic, record_rtv, move_heartbeat, pcr_full_prob, pcr_cheap_sims, game_seed,
         start_state, search_config, excursion_run, dome_dice_place_sims, dome_dice_last_round_value, aggr,
+        opponent,
     )
 }
 
@@ -8134,6 +8599,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
 /// `dome_dice_last_round` (par.5d): letzte Wuerfelrunde, nur bei W an
 /// wirksam ([`DOME_DICE_LAST_ROUND_DEFAULT`] = Bestand). `aggr`:
 /// `None` = Klasse S aus (Bestand), `Some` = Stoerer mit diesen Werten.
+/// `opponent` (par.7): `None` = beide Seiten `net` (Bestand); `Some` = die
+/// Seite `side` spielt mit `opponent.net`, Records nach `record_sides` gefiltert.
 #[allow(clippy::too_many_arguments)]
 fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     net: &Net,
@@ -8157,7 +8624,11 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     dome_dice_place_sims: Option<u32>,
     dome_dice_last_round: u32,
     aggr: Option<AggrSideParams>,
+    opponent: Option<OpponentConfig<'_>>,
 ) -> (Vec<Value>, Option<ExcursionBranch>, bool) {
+    // par.7 (Exploiter, Bauplan 2b): Netz JE SPIELERINDEX. Ohne Gegner beide
+    // `net` (Bestand); jede Netzstelle unten nimmt `nets[seite]`.
+    let nets: [&Net; 2] = side_assign(net, opponent.map(|o| (o.side, o.net)));
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
     // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
@@ -8193,9 +8664,17 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     // Ohne Klasse W ist `search_config` unveraendert (Feld bleibt `None`).
     let (search_config, agent_configs) =
         side_search_configs(search_config, dice_side, dome_dice_last_round, aggr, aggr_side);
-    let agent_config = |player: usize| -> crate::net_mcts::SearchConfig { agent_configs[player] };
+    // par.5e1 Frage 3: Stichentscheid-Seite. Bei AUS (Default) ist
+    // `tiebreak_side_configs` die Identitaet und `tiebreak_side` `None`; kein
+    // RNG-Zug in keinem Fall (Seite aus dem Hash von `game_seed`). Nie im
+    // Ausflug (`run_net_self_play` lehnt die Kombination ab).
+    let tiebreak_on = tau_tiebreak_side_enabled() && !excursion_run;
+    let tiebreak_side: Option<usize> = tiebreak_on.then(|| tiebreak_side_for(game_seed));
+    let (search_config, agent_configs) =
+        tiebreak_side_configs(search_config, agent_configs, tiebreak_on, tiebreak_side);
+    let agent_config =|player: usize| -> crate::net_mcts::SearchConfig { agent_configs[player] };
     let agent0 = NetSelfPlayAgent {
-        net,
+        net: nets[0],
         base_sims,
         c_puct,
         add_root_noise,
@@ -8207,7 +8686,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         tau_argmax_override,
     };
     let agent1 = NetSelfPlayAgent {
-        net,
+        net: nets[1],
         base_sims,
         c_puct,
         add_root_noise,
@@ -8220,7 +8699,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     };
     let player0 = PlayerLoopConfig {
         agent: &agent0,
-        tiling_net: Some(net),
+        tiling_net: Some(nets[0]),
         envelope_tiling_w: search_config.envelope_tiling_w,
         envelope_profile: search_config.envelope_profile,
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
@@ -8231,7 +8710,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         // Self-Play. `add_root_noise` folgt dem Drafting-Knopf dieses Laufs
         // -- die Erzeugung darf an der Wurzel streuen, die Arena nicht.
         start_search: StartSearchParams::for_net(
-            Some(net), base_sims, &search_config, add_root_noise, game_seed),
+            Some(nets[0]), base_sims, &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
         // par.16.10, Traegerprinzip wie bei `start_search`: was die Arena
         // spielt, erzeugt das Self-Play.
@@ -8239,7 +8718,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     };
     let player1 = PlayerLoopConfig {
         agent: &agent1,
-        tiling_net: Some(net),
+        tiling_net: Some(nets[1]),
         envelope_tiling_w: search_config.envelope_tiling_w,
         envelope_profile: search_config.envelope_profile,
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
@@ -8247,7 +8726,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         column_build_trace: false,
         return_order_mode: search_config.return_order_mode,
         start_search: StartSearchParams::for_net(
-            Some(net), base_sims, &search_config, add_root_noise, game_seed),
+            Some(nets[1]), base_sims, &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
         net_tiling_tiebreak: search_config.net_tiling_tiebreak,
     };
@@ -8255,7 +8734,7 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
     let greif_counter = std::cell::Cell::new([0u64; 2]);
     // Weg B (par.9f): Reservoir-Zelle IMMER angelegt und verdrahtet -- wie
-    // `deviate_net: Some(net)` unten ist dieser Aufruf der EINZIGE Pfad mit
+    // `deviate_net: Some(nets)` unten ist dieser Aufruf der EINZIGE Pfad mit
     // Ausflug, die eigentliche Abschaltung (Default AUS) passiert INNEN
     // (`excursion_gate`s Fruehausstieg bei `MOSAIC_EXCURSION_PROB<=0`), nicht
     // hier ueber einen Bool-Parameter.
@@ -8272,14 +8751,25 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         seed_from_steps: false,
         game_seed,
         move_heartbeat,
-        labels: Some(LabelSamplingConfig { net, record_rtv, profiled: true }),
+        // par.7 (Bauplan D4): das Gegner-Label nur, wenn die Gegner-Seite
+        // Records schreibt.
+        labels: Some(LabelSamplingConfig {
+            net,
+            record_rtv,
+            profiled: true,
+            opponent: opponent.map(|o| OpponentLabels {
+                net: o.net,
+                needed: o.record_sides != RecordSides::Primary,
+            }),
+        }),
         mode: LoopMode::Records { game_id },
         players: [player0, player1],
         preference_hits: if asym { Some(&greif_counter) } else { None },
         start_state,
         // Weg C (par.9c): der EINZIGE Pfad mit Abweichung. Default AUS
-        // (`MOSAIC_DEVIATE_PROB=0`) ist byte-identisch zum Bestand.
-        deviate_net: Some(net),
+        // (`MOSAIC_DEVIATE_PROB=0`) ist byte-identisch zum Bestand. par.7:
+        // je Seite das Netz dieser Seite.
+        deviate_net: Some(nets),
         excursion_branch: Some(&excursion_cell),
         // Weg B (Umbau 2026-09-07): NUR der Ausflug-Aufruf selbst erzwingt
         // an seinem ersten Halbzug eine Abweichung -- die Hauptpartie nicht.
@@ -8298,10 +8788,20 @@ fn play_net_self_play_game_with_dice<R: Rng + ?Sized>(
         // Klasse S: nur das Stempelfeld; Startsetzung und Tiling der S-Seite
         // laufen ueber `PlayerLoopConfig` mit der Basis-Config (FS4).
         aggr_side,
+        // par.5e1: nur das Stempelfeld; der Modus sitzt in `agent_configs`.
+        tiebreak_side,
+        // par.7: nur das Stempelfeld; die Netze sitzen in `players`/`deviate_net`.
+        opponent_side: opponent.map(|o| o.side),
     };
     let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
         LoopOutput::Summary(_) => unreachable!("Records-Modus konfiguriert"),
+    };
+    // par.7: Seitenfilter VOR der Rueckgabe, also auch vor Fortschrittsdatei und
+    // Spiegel-Stempel in `run_net_self_play`. Ohne Gegner unveraendert.
+    let out = match opponent {
+        Some(o) => filter_record_sides(out, o.side, o.record_sides),
+        None => out,
     };
     // par.5 (Sperre): "wie oft greift der Bauer" muss je Seite ausgewiesen
     // werden. ENTSCHEIDUNG eprintln statt Record-Feld (Begruendung im
@@ -8521,6 +9021,16 @@ pub fn run_net_self_play(
     // S-Partie weiter; die Ausfluege bleiben in der G-G-Klasse `value-excursion`
     // (Prereg par.4). Der Bauplan nennt fuer S keine Ausnahme (4.8: Ablehnung
     // der Kombination mit `--excursion-prob > 0`).
+    // par.5e1 Frage 3: Seitenknopf des Stichentscheids, Kombinationen VOR dem Lauf.
+    if let Some(msg) = tiebreak_side_conflict(
+        tau_tiebreak_side_enabled(),
+        search_config.tau_tiebreak_q,
+        dome_dice_enabled(),
+        aggr_side_enabled(),
+        excursion_prob() > 0.0,
+    ) {
+        return Err(msg);
+    }
     aggr_side_params()?;
     if aggr_side_enabled() && excursion_prob() > 0.0 {
         return Err(format!(
@@ -8528,6 +9038,21 @@ pub fn run_net_self_play(
              PREREG_asymmetric_selfplay.md par.3a): Ausfluege bleiben in der G-G-Klasse.",
             excursion_prob()
         ));
+    }
+    // par.7 (Exploiter-Gegner): Seitenfilter und verbotene Kombinationen VOR dem
+    // Lauf (Bauplan D5); ein ungueltiger Filter ist ein harter Fehler.
+    let opponent_path = opponent_model_path();
+    let sides = record_sides()?;
+    if let Some(msg) = opponent_conflict(
+        opponent_path.is_some(),
+        sides,
+        dome_dice_enabled(),
+        aggr_side_enabled(),
+        tau_tiebreak_side_enabled(),
+        excursion_prob() > 0.0,
+        record_rtv,
+    ) {
+        return Err(msg);
     }
     let seed_positions: Option<Vec<(String, Value)>> = match seed_positions {
         None => None,
@@ -8567,6 +9092,17 @@ pub fn run_net_self_play(
     // `MOSAIC_INTERLEAVE_ENABLED=1` gesetzt ist -- No-Op sonst (Default),
     // `net_leaf_eval`/`make_node` bleiben dann unveraendert synchron.
     crate::net_batcher::ensure_batcher_for(&net);
+    // par.7: das Gegner-Netz EINMAL je Lauf laden (eigenes `Arc`, eigener
+    // Sammel-Faden bei aktivem Weg V). `None` = Bestand.
+    let opponent_net: Option<std::sync::Arc<Net>> = match &opponent_path {
+        None => None,
+        Some(p) => Some(std::sync::Arc::new(
+            Net::load_auto(p).map_err(|e| format!("MOSAIC_OPPONENT_MODEL={p}: {e}"))?,
+        )),
+    };
+    if let Some(opp) = &opponent_net {
+        crate::net_batcher::ensure_batcher_for(opp);
+    }
     let progress_file = open_progress_file(progress_path);
     let move_counter = Arc::new(AtomicU64::new(0));
     let games_counter = Arc::new(AtomicU64::new(0));
@@ -8639,6 +9175,8 @@ pub fn run_net_self_play(
         // also nicht mehr verfuegbar -- `net_ex` sichert den Ausflug-eigenen
         // Zugriff dagegen vorher ab.
         let net_ex = std::sync::Arc::clone(&net);
+        // par.7: Klon des Gegner-Netzes fuer den Partie-Thread (Ausflug: keiner).
+        let opponent_thread: Option<std::sync::Arc<Net>> = opponent_net.as_ref().map(std::sync::Arc::clone);
         let gid_thread = gid.clone();
         let move_counter_thread = Arc::clone(&move_counter);
         // Spiegelknopf (PREREG_tie_mirror.md par.2): EINE Muenze je Partie, aus
@@ -8699,6 +9237,7 @@ pub fn run_net_self_play(
                         &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
                         deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
                         partie_seed, start_state, search_config, false,
+                        opponent_thread.as_deref(),
                     )
                 },
             )
@@ -8794,6 +9333,7 @@ pub fn run_net_self_play(
                             &mut ex_rng, add_root_noise, deterministic, record_rtv,
                             Some(&move_counter_ex), pcr_full_prob, pcr_cheap_sims, excursion_seed,
                             Some(branch_state), search_config, true,
+                            None, // par.7: Ausflug ohne Gegner (abgelehnt, Bauplan D5)
                         )
                     },
                 )
@@ -8901,6 +9441,9 @@ pub fn run_net_self_play(
     }
     // Review #15: erst NACH dem Auslesen der Batcher-Statistik abmelden.
     crate::net_batcher::release_batcher_for(&net);
+    if let Some(opp) = &opponent_net {
+        crate::net_batcher::release_batcher_for(opp);
+    }
     Ok(serde_json::to_string(&Value::Array(flat)).unwrap_or_else(|_| "[]".to_string()))
 }
 
@@ -10586,6 +11129,8 @@ pub(crate) mod tests {
                 excursion_deviated: None,
                 dome_dice: None,
                 aggr_side: None,
+                tiebreak_side: None,
+                opponent_side: None,
             };
             match unified_game_loop(vec![], ["A".into(), "B".into()], 0, &mut r, cfg) {
                 LoopOutput::Records(out) => serde_json::to_string(&out).unwrap(),
@@ -10643,6 +11188,8 @@ pub(crate) mod tests {
             excursion_deviated: None,
             dome_dice: None,
             aggr_side: None,
+            tiebreak_side: None,
+            opponent_side: None,
         };
         let mut rng = StdRng::seed_from_u64(seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
@@ -10753,6 +11300,8 @@ pub(crate) mod tests {
                 excursion_deviated: None,
                 dome_dice: None,
                 aggr_side: None,
+                tiebreak_side: None,
+                opponent_side: None,
             };
             let ids = sample_valid_scoring_ids(3, &mut r);
             match unified_game_loop(ids, ["A".into(), "B".into()], 0, &mut r, cfg) {
@@ -11327,6 +11876,7 @@ pub(crate) mod tests {
                 None,  // start_state
                 crate::net_mcts::SearchConfig::from_env(),
                 false, // excursion_run (Weg B, par.9f) -- keine Ausflug-Partie
+                None, // opponent (par.7): Bestand
             );
             assert!(
                 !records.is_empty(),
@@ -11838,6 +12388,7 @@ pub(crate) mod tests {
                 net, 60, crate::net_mcts::DEFAULT_C_PUCT, ids, names, 0, "gate_b_repro", &mut rng,
                 true, false, true, None, None, 0, seed, None, crate::net_mcts::SearchConfig::from_env(),
                 false,
+                None, // opponent (par.7): Bestand
             );
             records
         }
@@ -12296,6 +12847,69 @@ pub(crate) mod tests {
         // Realistische Besuchszahlen (visits als f64, wie in
         // `net_drafting_policy`s `weights`).
         assert_eq!(argmax_index(&[12.0, 340.0, 48.0, 0.0]), 1);
+    }
+
+    /// par.5e1, Modus 1 des tau-Stichentscheids (reine Funktion, kein Netz):
+    /// Besuche entscheiden, bei Gleichstand das hoehere Q; bei vollem
+    /// Gleichstand der LETZTE Eintrag (wie der `deterministic`-Zweig). Leer -> 0.
+    #[test]
+    fn tau_tiebreak_mode1_breaks_visit_ties_by_q() {
+        let a = |i: usize| Action::BonusChip(crate::moves::TakeBonusChipMove { factory_id: i });
+        let stats = vec![(a(0), 30, 0.40), (a(1), 30, 0.55), (a(2), 12, 0.90)];
+        assert_eq!(argmax_index(&[30.0, 30.0, 12.0]), 0, "Bestand: erster Eintrag");
+        assert_eq!(visits_then_q_index(&stats), 1, "Gleichstand der Besuche -> hoeheres Q");
+        assert_eq!(tau_tiebreak_index(&stats, None, 1), 1);
+        // Eindeutiges Besuchsmaximum schlaegt ein hoeheres Q mit weniger Besuchen.
+        let stats = vec![(a(0), 31, 0.40), (a(1), 30, 0.55)];
+        assert_eq!(tau_tiebreak_index(&stats, None, 1), 0);
+        // Voller Gleichstand: der letzte Eintrag (Eigenschaft von max_by).
+        let stats = vec![(a(0), 30, 0.5), (a(1), 30, 0.5)];
+        assert_eq!(visits_then_q_index(&stats), 1);
+        assert_eq!(visits_then_q_index(&[]), 0);
+    }
+
+    /// par.5e1, Modus 2: hoechstes Q unter den Halving-Ueberlebenden
+    /// (`visits > 0 && visits >= n_min`), Gleichstand mehr Besuche, dann der
+    /// fruehere Eintrag; ein Nicht-Ueberlebender mit hoeherem Q zaehlt nicht.
+    /// Ohne Wurzelstatistik oder ohne Ueberlebende Rueckfall auf Modus 1.
+    #[test]
+    fn tau_tiebreak_mode2_picks_best_q_among_survivors() {
+        use crate::net_mcts::RootOwnStats;
+        let a = |i: usize| Action::BonusChip(crate::moves::TakeBonusChipMove { factory_id: i });
+        let stats = vec![(a(0), 26, 0.40), (a(1), 25, 0.60), (a(2), 12, 0.95), (a(3), 0, 0.0)];
+        let own = RootOwnStats {
+            children: vec![
+                (a(0), 26, 0.40, None),
+                (a(1), 25, 0.60, None),
+                (a(2), 12, 0.95, None),
+                (a(3), 0, 0.0, None),
+            ],
+            n_min: 25,
+        };
+        // a(2) hat das hoechste Q, ist aber kein Ueberlebender (12 < 25).
+        assert_eq!(survivor_best_q_index(&stats, Some(&own)), Some(1));
+        assert_eq!(tau_tiebreak_index(&stats, Some(&own), 2), 1);
+        // Modus 1 auf denselben Daten: Besuche entscheiden.
+        assert_eq!(tau_tiebreak_index(&stats, Some(&own), 1), 0);
+        // Q-Gleichstand: mehr Besuche, dann der fruehere Eintrag.
+        let own_tie = RootOwnStats {
+            children: vec![(a(0), 25, 0.60, None), (a(1), 26, 0.60, None), (a(2), 26, 0.60, None)],
+            n_min: 25,
+        };
+        let stats_tie = vec![(a(0), 25, 0.60), (a(1), 26, 0.60), (a(2), 26, 0.60)];
+        assert_eq!(survivor_best_q_index(&stats_tie, Some(&own_tie)), Some(1));
+        // Die Rueckgabe ist ein Index in `stats`, gesucht ueber die Aktion.
+        let stats_perm = vec![(a(2), 26, 0.60), (a(0), 25, 0.60), (a(1), 26, 0.60)];
+        assert_eq!(survivor_best_q_index(&stats_perm, Some(&own_tie)), Some(2));
+        // Keine Ueberlebenden (n_min ueber allen Besuchen) -> Rueckfall Modus 1.
+        let own_none = RootOwnStats { children: own.children.clone(), n_min: 99 };
+        assert_eq!(survivor_best_q_index(&stats, Some(&own_none)), None);
+        assert_eq!(tau_tiebreak_index(&stats, Some(&own_none), 2), 0);
+        // Keine Wurzelstatistik (Runde-5-Loeser, Wald) -> Rueckfall Modus 1.
+        assert_eq!(tau_tiebreak_index(&stats, None, 2), 0);
+        // n_min 0 und unbesuchte Kinder: `visits > 0` schliesst sie aus.
+        let own_zero = RootOwnStats { children: vec![(a(3), 0, 0.99, None), (a(0), 26, 0.40, None)], n_min: 0 };
+        assert_eq!(survivor_best_q_index(&stats, Some(&own_zero)), Some(0));
     }
 
     /// Default-Paritaet (MOSAIC_TAU_ARGMAX_FROM_MOVE ungesetzt): der
@@ -15596,11 +16210,13 @@ mod dome_dice_tests {
     /// Test 15 (Teil 1): alle Distinguisher im Baum sind paarweise verschieden.
     #[test]
     fn dome_dice_distinguishers_are_unique() {
-        let all: [(&str, u64); 15] = [
+        let all: [(&str, u64); 17] = [
             ("DOME_DICE_SIDE_DISTINGUISHER", DOME_DICE_SIDE_DISTINGUISHER),
+            ("OPPONENT_SIDE_DISTINGUISHER", OPPONENT_SIDE_DISTINGUISHER),
             ("DOME_DICE_SEED_DISTINGUISHER", DOME_DICE_SEED_DISTINGUISHER),
             ("DOME_DICE_SEARCH_SEED_DISTINGUISHER", DOME_DICE_SEARCH_SEED_DISTINGUISHER),
             ("AGGR_SIDE_DISTINGUISHER", AGGR_SIDE_DISTINGUISHER),
+            ("TIEBREAK_SIDE_DISTINGUISHER", TIEBREAK_SIDE_DISTINGUISHER),
             ("LABEL_SEED_DISTINGUISHER", LABEL_SEED_DISTINGUISHER),
             ("RETURN_ORDER_SEED_DISTINGUISHER", RETURN_ORDER_SEED_DISTINGUISHER),
             ("RETURN_ORDER_NODE_SEED_DISTINGUISHER", RETURN_ORDER_NODE_SEED_DISTINGUISHER),
@@ -15662,6 +16278,7 @@ mod dome_dice_tests {
             place_sims,
             last_round,
             None,
+            None, // opponent (par.7): Bestand
         );
         records
     }
@@ -15771,6 +16388,7 @@ mod dome_dice_tests {
             &net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
             (seed % 2) as usize, "dice_test", &mut rng, false, true, false, None, None, 0, seed, None,
             SearchConfig::from_env(), false,
+            None, // opponent (par.7): Bestand
         );
         assert_eq!(serde_json::to_string(&off).unwrap(), serde_json::to_string(&bestand).unwrap());
         for r in &off {
@@ -16090,6 +16708,7 @@ mod aggr_side_tests {
             net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
             (seed % 2) as usize, "aggr_test", &mut rng, false, true, false, None, None, 0, seed, None,
             SearchConfig::from_env(), false, place_sims, DOME_DICE_LAST_ROUND_DEFAULT, aggr,
+            None, // opponent (par.7): Bestand
         );
         records
     }
@@ -16148,6 +16767,7 @@ mod aggr_side_tests {
             &net, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
             (seed % 2) as usize, "aggr_test", &mut rng, false, true, false, None, None, 0, seed, None,
             SearchConfig::from_env(), false,
+            None, // opponent (par.7): Bestand
         );
         assert_eq!(serde_json::to_string(&off).unwrap(), serde_json::to_string(&bestand).unwrap());
         for r in &off {
@@ -16388,5 +17008,515 @@ mod aggr_side_tests {
                 assert_eq!(r["player"], json!(d));
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Stichentscheid der tau-Zugwahl (PREREG_asymmetric_selfplay.md par.5e/par.5e1)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod tau_tiebreak_tests {
+    use super::*;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use std::collections::BTreeMap;
+
+    fn champion_net() -> Net {
+        let path = crate::net::test_champion_model_path();
+        Net::load_auto(path.to_str().unwrap())
+            .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
+    }
+
+    // ── Seitenknopf MOSAIC_TAU_TIEBREAK_SIDE (par.5e1 Frage 3), ohne Netz ─────
+
+    /// Die Seite ist ein Hash des Partie-Seeds: reproduzierbar, rund 50:50,
+    /// eine eigene Muenze (nicht die des Stoerers), und der Testprozess laeuft
+    /// ohne Knopf (Bestand).
+    #[test]
+    fn tiebreak_side_is_balanced_reproducible_and_off_by_default() {
+        assert!(!tau_tiebreak_side_enabled(), "Test laeuft ohne MOSAIC_TAU_TIEBREAK_SIDE");
+        let n = 10_000u64;
+        let (mut side1, mut same_as_aggr) = (0u32, 0u32);
+        for i in 0..n {
+            let game_seed = 20261740u64.wrapping_add(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            let s = tiebreak_side_for(game_seed);
+            assert!(s <= 1);
+            assert_eq!(s, tiebreak_side_for(game_seed), "reproduzierbar");
+            side1 += s as u32;
+            same_as_aggr += u32::from(s == aggr_side_for(game_seed, None));
+        }
+        assert!((4800..=5200).contains(&side1), "Seite 1 in {side1} von {n}");
+        assert!((4700..=5300).contains(&same_as_aggr), "eigene Muenze: {same_as_aggr}");
+    }
+
+    /// Zuordnung: AUS ist die Identitaet; AN gibt nur dem Agenten der Seite den
+    /// Modus der Basis, Basis und Gegenseite bekommen 0, sonst bleibt jedes Feld.
+    #[test]
+    fn tiebreak_side_configs_assign_mode_to_one_side_only() {
+        use crate::net_mcts::{TAU_TIEBREAK_Q_DEFAULT as OFF, TAU_TIEBREAK_Q_SURVIVORS as M2};
+        let base = SearchConfig { tau_tiebreak_q: M2, ..SearchConfig::from_env() };
+        let agents = [base, base];
+        assert_eq!(tiebreak_side_configs(base, agents, false, None), (base, agents), "AUS: Bestand");
+        assert_eq!(tiebreak_side_configs(base, agents, false, Some(1)), (base, agents), "AUS ignoriert die Seite");
+        for side in 0..2usize {
+            let (b, a) = tiebreak_side_configs(base, agents, true, Some(side));
+            assert_eq!(b.tau_tiebreak_q, OFF, "Basis (Startsetzung usw.) ohne Modus");
+            assert_eq!(a[side].tau_tiebreak_q, M2, "Seite {side} mit Modus");
+            assert_eq!(a[1 - side].tau_tiebreak_q, OFF, "Gegenseite Bestand");
+            assert_eq!(SearchConfig { tau_tiebreak_q: M2, ..a[1 - side] }, base, "sonst unveraendert");
+            assert_eq!(a[side], base);
+        }
+        let (b, a) = tiebreak_side_configs(base, agents, true, None);
+        assert_eq!((b.tau_tiebreak_q, a[0].tau_tiebreak_q, a[1].tau_tiebreak_q), (OFF, OFF, OFF));
+    }
+
+    /// Verbotene Kombinationen des Seitenknopfs; AUS ist immer in Ordnung.
+    #[test]
+    fn tiebreak_side_conflicts_are_rejected() {
+        assert_eq!(tiebreak_side_conflict(false, 0, true, true, true), None, "AUS: nichts zu pruefen");
+        assert_eq!(tiebreak_side_conflict(true, 1, false, false, false), None);
+        assert_eq!(tiebreak_side_conflict(true, 2, false, false, false), None);
+        assert!(tiebreak_side_conflict(true, 0, false, false, false).is_some(), "Modus 0");
+        assert!(tiebreak_side_conflict(true, 1, true, false, false).is_some(), "mit Klasse W");
+        assert!(tiebreak_side_conflict(true, 1, false, true, false).is_some(), "mit Klasse S");
+        assert!(tiebreak_side_conflict(true, 2, false, false, true).is_some(), "mit Ausflug");
+    }
+
+    /// Erzeugungs-Sims (models/v35.recipe.json `sims`).
+    const SIMS: u32 = 100;
+    /// Partie-Seeds 4711..=4730 (par.5e1: 20 Partien).
+    const GAME_SEEDS: std::ops::RangeInclusive<u64> = 4711..=4730;
+    /// Such-Seed der Analysesuche je Zustand (par.5e1).
+    const SEARCH_SEED: u64 = 7;
+
+    /// Eine Netz-Self-Play-Partie in Erzeugungsbedingungen (Root-Noise, nicht
+    /// deterministisch, `SearchConfig::from_env()`), OHNE Wuerfel und ohne
+    /// Stoerer. Labels (rtv) aus: sie aendern keine Stellung, nur Kosten.
+    fn play_generation_game(net: &Net, seed: u64) -> Vec<Value> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (records, _x, _d) = play_net_self_play_game_with_dice(
+            net,
+            SIMS,
+            crate::net_mcts::DEFAULT_C_PUCT,
+            ids,
+            ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize,
+            "tie_report",
+            &mut rng,
+            true,
+            false,
+            false,
+            None,
+            None,
+            0,
+            seed,
+            None,
+            SearchConfig::from_env(),
+            false,
+            None,
+            DOME_DICE_LAST_ROUND_DEFAULT,
+            None,
+            None, // opponent (par.7): Bestand
+        );
+        records
+    }
+
+    /// Ergebnis der Analysesuche an EINEM Entscheid.
+    struct TieOutcome {
+        round: u32,
+        /// Einzelbaum-Statistik vorhanden (sonst Runde-5-Loeser, Wald oder
+        /// leere Suche: dann zaehlen (a)-(c) nicht).
+        tree: bool,
+        /// (a) mindestens zwei Wurzelkinder auf der maximalen Besuchszahl.
+        tie_at_max: bool,
+        /// (b) Bestand (`argmax_index`) != Modus 1 (Besuche, dann Q).
+        differs_mode1: bool,
+        /// (c) Bestand != Modus 2 (hoechstes Q unter den Ueberlebenden).
+        differs_mode2: bool,
+        /// (c) Q(Modus 2) - Q(Bestand), Gewinnwahrscheinlichkeit, nur bei Abweichung.
+        q_gain_mode2: Option<f64>,
+        /// Modus 2 haette mangels Ueberlebender auf Modus 1 zurueckgegriffen.
+        no_survivors: bool,
+    }
+
+    /// Analysesuche @SIMS mit Such-Seed 7 an einem Drafting-Record. `None`, wenn
+    /// der Record nicht zur Grundmenge gehoert (kein `root_q` oder <= 1 Aktion).
+    fn analyze_record(net: &Net, ext: bool, r: &Value) -> Option<TieOutcome> {
+        let n_actions = r.get("valid_actions").and_then(Value::as_array).map(|v| v.len()).unwrap_or(0);
+        if r.get("root_q").is_none() || n_actions <= 1 {
+            return None;
+        }
+        let mut state_rng = StdRng::seed_from_u64(1);
+        let mut st = crate::serialize::json_to_state(&r["state"], &mut state_rng).expect("Record-Zustand");
+        st.extended_action_nodes = [ext, ext];
+        assert_eq!(st.phase, Phase::Drafting, "Records mit root_q sind Drafting-Entscheide");
+        // Modus 2 als Schalter fuer das AUSLESEN der Halving-Ueberlebenden: die
+        // Suche selbst liest `tau_tiebreak_q` nicht (net_mcts.rs
+        // `net_root_child_stats_policy_prior_and_own`).
+        let cfg = SearchConfig {
+            tau_tiebreak_q: crate::net_mcts::TAU_TIEBREAK_Q_SURVIVORS,
+            ..SearchConfig::from_env()
+        };
+        let sims = net_effective_sims(crate::net_mcts::r5_adjusted_base_sims(&st, SIMS, &cfg), n_actions);
+        let mut search_rng = StdRng::seed_from_u64(SEARCH_SEED);
+        let (stats, _policy, _root_q, _child_q, _prior, own) = crate::net_mcts::net_root_child_stats_policy_prior_and_own(
+            net,
+            &st,
+            sims,
+            crate::net_mcts::DEFAULT_C_PUCT,
+            true,
+            &mut search_rng,
+            &cfg,
+        );
+        let total: u64 = stats.iter().map(|(_, v, _)| u64::from(*v)).sum();
+        let mut out = TieOutcome {
+            round: st.round_number,
+            tree: false,
+            tie_at_max: false,
+            differs_mode1: false,
+            differs_mode2: false,
+            q_gain_mode2: None,
+            no_survivors: false,
+        };
+        let Some(own) = own.filter(|_| !stats.is_empty() && total > 0) else {
+            return Some(out);
+        };
+        out.tree = true;
+        let max_v = stats.iter().map(|(_, v, _)| *v).max().unwrap_or(0);
+        out.tie_at_max = stats.iter().filter(|(_, v, _)| *v == max_v).count() >= 2;
+        // Genau die drei Zugwahlen des tau-Zweigs (Bestand, Modus 1, Modus 2).
+        let weights: Vec<f64> = stats.iter().map(|(_, v, _)| *v as f64).collect();
+        let base = argmax_index(&weights);
+        let mode1 = tau_tiebreak_index(&stats, Some(&own), crate::net_mcts::TAU_TIEBREAK_Q_VISITS_THEN_Q);
+        let mode2 = tau_tiebreak_index(&stats, Some(&own), crate::net_mcts::TAU_TIEBREAK_Q_SURVIVORS);
+        out.no_survivors = survivor_best_q_index(&stats, Some(&own)).is_none();
+        out.differs_mode1 = mode1 != base;
+        out.differs_mode2 = mode2 != base;
+        if out.differs_mode2 {
+            let q_of = |a: &Action| own.children.iter().find(|c| c.0 == *a).map(|c| c.2);
+            if let (Some(q2), Some(qb)) = (q_of(&stats[mode2].0), q_of(&stats[base].0)) {
+                out.q_gain_mode2 = Some(q2 - qb);
+            }
+        }
+        Some(out)
+    }
+
+    /// Eine `[tie_report]`-Zeile ueber eine Teilmenge der Entscheide.
+    fn report_tie_line(label: &str, rows: &[&TieOutcome]) {
+        let n = rows.len();
+        let tree: Vec<&&TieOutcome> = rows.iter().filter(|o| o.tree).collect();
+        let n_tree = tree.len();
+        let share = |k: usize| if n_tree > 0 { k as f64 / n_tree as f64 } else { f64::NAN };
+        let a = tree.iter().filter(|o| o.tie_at_max).count();
+        let b = tree.iter().filter(|o| o.differs_mode1).count();
+        let c = tree.iter().filter(|o| o.differs_mode2).count();
+        let no_surv = tree.iter().filter(|o| o.no_survivors).count();
+        let mut gains: Vec<f64> = tree.iter().filter_map(|o| o.q_gain_mode2).collect();
+        gains.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+        let mean = if gains.is_empty() { f64::NAN } else { gains.iter().sum::<f64>() / gains.len() as f64 };
+        let median = match gains.len() {
+            0 => f64::NAN,
+            k if k % 2 == 1 => gains[k / 2],
+            k => (gains[k / 2 - 1] + gains[k / 2]) / 2.0,
+        };
+        eprintln!(
+            "[tie_report] {label}: n={n} Entscheide (Grundmenge: Drafting-Records mit root_q und > 1 Aktion), \
+             davon mit Einzelbaum n_baum={n_tree} (Nenner der Anteile), ohne Baum {} | \
+             (a) Gleichstand auf max. Besuchen {a}/{n_tree} = {:.4} | \
+             (b) Bestand != Besuche-dann-Q {b}/{n_tree} = {:.4} | \
+             (c) Bestand != hoechstes Q der Ueberlebenden {c}/{n_tree} = {:.4}, \
+             Q-Differenz (Gewinnwahrscheinlichkeit) mittel {mean:.4} median {median:.4} (n={}) | \
+             ohne Ueberlebende {no_surv}",
+            n - n_tree,
+            share(a),
+            share(b),
+            share(c),
+            gains.len()
+        );
+    }
+
+    /// Messbericht par.5e1 Frage 1 (kein Gate, nur auf Anweisung): wie oft
+    /// liegen die Wurzelkinder der Erzeugung bei den Besuchen gleichauf, und wie
+    /// oft weicht die Bestands-Zugwahl des tau-Zweigs (`argmax_index`, erster
+    /// Eintrag) von "Besuche, dann Q" (Modus 1) bzw. "hoechstes Q unter den
+    /// Halving-Ueberlebenden" (Modus 2) ab? 20 Partien des Champions (Seeds
+    /// 4711..=4730, 100 Sims, Root-Noise, `SearchConfig::from_env()`, ohne
+    /// Wuerfel), je Drafting-Entscheid mit `root_q` und > 1 Aktion EINE Suche
+    /// @100 mit Such-Seed 7 und Root-Noise. Je Runde und als Summe.
+    ///
+    /// Erzeugungsnaehe haengt an der Umgebung: die Kette setzt die Env-Knoepfe
+    /// des Rezepts (`MOSAIC_TAU_ARGMAX_FROM_MOVE=1` usw.). `r5_net_sims` hat
+    /// keinen Env-Knopf; Runde 5 sucht hier darum mit 100 statt den 400 der
+    /// Erzeugungs-Spec. Der Test schlaegt nicht fehl, er berichtet.
+    /// `cargo test --release --lib tie_frequency_report -- --ignored --nocapture`
+    #[test]
+    #[ignore = "Messbericht par.5e1 Frage 1, nur auf Anweisung"]
+    fn tie_frequency_report() {
+        let t0 = std::time::Instant::now();
+        let net = champion_net();
+        let ext = crate::net_mcts::net_supports_extended_action_nodes(&net);
+        eprintln!(
+            "[tie_report] Start: {} Partien, {SIMS} Sims, Such-Seed {SEARCH_SEED}, tau ab Halbzug {:?}, Netz {:?}",
+            GAME_SEEDS.count(),
+            crate::net_mcts::tau_argmax_from_move(),
+            crate::net::test_champion_model_path()
+        );
+        let games: Vec<(u64, Vec<Value>)> = GAME_SEEDS
+            .into_par_iter()
+            .map(|seed| {
+                let records = play_generation_game(&net, seed);
+                eprintln!(
+                    "[tie_report] Partie {seed} fertig: {} Records, {:.0} s seit Start",
+                    records.len(),
+                    t0.elapsed().as_secs_f64()
+                );
+                (seed, records)
+            })
+            .collect();
+        let t_games = t0.elapsed().as_secs_f64();
+        let records: Vec<&Value> = games.iter().flat_map(|(_, rs)| rs.iter()).collect();
+        let done = AtomicU64::new(0);
+        let outcomes: Vec<TieOutcome> = records
+            .par_iter()
+            .filter_map(|r| {
+                let out = analyze_record(&net, ext, r);
+                if out.is_some() {
+                    let k = done.fetch_add(1, Ordering::Relaxed) + 1;
+                    if k % 100 == 0 {
+                        eprintln!("[tie_report] {k} Entscheide analysiert, {:.0} s seit Start", t0.elapsed().as_secs_f64());
+                    }
+                }
+                out
+            })
+            .collect();
+        let mut by_round: BTreeMap<u32, Vec<&TieOutcome>> = BTreeMap::new();
+        for o in &outcomes {
+            by_round.entry(o.round).or_default().push(o);
+        }
+        for (round, rows) in &by_round {
+            report_tie_line(&format!("Runde {round}"), rows);
+        }
+        let all: Vec<&TieOutcome> = outcomes.iter().collect();
+        report_tie_line("SUMME", &all);
+        eprintln!(
+            "[tie_report] laufzeit: wanduhr_s={:.1} (Partien {t_games:.1}), threads={}, Partien={}, s_je_partie={:.1}",
+            t0.elapsed().as_secs_f64(),
+            rayon::current_num_threads(),
+            games.len(),
+            t_games / games.len().max(1) as f64
+        );
+    }
+}
+
+// ── Exploiter-Gegner: zwei Netze je Partie (PREREG_asymmetric_selfplay.md par.7) ──
+#[cfg(test)]
+mod opponent_net_tests {
+    use super::*;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn load(path: std::path::PathBuf) -> Net {
+        Net::load_auto(path.to_str().unwrap())
+            .unwrap_or_else(|e| panic!("{path:?} nicht ladbar ({e}) -- nie leer gruen (Nutzer-Regel)"))
+    }
+
+    fn champion_net() -> Net {
+        load(crate::net::test_champion_model_path())
+    }
+
+    fn test_net() -> Net {
+        load(crate::net::test_model_path("engine_test.onnx"))
+    }
+
+    /// Eine Partie mit kleinem Budget, deterministisch, ohne Wurzelrauschen,
+    /// Label-Strom AN (wie im Rezept, `label_rng_split`).
+    fn play(primary: &Net, opponent: Option<(&Net, usize, RecordSides)>, seed: u64) -> Vec<Value> {
+        set_label_rng_split_for_test(Some(true));
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let (records, _x, _d) = play_net_self_play_game_with_dice(
+            primary, 8, crate::net_mcts::DEFAULT_C_PUCT, ids, ["Netz".to_string(), "Netz".to_string()],
+            (seed % 2) as usize, "opp_test", &mut rng, false, true, false, None, None, 0, seed, None,
+            SearchConfig::from_env(), false, None, DOME_DICE_LAST_ROUND_DEFAULT, None,
+            opponent.map(|(net, side, record_sides)| OpponentConfig { net, side, record_sides }),
+        );
+        set_label_rng_split_for_test(None);
+        assert!(!records.is_empty(), "Partie ohne Records");
+        records
+    }
+
+    fn strip(records: &[Value]) -> Vec<Value> {
+        records
+            .iter()
+            .map(|r| {
+                let mut r = r.clone();
+                if let Some(m) = r.as_object_mut() {
+                    m.remove("opponent_side");
+                    m.remove("net_label");
+                }
+                r
+            })
+            .collect()
+    }
+
+    fn player_of(r: &Value) -> usize {
+        r["player"].as_u64().expect("player") as usize
+    }
+
+    // ── ohne Netz ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn record_sides_parser_and_defaults() {
+        assert_eq!(parse_record_sides("both"), Some(RecordSides::Both));
+        assert_eq!(parse_record_sides(" primary "), Some(RecordSides::Primary));
+        assert_eq!(parse_record_sides("opponent"), Some(RecordSides::Opponent));
+        assert_eq!(parse_record_sides(""), Some(RecordSides::Both));
+        assert_eq!(parse_record_sides("Opponent"), None);
+        assert_eq!(parse_record_sides("e"), None);
+        for s in [RecordSides::Both, RecordSides::Primary, RecordSides::Opponent] {
+            assert_eq!(parse_record_sides(s.as_str()), Some(s));
+        }
+        assert_eq!(record_sides(), Ok(RecordSides::Both), "Test laeuft ohne MOSAIC_RECORD_SIDES");
+        assert_eq!(opponent_model_path(), None, "Test laeuft ohne MOSAIC_OPPONENT_MODEL");
+    }
+
+    /// Seite 50:50, 2x2-Tafel mit dem Startspieler (Ableitung wie in
+    /// `run_net_self_play`), reproduzierbar, eine eigene Muenze.
+    #[test]
+    fn opponent_side_is_balanced_and_reproducible() {
+        let n = 10_000u64;
+        let mut table = [[0u32; 2]; 2];
+        let mut same_as_tiebreak = 0u32;
+        for i in 0..n {
+            let game_seed = 12345u64.wrapping_add(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            let mut rng = StdRng::seed_from_u64(game_seed);
+            let _ids = sample_valid_scoring_ids(3, &mut rng);
+            let first = rng.random_range(0..2usize);
+            let s = opponent_side_for(game_seed);
+            table[s][first] += 1;
+            same_as_tiebreak += u32::from(s == tiebreak_side_for(game_seed));
+        }
+        let side0 = table[0][0] + table[0][1];
+        assert!((4800..=5200).contains(&side0), "Seite 0 in {side0} von {n}");
+        for row in table {
+            for cell in row {
+                assert!((2350..=2650).contains(&cell), "2x2-Tafel Seite x Startspieler unbalanciert: {table:?}");
+            }
+        }
+        assert!((4800..=5200).contains(&same_as_tiebreak), "keine eigene Muenze: {same_as_tiebreak}");
+        assert_eq!(opponent_side_for(77), opponent_side_for(77));
+    }
+
+    #[test]
+    fn side_assign_and_labels() {
+        assert_eq!(side_assign(1, None), [1, 1]);
+        assert_eq!(side_assign(1, Some((0, 2))), [2, 1]);
+        assert_eq!(side_assign(1, Some((1, 2))), [1, 2]);
+        assert_eq!(net_label_for(1, 1), "opponent");
+        assert_eq!(net_label_for(0, 1), "primary");
+        for side in 0..2 {
+            for player in 0..2 {
+                assert!(record_keep(player, side, RecordSides::Both));
+                assert_eq!(record_keep(player, side, RecordSides::Opponent), player == side);
+                assert_eq!(record_keep(player, side, RecordSides::Primary), player != side);
+            }
+        }
+    }
+
+    #[test]
+    fn filter_record_sides_keeps_exactly_one_side() {
+        let recs: Vec<Value> = (0..6).map(|i| json!({ "player": i % 2, "i": i })).collect();
+        let opp = filter_record_sides(recs.clone(), 1, RecordSides::Opponent);
+        let prim = filter_record_sides(recs.clone(), 1, RecordSides::Primary);
+        assert_eq!(opp.iter().map(|r| r["i"].as_u64().unwrap()).collect::<Vec<_>>(), vec![1, 3, 5]);
+        assert_eq!(prim.iter().map(|r| r["i"].as_u64().unwrap()).collect::<Vec<_>>(), vec![0, 2, 4]);
+        assert_eq!(filter_record_sides(recs.clone(), 1, RecordSides::Both), recs);
+    }
+
+    #[test]
+    #[should_panic(expected = "Record ohne `player`")]
+    fn filter_record_sides_panics_without_player() {
+        let _ = filter_record_sides(vec![json!({ "x": 1 })], 0, RecordSides::Opponent);
+    }
+
+    #[test]
+    fn opponent_conflicts_are_rejected() {
+        let b = RecordSides::Both;
+        assert_eq!(opponent_conflict(false, b, true, true, true, true, true), None, "AUS: Bestand, nichts geprueft");
+        assert!(opponent_conflict(false, RecordSides::Opponent, false, false, false, false, false).is_some());
+        assert!(opponent_conflict(false, RecordSides::Primary, false, false, false, false, false).is_some());
+        assert_eq!(opponent_conflict(true, b, false, false, false, false, false), None);
+        assert_eq!(opponent_conflict(true, RecordSides::Opponent, false, false, false, false, false), None);
+        assert!(opponent_conflict(true, b, true, false, false, false, false).unwrap().contains("DOME_DICE"));
+        assert!(opponent_conflict(true, b, false, true, false, false, false).is_some());
+        assert!(opponent_conflict(true, b, false, false, true, false, false).is_some());
+        assert!(opponent_conflict(true, b, false, false, false, true, false).unwrap().contains("EXCURSION"));
+        assert!(opponent_conflict(true, b, false, false, false, false, true).unwrap().contains("rtv"));
+    }
+
+    // ── mit Netz ───────────────────────────────────────────────────────────
+
+    /// N1: Gegner = zweites Laden DESSELBEN Netzes -> die Partie ist byte-gleich
+    /// zum Bestand bis auf die zwei Stempelfelder (Seite per Hash, Gegner-Label
+    /// aus demselben abgeleiteten Strom). Felder auf jedem Record, `net_label`
+    /// passt zu `player`.
+    #[test]
+    fn same_weights_reproduce_the_baseline() {
+        let net = champion_net();
+        let twin = champion_net();
+        for seed in [11u64, 12] {
+            let base = play(&net, None, seed);
+            assert!(base.iter().all(|r| r.get("opponent_side").is_none() && r.get("net_label").is_none()),
+                "Bestand ohne Felder");
+            for side in 0..2 {
+                let with = play(&net, Some((&twin, side, RecordSides::Both)), seed);
+                assert_eq!(strip(&with), base, "Seed {seed}, Seite {side}: Partie weicht vom Bestand ab");
+                for r in &with {
+                    assert_eq!(r["opponent_side"], json!(side));
+                    assert_eq!(r["net_label"], json!(net_label_for(player_of(r), side)));
+                }
+            }
+        }
+    }
+
+    /// N2: Rollentausch mit zwei VERSCHIEDENEN Netzen. Partie(primaer A, Gegner B
+    /// auf Seite s) und Partie(primaer B, Gegner A auf Seite 1-s) lassen jeden
+    /// Spieler mit demselben Netz spielen; sie muessen bis auf `net_label` gleich
+    /// sein. Nimmt irgendeine Netzstelle (Bauplan 2b) das Primaernetz statt das
+    /// der Seite, laufen die Partien auseinander.
+    #[test]
+    fn role_swap_gives_the_same_game() {
+        let a = test_net();
+        let b = champion_net();
+        for seed in [21u64, 22] {
+            let base_a = play(&a, None, seed);
+            for s in 0..2 {
+                let g1 = play(&a, Some((&b, s, RecordSides::Both)), seed);
+                let g2 = play(&b, Some((&a, 1 - s, RecordSides::Both)), seed);
+                assert_eq!(strip(&g1), strip(&g2), "Seed {seed}, Seite {s}: Rollentausch aendert die Partie");
+                assert_ne!(strip(&g1), base_a, "Seed {seed}: das Gegner-Netz hat nichts bewirkt");
+            }
+        }
+    }
+
+    /// N3: der Seitenfilter liefert genau die Records einer Seite, und beide
+    /// Haelften zusammen sind `both`.
+    #[test]
+    fn record_sides_split_the_both_records() {
+        let a = test_net();
+        let b = champion_net();
+        let seed = 31u64;
+        let side = 1usize;
+        let both = play(&a, Some((&b, side, RecordSides::Both)), seed);
+        let opp = play(&a, Some((&b, side, RecordSides::Opponent)), seed);
+        let prim = play(&a, Some((&b, side, RecordSides::Primary)), seed);
+        assert!(!opp.is_empty() && !prim.is_empty());
+        assert!(opp.iter().all(|r| player_of(r) == side && r["net_label"] == json!("opponent")));
+        assert!(prim.iter().all(|r| player_of(r) != side && r["net_label"] == json!("primary")));
+        let want_opp: Vec<Value> = both.iter().filter(|r| player_of(r) == side).cloned().collect();
+        let want_prim: Vec<Value> = both.iter().filter(|r| player_of(r) != side).cloned().collect();
+        assert_eq!(opp, want_opp);
+        assert_eq!(prim, want_prim);
     }
 }

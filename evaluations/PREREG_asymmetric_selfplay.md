@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel-Kuppelplatten auf einer Seite, ein stoerender Gegner) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W in Vollform verliert 75-77 % mit verzerrten Wertzielen (par.5a/5b1); jetzt Eroeffnungs-Wuerfel R1/R1-2 mit Wertmaske gebaut, Sonde S5 offen (par.5d). Stoerer B war konfundiert (S Q-gierig, 77-81 %, par.5c1), repariert, S4b neu offen (par.5c2). Nebenbefund Zugwahl der Erzeugung offen (par.5e). -->
+<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W Vollform verliert 75-77 % (par.5a); Eroeffnungs-Wuerfel R1 ausgeglichen, G-KL +0,03 CI um 0 (par.5d1). Stoerer-Knopf traegt nicht (par.5c3). Exploiter E_3 gegen G 46 % statt >= 55 % (par.7a), geschlossen. TRAEGT: Q-Stichentscheid der Erzeugungs-Zugwahl 75 % gegen Bestand (par.5e3), Vorschlag Modus 2. Sockel @400: KL x2, aber -15 Punkte (par.8a). Offen: v35-Sockel (Nutzer). -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -523,6 +523,92 @@ models/v35.recipe.json:15): `argmax_index` der Besuche, Gleichstand = ERSTER Ein
    Punkte, Spaltenbau) und, falls gross, als Erzeugungsfrage fuer das naechste Fenster.
 Vorschlag, keine Entscheidung: Frage 1 zuerst (billig, aus einem Instrumentierungs-Test), dann 3.
 
+##### par.5e1 MESSPLAN par.5e (REGISTRIERT 2026-10-04 vor Bau und Messung; Nutzer: *"par.5e zuerst messen"*)
+
+**Frage 1 (Gleichstand):** `#[ignore]`-Test `tie_frequency_report` (self_play.rs, Muster `dice_tree_depth_report`):
+Zustaende = alle Drafting-Records mit `root_q` und mehr als einer legalen Aktion aus 20 Partien des Champions
+`v34-b01` (Erzeugungsbedingungen: 100 Sims, Root-Noise, Gumbel, `SearchConfig::from_env()`; Partie-Seeds
+4711 ff.). Je Zustand EINE Suche @100, Such-Seed 7; aus `stats` (Aktion, Besuche, Q) werden gezaehlt:
+(a) Anteil der Entscheide, bei denen mindestens zwei Wurzelkinder die MAXIMALE Besuchszahl teilen;
+(b) Anteil, bei dem die Bestands-Wahl (`argmax_index`, erster Eintrag) von der Wahl "Besuche, dann Q"
+(`deterministic`-Zweig) abweicht; (c) Anteil, bei dem sie von "hoechstes Q unter den Halving-Ueberlebenden"
+(`visits >= n_min`) abweicht, dazu Mittel und Median der Q-Differenz (Gewinnwahrscheinlichkeit) in den Faellen
+von (c); (d) alles getrennt nach Runde. **Grundmenge** Drafting-Entscheide mit > 1 Aktion, **Einheit** Anteil
+je Entscheid bzw. Q-Differenz in Gewinnwahrscheinlichkeit. Keine Schwelle: Frage 1 beschreibt.
+
+**Frage 3 (Wirkung), GEAENDERT 00:30 vor dem Lauf:** Spec-Feld je Seite `tau_tiebreak_q` (0 = Bestand,
+byte-gleich; 1 = im tau-Zweig Gleichstand der Besuche nach Q brechen, wie der `deterministic`-Zweig; 2 =
+unter den Halving-Ueberlebenden das hoechste Q, Gumbel-MuZero-Form). Die urspruenglich geplante gepaarte
+Arena ist UNTAUGLICH: der Arena-Pfad (`net_arena_choose_action`, self_play.rs:4975 ->
+`net_search_drafting_action`, :4994) laeuft nie durch den tau-Zweig der Erzeugung, beide Arme waeren
+zuggleich (Agent-Befund, vom Koordinator an den Zeilen geprueft). Stattdessen dieselbe Anordnung, in der der
+Befund par.5c1 entstand: **asymmetrisches Self-Play**, eine Seite je Partie (50:50 aus einem Hash des Partie-Seeds wie
+`dome_dice_side`, ohne Ziehung aus dem Partie-RNG; Knopf `MOSAIC_TAU_TIEBREAK_SIDE=1`, Record-Feld `tiebreak_side`) spielt mit `tau_tiebreak_q` = Modus, die andere
+mit 0; Klassen `policy-tb1` und `policy-tb2` in `models/v35_probes2.recipe.json`, je **200 Partien**,
+Erzeugungs-Rezept (100 Sims, R5 @400, Weg C, Spiegelknopf), Seeds 20261740/41. Berichtet: Siegquote der
+Knopf-Seite gegen 0,50 mit Block-Bootstrap-CI (Block Datei), Punkte und Marge beider Seiten, sechs
+Standard-Kennzahlen, Kosten je Partie. **Leseregel:** CI der Siegquote ganz ueber 0,50 UND Punktmarge > 0 ->
+der Modus geht als Vorschlag in das v35-Sockel-Rezept (Nutzer-Entscheid am Morgen, weil es die Zugwahl des
+Generators aendert; bei zwei bestandenen Modi der mit der hoeheren Siegquote); CI mit 0,50 -> Bestand bleibt,
+berichtet; CI ganz unter 0,50 -> Bestand bleibt, par.5c1 war dann etwas anderes (zu klaeren). Eingebaute
+Kontrolle: Modus 0 auf beiden Seiten ist byte-gleich der Klasse `policy` (Anker-Invarianz prueft den Bestand).
+
+##### par.5e2 ERGEBNIS Frage 1 (2026-10-04 00:38-00:40, `tie_frequency_report`, Kette `tools/night_v35_prep_chain1.sh`; Anker-Drift und -Konservierung auf dem neuen Wheel GRUEN)
+
+20 Partien `v34-b01` in Erzeugungsbedingungen (100 Sims, Root-Noise, `MOSAIC_TAU_ARGMAX_FROM_MOVE=1`, Weg C;
+ABWEICHUNG: Runde 5 hier @100 statt @400, weil `r5_net_sims` keinen Env-Knopf hat), je Entscheid eine Nachsuche
+@100 mit Such-Seed 7. **Grundmenge** n = 2.833 Drafting-Entscheide mit `root_q` und > 1 Aktion, **Einheit** Anteil
+je Entscheid bzw. Q-Differenz in Gewinnwahrscheinlichkeit:
+
+| Runde | n | (a) Gleichstand auf max. Besuchen | (b) Bestand != Besuche-dann-Q | (c) Bestand != bestes Q der Ueberlebenden | Q-Diff. (c) Mittel / Median |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 601 | 0,117 | 0,087 | 0,276 | 0,014 / 0,008 |
+| 2 | 605 | 0,091 | 0,061 | 0,222 | 0,023 / 0,011 |
+| 3 | 634 | 0,148 | 0,099 | 0,259 | 0,019 / 0,011 |
+| 4 | 581 | 0,172 | 0,121 | 0,219 | 0,025 / 0,008 |
+| 5 (@100) | 412 | 0,240 | 0,153 | 0,286 | 0,033 / 0,005 |
+| **Summe** | **2.833** | **0,148** | **0,101** | **0,250** | **0,022 / 0,009** |
+
+Lesart: in rund jedem siebten Entscheid liegen Wurzelkinder bei den Besuchen gleichauf, und in jedem zehnten
+spielt die Erzeugung dadurch einen anderen Zug als "Besuche, dann Q". Jeder vierte Zug weicht vom besten Q der
+Halving-Ueberlebenden ab, im Median um 0,9 Prozentpunkte Gewinnwahrscheinlichkeit (Mittel 2,2). Ob das Staerke
+kostet, misst Frage 3 (Klassen `policy-tb1`/`-tb2`, laufen in derselben Kette).
+
+##### par.5e3 ERGEBNIS Frage 3 (2026-10-04 00:51-01:13, Klassen `policy-tb1`/`policy-tb2`, Artefakte `evaluations/artifacts/tiebreak_side_tb1.json`, `_tb2.json`)
+
+Je Modus 200 Partien, eine Seite je Partie mit dem Modus, die Gegenseite Bestand (Modus 0), sonst Erzeugungs-
+Rezept @100. **Grundmenge** 200 Partien je Klasse (alle mit eindeutigem `tiebreak_side`), **Einheit** Siegquote je
+Partie (CI Block-Bootstrap ueber Dateien), Punkte und Marge je Partie, Kennzahlen je Seite ueber 200 Seiten:
+
+| Groesse | Modus 1 (Besuche, dann Q) | Modus 2 (bestes Q der Ueberlebenden) |
+| --- | --- | --- |
+| Siegquote Knopf-Seite [CI] | **0,745 [0,690; 0,800]** | **0,755 [0,715; 0,795]** |
+| Punkte Knopf-Seite / Bestand-Seite, Marge | 58,6 / 43,1, +15,5 | 59,7 / 41,9, +17,8 |
+| volle Spalten je Seite Knopf / Bestand | 1,04 / 0,79 | 1,09 / 0,85 |
+| Strafleiste je Seite Knopf / Bestand | 4,3 / 6,5 | 4,1 / 7,3 |
+| Versatz Wertkopf Knopf / Bestand | -0,184 / +0,170 (CI ohne 0) | -0,161 / +0,149 (CI ohne 0) |
+| s je Partie (11 Threads) | 2,974 | 2,813 |
+
+**Leseregel: BEIDE Modi bestehen** (CI ganz ueber 0,50, Marge > 0); nach Regel geht der Modus mit der hoeheren
+Siegquote als Vorschlag ins v35-Sockel-Rezept: **Modus 2** (die Intervalle ueberlappen fast vollstaendig; Modus 2
+ist zugleich die Gumbel-MuZero-Form der Endauswahl). Lesart: der Bestand der Erzeugung (argmax Besuche, Gleichstand
+= erster Eintrag, par.5e) verschenkt gegen dieselbe Suche mit Q-Stichentscheid drei von vier Partien und 15 bis 18
+Punkte; die Verengung von Tor 1 (par.7 Anlass) hat damit einen benannten Mitverursacher: der Generator spielte seit
+`tau_argmax_from_move` 1 unter seiner eigenen Suche. Das Policy-ZIEL war davon nie betroffen (completed-Q), nur die
+Trajektorie und damit die Wertziele. Der Versatz des Wertkopfs (Knopf-Seite -0,16: der Kopf unterschaetzt den
+Spieler mit korrektem Stichentscheid) passt dazu: der Kopf ist auf Trajektorien des Bestands geeicht.
+**Nutzer-Entscheid am Morgen:** Modus 2 (oder 1) in das v35-Sockel-Rezept und in die Schwarm-Klassen (die
+`value-*`-Klassen laufen ebenfalls mit `tau_argmax_from_move` 1 und sind betroffen; der schon erzeugte v35-Schwarm
+traegt den Bestand). **Annahme fuer die Nacht (Koordinator):** die Exploiter-Zyklen (par.7) laufen mit Modus 2 auf
+BEIDEN Seiten, weil ein Exploiter gegen den Bestand eine Schwaeche ausnutzen wuerde, die der v35-Sockel voraus-
+sichtlich nicht mehr hat; faellt der Entscheid anders, sind die Zyklen zu wiederholen (rund 3,5 h).
+**Rueckwaerts-Pruefung (Konsumenten von `tau_argmax_from_move` 1, Grep 01:30):** `models/v34.recipe.json` und
+`models/v35.recipe.json` (der schon erzeugte v35-Schwarm traegt den Bestand; v34 ebenso, erklaert nichts
+rueckwirkend falsch, weil Policy-Ziele unberuehrt sind); `PREREG_difficulty_levels.md` Z. 1029 (eine Stufen-Spec
+mit `tau_argmax_from_move` wuerde den Bestands-Stichentscheid erben; der GUI-Pfad selbst ist nicht betroffen, er
+spielt ueber `select_final_root_child` mit Q); `PREREG_search_path_remeasurements.md` M3/3-V (Sampling gegen argmax,
+nicht widerlegt: beide Arme dort hatten denselben Stichentscheid).
+
 ### par.5d NUTZER-ENTSCHEID 2026-10-03: W als Eroeffnungs-Wuerfel (REGISTRIERT vor Bau und Lauf)
 
 Anlass (par.5a/par.5b1): W verliert 75-77 %, die Wertziele beider Seiten sind verzerrt, und G sieht keine
@@ -545,6 +631,50 @@ Positionswahl-Records bleiben.
    heisst "andere Stellungen". Sonst traegt W keine neuen Stellungen, Nutzer-Entscheid ueber W.
 3. Siegquote, Punkte, gezahlte Wuerfelpunkte, Kosten je Partie werden berichtet, ohne Schwelle.
 
+#### par.5d1 ERGEBNIS S5 (2026-10-04 00:04-00:25, Kette `tools/asym_s5_s4b2_chain.sh`, Artefakte `evaluations/artifacts/asym_probe_s5_r1.json`, `_r2.json`)
+
+Vorher Lib-Suite gruen, Wheel neu, Anker-Drift und -Konservierung GRUEN (`anchor_v2_*_20261003_s5.json`). Je Arm
+100 Partien, Seed 20261720, Bezug `policy` (par.5a; Grundmengen und Einheiten wie par.5a; Versatz und KL NUR
+ueber Drafting-Records NACH der Wuerfelphase, `--post-dice-phase`):
+
+| Groesse | `policy-dice-r1` (R_dice 1) | `policy-dice-r2` (R_dice 1-2) |
+| --- | --- | --- |
+| Siegquote W [CI] | **0,51 [0,40; 0,62]** | 0,34 [0,29; 0,40] |
+| Punkte W / G, Marge | 45,08 / 45,07, +0,01 | 40,28 / 48,96, -8,68 |
+| gezahlte Wuerfelpunkte je Partie | 0,93 | 1,97 |
+| Mehrkosten je Partie gegen `policy` | +9,2 % | +10,7 % |
+| Versatz W / G [CI] | -0,035 [-0,121; +0,053] / +0,017 [-0,066; +0,107] | +0,017 [-0,043; +0,076] / -0,022 [-0,082; +0,042] |
+| KL-Differenz G gegen Sockel [CI] (n) | +0,030 [-0,012; +0,071] (4.497) | +0,021 [-0,032; +0,077] (2.906) |
+| KL-Differenz W gegen Sockel [CI] (n) | +0,029 [-0,007; +0,070] (4.392) | +0,019 [-0,041; +0,075] (2.952) |
+
+**Leseregel 1 (Versatz) HAELT in beiden Armen** (alle vier CI enthalten 0): die Wertmaske der Wuerfelphase
+reicht, nach der Phase ist der Wert unverzerrt. **Leseregel 2 (G sieht andere Stellungen) HAELT NICHT:** beide
+CI enthalten 0. Die Punktschaetzer liegen in beiden Armen und auf beiden Seiten ueber dem Sockel (+0,02 bis
++0,03 auf 0,316, also rund 6-10 % hoehere KL), bei n = 100 Partien aber nicht aufloesbar. R1 ist ausgeglichen
+(51 %) und kostet 9 %; R2 benachteiligt W (34 %). **Nach Leseregel: Nutzer-Entscheid ueber W** (Vorschlag des
+Koordinators: wenn W, dann R1; der Nachweis "andere Stellungen" braeuchte rund 400 Partien, HERLEITUNG aus der
+CI-Breite 0,08 bei 100).
+
+#### par.5c3 ERGEBNIS S4b neu, Stoerer B repariert (2026-10-04 00:09-00:26, Artefakt `evaluations/artifacts/asym_probe_s4b2.json`)
+
+Je eps 100 Partien, Seeds 20261730-32, Bezug `policy` 46,855 Punkte je Seite (par.5a):
+
+| eps | Siegquote S [CI] | Punkte S / G | Marge S | Anteil `aggr_switched` | mittl. `aggr_opp_drop_pts` | Versatz S / G | s je Partie |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0,01 | 0,47 [0,40; 0,55] | 44,26 / 44,82 | -0,56 | 0,057 | 0,05 | +0,016 / -0,044 | 2,973 |
+| 0,02 | 0,47 [0,42; 0,50] | 44,86 / 46,39 | -1,53 | 0,084 | 0,07 | +0,027 / -0,038 | 2,842 |
+| 0,04 | 0,49 [0,39; 0,59] | 45,28 / 45,29 | -0,01 | 0,106 | 0,08 | +0,015 / -0,040 | 2,930 |
+
+(Grundmenge `aggr_switched`: rund 5.900 Drafting-Records der S-Seite je eps; Versatz-CI enthalten alle 0.)
+**Die Konfundierung aus par.5c1 ist weg:** S liegt bei 47-49 %, nicht mehr bei 77-81 %. **B ist aber zu
+schwach:** die Leseregel par.5c waehlt formal eps 0,04 (S >= 0,45, G 45,29 < 46,855), die G-Senkung betraegt
+dort 1,57 Punkte (< 2) und bei eps 0,01 2,03 bei gleichzeitig -2,6 Punkten fuer S selbst; S weicht nur in 6-11 %
+der Zuege ab, um 0,05-0,08 prognostizierte Gegnerpunkte je Zug (rund 0,3 Punkte je Partie, HERLEITUNG), und
+beide Seiten liegen 1-2 Punkte unter dem `policy`-Bezug anderer Seeds (Streuung rund 15 Punkte je Partie, SE des
+Mittels rund 1,5, also Rauschen). **Verdikt: Stoerer als Suchknopf (Blend UND lexikografisch) traegt nicht;
+Linie geschlossen, Ersatz ist der trainierte Exploiter (par.7).** Nutzer-Entscheid 2026-10-04 00:00 (Exploiter
+statt Stoerer) damit bestaetigt.
+
 ## par.6 BAU (nach der v34-Erzeugung, in der Wheel-Runde mit E4 und dem Review-Rest)
 
 Engine: Wuerfel-Seite und Wuerfel in der Self-Play-Schleife (Partie-RNG bzw. eigener Strom nach
@@ -555,3 +685,164 @@ Danach Anker-Invarianz, Netz-Paritaets-Fixture, Smoke. Fuer S: Spec-Feld je Seit
 Neue Mischstellen: keine (die Wuerfel nehmen dem Spieler nichts, was er rechtmaessig hat; sie
 ERSETZEN seine Wahl), Eintrag in `docs/architecture_reference.md` darum nicht noetig, beim Bau
 pruefen.
+
+
+## par.7 EXPLOITER-GEGNER (NUTZER-ENTSCHEID 2026-10-04, REGISTRIERT vor Bau und Lauf)
+
+**Anlass:** Tor 1 verengt sich ueber die Generationen (v31 57,6 %, v32 54,3 %, v33 52,5 %; Koepfe der
+Fenster-Preregs), der Stoerer als Suchknopf bewegt G nur um Rauschen (par.5a, par.5c1), und W verzerrt
+die Wertziele (par.5a/5b1). Koordinator-Vorschlag, vom Nutzer angenommen (*"den stoerer als trainierten
+exploiter find ich gut"*; Entscheide: *"3 x 1000, sims 100, tor 55 %"*).
+
+**Konstruktion (AlphaStar-Form):** E_0 = Kopie des Generators G (`v34-b01`). Zyklus k = 1..3: 1.000
+Partien E_{k-1} gegen G @100 Sims, E-Seite je Partie 50:50 Spieler 0 oder 1 (Partie-RNG), **Records NUR
+von der E-Seite** (Policy aus der eigenen Suche, Wert = Partieausgang aus E-Sicht); dann Warm-Start-Training
+E_k aus E_{k-1} auf genau diesen Records (Afterburner-Muster, `docs/measured_runtimes.md` Z. 52-53: 6 Epochen,
+uebrige Flags wie das v34-Training). G bewegt sich nicht. **Die Wertverzerrung von W tritt hier nicht auf:**
+E ist kein behinderter, sondern ein anderer Spieler; G-Records gegen E tragen den echten Ausgang gegen
+diesen Gegner (HERLEITUNG).
+
+**Tor (Nutzer):** E_3 schlaegt G in einer gepaarten Arena @100 Sims (200 Paare, Blockgroesse 5, Seed
+20261745) mit **mindestens 55 %** der Partien. Haelt das Tor, kommt die Sockel-Klasse `policy-exploiter`
+(G gegen E_3, sonst Sockel-Einstellung) in den v35-Sockel-Vorschlag; sonst wird berichtet, keine Klasse.
+**NUTZER 2026-10-04 00:20: Records BEIDER Seiten mitschreiben** (*"ja, beide seiten mitschreiben. waere schon
+gut wenn er sich ein paar aggressive moves abschaut"*), jeder Record mit Seitenmarkierung (`opponent_side`,
+`net_label`). Standardvorschlag fuer das Fenster: G-Seite voll; E-Seite als ZWEITE Klasse mit eigener
+Registrierung, Entscheid am Morgen, wie die E-Policy gefiltert wird (alles, oder nur Zuege, die auch G
+plausibel findet, z. B. ueber G's Prior auf E's Zug; `own_q_gap` aus Klasse S ist dafuer NICHT die richtige
+Groesse, weil es E's eigene Bewertung misst). Die Auswahl passiert im Training, nicht in der Erzeugung. Zusaetzlich berichtet je Zyklus: Siegquote E gegen G, Punkte und Marge beider Seiten,
+sechs Standard-Kennzahlen, Laufzeit im Artefakt.
+
+**Bau (Record-Feld-Regel: VOR der Erzeugung):** Self-Play mit zweitem Netz je Seite (`--opponent-model`,
+Seitenwahl je Partie, Record-Feld `opponent_side` auf jedem Record einer solchen Partie, `net_label` je
+Record), Schalter welche Seite Records schreibt (`--record-sides both|primary|opponent`); Rezept-Schluessel,
+Manifest, Waechter. Knopf AUS byte-gleich (Lib-Tests, Anker-Invarianz, Netz-Paritaets-Fixture). Kosten
+HERLEITUNG: je Zyklus rund 50 min Partien (3 s je Partie, par.5a) plus rund 10 min Training; drei Zyklen plus
+Tor-Arena rund 3,5 h.
+
+**Bauform, REGISTRIERT 2026-10-04 01:00 vor Kompilat und Lauf** (Bauplan `evaluations/exploiter_build_plan.md`,
+Agent 2, Entscheide D1-D7; vom Koordinator angenommen): (D2) Seitenwahl des Gegner-Netzes je Partie aus einem
+Hash des Partie-Seeds wie `dome_dice_side`, nicht aus dem Partie-RNG (der bleibt bei AN und AUS unberuehrt);
+(D3) Zyklus-Partien mit `--record-sides both`, trainiert wird auf einer Kopie nur der E-Records
+(`tools/split_records_by_net_label.py`), weil die Datenschicht nicht nach Feldern filtert und die Kennzahlen
+den letzten Record je Partie brauchen; (D4) das Bootstrap-Label (`bootstrap_value`, TD-lambda 0,5 Anteil am
+Wertziel) kommt je Seite aus dem Netz DIESER Seite, sonst waere die Haelfte von E's Wertziel G's Urteil; Grenze:
+im Bootstrap spielt E gegen E weiter (HERLEITUNG); (D5) nicht kombinierbar mit Wuerfel, Stoerer, Stichentscheid-
+Seite, Ausflug, `--rtv`; (D6) Dateinamen nach dem ERZEUGER: Zyklus k heisst `x35-e0{k-1}-cycle`, `e00` =
+`v34-b01_brierbest`; (D7) der Gegner-Pfad kommt als Flag von der Kette (`_brierbest`, sonst finales Modell;
+Manifest-Pruefung `engine_config.opponent_model`). Seeds: Partien 20261750/51/52, Training 20261753/54/55,
+Smoke 20261756, Tor-Arena 20261745. Smoke-Schritt in der Kette: 10 Partien ohne und 10 mit Gegner E_0 bei
+gleichem Seed muessen bis auf `opponent_side`, `net_label`, `game_id` identisch sein (Byte-Gleichheit der
+Netzwahl bei gleichen Gewichten), sonst Stopp.
+
+**Lauf-Chronik (Koordinator):** Kette gestartet 01:24; Lib 856 gruen, Anker-Drift und -Konservierung GRUEN
+(`anchor_v2_*_20261004_exploiter.json`), Paritaets-Fixture GRUEN, Smoke identisch. Zyklus 1: 1.000 Partien in
+6.126,6 s (**6,13 s je Partie**, 11 Threads; die HERLEITUNG oben mit 3 s war falsch, zwei Netze kosten das
+Doppelte), Training `x35-e01` 183 s (6 Epochen, 347 Batches je Epoche; `_best` Epoche 2, `_brierbest` Epoche 1,
+Policy-Val flach bei 1,02, "kein Plateau"). Stopp 03:19 am Manifest-Diff: `margin_threshold_weight`/`margin_thresholds`
+sind train.py-Defaults vom 2026-10-02 (train.py:3453/3463), juenger als das v34-Manifest, inaktiv; Falsch-Positiv,
+Diff-Liste korrigiert. **Koordinator-Entscheid 03:25 (vor Zyklus 2): E_k ist das FINALE Modell `alphazero_x35-e0k`,
+nicht `_brierbest`** (das war Epoche 1, der am wenigsten vom Generator entfernte Stand; der Exploiter braucht die
+am weitesten spezialisierte Policy). D7 ist damit ueberholt. Wiederaufnahme ab Zyklus 2 mit `EXPLOITER_FROM_CYCLE=2`.
+
+**Zyklen 1 und 2, Kennzahlen** (`evaluations/artifacts/exploiter_cycle_1.json`, `_2.json`; Grundmenge je 1.000
+Partien, Einheit Siegquote je Partie mit Block-Bootstrap-CI ueber 100 Dateien, Punkte je Partie; Kennzahlen je
+Seite ueber 1.000 Seiten):
+
+| Zyklus | Paarung | Siegquote E [CI] | Punkte E / G | volle Spalten E / G | Strafleiste E / G |
+| --- | --- | --- | --- | --- | --- |
+| 1 | G gegen E_0 (= G) | 0,520 [0,489; 0,552] | 53,3 / 52,6 | 0,91 / 0,91 | 5,0 / 5,2 |
+| 2 | G gegen E_1 | **0,458 [0,430; 0,486]** | 52,4 / 54,3 | 0,93 / 0,90 | 5,0 / 4,9 |
+
+Zyklus 1 ist die Nullkontrolle (gleiche Gewichte, 52 %, CI mit 0,50). **Zyklus 2: E_1 ist SCHWAECHER als G** (CI
+ganz unter 0,50, -1,9 Punkte), nicht staerker. HERLEITUNG (vorlaeufig, vor Zyklus 3 und Tor): ein Afterburner
+ueber 6 Epochen auf rund 99.000 E-Records aus einem 50:50-Regime erzeugt keine Gegenstrategie, sondern eine
+verrauschte Kopie (Policy-Val flach 1,02-1,03; Value-R2 von 0,45 auf 0,53 ist Anpassung an den kleinen Satz). Die
+AlphaStar-Form braucht vermutlich ein Vielfaches an Partien je Zyklus oder ein anderes Ziel (nur Verlustpartien
+von G, hoeheres Gewicht auf E-Siege); das Tor 55 % wird nach diesem Stand voraussichtlich NICHT fallen. Zyklus 3 und
+Tor laufen wie registriert weiter (Nutzer-Entscheid 3 x 1.000), Ergebnis unten. Nebenbefund: beide Seiten holen
+mit Stichentscheid Modus 2 rund 53 Punkte je Partie gegen 46,9 im Bestand-Sockel `policy` (par.5a), konsistent
+mit par.5e3.
+
+**Zyklus 3, Lauf-Chronik:** Start 05:17 (E_2 = `alphazero_x35-e02` final); um 05:24 beendete der Harness die
+Hintergrundaufgabe (Zeitlimit 2 h), danach scheiterten neue Chunk-Subprozesse mit Exit 0xC0000142, self_play.py
+brach bei 70 Partien ab (Chunks 0-6 vollstaendig). **Teil-Wiederaufnahme 05:40 im Terminal-Tab** nach der
+Tail-Konvention: `--games 930 --seed 20261759` (Basis 20261752 + 7 Chunks), Rezept-Overrides im Manifest; die
+Kennzahlen laufen ueber alle 100 Dateien, `laufzeit_vollstaendig` = false (Abbruchlauf ohne Laufzeit).
+**Befund (Agent 2, vom Koordinator an `make_chunk` nicht nachgeprueft, Lesart plausibel): die Chunk-Seeds sind
+Basis + Chunk-Index, und die Basis-Seeds 20261750/51/52 liegen nur um 1 auseinander** -- Chunk i von Zyklus 2
+startet mit demselben Seed wie Chunk i+1 von Zyklus 1 (gleiche Wertungsplatten, gleicher Startspieler), nur mit
+anderem E. Je Zyklus sauber, ueber Zyklen korreliert; fuer eine Sockel-Klasse aus mehreren Zyklen und fuer
+kuenftige Zyklus-Seeds mindestens 100 Abstand waehlen.
+
+### par.7a ERGEBNIS EXPLOITER: Zyklus 3 und Tor (2026-10-04 05:29-07:39; Artefakte `exploiter_cycle_3.json`, `exploiter_gate.json`, `plate_points_exploiter_gate.json`, `arena_columns_exploiter_gate.json`)
+
+| Zyklus | Paarung | Siegquote E [CI] | Punkte E / G | Marge E |
+| --- | --- | --- | --- | --- |
+| 1 | G gegen E_0 (= G) | 0,520 [0,489; 0,552] | 53,3 / 52,6 | +0,7 |
+| 2 | G gegen E_1 | 0,458 [0,430; 0,486] | 52,4 / 54,3 | -1,9 |
+| 3 | G gegen E_2 | 0,476 [0,443; 0,508] | 52,0 / 53,1 | -1,1 |
+
+(Grundmenge je 1.000 Partien @100, Erzeugungsbedingungen, Stichentscheid Modus 2 beide Seiten; Zyklus 3 aus
+zwei Laeufen, 70 plus 930 Partien, Laufzeit des Abbruchlaufs fehlt.)
+
+**TOR (par.7): E_3 gegen G, gepaarte Arena @100, 200 Paare = 400 Partien, Blockgroesse 5, Seed 20261745,
+Fruehstopp aus, 1.797 s bei 10 Threads: 185:215 = 46,25 %** (Siege je Brett 0,463 [0,414; 0,511]), gepaarte
+Differenz -0,15, McNemar p 0,17; Punkte 57,8 gegen 58,7, Marge -0,9 [-2,8; +1,0], volle Spalten je Seite
+1,0 gegen 1,1 (Spaltensonde), Strafleiste 7,5 gegen 7,2, Plattenpunkte 8,3 gegen 8,6. **Das Tor von 55 % faellt
+NICHT; E_3 ist tendenziell schwaecher als G.** Keine Sockel-Klasse `policy-exploiter` im v35-Vorschlag.
+
+**Lesart (HERLEITUNG):** drei Afterburner-Zyklen mit je rund 99.000 E-Records aus einem 50:50-Regime bewegen
+E nicht zu einer Gegenstrategie, sondern zu einer verrauschten, leicht schwaecheren Kopie (Policy-Val flach
+1,02-1,03, Siegquote 52 -> 46 -> 48 %). Die AlphaStar-Form braucht ein anderes Ziel oder ein Vielfaches an
+Material: (a) Training nur auf den Partien, die E gewinnt, oder mit Gewicht auf E-Siege (Ziel "schlage G",
+nicht "spiele wie G gegen G"); (b) deutlich mehr Partien je Zyklus (hier 1.000 bei 6,1 s je Partie, also
+rund 100 min; ein Vielfaches ist eine Nacht je Zyklus); (c) kaltere Lernrate ist NICHT der Hebel (die Policy
+bewegte sich kaum). Der Bau (zweites Netz je Seite, `--record-sides`, Record-Felder) bleibt im Baum,
+Knopf AUS byte-gleich (Anker, Paritaet, Smoke gruen), und steht fuer eine spaetere Form bereit. Linie fuer
+v35 GESCHLOSSEN; Wiederaufnahme nur mit neuer Registrierung (Ziel und Material).
+
+**Kosten der Nacht fuer par.7 (gemessen):** Partien 3 x rund 6.200 s, Trainings 3 x rund 180 s, Tor 1.797 s;
+zusammen rund 5,9 h Maschine.
+
+## par.8 SOCKEL @400 SIMS (NUTZER 2026-10-04: *"sockel mit 400 sims kann ich gut leben"*)
+
+Vorschlag des Koordinators: die 2.000 G-G-Partien des v35-Sockels @400 statt @100 (der Schwarm bleibt @100).
+Begruendung: der Policy-Zielwert ist eine Suche ueber den eigenen Prior; hat der Prior die 100er-Suche
+eingeholt, traegt das Ziel nichts Neues (HERLEITUNG). Kosten aus `PREREG_search_depth_column_optimum.md`
+par.8e: 8,29 h fuer 4.000 @400 -> rund 4,1 h fuer 2.000. Benannter Preis: die Spaltenvollendung faellt ueber
+100-400 Sims monoton (par.8e; Nutzer-Entscheid 2026-09-13 "Betriebspunkt 100 BLEIBT" galt den Spalten).
+
+**Vortest (REGISTRIERT vor dem Lauf):** Klasse `policy-s400` (wie `policy`, Sims 400, gleicher Seed 20261720,
+100 Partien) in `models/v35_probes2.recipe.json`; Median-KL(Ziel || Prior) der Drafting-Records R1-4 gegen die
+0,316 der Klasse `policy` @100 (par.5a, gleiche Grundmenge und Einheit), Block-Bootstrap-CI ueber Dateien;
+dazu Kosten je Partie und die sechs Standard-Kennzahlen. Keine Schwelle: der Vortest beschreibt, der
+Nutzer entscheidet ueber das Sockel-Rezept.
+
+### par.8a ERGEBNIS Vortest Sockel @400 (2026-10-04 00:40-00:51, Artefakt `evaluations/artifacts/probe_policy_s400_kl.json`)
+
+100 Partien `policy-s400` (Seed 20261720, sonst wie `policy`), Bezug `policy` @100 (par.5a). **Grundmenge** Drafting-
+Records R1-4 mit Ziel >= 2 IDs (12.095 gegen 11.999), **Einheit** KL(Ziel || Prior) je Record, Median; Kennzahlen
+je Seite ueber 200 Seiten aus 100 Partien (`corpus_sanity_check.auswerten`):
+
+| Groesse | `policy` @100 | `policy-s400` @400 |
+| --- | --- | --- |
+| Median-KL (R1 / R2 / R3 / R4) | 0,316 (0,21 / 0,34 / 0,37 / 0,38) | **0,625** (0,52 / 0,61 / 0,69 / 0,72) |
+| Differenz [CI Block-Bootstrap] | | **+0,310 [+0,263; +0,354]** |
+| s je Partie (11 Threads) | 2,898 | 6,010 (**Faktor 2,07**) |
+| Punkte je Seite | 46,9 | **31,4** |
+| volle Spalten je Seite / Seiten mit voller Spalte | 0,90 / 128 | **0,445 / 73** |
+| volle Zeilen je Seite | 0,05 | 0,11 |
+| Strafleiste je Seite | 5,9 | **8,4** |
+| k1-Punkte (aktiv in 38 Partien) | 7,4 | 3,1 |
+| k5-Punkte (aktiv in 36) | 9,2 | 6,4 |
+
+Lesart: die tiefere Suche korrigiert den Prior DOPPELT so stark (die Frage aus par.8 ist mit JA beantwortet, das
+Ziel traegt bei 400 Sims deutlich mehr Information als bei 100). **Aber der Preis ist groesser als der aus par.8e
+bekannte Spalten-Tausch:** beide Seiten holen 15 Punkte weniger, vollenden halb so viele Spalten und nehmen 2,5
+Strafpunkte mehr. HERLEITUNG, nicht geprueft: die tiefere Nullsummen-Suche opfert eigene Punkte fuer Siegwahrschein-
+lichkeit (Denial), und ein Teil der hoeheren KL ist dieser Stilwechsel, nicht nur "mehr Wissen". Fuer den Punkte-
+und Spaltenlehrer (Kopf `opp_points`, Spaltenziele der Kampagne) waere ein solcher Sockel ein Schritt zurueck.
+Kosten fuer 2.000 Partien: rund 3,3 h (HERLEITUNG aus 6,01 s). **Nutzer-Entscheid am Morgen**; Vorschlag des
+Koordinators: NICHT der ganze Sockel @400, sondern ein Mischarm (z. B. 1.000 @100 plus 1.000 @400, oder @200 als
+Zwischenpunkt mit eigener Sonde), damit der Punkte-Einbruch nicht das ganze Policy-Material praegt.

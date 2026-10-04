@@ -91,7 +91,20 @@ def main() -> None:
     ap.add_argument("--model", default="models/alphazero_v34-b01_brierbest.pth", help="Generator (.pth)")
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--seed", type=int, default=20261003)
-    ap.add_argument("--out", default="evaluations/artifacts/asym_probes_s1_s4.json")
+    ap.add_argument("--out", default=None,
+                    help="Artefakt; Default evaluations/artifacts/asym_probes_s1_s4.json, mit --kl-class "
+                         "evaluations/artifacts/probe_<klasse>_kl.json")
+    ap.add_argument("--kl-class", default=None,
+                    help="NUR den S2-KL-Vergleich einer beliebigen Klasse ohne Wuerfel-Felder gegen `policy` rechnen "
+                         "(Median KL(Ziel||Prior), Block-Bootstrap ueber Dateien), dazu Kosten je Partie aus den "
+                         "Manifesten und die Standard-Kennzahlen (tools/corpus_sanity_check.py); S1-S4 entfallen")
+    ap.add_argument("--side-class", default=None,
+                    help="par.5e1 Frage 3: NUR die Seitenauswertung einer asymmetrischen Klasse (z. B. "
+                         "policy-tb1): Siegquote der markierten Seite gegen 0,50 (Block-Bootstrap ueber "
+                         "Dateien), Punkte und Marge beider Seiten, Standard-Kennzahlen je Seite, Kosten je "
+                         "Partie; S1-S4 entfallen")
+    ap.add_argument("--side-field", default="tiebreak_side",
+                    help="Record-Feld mit dem Spielerindex der markierten Seite (Default tiebreak_side)")
     ap.add_argument("--dice-class", default="policy-dice",
                     help="W-Klasse fuer S1-S3 (par.5b: policy-dice-src4 nach der neuen Quellenregel)")
     ap.add_argument("--skip-s4", action="store_true", help="S4 (Stoerer-Stufen) auslassen")
@@ -228,6 +241,112 @@ def main() -> None:
         return res
 
     out = {"prereg": "evaluations/PREREG_asymmetric_selfplay.md par.5", "data_dir": args.data_dir, "model": args.model}
+    if args.out is None:
+        args.out = (f"evaluations/artifacts/probe_{args.kl_class}_kl.json" if args.kl_class
+                    else f"evaluations/artifacts/probe_{args.side_class}_side.json" if args.side_class
+                    else "evaluations/artifacts/asym_probes_s1_s4.json")
+
+    # --- Nur Seitenauswertung einer asymmetrischen Klasse (--side-class, par.5e1 Frage 3) --------
+    if args.side_class:
+        import corpus_sanity_check
+        sf = args.side_field
+        sfiles, sarr, sgames, _ = read_class(args.side_class, sf)
+        nf = len(sfiles)
+        sgs = side_game_stats(sgames, nf)
+        mark = sgs["sonderseite"]
+        ci = mark["siegquote_ci95"]
+        mar = mark["marge"]
+        if ci and ci[0] > 0.5 and mar is not None and mar > 0:
+            lesart = "CI ganz ueber 0,50 UND Marge > 0: Modus als Vorschlag ins v35-Sockel-Rezept (Nutzer-Entscheid)"
+        elif ci and ci[1] < 0.5:
+            lesart = "CI ganz unter 0,50: Bestand bleibt, par.5c1 war dann etwas anderes (zu klaeren)"
+        else:
+            lesart = "CI mit 0,50 (oder Marge <= 0): Bestand bleibt, berichtet"
+        n_marked = sum(1 for g in sgames if g["special"] is not None)
+        out["side_class"] = args.side_class
+        out["side_field"] = sf
+        out["seiten"] = {
+            "grundmenge": (f"Partien der Klasse {args.side_class} mit eindeutigem `{sf}` ({n_marked} von "
+                           f"{len(sgames)}); 'sonderseite' = Seite mit Knopf, 'G' = Gegenseite (Modus 0)"),
+            "einheit": "Siegquote je Partie (CI Block-Bootstrap ueber Dateien), Punkte und Marge je Partie",
+            "partien": sgs,
+            "siegquote_gegen_050": {"siegquote": mark["siegquote"], "ci95": ci,
+                                    "ci_ganz_ueber_050": bool(ci and ci[0] > 0.5),
+                                    "ci_ganz_unter_050": bool(ci and ci[1] < 0.5)},
+            "lesart": lesart,
+            "nicht_beendet": sum(1 for g in sgames if not g["completed"]),
+            # Wertkopf-Versatz je Seite (vorhandene Groesse aus S3/S4, ohne Leseregel hier).
+            "kalibrierung": {"sonderseite": calibration(sarr, nf, 0), "G": calibration(sarr, nf, 1)},
+        }
+        out["kosten"] = {"grundmenge": "Partien, Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
+                         args.side_class: manifest_runtime(data, args.side_class),
+                         "policy": manifest_runtime(data, "policy")}
+
+        def side_of(rec):
+            v = rec.get(sf)
+            return None if v is None else int(v)
+
+        out["standard_kennzahlen"] = {
+            "quelle": "tools/corpus_sanity_check.py auswerten (Endzustand je Partie), je Seite gefiltert",
+            "sonderseite": corpus_sanity_check.auswerten(
+                str(data), files=sfiles, side_filter=lambda r, pi: side_of(r) == pi),
+            "G": corpus_sanity_check.auswerten(
+                str(data), files=sfiles, side_filter=lambda r, pi: side_of(r) is not None and side_of(r) != pi),
+        }
+        out["laufzeit"] = laufzeit_block(t_start, cpu_start=c_start, threads=torch.get_num_threads(),
+                                         n_units=len(sgames), unit="partie")
+        Path(BASE_DIR / args.out).parent.mkdir(parents=True, exist_ok=True)
+        json.dump(out, open(BASE_DIR / args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print(json.dumps({k: out[k] for k in ("seiten", "kosten")}, ensure_ascii=False, indent=1)[:4000], flush=True)
+        print(f"Ergebnis: {args.out} ({time.monotonic() - t_start:.1f} s)", flush=True)
+        return
+
+    # --- Nur KL-Vergleich einer Klasse gegen den Sockel (--kl-class) ----------------------------
+    if args.kl_class:
+        import corpus_sanity_check
+        pf, pa, _pg, _ = read_class("policy", None)
+        kf, ka, _kg, _ = read_class(args.kl_class, None)
+        base_bf = by_file(pa, np.ones(len(pa["kl"]), bool), "kl", len(pf))
+        cls_bf = by_file(ka, np.ones(len(ka["kl"]), bool), "kl", len(kf))
+        ci = boot_diff_ci(cls_bf, base_bf, np.median, rng) if len(ka["kl"]) and len(pa["kl"]) else None
+        kl = {"grundmenge": ("Drafting-Records R1-4 (Ziel >= 2 IDs, ohne Platzwahl-Records), alle Seiten; "
+                             f"Klasse {args.kl_class} gegen alle Records der Klasse policy"),
+              "einheit": "KL(Ziel || Prior des Generators) je Record, Median; CI Block-Bootstrap ueber Dateien",
+              "policy": {"n": int(len(pa["kl"])), "dateien": len(pf),
+                         "median": float(np.median(pa["kl"])) if len(pa["kl"]) else None},
+              args.kl_class: {"n": int(len(ka["kl"])), "dateien": len(kf),
+                              "median": float(np.median(ka["kl"])) if len(ka["kl"]) else None},
+              "median_diff_gegen_policy": (float(np.median(ka["kl"]) - np.median(pa["kl"]))
+                                           if len(ka["kl"]) and len(pa["kl"]) else None),
+              "ci95": ci,
+              "lesart": ("hoeher als policy" if ci and ci[0] > 0
+                         else "niedriger als policy" if ci and ci[1] < 0 else "nicht nachweisbar anders")}
+        kl["je_runde"] = {str(r): {"policy": float(np.median(pa["kl"][pa["round"] == r])) if (pa["round"] == r).any() else None,
+                                   args.kl_class: float(np.median(ka["kl"][ka["round"] == r])) if (ka["round"] == r).any() else None}
+                          for r in ROUNDS}
+        out["kl_class"] = args.kl_class
+        out["KL"] = kl
+        lz_p, lz_k = manifest_runtime(data, "policy"), manifest_runtime(data, args.kl_class)
+        cost = {"grundmenge": "Partien je Klasse, Einheit Sekunden Wanduhr je Partie aus dem Lauf-Manifest",
+                "policy": lz_p, args.kl_class: lz_k}
+        if lz_p and lz_k and lz_p.get("s_je_partie") and lz_k.get("s_je_partie"):
+            cost["kostenfaktor_gegen_policy"] = lz_k["s_je_partie"] / lz_p["s_je_partie"]
+        out["kosten"] = cost
+        # Standard-Kennzahlen (CLAUDE.md 2026-08-23) aus dem Endzustand je Partie; G gegen G, darum je
+        # Partie-Seite gemittelt (die Marge ist per Konstruktion 0 im Mittel, berichtet wird sie trotzdem).
+        std = {"quelle": "tools/corpus_sanity_check.py auswerten (score_geo / scoring_tile_points des Endzustands)",
+               "policy": corpus_sanity_check.auswerten(str(data), files=pf),
+               args.kl_class: corpus_sanity_check.auswerten(str(data), files=kf)}
+        diff_keys = ("zeilen_voll", "zeilen_fuell", "sp_voll", "sp_ge4", "sp_ge3", "sp_max", "floor", "punkte")
+        std["differenz_klasse_minus_policy"] = {k: std[args.kl_class][k] - std["policy"][k] for k in diff_keys}
+        out["standard_kennzahlen"] = std
+        out["laufzeit"] = laufzeit_block(t_start, cpu_start=c_start, threads=torch.get_num_threads(),
+                                         n_units=len(pa["kl"]) + len(ka["kl"]), unit="zustand")
+        Path(BASE_DIR / args.out).parent.mkdir(parents=True, exist_ok=True)
+        json.dump(out, open(BASE_DIR / args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print(json.dumps({k: out[k] for k in ("KL", "kosten")}, ensure_ascii=False, indent=1)[:4000], flush=True)
+        print(f"Ergebnis: {args.out} ({time.monotonic() - t_start:.1f} s)", flush=True)
+        return
 
     # --- Sockel (Bezug) und W ------------------------------------------------------------------
     pf, pa, pg, _ = read_class("policy", None)

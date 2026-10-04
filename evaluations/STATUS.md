@@ -18,45 +18,56 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**UEBERGABE 2026-10-03 kurz vor Mitternacht (Nutzer: *"mach mir dann ein update in status.md, ich mach in
-einer anderen sitzung weiter"*). NICHTS LAEUFT.** Baum committet, nicht gepusht (Ahead-Stand im Commit-Log).
-Installiertes Wheel = S4b-Kette (23:05, Stand VOR Eroeffnungs-Wuerfel und VOR B-Reparatur); der Quelltext ist
-weiter, das naechste Wheel baut die Kette in Schritt 1.
+**UEBERGABE 2026-10-04 09:30, NACHTPROGRAMM FERTIG. NICHTS LAEUFT.** (Nutzer 00:00: *"mach mir ein
+nachtprogramm indem du alles misst was notwendig ist und vorbereitest fuer das v35 self play. du selbst baust
+nichts sondern orchestrierst nur"*.) Alles registriert in `PREREG_asymmetric_selfplay.md` (Kopf, par.5c3, 5d1,
+5e1-5e3, 7, 7a, 8, 8a); Baum NICHT committet (siehe unten), Wheel = Exploiter-Bau (Anker gruen 01:29).
 
-**Stand asymmetrisches Self-Play** (`PREREG_asymmetric_selfplay.md`, Kopf und par.5a-5e):
-* W in Vollform (alle Plattenrunden): verliert 75-77 %, Wertziele beider Seiten verzerrt (verborgene
-  kuenftige Wuerfelplatten, par.5a/5b1); neue Quellenregel (Auslage 1/2/3 oder Stapel oben, par.5b) aendert
-  daran nichts, kostet sauber gemessen +32,1 % je Partie.
-* **Gebaut, NICHT gemessen:** Eroeffnungs-Wuerfel (par.5d, Nutzer: nur EINE Seite wuerfelt, nur Runde 1
-  bzw. 1-2): Knopf `MOSAIC_DOME_DICE_LAST_ROUND`, zentrale Regel `in_dome_dice_phase` (self_play.rs), Record-
-  Feld `dice_phase`, Wertmaske `MOSAIC_MASK_DICE_PHASE_VALUE` (corpus_dataset.py + train.py, beide
-  Cache-Schluessel). Agenten-Tests: Lib 840 gruen, Python 110 OK.
-* Stoerer: Blend-Form (lambda) = bekannter Nullbefund aus Task #28; Form B (lexikografisch an der Wurzel)
-  war in S4b KONFUNDIERT (S spielte Q-gierig, 77-81 % Siege, par.5c1). **Repariert, NICHT gemessen** (par.5c2:
-  Bezugszug = Bestands-Wahl, Abweichung nur nach unten).
-* **Nebenbefund OFFEN (par.5e):** die Erzeugung waehlt ab `tau_argmax_from_move` per Besuchs-argmax mit
-  Gleichstand = erster Eintrag, ohne Q-Stichentscheid; Q-gierige Wahl gewann 77-81 %. Nichts gemessen.
+**Ergebnisse der Nacht, gegen die vorab registrierten Leseregeln:**
 
-**ERSTE AUFGABE DER NEUEN SITZUNG**
-1. `bash tools/asym_s5_s4b2_chain.sh` als Hintergrundaufgabe (KEINE Pipe; Monitor auf die Ausgabedatei,
-   alle 30 min neu setzen). Inhalt: Lib-Suite, --no-run, Wheel, Anker-Drift/-Konservierung, dann je 100
-   Partien `policy-dice-r1`, `policy-dice-r2`, `policy-aggrb-e01/e02/e04` (Rezept
-   `models/v35_probes.recipe.json`), dann drei Auswertungen nach `evaluations/artifacts/asym_probe_s5_r1.json`,
-   `asym_probe_s5_r2.json`, `asym_probe_s4b2.json`. Kosten geschaetzt rund 45 min (5 x 5-7 min Partien, Build
-   und Tests rund 7 min, Auswertungen rund 5 min). Anker ROT = anhalten, Nutzer-Entscheid.
-2. Ergebnisse gegen die VORAB registrierten Leseregeln: S5 par.5d (|Versatz| nach der Wuerfelphase <= 0,03;
-   G-KL ueber Sockel), S4b neu par.5c2/par.5c (Siegquote S jetzt <= ~0,50; eps-Wahl). Registrieren (Prereg-
-   Kopf + Index), STATUS nachziehen, dem Nutzer berichten.
-3. Danach Nutzer-Entscheide: Zusammensetzung des Sockels (policy / Eroeffnungs-W / B) und Sockel-Rezept fuer
-   die v35-Erzeugung; ob par.5e (Zugwahl-Stichentscheid) zuerst untersucht wird (Vorschlag: Gleichstands-
-   Haeufigkeit zaehlen, dann ein A/B-Arm).
+| Messung | Ergebnis | Regel | Folge |
+| --- | --- | --- | --- |
+| S5 Eroeffnungs-Wuerfel R1 (par.5d1) | W 51 %, +9,2 % Kosten, Versatz-CI um 0, G-KL +0,030 [-0,012; +0,071] | Maske reicht; "andere Stellungen" nicht nachweisbar | **Nutzer-Entscheid** ueber W (wenn, dann R1) |
+| S5 R1-2 | W 34 %, Marge -8,7 | wie oben | nicht empfohlen |
+| S4b neu, Stoerer B (par.5c3) | S 47-49 %, G hoechstens -2,0 Punkte, 6-11 % der Zuege | G-Senkung < 2 bzw. Rauschen | **Stoerer-Linie geschlossen** |
+| par.5e Frage 1 (par.5e2) | Gleichstand 14,8 %, Bestand != Besuche-dann-Q 10,1 %, != bestes Q 25 % | beschreibend | siehe Frage 3 |
+| **par.5e Frage 3 (par.5e3)** | **Knopf-Seite gewinnt 74,5 % (Modus 1) / 75,5 % [71,5; 79,5] (Modus 2), +16-18 Punkte, mehr Spalten** | CI ueber 0,50 und Marge > 0 | **Vorschlag: `tau_tiebreak_q` 2 in Sockel UND Schwarm; Nutzer-Entscheid** |
+| Sockel @400 Vortest (par.8a) | KL 0,316 -> 0,625 (CI klar), Kosten x2,07, **Punkte je Seite 46,9 -> 31,4**, volle Spalten 0,90 -> 0,445, Strafleiste +2,5 | beschreibend | Vorschlag Mischarm statt ganzer Sockel; **Nutzer-Entscheid** |
+| Exploiter (par.7a) | E_1 45,8 %, E_2 47,6 % gegen G; **Tor E_3 gegen G 185:215 = 46,25 %** (Ziel >= 55 %) | Tor faellt nicht | **keine Exploiter-Klasse**; Bau bleibt (AUS byte-gleich) |
 
-**Freigaben und Verbote (woertlich bzw. stehend):** "Kein Push ohne Anweisung." "Jede Loeschung braucht
-restic-Beleg UND neue pfadgenaue Freigabe." Nie committen: `player_profiles.json`, `player_profiles.json.bak`.
-Messungen exklusiv, ein Build ist Last, kein Commit waehrend eines Wanduhr-Laufs. "Mehrkosten sind kritisch
-abzuwaegen." "Stelle sicher dass du nichts faehrst was nicht schon bereits getestet wurde." Im Projektordner
-arbeiten, kein Worktree. Subagenten Opus medium, ihre Befunde nachpruefen. Offen beim Nutzer ausserdem:
-Server-Neustart fuer v34-b01 in der GUI; Review 2 #17-#19 nur auf Entscheid.
+**Wichtigster Befund:** der Generator spielt seit `tau_argmax_from_move` 1 bei Besuchs-Gleichstand den ERSTEN
+Eintrag statt nach Q (par.5e); dieselbe Suche mit Q-Stichentscheid gewinnt 3 von 4 Partien gegen ihn. Das Policy-
+Ziel war nie betroffen, die Trajektorien und Wertziele aller bisherigen Fenster schon (auch der schon erzeugte
+v35-Schwarm). Konsumenten gegrept (par.5e3).
+
+**Rezept-Entwurf fuer den v35-Sockel:** `models/v35_sockel_draft.recipe.json` (loest sich ueber die Rezept-Schicht
+auf, nicht gestartet): `policy` 2.000 @100 mit Modus 2; `ALT-policy-s400` (1.000 @400) als Mischarm-Alternative;
+`policy-dice-r1` optional; `policy-exploiter` nur belassen, NICHT empfohlen. Seeds 20260953-55 VORSCHLAG,
+registrieren vor dem Lauf. Offen, ob der Schwarm mit Modus 2 NEU erzeugt wird (rund 5 h) oder der Bestand bleibt.
+
+**Nutzer-Entscheide fuer heute:** (1) `tau_tiebreak_q` 2 in die Erzeugung (Sockel; Schwarm neu oder Bestand);
+(2) Sockel @100, @400 oder Mischarm; (3) W R1 ja/nein; (4) E-Seiten-Records sind nicht entstanden (Tor gefallen),
+Punkt entfaellt; (5) Commit des Nachtbaus (unten).
+
+**Gebaut in der Nacht (Agenten, alles getestet, Lib 856 gruen, `--no-run` gruen, Anker-Drift/-Konservierung
+und Paritaets-Fixture gruen):** Spec-/Env-Feld `tau_tiebreak_q` (Modus 0/1/2) und Seitenknopf
+`MOSAIC_TAU_TIEBREAK_SIDE`; `tie_frequency_report` (`#[ignore]`); zweites Netz je Seite im Self-Play
+(`--opponent-model`, `--record-sides`, Felder `opponent_side`/`net_label`); Rezepte `v35_probes2`,
+`v35_exploiter`, `v35_sockel_draft`; Ketten `night_v35_prep_chain1.sh`, `night_v35_exploiter_chain.sh`
+(mit `EXPLOITER_FROM_CYCLE`); `tools/split_records_by_net_label.py`, `tools/probes/exploiter_cycle_report.py`;
+`asym_probe_report.py` mit `--kl-class` und `--side-class`. Bauplan `evaluations/exploiter_build_plan.md`.
+**Nicht committet** (Nutzer-Freigabe vom 2026-10-01 "committe sobald es moeglich ist" gilt; Commit folgt in
+dieser Sitzung, ohne `player_profiles.json`).
+
+**Betriebsbefunde:** (a) Hintergrundaufgaben enden nach max. 2 h; danach scheitern NEUE Subprozesse der verwaisten
+Kette mit 0xC0000142 (Zyklus 3 bei 70 Partien abgebrochen, Tail per Chunk-Seed nachgezogen, `--games 930
+--seed 20261759`); lange Ketten im Terminal-Tab starten (Git-bash aus `Git/bin/bash.exe`, nicht `usr/bin`).
+(b) Zwei Netze je Partie kosten 6,1 s statt 2,9 s je Partie. (c) Zyklus-Basis-Seeds 20261750/51/52 ueberlappen
+ueber die Chunks (par.7 Chronik); kuenftig mindestens 100 Abstand.
+
+**Reste in `data/`:** `data/probe_asym` (Sonden-Klassen inkl. s400, tb1, tb2), `data/exploiter` (3.000 Partien plus
+drei `train_x35-e0k`-Kopien), `data/exploiter_smoke`; Modelle `alphazero_x35-e01/02/03*` plus Manifeste. Nichts
+davon im Fenster; Loeschung nur auf Freigabe mit restic-Beleg.
 
 **FERTIG 2026-10-03 10:01: v35-Schwarm** (`tools/night_v35_swarm.sh`,
 `PREREG_v35_window.md`): `value-deviate` 05:19-08:06 und `value-excursion` 08:06-10:01, je 4.000
@@ -286,8 +297,8 @@ als Diversitaets-Mittel, `PREREG_tie_mirror.md` par.4b); `v34_window`, `targeted
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `v35_window` | Schwarm erzeugt und abgenommen (par.9); Sockel nach dem asymmetrischen Bau; Fenster, Arme, Tore |
-| `asymmetric_selfplay` | S1-S4 und S4b registriert (par.5a-5c1); Eroeffnungs-W (par.5d) und B repariert (par.5c2) gebaut, Sonden S5/S4b neu offen; Nebenbefund Zugwahl par.5e |
+| `v35_window` | Schwarm erzeugt und abgenommen (par.9); Sockel-Rezept als Entwurf (`models/v35_sockel_draft.recipe.json`), Entscheid Stichentscheid Modus 2 / Sims / W; Fenster, Arme, Tore |
+| `asymmetric_selfplay` | Sonden alle gefahren (par.5a-5e3, 7a, 8a); offen nur die Zusammensetzung des v35-Sockels (Nutzer) |
 | `difficulty_levels` | ganze Leiter auf den letzten Champion vertagt |
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
