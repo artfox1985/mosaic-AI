@@ -178,6 +178,116 @@ def _mask_dice_phase_value_key() -> bool:
     return os.environ.get("MOSAIC_MASK_DICE_PHASE_VALUE") == "1"
 
 
+BOOTSTRAP_HORIZON_ROUNDS_ALLOWED = (1, 2, 3)
+BOOTSTRAP_SOURCES = ("trajectory", "margin")
+
+
+def _bootstrap_source_config():
+    """Liest und prueft `MOSAIC_BOOTSTRAP_SOURCE` mit seinen Parametern
+    `MOSAIC_BOOTSTRAP_HORIZON_ROUNDS` und `MOSAIC_BOOTSTRAP_MARGIN_SCALE`.
+
+    EINE Pruefstelle fuer beide Quellen, damit die beiden Schluessel-Leser
+    darunter (`_bootstrap_trajectory_horizon_key`,
+    `_bootstrap_margin_scale_key`) nie verschiedene Lesarten derselben Umgebung
+    haben. Rueckgabe:
+
+    - `None`: Bestand (alle drei ungesetzt oder leer), kein Marker.
+    - `("trajectory", k)`: par.12a, Arm v35-b03; k in 1..3, Pflicht.
+    - `("margin", b)`: par.14, Arm v35-b04; b = Skala in Punkten, endliche
+      Zahl > 0, Pflicht; als KANONISCHER String (Dezimalzahl ohne
+      ueberfluessige Nullen: "20", "12.5"), damit "20" und "20.0" denselben
+      Schluessel bekommen und zwei Skalen zwei.
+
+    Harte Fehler statt stillem Default: unbekannte Quelle, fehlender oder
+    ungueltiger Pflichtparameter, und jeder Parameter, der zur gesetzten Quelle
+    nicht gehoert oder ohne Quelle gesetzt ist (ein verwaister Parameter waere
+    ein Knopf, der unbemerkt nichts tut).
+    """
+    import math
+    import os
+    source = (os.environ.get("MOSAIC_BOOTSTRAP_SOURCE") or "").strip().lower()
+    raw_horizon = (os.environ.get("MOSAIC_BOOTSTRAP_HORIZON_ROUNDS") or "").strip()
+    raw_scale = (os.environ.get("MOSAIC_BOOTSTRAP_MARGIN_SCALE") or "").strip()
+    if not source:
+        if raw_horizon:
+            raise ValueError(
+                f"MOSAIC_BOOTSTRAP_HORIZON_ROUNDS={raw_horizon!r} ist gesetzt, aber "
+                "MOSAIC_BOOTSTRAP_SOURCE nicht -- ohne 'trajectory' waere der Horizont wirkungslos.")
+        if raw_scale:
+            raise ValueError(
+                f"MOSAIC_BOOTSTRAP_MARGIN_SCALE={raw_scale!r} ist gesetzt, aber "
+                "MOSAIC_BOOTSTRAP_SOURCE nicht -- ohne 'margin' waere die Skala wirkungslos.")
+        return None
+    if source not in BOOTSTRAP_SOURCES:
+        raise ValueError(
+            f"MOSAIC_BOOTSTRAP_SOURCE={source!r} unbekannt -- erlaubt sind {BOOTSTRAP_SOURCES} "
+            "(ungesetzt = Bestand, Netz-Rollout bootstrap_value).")
+    if source == "trajectory":
+        if raw_scale:
+            raise ValueError(
+                f"MOSAIC_BOOTSTRAP_MARGIN_SCALE={raw_scale!r} gehoert zur Quelle 'margin', "
+                "nicht zu 'trajectory' -- dort waere sie wirkungslos.")
+        try:
+            horizon = int(raw_horizon)
+        except ValueError:
+            horizon = None
+        if horizon not in BOOTSTRAP_HORIZON_ROUNDS_ALLOWED:
+            raise ValueError(
+                f"MOSAIC_BOOTSTRAP_HORIZON_ROUNDS={raw_horizon!r} ungueltig -- bei "
+                f"MOSAIC_BOOTSTRAP_SOURCE=trajectory Pflicht, erlaubt {BOOTSTRAP_HORIZON_ROUNDS_ALLOWED}.")
+        return ("trajectory", horizon)
+    # source == "margin"
+    if raw_horizon:
+        raise ValueError(
+            f"MOSAIC_BOOTSTRAP_HORIZON_ROUNDS={raw_horizon!r} gehoert zur Quelle 'trajectory', "
+            "nicht zu 'margin' -- dort waere er wirkungslos.")
+    try:
+        scale = float(raw_scale)
+    except ValueError:
+        scale = float("nan")
+    if not (math.isfinite(scale) and scale > 0.0):
+        raise ValueError(
+            f"MOSAIC_BOOTSTRAP_MARGIN_SCALE={raw_scale!r} ungueltig -- bei "
+            "MOSAIC_BOOTSTRAP_SOURCE=margin Pflicht, endliche Zahl > 0 (Punkte).")
+    canonical = repr(scale)
+    if canonical.endswith(".0"):
+        canonical = canonical[:-2]
+    return ("margin", canonical)
+
+
+def _bootstrap_trajectory_horizon_key() -> int | None:
+    """Obergrenze k des Trajektorien-Bootstraps fuer BEIDE Cache-Schluessel.
+
+    `PREREG_v35_window.md` par.12a (Nutzer-Entscheid 2026-10-05, Arm v35-b03):
+    die Quelle des TD-Bootstraps im WDL-Wertziel wird vom gespeicherten
+    Netz-Rollout (`bootstrap_value`) auf den Suchwert `root_q` des ersten
+    spaeteren Records derselben Seite mindestens k Runden spaeter umgestellt
+    (`trajectory_bootstrap.trajectory_bootstrap_lookup`). Das aendert
+    `values_wdl` im BLOCK, also beide Schluessel
+    (`feedback_feature_knob_belongs_in_both_cache_keys`).
+
+    Rueckgabe: `None` = nicht diese Quelle (Bestand oder 'margin'), sonst k.
+    Pruefung und harte Fehler: `_bootstrap_source_config`.
+    """
+    config = _bootstrap_source_config()
+    return config[1] if config is not None and config[0] == "trajectory" else None
+
+
+def _bootstrap_margin_scale_key() -> str | None:
+    """Skala b des Margen-Bootstraps fuer BEIDE Cache-Schluessel.
+
+    `PREREG_v35_window.md` par.14 (Arm v35-b04): Bootstrap im WDL-Wertziel ist
+    sigmoid(Endmarge / b) mit der realisierten Endmarge aus Sicht des Ziehers
+    (`trajectory_bootstrap.margin_bootstrap_value`). Aendert `values_wdl` im
+    BLOCK, also beide Schluessel.
+
+    Rueckgabe: `None` = nicht diese Quelle, sonst b als kanonischer String
+    (Marker `bootstrapmargin_b<b>_v1`). Pruefung: `_bootstrap_source_config`.
+    """
+    config = _bootstrap_source_config()
+    return config[1] if config is not None and config[0] == "margin" else None
+
+
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
                        conjunction_head: bool, bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
@@ -335,4 +445,15 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     # par.5d: Wertmaske der Wuerfelphase (Zusatzfeld `value_weights` im Block).
     if _mask_dice_phase_value_key():
         material += "|maskdicephasevalue_v1"
+    # par.12a (Arm v35-b03): Bootstrap-Quelle im WDL-Ziel aus der echten
+    # Trajektorie. Nur ANGEHAENGT, wenn gesetzt -- der Hash jedes vorhandenen
+    # Blocks bleibt.
+    _traj_horizon = _bootstrap_trajectory_horizon_key()
+    if _traj_horizon is not None:
+        material += "|bootstraptraj_h" + str(_traj_horizon) + "_v1"
+    # par.14 (Arm v35-b04): Margen-Bootstrap, Skala b im Marker. Nur ANGEHAENGT,
+    # wenn gesetzt.
+    _margin_scale = _bootstrap_margin_scale_key()
+    if _margin_scale is not None:
+        material += "|bootstrapmargin_b" + _margin_scale + "_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

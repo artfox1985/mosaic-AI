@@ -54,6 +54,8 @@ DATEN_KNOEPFE = {
     "_aggr_own_q_eps_key": "S-Maske: policy_weights 0 bei own_q_gap > eps (asymmetrisches Self-Play)",
     "_mask_dice_trigger_key": "W-Maske: policy_weights 0 auf dice_trigger-Records (asymmetrisch)",
     "_mask_dice_phase_value_key": "W-Wertmaske: Zusatzfeld value_weights, 0 auf dice_phase-Records (par.5d)",
+    "_bootstrap_trajectory_horizon_key": "Bootstrap-Quelle im WDL-Ziel aus der echten Trajektorie (v35 par.12a)",
+    "_bootstrap_margin_scale_key": "Bootstrap-Quelle im WDL-Ziel aus der Endmarge, sigmoid(Marge/b) (v35 par.14)",
 }
 
 # Knoepfe, die in BEIDEN Schluesseln stehen muessen: der Wert steckt schon in den
@@ -68,6 +70,8 @@ BOTH_KEYS = {
     "_aggr_own_q_eps_key": "policy_weights stecken je Datei im Block (Klasse S)",
     "_mask_dice_trigger_key": "policy_weights stecken je Datei im Block (Klasse W)",
     "_mask_dice_phase_value_key": "value_weights stecken je Datei im Block (Klasse W, par.5d)",
+    "_bootstrap_trajectory_horizon_key": "values_wdl stecken je Datei im Block (v35 par.12a)",
+    "_bootstrap_margin_scale_key": "values_wdl stecken je Datei im Block (v35 par.14)",
 }
 
 # Knoepfe, die BEWUSST nicht im Fenster-Schluessel stehen, mit Grund.

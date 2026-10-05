@@ -127,8 +127,11 @@ def _block_path(data_dir, basename, kwargs):
 def _build_one_file(args):
     """Laeuft im Worker: baut GENAU EINE Datei in ihren Block-Cache.
 
-    Gibt (basename, pfad, n_zustaende, gebaut?) zurueck -- die Arrays bleiben
-    auf der Platte (bei 2.400 Dateien waeren es sonst >11 GB durch die Pipe).
+    Gibt (basename, pfad, n_zustaende, gebaut?, trajektorien_zaehlung)
+    zurueck -- die Arrays bleiben auf der Platte (bei 2.400 Dateien waeren es
+    sonst >11 GB durch die Pipe). Die Zaehlung (par.12a,
+    `MosaicDataset.trajectory_bootstrap_counts`) ist None, wenn der Block schon
+    lag oder MOSAIC_BOOTSTRAP_SOURCE nicht gesetzt ist.
     """
     data_dir, path_pkl, kwargs, block_file = args
     basename = os.path.basename(path_pkl)
@@ -136,7 +139,7 @@ def _build_one_file(args):
         import h5py
         with h5py.File(block_file, "r") as hf:
             n = hf["values"].shape[0] if "values" in hf else 0
-        return basename, block_file, n, False
+        return basename, block_file, n, False, None
     # C 2026-08-29: beim MosaicDataset-Auszug (C 2026-08-27) wurde hier der
     # Import vergessen -- der Neubau-Pfad starb seitdem im Worker mit
     # NameError, nur der Blocks-liegen-schon-Pfad lief. Gefunden durch den
@@ -144,7 +147,7 @@ def _build_one_file(args):
     import corpus_dataset
     ds = corpus_dataset.MosaicDataset(data_dir, files=[path_pkl],
                                   cache_path_override=block_file, **kwargs)
-    return basename, block_file, len(ds), True
+    return basename, block_file, len(ds), True, ds.trajectory_bootstrap_counts
 
 
 def _files(data_dir, limit=None, explicit=None):
@@ -267,6 +270,15 @@ def main():
 
     t0 = time.time()
     t_cpu0 = time.process_time()
+    # par.12a: Bootstrap-Quellen je Runde, summiert ueber alle NEU gebauten
+    # Bloecke dieses Laufs (schon liegende Bloecke tragen nichts bei).
+    # par.14: dieselbe Zaehlung fuer den Margen-Bootstrap (Arm v35-b04).
+    from trajectory_bootstrap import (add_trajectory_counts, format_margin_counts,
+                                      format_trajectory_counts)
+    from file_cache_key import _bootstrap_margin_scale_key, _bootstrap_trajectory_horizon_key
+    traj_horizon = _bootstrap_trajectory_horizon_key()
+    margin_scale = _bootstrap_margin_scale_key()
+    traj_counts_total = {}
     all_entries = []
     built_total = 0
     empty = 0
@@ -278,6 +290,8 @@ def main():
                                          carrier_prefixes, a.workers, t0)
         all_entries = file_list
         built_total += sum(1 for e in results if e[3])
+        for e in results:
+            add_trajectory_counts(traj_counts_total, e[4])
         if not a.watch:
             break
         empty = empty + 1 if n_open == 0 else 0
@@ -288,6 +302,12 @@ def main():
 
     wall = time.time() - t0
     cpu = time.process_time() - t_cpu0
+    if traj_horizon is not None:
+        for line in format_trajectory_counts(traj_counts_total, traj_horizon):
+            print(line, flush=True)
+    elif margin_scale is not None:
+        for line in format_margin_counts(traj_counts_total, margin_scale):
+            print(line, flush=True)
 
     # --- Zusammensetzen (optional): sortierte Dateireihenfolge = serielle
     # Reihenfolge, Voraussetzung fuer die Bit-Identitaet.
@@ -345,6 +365,16 @@ def main():
         "file_list": a.file_list,
         "cache_key": window_key.key if window_key is not None else None,
         "cache_key_full": window_key.key_full if window_key is not None else None,
+        # par.12a/par.14: nur NEU gebaute Bloecke; None ohne
+        # MOSAIC_BOOTSTRAP_SOURCE. Quelle und Parameter stehen daneben, weil
+        # dieses Artefakt die Umgebung sonst nicht festhaelt.
+        "bootstrap_source": ({"source": "trajectory", "horizon_rounds": traj_horizon}
+                             if traj_horizon is not None else
+                             {"source": "margin", "margin_scale": margin_scale}
+                             if margin_scale is not None else None),
+        "trajectory_bootstrap_counts": (
+            {str(rd): c for rd, c in sorted(traj_counts_total.items())}
+            if (traj_horizon is not None or margin_scale is not None) else None),
         # Pflichtfelder nach CLAUDE.md "Laufzeiten messen, nicht schaetzen".
         # `threads` ist hier die Worker-Zahl des Pools; `cpu_s` misst NUR den
         # Elternprozess (die Worker sind eigene Prozesse), taugt also als
