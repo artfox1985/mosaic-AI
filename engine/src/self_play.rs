@@ -5433,6 +5433,11 @@ struct NetArenaAgent<'n> {
     /// passiert BEIM AUFRUFER (`play_net_game`/`play_net_vs_net_game`), hier
     /// liegt nur noch der fertige Wert.
     search_config: crate::net_mcts::SearchConfig,
+    /// `PREREG_tree_reuse.md` par.2 (ENTWURF): der Suchbaum des letzten
+    /// eigenen Entscheids, gehalten fuer die naechste Suche dieser Seite. Lebt
+    /// so lange wie der Agent, also eine Partie. Bei `search_config.tree_reuse
+    /// == false` bleibt er `None` und wird nie beruehrt (Bestand).
+    retained_tree: std::cell::RefCell<Option<crate::net_mcts::RetainedTree>>,
 }
 
 impl DraftingAgent for NetArenaAgent<'_> {
@@ -5450,9 +5455,26 @@ impl DraftingAgent for NetArenaAgent<'_> {
         } else {
             None
         };
-        let chosen = net_arena_choose_action(
-            self.net, state, actions, search_rng, self.base_sims, self.c_puct, self.vorzug, &self.search_config,
-        );
+        let chosen = if self.search_config.tree_reuse {
+            // PREREG_tree_reuse.md par.2: derselbe Auswahlweg, nur mit dem
+            // gehaltenen Baum dieser Seite.
+            let mut retained = self.retained_tree.borrow_mut();
+            net_arena_choose_action_with_tree(
+                self.net,
+                state,
+                actions,
+                search_rng,
+                self.base_sims,
+                self.c_puct,
+                self.vorzug,
+                &self.search_config,
+                Some(&mut *retained),
+            )
+        } else {
+            net_arena_choose_action(
+                self.net, state, actions, search_rng, self.base_sims, self.c_puct, self.vorzug, &self.search_config,
+            )
+        };
         DraftingDecision { vorzug: vorzug_kandidat, ..DraftingDecision::plain(chosen) }
     }
 }
@@ -5474,16 +5496,45 @@ pub(crate) fn net_arena_choose_action(
     vorzug: bool,
     search_config: &SearchConfig,
 ) -> Action {
+    net_arena_choose_action_with_tree(
+        net, state, actions, search_rng, base_sims, c_puct, vorzug, search_config, None,
+    )
+}
+
+/// Rumpf von [`net_arena_choose_action`] mit optionalem gehaltenem Suchbaum
+/// (`PREREG_tree_reuse.md` par.2, ENTWURF). `retained == None` ist der Bestand
+/// Zeile fuer Zeile (`net_search_drafting_action`); `Some` nimmt den Reuse-
+/// Einstieg `net_mcts::net_search_drafting_action_reuse`, der den Baum
+/// verbraucht und ersetzt. Ein-Aktion-Kurzschluss und Bauer-Vorzug suchen nicht
+/// und lassen den Baum stehen; der naechste Entscheid sucht seinen Treffer ueber
+/// den Zustand (`net_mcts::take_reuse_start`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn net_arena_choose_action_with_tree(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    search_rng: &mut StdRng,
+    base_sims: u32,
+    c_puct: f64,
+    preference: bool,
+    search_config: &SearchConfig,
+    retained: Option<&mut Option<crate::net_mcts::RetainedTree>>,
+) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
     }
-    let vorzug_kandidat = if vorzug { builder_drafting_preference(state) } else { None };
+    let preference_candidate = if preference { builder_drafting_preference(state) } else { None };
     // par.5b (`PREREG_r5_net_vs_solver.md`): eigene Runde-5-Sims dieser Seite,
     // bei ungesetztem Feld exakt `base_sims` (Bestand).
     let base = crate::net_mcts::r5_adjusted_base_sims(state, base_sims, search_config);
     let s = net_effective_sims(base, actions.len());
-    vorzug_kandidat
-        .or_else(|| net_search_drafting_action(net, state, s, c_puct, false, search_rng, search_config))
+    preference_candidate
+        .or_else(|| match retained {
+            None => net_search_drafting_action(net, state, s, c_puct, false, search_rng, search_config),
+            Some(tree) => crate::net_mcts::net_search_drafting_action_reuse(
+                net, state, s, c_puct, search_rng, search_config, tree,
+            ),
+        })
         .unwrap_or_else(|| actions[0].clone())
 }
 
@@ -6000,6 +6051,8 @@ fn unified_game_loop<R: Rng + ?Sized>(
     // und nie ausgelesen hat. Bei ausgeschalteter Nachsuche ist das ein
     // Cell-Lesezugriff und sonst nichts.
     let _ = crate::net_mcts::take_moon_order_diag();
+    // PREREG_tree_reuse.md: gleiche Begruendung; bei Knopf aus ein Cell-Zugriff.
+    let _ = crate::net_mcts::take_tree_reuse_diag();
     let mut records: Vec<Map<String, Value>> = Vec::new();
     // Rundenübergangs-Trainingsziel (siehe round_transition.rs): je Runde N
     // ein per Chance-Node-Sampling gemitteltes Blattwert-Paar, gespeichert
@@ -6807,6 +6860,25 @@ fn unified_game_loop<R: Rng + ?Sized>(
         ));
     }
 
+    // PREREG_tree_reuse.md par.2 (ENTWURF): EINE Zeile je Partie, nur wenn eine
+    // Seite mit Knopf an gesucht hat -- bei Knopf aus bleibt das Log
+    // bitidentisch. Je Spieler: Suchen, davon mit Treffer, uebernommene
+    // Wurzelbesuche (Summe), neue Simulationen (Summe = Budget).
+    let reuse_diag = crate::net_mcts::take_tree_reuse_diag();
+    if reuse_diag.iter().any(|d| d.searches > 0) {
+        let side = |d: &crate::net_mcts::TreeReuseDiag| {
+            format!(
+                "searches={} reused={} retained_visits={} new_sims={}",
+                d.searches, d.reused, d.retained_visits, d.new_sims
+            )
+        };
+        game.state.log_event(format!(
+            "[tree_reuse] p0 {} | p1 {}",
+            side(&reuse_diag[0]),
+            side(&reuse_diag[1])
+        ));
+    }
+
     // Variante B (PREREG_round_transition_search_sampling.md par.5 Schritt 1):
     // EINE Zeile je Partie, nur wenn der Knopf ueberhaupt an war. `leaves` sind
     // die vom Netz-Blattpfad bewerteten Blaetter dieser Partie, `pseudo` die
@@ -7591,7 +7663,8 @@ fn play_net_game<R: Rng + ?Sized>(
     // Elo-Verankerungs-/Gating-Pfad einen ANDEREN Spieler als den, der
     // tatsaechlich gated/trainiert wird; die Heuristik-Seite bleibt bewusst
     // ohne Netz). Spaltenbau-Trace nur Netz-Seite (Nutzer 2026-08-13).
-    let net_agent = NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true, search_config };
+    let net_agent =
+        NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true, search_config, retained_tree: Default::default() };
     let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c, variant: crate::mcts::HeuristicVariant::Hv1 };
     let net_player = PlayerLoopConfig {
         agent: &net_agent,
@@ -7785,9 +7858,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     // Zuordnung wie beim Drafting), sequenzielle Stapel-Zieh-Aufloesung
     // (`apply_chosen_action`) beidseitig, kein Spaltenbau-Trace (Bestand).
     let agent_a =
-        NetArenaAgent { net: net_a, base_sims: sims_a, c_puct: c_puct_a, vorzug: true, search_config: search_config_a };
+        NetArenaAgent { net: net_a, base_sims: sims_a, c_puct: c_puct_a, vorzug: true, search_config: search_config_a, retained_tree: Default::default() };
     let agent_b =
-        NetArenaAgent { net: net_b, base_sims: sims_b, c_puct: c_puct_b, vorzug: true, search_config: search_config_b };
+        NetArenaAgent { net: net_b, base_sims: sims_b, c_puct: c_puct_b, vorzug: true, search_config: search_config_b, retained_tree: Default::default() };
     let cfg = GameLoopConfig {
         // Arena: grosszuegiger Haenger-Alarm statt Abbruch-Wanduhr (siehe
         // `MAX_GAME_STEPS`-Abschnitt); eigene Runde-5-Sims zaehlen mit.

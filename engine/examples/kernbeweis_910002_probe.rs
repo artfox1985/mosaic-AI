@@ -145,6 +145,8 @@ fn main() {
         r5_solver_node_budget: mosaic_rust::round5::node_budget(),
         // Eigene Runde-5-Sims (PREREG_r5_net_vs_solver.md par.5b): Bestand = ungesetzt.
         r5_net_sims: None,
+        // Teilbaum-Wiederverwendung (PREREG_tree_reuse.md par.2): Bestand = aus.
+        tree_reuse: false,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

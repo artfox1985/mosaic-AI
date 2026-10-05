@@ -98,6 +98,10 @@ SPEC_TO_ENV = {
     # PREREG_r5_net_vs_solver.md par.5a: iterativer Loeser je Seite, OPTIONAL, 0 oder 1, Default 0.
     # Die Env ist nur der Default des Seiten-Felds (round5.rs solver_iterative_env).
     "r5_solver_iterative": "MOSAIC_R5_SOLVER_ITERATIVE",
+    # PREREG_tree_reuse.md par.2 (ENTWURF 2026-10-05): Teilbaum-Wiederverwendung je Seite,
+    # OPTIONAL, 0 oder 1, Default 0. Die Env ist nur der Default des Seiten-Felds
+    # (net_mcts.rs read_tree_reuse_env); wirkt nur im Arena-Agenten.
+    "tree_reuse": "MOSAIC_TREE_REUSE",
 }
 
 # Felder aus `KNOWN_FIELDS`, die BEWUSST keinen Env-Knopf bekommen. Der Test

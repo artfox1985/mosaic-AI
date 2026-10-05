@@ -386,6 +386,29 @@ pub(crate) fn read_start_by_search_env() -> u8 {
     }
 }
 
+/// `MOSAIC_TREE_REUSE` als 0/1 (`PREREG_tree_reuse.md` par.2): Env-Default des
+/// Seiten-Felds [`SearchConfig::tree_reuse`] fuer Seiten ohne Spec-Feld.
+///
+/// `0` (Default, auch bei fehlender oder ungueltiger Variable) ist der Bestand:
+/// jede Suche baut ihren Baum frisch. KEIN `OnceLock`, gleiche Begruendung wie
+/// bei [`read_start_by_search_env`]: der Wert ist ein Spec-Feld JE SEITE.
+pub(crate) fn read_tree_reuse_env() -> bool {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_TREE_REUSE") else {
+        return false;
+    };
+    match raw.trim() {
+        "" | "0" => false,
+        "1" => true,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!("WARNUNG: MOSAIC_TREE_REUSE={raw:?} ungueltig (0 aus, 1 an) -- aus (0) gilt.");
+            });
+            false
+        }
+    }
+}
+
 /// Default von [`SearchConfig::moon_order_variants`]
 /// (`PREREG_moon_stack_order.md` par.4): `1` = BESTAND, der Fan-out ueber die
 /// Reihenfolge-Varianten bleibt an. `0` = nur die kanonische Restreihenfolge,
@@ -1286,6 +1309,18 @@ pub struct SearchConfig {
     /// prozessweite Quelle gaelte fuer beide Seiten und machte das A/B
     /// "Netz @400 in Runde 5 gegen Netz @100" im selben Prozess unmoeglich.
     pub r5_net_sims: Option<u32>,
+    /// Teilbaum-Wiederverwendung DIESER SEITE zwischen ihren Zuegen
+    /// (`PREREG_tree_reuse.md` par.2, ENTWURF 2026-10-05, ungebaut). `false` =
+    /// Bestand: jede Suche baut ihren Baum frisch, und dieser Wert wird von
+    /// keinem Suchpfad gelesen. `true` wirkt NUR im Arena-Agenten
+    /// (`self_play::NetArenaAgent`, Einstieg [`net_search_drafting_action_reuse`]);
+    /// Self-Play-Erzeugung, Referee/GUI und die Record-Einstiege lesen das Feld
+    /// nicht (par.5 Punkt 1 offen).
+    ///
+    /// Spec-Feld je Seite (`tree_reuse`, OPTIONAL, 0 oder 1 als Zahl; fehlt es,
+    /// gilt der Env-Default `MOSAIC_TREE_REUSE`, [`read_tree_reuse_env`]) --
+    /// dasselbe Muster wie [`Self::r5_net_solver`].
+    pub tree_reuse: bool,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1513,6 +1548,7 @@ impl SearchConfig {
             r5_solver_node_budget: crate::round5::node_budget(),
             // KEIN Env-Knopf (par.5b): nur ueber das Spec-Feld, sonst Bestand.
             r5_net_sims: None,
+            tree_reuse: read_tree_reuse_env(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1591,6 +1627,8 @@ impl SearchConfig {
             "r5_solver_node_budget",
             // PREREG_r5_net_vs_solver.md par.5b: Netz-Sims nur in Runde 5.
             "r5_net_sims",
+            // PREREG_tree_reuse.md par.2: Teilbaum-Wiederverwendung je Seite.
+            "tree_reuse",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1978,6 +2016,10 @@ impl SearchConfig {
         // Regel wie bei `r5_net_solver` darueber, eine Spec ohne die Felder
         // beschreibt also weiter bitgenau den Bestand.
         let r5_solver_iterative = spec_flag("r5_solver_iterative", crate::round5::solver_iterative_env())?;
+        // PREREG_tree_reuse.md par.2: OPTIONAL, 0 oder 1, fehlt es, gilt der
+        // Env-Default (ohne Variable `false` = Bestand). Jede vorhandene Spec
+        // ohne das Feld beschreibt damit weiter bitgenau den Bestand.
+        let tree_reuse = spec_flag("tree_reuse", read_tree_reuse_env())?;
         let r5_solver_node_budget = match obj.get("r5_solver_node_budget") {
             None => crate::round5::node_budget(),
             Some(v) => {
@@ -2160,6 +2202,7 @@ impl SearchConfig {
             r5_solver_iterative,
             r5_solver_node_budget,
             r5_net_sims,
+            tree_reuse,
             heuristic_variant,
             sims,
             root_noise,
@@ -6673,6 +6716,7 @@ fn build_gumbel_tree_for<R: Rng + ?Sized>(
 ) -> Vec<Node> {
     build_gumbel_tree_inner_for(
         net_policy, net_value, state, sims, add_root_noise, rng, trace, BATCH_ROOT_EXPANSION, search_config, viewer,
+        None, None,
     )
 }
 
@@ -6724,6 +6768,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
 ) -> Vec<Node> {
     build_gumbel_tree_inner_for(
         net_policy, net_value, state, sims, add_root_noise, rng, trace, batch_root_expansion, search_config, None,
+        None, None,
     )
 }
 
@@ -6731,6 +6776,18 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
 /// Wurzel-Determinisierung ([`determinize_root_for`]). Der Betrachter gilt
 /// auch fuer den Kuppelstapel am Rundenende-Blatt der Variante B -- beide
 /// modellieren dieselbe Informationsmenge, die des Suchenden.
+///
+/// `retained_root` (`PREREG_tree_reuse.md` par.2, ENTWURF): `None` ist der
+/// Bestand, Zeile fuer Zeile. `Some(nodes)` ist ein wiederverwendeter Teilbaum
+/// aus [`take_reuse_start`] mit `nodes[0]` als Wurzel: dann entfallen die
+/// Wurzel-Determinisierung (die Suche laeuft in der Welt des gehaltenen Baums
+/// weiter, siehe dort) und der Wurzel-`make_node`; die Gumbel-Ziehung, Top-m und
+/// Sequential Halving laufen NEU ueber ALLE Wurzelkandidaten (Kinder plus
+/// `untried`), uebernommene Kinder starten mit ihren Besuchen, Werten und
+/// Prioren. `sims` zaehlt in beiden Faellen nur NEUE Simulationen
+/// (`budget_used`). `survivors_out` erhaelt die Knoten-IDs der Halving-
+/// Ueberlebenden (nur der Reuse-Einstieg fragt danach, siehe
+/// [`gumbel_final_root_action_among`]).
 #[allow(clippy::too_many_arguments)]
 fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     net_policy: &Net,
@@ -6743,10 +6800,15 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     batch_root_expansion: bool,
     search_config: &SearchConfig,
     viewer: Option<usize>,
+    retained_root: Option<Vec<Node>>,
+    survivors_out: Option<&mut Vec<usize>>,
 ) -> Vec<Node> {
+    let reused = retained_root.is_some();
     let mut root_state = state.clone();
     root_state.log.clear();
-    if DETERMINIZE_ROOT_HIDDEN_INFO {
+    // Tree Reuse: KEINE neue Welt ziehen -- die Statistiken des gehaltenen
+    // Baums gehoeren zu SEINER Welt (`retained_world_matches`).
+    if DETERMINIZE_ROOT_HIDDEN_INFO && !reused {
         determinize_root_for(&mut root_state, viewer, rng);
     }
     let root_player = root_state.current_player;
@@ -6754,8 +6816,12 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     // bei ausgeschaltetem Knopf eine Identitaet ohne RNG-Verbrauch.
     let leaf_config = with_round_transition_leaf_context(search_config, viewer.unwrap_or(root_player), rng);
     let search_config = &leaf_config;
-    let mut nodes =
-        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
+    let mut nodes = match retained_root {
+        None => {
+            vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)]
+        }
+        Some(retained) => retained,
+    };
     // K1: `x0` einmal je Suche aus dem Wurzel-Forecast; alle weiteren Knoten
     // dieser Suche lesen die Kopie mit gesetzter Wurzelmarge.
     let root_config = with_root_margin(search_config, &nodes[0]);
@@ -6764,6 +6830,29 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     if let Some(t) = trace.as_deref_mut() {
         t.determinize_active = DETERMINIZE_ROOT_HIDDEN_INFO;
         t.root_value = Some(compute_root_value_debug(net_policy, net_value, &nodes[0].state));
+    }
+
+    // Tree Reuse (`PREREG_tree_reuse.md` par.2): die Wurzel wird FRISCH
+    // behandelt. Dazu wandern die uebernommenen Kinder als (Aktion, Prior)
+    // zurueck in die Kandidatenliste, und `nodes[0].children` wird geleert; die
+    // Kinder, die die neue Top-m-Ziehung trifft, haengt der Block nach der
+    // Kandidatenbildung wieder ein (mit ihrem ganzen Teilbaum). Nicht gezogene
+    // alte Kinder bleiben als verwaiste Knoten im Vektor (unerreichbar, kein
+    // Backprop), ihre Aktion steht wie jeder nicht gezogene Kandidat mit N=0 in
+    // `untried`. Im Bestand (`!reused`) leer und ohne Allokation.
+    let mut retained_children: Vec<(Action, usize)> = Vec::new();
+    if reused {
+        let kids = std::mem::take(&mut nodes[0].children);
+        for cid in kids {
+            if let Some(act) = nodes[cid].action.clone() {
+                nodes[0].untried.push((act.clone(), nodes[cid].prior));
+                retained_children.push((act, cid));
+            }
+        }
+        // Stabil nach Prior absteigend, wie `build_untried_actions` sie liefert.
+        nodes[0]
+            .untried
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     let n_root = nodes[0].untried.len();
@@ -6824,6 +6913,17 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     // (§5, Phase 4) korrekt als "N(a)=0"-Menge erhalten.
 
     let mut candidate_node: Vec<Option<usize>> = vec![None; candidates.len()];
+    // Tree Reuse: gezogene Kandidaten, zu denen ein uebernommenes Kind gehoert,
+    // starten mit diesem Kind (Besuche, Werte, Teilbaum). `visit_candidate!`
+    // steigt dort wegen `visits > 0` direkt per `descend_and_backprop` ab.
+    if reused {
+        for (ci, (act, _, _)) in candidates.iter().enumerate() {
+            if let Some(&(_, cid)) = retained_children.iter().find(|(a, _)| a == act) {
+                candidate_node[ci] = Some(cid);
+                nodes[0].children.push(cid);
+            }
+        }
+    }
     let mut current: Vec<usize> = (0..candidates.len()).collect();
 
     // Perf-Auftrag (2026-08-02): gebuendelte Erstexpansion ALLER Kandidaten
@@ -6837,7 +6937,14 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
     // ist (sonst wuerde die geaenderte Kandidaten-Reihenfolge den
     // RNG-Verbrauch verschieben, siehe `BATCH_ROOT_EXPANSION`-Doku).
     let same_net_for_batching = net_value.is_none_or(|v| std::ptr::eq(v, net_policy));
-    if batch_root_expansion && candidates.len() > 1 && same_net_for_batching && !SHUFFLE_STACK_PEEK_IN_SEARCH {
+    // Tree Reuse: kein gebuendelter Erstausbau, einige Kandidaten existieren
+    // schon (`!reused` ist im Bestand immer wahr).
+    if batch_root_expansion
+        && candidates.len() > 1
+        && same_net_for_batching
+        && !SHUFFLE_STACK_PEEK_IN_SEARCH
+        && !reused
+    {
         let root_state = nodes[0].state.clone();
         batched_expand_root_candidates(
             net_policy, net_value, &root_state, &candidates, &mut nodes, &mut candidate_node, rng,
@@ -7040,6 +7147,13 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
         .filter_map(|&ci| candidate_node[ci].map(|cid| nodes[cid].visits))
         .min()
         .unwrap_or(0);
+    // Tree Reuse: die Ueberlebenden als Knoten-IDs fuer die finale Zugwahl.
+    // Mit uebernommenen Besuchen gilt "Ueberlebende = Kinder mit maximalen
+    // Besuchen" nicht mehr (`gumbel_final_root_action` setzt das voraus).
+    if let Some(out) = survivors_out {
+        out.clear();
+        out.extend(current.iter().filter_map(|&ci| candidate_node[ci]));
+    }
 
     // Anforderung 2d: finale Zugwahl -- die Max-Visit-Menge (Sequential-
     // Halving-Überlebende) mit `ln(prior)+σ(Q)` je Finalist, exakt dieselbe
@@ -7788,6 +7902,338 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(a, _)| a);
     moon_order_post_search(net, None, state, chosen, c_puct, rng, search_config)
+}
+
+// ── Tree Reuse (PREREG_tree_reuse.md par.2, ENTWURF 2026-10-05) ─────────────
+//
+// STAND: ENTWURF, NICHT KOMPILIERT, NICHT GEMESSEN. Geschrieben waehrend einer
+// exklusiven Erzeugung ohne Build; erst nach dem Kompilat und den Abnahmen unten
+// darf der Knopf in eine Arena.
+//
+// Bauform: der Arena-Agent (`self_play::NetArenaAgent`) haelt je Seite und Partie
+// ein `Option<RetainedTree>` = den GANZEN Baum seiner letzten Suche. Beim
+// naechsten eigenen Entscheid sucht [`take_reuse_start`] darin einen Knoten, an
+// dem diese Seite zieht und dessen Zustand zum echten Zustand passt
+// ([`retained_world_matches`]); dessen Teilbaum wird die neue Wurzel. Kein Treffer
+// (Gegnerzug nicht expandiert, Rundenwechsel, verdeckte Information anders
+// aufgedeckt, Bauer-Vorzug mit anderem Zug, Mondstapel-Nachsuche mit anderer
+// Reihenfolge) = frische Suche, exakt der Bestandsweg. Die Kanten werden also
+// nicht einzeln (eigener Zug, dann Gegnerzug) abgelaufen, sondern ueber den
+// ZUSTAND gesucht -- das deckt mehrstufige Zuege (Kuppelwahl in zwei Stufen,
+// Stapel-Zug, Ein-Aktion-Kurzschluss ohne Suche) mit ab, ohne den Zugverlauf
+// zwischen zwei Entscheiden kennen zu muessen.
+//
+// Welt: die Suche determinisiert ihre Wurzel EINMAL je Suche
+// (`DETERMINIZE_ROOT_HIDDEN_INFO`). Ein uebernommener Teilbaum lebt in der Welt
+// der Suche, die ihn gebaut hat; seine Statistiken sind nur in DIESER Welt
+// gueltig. Darum zieht eine Reuse-Suche KEINE neue Welt, sondern sucht in der
+// alten weiter -- zulaessig nur, solange die alte Welt mit allem vereinbar ist,
+// was seitdem sichtbar wurde (Pruefung in `retained_world_matches`). Eintrag in
+// `docs/architecture_reference.md`, Abschnitt "Wo der Code Information
+// ABSICHTLICH vernichtet".
+//
+// Budget: `sims` zaehlt nur NEUE Simulationen (`budget_used` im Gumbel-Rumpf);
+// uebernommene Besuche zaehlt [`TreeReuseDiag::retained_visits`] getrennt.
+//
+// ABNAHMEN (par.2, Pflicht vor jeder Arena; keine davon gelaufen):
+//  1. Knopf aus BYTE-GLEICH: Lib-Suite gruen; Netz-Paritaets-Fixture und Golden
+//     Probe unveraendert. Der Bestandsweg betritt keinen neuen Zweig:
+//     `tree_reuse == false` -> `net_arena_choose_action` -> unveraenderter
+//     `net_search_drafting_action`; im Gumbel-Rumpf sind `retained_root` und
+//     `survivors_out` `None` (keine RNG-Ziehung mehr oder weniger, keine
+//     Allokation: `Vec::new()` allokiert nicht).
+//  2. Anker: `/mosaic-anchor-invariance`, Drift UND Konservierung (die Heuristik-
+//     Bahn ist unberuehrt, die Pruefung ist trotzdem Pflicht je Wheel).
+//  3. Determinismus: zwei Laeufe mit Knopf AN und gleichen Seeds byte-gleich
+//     (gehaltener Baum lebt im Agenten der Partie, keine Prozess-Globale ausser
+//     dem thread-lokalen Diagnosezaehler).
+//  4. Gleichwertigkeit "an, kein Treffer": eine Suche ohne Treffer ist der
+//     Bestandsweg; Test: Wurzelstatistik identisch zu `build_net_tree` bei
+//     gleichem Seed.
+//  5. Reuse-Invarianten (Unit-Tests zu schreiben): `extract_subtree` erhaelt
+//     Besuche/Werte und Eltern-Kind-Konsistenz; `take_reuse_start` trifft den
+//     Folgezustand nach (eigener Zug, Gegnerzug) und verwirft ihn, sobald eine
+//     verdeckte Information anders aufgedeckt ist; nach einer Reuse-Suche gilt
+//     Summe der neuen Wurzel-Besuche == `sims`.
+//  6. Kostentor: s je Partie mit und ohne Knopf, 2 x 20 Paare; dazu Trefferquote
+//     und Speicher aus `[tree_reuse]` im Partie-Log.
+
+/// Zwischen zwei Entscheiden DERSELBEN Seite gehaltener Suchbaum (der ganze
+/// Baum der letzten Suche, `nodes[0]` = deren Wurzel). Lebt im Arena-Agenten
+/// einer Partie, nie prozessweit.
+pub struct RetainedTree {
+    nodes: Vec<Node>,
+}
+
+impl RetainedTree {
+    /// Knotenzahl, fuer Diagnose und Speicherabschaetzung.
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+}
+
+/// Diagnose der Teilbaum-Wiederverwendung JE SPIELER einer Partie: Suchen mit
+/// Knopf an, davon mit Treffer, Summe der uebernommenen Wurzelbesuche, Summe
+/// der neuen Simulationen (Budget). Thread-lokal, Muster `MOON_ORDER_DIAG`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TreeReuseDiag {
+    pub searches: u64,
+    pub reused: u64,
+    pub retained_visits: u64,
+    pub new_sims: u64,
+}
+
+impl TreeReuseDiag {
+    const ZERO: Self = Self { searches: 0, reused: 0, retained_visits: 0, new_sims: 0 };
+}
+
+thread_local! {
+    static TREE_REUSE_DIAG: std::cell::Cell<[TreeReuseDiag; 2]> =
+        const { std::cell::Cell::new([TreeReuseDiag::ZERO; 2]) };
+}
+
+/// Liest die Zaehler aus und setzt sie zurueck (Begruendung wie bei
+/// [`take_moon_order_diag`]). Bei Knopf aus bleiben sie `ZERO`.
+pub fn take_tree_reuse_diag() -> [TreeReuseDiag; 2] {
+    TREE_REUSE_DIAG.with(|c| c.replace([TreeReuseDiag::ZERO; 2]))
+}
+
+fn note_tree_reuse(player: usize, retained_visits: Option<u32>, new_sims: u32) {
+    if player >= 2 {
+        return;
+    }
+    TREE_REUSE_DIAG.with(|c| {
+        let mut d = c.get();
+        d[player].searches += 1;
+        d[player].new_sims += u64::from(new_sims);
+        if let Some(v) = retained_visits {
+            d[player].reused += 1;
+            d[player].retained_visits += u64::from(v);
+        }
+        c.set(d);
+    });
+}
+
+/// Passt der Zustand `world` eines gehaltenen Knotens zum ECHTEN Zustand `real`,
+/// gesehen vom Suchenden `viewer`?
+///
+/// `world` traegt die verdeckte Information der damaligen Determinisierung,
+/// `real` die echte. Verglichen wird deshalb so: (a) die Struktur der
+/// verdeckten Bestaende muss gleich sein (Stapellaenge, Multimenge der Platten,
+/// Wissensbloecke, eigene Rueckgabe-Bloecke positionsgleich, Typ der obersten
+/// Platte; dieselben Fabriken mit verdecktem Chip und dieselbe Multimenge
+/// verdeckter Chips); (b) danach werden die verdeckten Felder der Welt in eine
+/// Kopie des echten Zustands eingesetzt und der Rest per
+/// `serialize::state_to_json_exact` verglichen. Wurde seit der Suche etwas
+/// aufgedeckt, das in der Welt anders lag (gezogene Platte, aufgedeckter Chip),
+/// unterscheidet sich der oeffentliche Teil und der Knoten faellt raus.
+///
+/// Der Vergleich ist bewusst KONSERVATIV: verdeckte Information, die hier nicht
+/// eingesetzt wird (etwa gezogene, fuer den Suchenden verdeckte Platten des
+/// Gegners), fuehrt zu "kein Treffer" und damit zur frischen Suche, nie zu einem
+/// falschen Treffer. UNGEPRUEFT: ob `state_to_json_exact` jedes Feld traegt, das
+/// die Suche liest (ein nicht serialisiertes Feld koennte einen falschen Treffer
+/// zulassen; Gegenmittel ist Abnahme 5).
+fn retained_world_matches(real: &GameState, world: &GameState, viewer: usize) -> bool {
+    if real.factories.len() != world.factories.len()
+        || real.dome_tile_pool.len() != world.dome_tile_pool.len()
+        || real.dome_pool_known_blocks != world.dome_pool_known_blocks
+    {
+        return false;
+    }
+    let pool_ids = |s: &GameState| -> Vec<usize> {
+        let mut v: Vec<usize> = s.dome_tile_pool.iter().map(|t| t.tile_id).collect();
+        v.sort_unstable();
+        v
+    };
+    if pool_ids(real) != pool_ids(world) {
+        return false;
+    }
+    // Eigene Rueckgabe-Bloecke laesst die Determinisierung stehen
+    // (`state::determinize_dome_pool`), also muessen sie positionsgleich sein.
+    let mut start = real.dome_pool_unknown_prefix_len();
+    for block in &real.dome_pool_known_blocks {
+        let end = (start + block.len).min(real.dome_tile_pool.len());
+        if block.returner == viewer && real.dome_tile_pool[start..end] != world.dome_tile_pool[start..end] {
+            return false;
+        }
+        start = end;
+    }
+    let top_type = |s: &GameState| s.dome_tile_pool.first().map(|t| t.is_special_type());
+    if top_type(real) != top_type(world) {
+        return false;
+    }
+    let hidden_slots = |s: &GameState| -> Vec<usize> {
+        s.factories
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.bonus_chip.is_some() && !f.bonus_chip_revealed)
+            .map(|(i, _)| i)
+            .collect()
+    };
+    let slots = hidden_slots(real);
+    if slots != hidden_slots(world) {
+        return false;
+    }
+    let hidden_chip_ids = |s: &GameState| -> Vec<usize> {
+        let mut v: Vec<usize> = s.bonus_chip_pool.iter().map(|c| c.chip_id).collect();
+        v.extend(slots.iter().filter_map(|&i| s.factories[i].bonus_chip.as_ref().map(|c| c.chip_id)));
+        v.sort_unstable();
+        v
+    };
+    if hidden_chip_ids(real) != hidden_chip_ids(world) {
+        return false;
+    }
+    let mut grafted = real.clone();
+    grafted.log.clear();
+    grafted.dome_tile_pool = world.dome_tile_pool.clone();
+    grafted.bonus_chip_pool = world.bonus_chip_pool.clone();
+    for &i in &slots {
+        grafted.factories[i].bonus_chip = world.factories[i].bonus_chip.clone();
+    }
+    crate::serialize::state_to_json_exact(&grafted, false) == crate::serialize::state_to_json_exact(world, false)
+}
+
+/// Schneidet den Teilbaum unter `new_root` heraus und nummeriert ihn neu
+/// (Breitensuche, `new_root` wird Index 0 ohne Eltern und ohne Kantenaktion).
+/// Besuche, Werte, Prioren und `untried` bleiben unveraendert.
+fn extract_subtree(nodes: Vec<Node>, new_root: usize) -> Vec<Node> {
+    let mut slots: Vec<Option<Node>> = nodes.into_iter().map(Some).collect();
+    let mut order: Vec<usize> = vec![new_root];
+    let mut i = 0;
+    while i < order.len() {
+        if let Some(n) = slots[order[i]].as_ref() {
+            order.extend(n.children.iter().copied());
+        }
+        i += 1;
+    }
+    let mut new_id = vec![usize::MAX; slots.len()];
+    for (k, &old) in order.iter().enumerate() {
+        new_id[old] = k;
+    }
+    let mut out = Vec::with_capacity(order.len());
+    for &old in &order {
+        let mut n = slots[old].take().expect("extract_subtree: Knoten zweimal im Teilbaum (kein Baum?)");
+        n.parent = if old == new_root { None } else { n.parent.map(|p| new_id[p]) };
+        for c in n.children.iter_mut() {
+            *c = new_id[*c];
+        }
+        out.push(n);
+    }
+    out[0].action = None;
+    out
+}
+
+/// Startbaum fuer die naechste Suche aus einem gehaltenen Baum, oder `None`
+/// (frisch). Kandidaten sind alle Knoten ausser der alten Wurzel, an denen der
+/// Suchende (`real.current_player`) in derselben Runde im Drafting zieht, mit
+/// mindestens einem Besuch, ohne Zufallsknoten-Rolle; unter mehreren Treffern
+/// gewinnt der meistbesuchte (Gleichstand: kleinerer Index). Verwaiste Knoten
+/// frueherer Reuse-Suchen (nicht gezogene alte Wurzelkinder) sind zulaessig:
+/// ihre Statistik gehoert zu ihrem Zustand in derselben Welt.
+fn take_reuse_start(tree: RetainedTree, real: &GameState) -> Option<Vec<Node>> {
+    let nodes = tree.nodes;
+    let viewer = real.current_player;
+    let mut best: Option<usize> = None;
+    for nid in 1..nodes.len() {
+        let n = &nodes[nid];
+        if n.visits == 0 || n.terminal || n.dice != DiceNodeKind::Decision {
+            continue;
+        }
+        let s = &n.state;
+        if s.phase != Phase::Drafting || s.current_player != viewer || s.round_number != real.round_number {
+            continue;
+        }
+        if best.is_some_and(|b| nodes[b].visits >= n.visits) {
+            continue;
+        }
+        if retained_world_matches(real, s, viewer) {
+            best = Some(nid);
+        }
+    }
+    best.map(|nid| extract_subtree(nodes, nid))
+}
+
+/// Finale Zugwahl einer Reuse-Suche: dieselbe Formel wie
+/// [`gumbel_final_root_action`] (`ln(prior) + sigma(Q)`), aber ueber die
+/// ausdruecklich uebergebenen Halving-Ueberlebenden statt ueber "Kinder mit
+/// maximalen Besuchen" -- mit uebernommenen Besuchen sind das nicht mehr
+/// dieselben Knoten.
+fn gumbel_final_root_action_among(nodes: &[Node], survivors: &[usize]) -> Option<usize> {
+    let max_n = survivors.iter().map(|&c| nodes[c].visits).max()?;
+    survivors.iter().copied().filter(|&c| nodes[c].visits > 0).max_by(|&a, &b| {
+        let score = |cid: usize| -> f64 {
+            let prior = (nodes[cid].prior as f64).max(1e-9);
+            let q = nodes[cid].value / nodes[cid].visits as f64;
+            prior.ln() + gumbel_sigma(q, max_n)
+        };
+        score(a).partial_cmp(&score(b)).unwrap_or(std::cmp::Ordering::Equal)
+    })
+}
+
+/// Arena-Einstieg MIT Teilbaum-Wiederverwendung (`PREREG_tree_reuse.md`
+/// par.2). `retained` ist der vom Agenten gehaltene Baum dieser Seite; er wird
+/// hier verbraucht und durch den neuen Baum ersetzt.
+///
+/// Faellt auf [`net_search_drafting_action`] zurueck (und verwirft den
+/// gehaltenen Baum), wenn der Knopf aus ist oder ein Fall vorliegt, fuer den der
+/// Entwurf nicht gebaut ist: PUCT-Pfad, ISMCTS mit k > 1, Klasse-W-
+/// Zufallsknoten, Runde 5 (par.2 Vorgabe; der Code zwingt das nicht, siehe
+/// par.2a Punkt 7) und der Runde-5-Loeser. Wurzelrauschen gibt es hier nicht
+/// (Arena: `add_root_noise = false`).
+pub fn net_search_drafting_action_reuse<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    rng: &mut R,
+    search_config: &SearchConfig,
+    retained: &mut Option<RetainedTree>,
+) -> Option<Action> {
+    let plain = !search_config.tree_reuse
+        || !USE_GUMBEL_SEARCH
+        || num_determinizations() > 1
+        || search_config.dome_dice_side.is_some()
+        || state.phase != Phase::Drafting
+        || crate::round5::applies(state)
+        || r5_solver_takes_over(state, search_config);
+    if plain {
+        *retained = None;
+        return net_search_drafting_action(net, state, sims, c_puct, false, rng, search_config);
+    }
+    let start = retained.take().and_then(|tree| take_reuse_start(tree, state));
+    let retained_visits = start.as_ref().map(|n| n[0].visits);
+    let mut survivors: Vec<usize> = Vec::new();
+    // Gleicher Rumpf wie `build_net_tree` -> `build_gumbel_tree_for` (Betrachter
+    // `None`, `BATCH_ROOT_EXPANSION`), nur mit Startbaum und Ueberlebenden.
+    let nodes = build_gumbel_tree_inner_for(
+        net,
+        None,
+        state,
+        sims,
+        false,
+        rng,
+        None,
+        BATCH_ROOT_EXPANSION,
+        search_config,
+        None,
+        start,
+        Some(&mut survivors),
+    );
+    note_tree_reuse(state.current_player, retained_visits, sims);
+    let best: Option<usize> = if retained_visits.is_some() {
+        gumbel_final_root_action_among(&nodes, &survivors).map(|baseline| {
+            color_denial_probe(&nodes, baseline);
+            apply_denial_tiebreak(&nodes, baseline)
+        })
+    } else {
+        // Kein Treffer: Zugwahl exakt wie im Bestand.
+        select_final_root_child(&nodes)
+    };
+    let best = best?;
+    let action = nodes[best].action.clone();
+    *retained = Some(RetainedTree { nodes });
+    moon_order_post_search(net, None, state, action, c_puct, rng, search_config)
 }
 
 /// Task #88 (Hybrid-Suche, kausaler Kopf-Test): wie [`net_search_drafting_action`],
@@ -10553,6 +10999,8 @@ mod tests {
             r5_solver_node_budget: crate::round5::NODE_BUDGET,
             // par.5b: Bestand = Sims der Partie auch in Runde 5.
             r5_net_sims: None,
+            // PREREG_tree_reuse.md: Bestand = kein Halten des Baums.
+            tree_reuse: false,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in

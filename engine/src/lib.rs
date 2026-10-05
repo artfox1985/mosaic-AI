@@ -953,6 +953,8 @@ fn engine_config_json() -> String {
         // 4->5-Label aendert.
         "r5_solver_iterative": crate::round5::solver_iterative_env(),
         "r5_solver_node_budget": crate::round5::node_budget(),
+        // PREREG_tree_reuse.md par.2: Env-Default der Seiten ohne Spec-Feld.
+        "tree_reuse": crate::net_mcts::read_tree_reuse_env(),
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
         // Arm v29-b02). Gehoert ins Lauf-Manifest, weil er den EINGANG des Netzes
