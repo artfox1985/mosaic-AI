@@ -18,7 +18,31 @@ seinen KONSUMENTEN (CLAUDE.md, Rueckwaerts-Pruefung).
 
 ## 1. WAS GERADE LAEUFT
 
-**KETTE `tools/night_v35_chain.sh` 19:41-23:4x (Terminal-Tab), Schritte 1-5 und Tor 1 Seed 1 fertig, Seed 2 abgebrochen.** Stand 20:40:
+**KETTE `tools/night_v35_b02_chain.sh` FERTIG 2026-10-06 01:32:32 (25,2 h). MASCHINE FREI. ERGEBNIS: v35-b02 TRAEGT TOR 1.**
+Drei Seeds gegen v34-b01 @400: 218:182 (z +1,51), 219:181 (z +2,12), 159:91 (SPRT-Stopp nach 125 Paaren, z +3,99);
+**gepoolt 596:454 = 56,8 %, Block-z +4,07 ueber 105 Bloecke** (`PREREG_v35_window.md` par.12c-12e). Tor 2b GRUEN in allen
+Seeds (volle Spalten je Brett 1,085/1,097/1,108 gegen 0,978/0,985/1,040), Punkte +1,7 bis +5,0 je Partie, Plattenpunkte
+hoeher, Strafsteine in zwei Seeds rund 0,7 mehr. Tor 2a: policy-s400 0,807 +- 0,032 gegen Bezug 0,826 (gleich bedingt).
+**Offline (par.12f): der Wertkopf lernt auf dem @400-Fenster MESSBAR** (dBrier Warmstart minus Epoche 2 +0,00107
+[+0,00041; +0,00169] auf 120 Val-Dateien; b01 @100: +0,0006 mit CI ueber 0), Policy-CE gepoolt +0,158; Netz GESUND
+(`weight_health_v35-b02.json`). Zuordnung vorab: Suchtiefe 400 PLUS Modus 2 in allen Klassen, nicht getrennt.
+**OFFEN, Nutzer-Entscheid: Promotion v35-b02 (`/mosaic-champion-promotion`, Ein-Promotion-Regel je Generation; Elo-Kanten
+erst damit ins Register).** Erzeugung 18,9 h (11.000 Partien, je Partie 6,92 / 6,91 / 6,64 / 5,20 s), Training 1.676,8 s,
+Tor 1 5,2 h; alle Laufzeiten in `docs/measured_runtimes.md`.
+
+**NACH DER KETTE (01:3x bis 02:xx):** Python-Suite (unittest discover, 513 Tests) nach Korrektur der EMA-Defaults in
+train.py (Literale statt Konstanten im argparse-Block und in der train()-Signatur, Waechter-assert gegen die Konstanten;
+Grund: `tools/tests/source_parser.py` baut den Parser per exec nach) und Nachzug des Tests "vier atomare Checkpoints"
+(`_avg`); `generate_knob_docs.py --check` gruen (152 Knoepfe); Konventions-Check gruen nach Umbenennung `vorzug` ->
+`preference` im Tree-Reuse-Entwurf (`self_play.rs` neue Funktion). DANN Commit (erster seit `4d100857`) und Start von
+`tools/night_v35_arms_chain.sh` (b03, b05, b06, b04, b07, b08) sowie `tools/night_v35_b09_b10_chain.sh` (wartet auf die
+Arm-Kette) in Terminal-Tabs. Die Arme messen gegen v34-b01 (Baseline b02 bleibt vergleichbar); bei Promotion von b02
+ist der Gegner der Arme ein Nutzer-Entscheid.
+
+**Zuvor (Ablauf der Kette):** Smoke je Klasse -> Cache-Waechter (3 Worker) daneben -> Erzeugung policy-s400 1.000,
+policy-dice-v2-r1-s400 2.000, value-deviate-s400 4.000, value-excursion-s400 4.000 (alle @400, Modus 2) -> Abnahmen par.8
+GRUEN -> Fenster v35-b02 (1.200 Dateien, 400 Traeger, Val 120) -> Training v35-b02 (Seed 20260965, Brier-beste Epoche 5)
+-> Tor 1. **Vorige Kette `tools/night_v35_chain.sh` 2026-10-04 19:41-23:4x: Schritte 1-5 und Tor 1 Seed 1 fertig, Seed 2 abgebrochen.** Stand 20:40:
 Fenster STEHT (20:00, Maske GRUEN) und Training v35-b01 DURCH (20:37, 2.198 s, Manifest-Diff 0 unerwartet,
 gegatet `v35-b01_best`, Epoche 2; `PREREG_v35_window.md` par.11a); **Tor 1: Seed 20261600 FERTIG 23:15 (208:192 = 52,0 %, Block-z +0,92, Spalten 1,078 gegen 1,128;
 par.11c, gebremst durch Nutzer-Spiel neben der Arena), Seed 20261601 auf Nutzer-Entscheid ABGEBROCHEN 23:4x bei 8:12** (par.11c Nachtrag; Tor 1 b01 = ein Seed,

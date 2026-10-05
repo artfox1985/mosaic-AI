@@ -23,16 +23,30 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v31-b01`**, shown in the game as **Tessa** (promoted 2026-09-20),
-Elo **1458** (95% CI [1414, 1510]) from 1,000 rated games, anchored at the frozen
+Champion: **`v34-b01`**, shown in the game as **Tessa** (promoted 2026-10-03),
+Elo **1595** (95% CI [1546, 1646]) from 960 rated games, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
-`tools/elo_tracker.py report`). None of its four edges was stopped early. It beat
-the previous champion 461:339 over two seeds, the anchor 45:5, and `v29-b09` two
-generations back 79:71 -- the last of those well below what the other two would
-predict, and recorded as such rather than smoothed over. `Tessa` is the name
-the game shows for the reigning champion; the technical name stays in the ladder
-and the files. `v32` is in preparation (user decision 2026-09-22) -- an earlier
-version of this file called `v31` the final generation, which it is not.
+`tools/elo_tracker.py report`). Its replication edge against the previous
+champion `v32-b01` ran to the cap: 285:115 over 200 pairs, block-z +10.00; it
+beat the anchor 45:5 and the artifact `v31-b01` 108:42. `Tessa` is the name the
+game shows for the reigning champion; the technical name stays in the ladder and
+the files (`models/champion.txt`). The ladder today: `v34-b01` 1595, `v32-b01`
+1460, `v31-b01` 1433 (`evaluations/PREREG_v34_window.md` par.10e).
+
+**`v35` is the last generation** (user decision 2026-10-04). Its first arm,
+`v35-b01`, trained on a window generated entirely by `v34-b01` and came out at
+52.0 % against the champion over one seed, which is not an edge. The offline
+measurement behind that result is the more important finding: the value head
+learns nothing measurable from a window whose search at 100 simulations is
+already weaker than the raw net in the opening (`PREREG_v35_window.md` par.11b
+and par.11d). The closing series therefore regenerates the whole window at 400
+simulations (`v35-b02`, running), then tries the value target itself (bootstrap
+from the own trajectory at one to three rounds, a margin blend, lambda 1.0,
+weight averaging over checkpoints; par.13 to par.16) and three search knobs
+with external evidence but no measurement here yet (tree reuse, variance-scaled
+exploration, subtree value bias; `PREREG_tree_reuse.md` and siblings). If one of
+them clears the gate it is promoted; if none does, the project closes with
+`v34-b01` as Tessa.
 
 **The cold-start question is settled.** `v30-b01` and `v30-b02` trained on the
 same replay window with the same seed and the same recipe and differed in a
@@ -56,7 +70,7 @@ not the pipeline. The list of places where the code discards information on
 purpose is kept in
 [`docs/architecture_reference.md`](docs/architecture_reference.md).
 
-The engine ships as version 1.0.0 with this champion.
+The engine package is version 1.1.0 (contract hash `6ef829e564c58bd5`, 888 inputs, 414 actions).
 
 Full history, all measurements and the methodology rules:
 [`evaluations/STATUS.md`](evaluations/STATUS.md); process diagrams:
@@ -65,24 +79,29 @@ Full history, all measurements and the methodology rules:
 
 ## Engine Core in Brief
 
-- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m Sequential Halving at the root), deterministic in arena/server, sampled
-  in self-play (τ = 1 throughout; annealing was measured and brought no
-  gain). Root width follows the budget: `m = clamp(round(sims/16), 4, 16)`,
-  i.e. 16 at 400/600 sims and 9 at 150 sims (measured strength-neutral).
-  The legacy PUCT path is still available behind `USE_GUMBEL_SEARCH`.
+- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m
+  Sequential Halving at the root), deterministic in arena/server. Self-play
+  also plays the argmax from move 1; diversity is bought explicitly instead
+  of by sampling: one forced deviation or one excursion per game, start-slot
+  scatter, and a tie-break mode, all printed in each run manifest. Root width
+  follows the budget: `m = clamp(round(sims/16), 4, 16)`, i.e. 16 at 400/600
+  sims and 9 at 150 sims (measured strength-neutral). The legacy PUCT path is
+  still available behind `USE_GUMBEL_SEARCH`.
 
 - **Network** (`engine/py/neural_net.py`): 2D encoder (`Mosaic2DNet`):
-  conv branch over 79 binary 6x6 planes + flat branch over 755 features
-  (744 up to `v28-b01`), fused into a 512-wide trunk. Both inputs are built
+  conv branch over 79 binary 6x6 planes + flat branch over 888 features
+  (744 up to `v28-b01`, 755 for `v28-b02`, 794 for the v29 arms; see
+  "State Tensor" below), fused into a 512-wide trunk. Both inputs are built
   once, in Rust (`engine/src/features.rs`), and exported to Python via PyO3;
   the Python twin builder remains as a test oracle and is bit-identical
-  (`tools/probes/feature_parity_rust_python.py`, gate passed 2026-09-11). Heads: policy (406 actions), value
+  (`tools/probes/feature_parity_rust_python.py`, gate passed 2026-09-11). Heads: policy (414 actions), value
   (WDL: two logits -> P(win)), moon order, own points, opponent points,
   ownership, and optionally `endgame_margin` (auxiliary target: the
   round-5 solver's root value, recorded free of charge from self-play
   records; a budget-limited expectiminimax value with exact leaf
-  scoring, not an exact minimax value). Aux heads are training signal
-  only; the search never reads them.
+  scoring, not an exact minimax value; off in the current recipe, the
+  v35 training manifests carry `endgame_head: false`). Aux heads are
+  training signal only; the search never reads them.
 - **Value target**: `VALUE_SCHEMA_VERSION=20`. `values_wdl` is a TD blend
   (`TD_LAMBDA=0.5`) of the bootstrap win probability at the next round
   transition and the actual game outcome. Bootstraps from pre-WDL
@@ -91,26 +110,33 @@ Full history, all measurements and the methodology rules:
   separately (`wdl_outcome`) and yields the **Brier score**, the only
   cross-arm comparable value metric; it also selects the checkpoint
   (`_brierbest`, re-validated in the arena).
-- **Cache**: HDF5, planes and legal-move masks bit-packed (1 bit per field),
-  ~2.7 KB per state; a 4.8 M-state window fits in ~13 GB.
+- **Cache**: HDF5, planes and legal-move masks bit-packed (1 bit per field)
+  and lzf-compressed. Measured on the v35-b01 monolith: 2,025,784 states in
+  577 MB, about 0.28 KB per state.
 - **Floor shaping** (`FLOOR_SHAPING_WEIGHT=0.3`, override
   `MOSAIC_FLOOR_SHAPING_W`): exact leaf-value additive against
   floor-penalty spirals; re-validated in the WDL era (0.15/0.6 sweep: H0).
   Plate shaping and value shrinkage were disproved and stay off.
-- **Round 5**: Expectiminimax (`engine/src/round5.rs`): alpha-beta over
-  the decision nodes plus chance nodes where the four fresh, still-hidden
-  bonus chips get revealed (`MOSAIC_R5_CHANCE_NODES`, default on since
-  2026-08-10). No network decisions in round-5 drafting, but the round is
-  *not* full-information, and the search is *not* exact; exact is the
-  leaf evaluation (optimal tiling plus plate scoring under a fixed dome
-  grid; the node budget is 200). Its values feed training: the round-4
-  bootstrap uses `round5::exact_round5_outcome`, and the optional
-  `endgame_margin` head distils the round-5 root value.
+- **Round 5**: the network path plays round 5 with the same Gumbel search
+  as rounds 1 to 4 (spec field `r5_net_solver` 0 in the champion and in
+  the generator spec, which also sets `r5_net_sims` 400). That is a
+  measured decision: the net search beat the expectiminimax solver at the
+  playing point 480:320 and at the generation point as well
+  (`evaluations/PREREG_r5_net_vs_solver.md` par.6d/6f). The solver
+  (`engine/src/round5.rs`: alpha-beta over the decision nodes plus chance
+  nodes where the four fresh, still-hidden bonus chips get revealed;
+  exact leaf evaluation under a fixed dome grid, node budget 200) stays
+  in the tree for the heuristic lane, the frozen anchor, and the round-4
+  bootstrap label (`round5::exact_round5_outcome`). A side can still opt
+  into it per spec (`r5_net_solver` 1).
 - **Runtime knobs**: every experimental lever is an `MOSAIC_*` environment
-  variable whose default reproduces the previous behaviour bit-for-bit
-  (verified by a hash probe before use). Currently all of them are inert
-  by measurement: aggression blend (w/λ), denial tie-break, floor-opponent
-  bias, root-width override, tiling criterion, τ annealing.
+  variable, or a per-side spec field with the environment value as its
+  default, and its default reproduces the previous behaviour bit-for-bit
+  (verified by a hash probe before use). The registry is the code
+  (`engine/src/knob_registry.rs`); `docs/knobs.md` is generated from it
+  (`python tools/generate_knob_docs.py --check`) and currently lists 152
+  knobs: 70 active in the recipe, 79 diagnostic, 3 dead. Each one names the
+  pre-registration that answered it.
 
 ## The Generation Cycle (Training Pipeline)
 
@@ -119,38 +145,45 @@ from the reigning champion. Every step has a written pre-registration in
 `evaluations/PREREG_*.md`: design **and** decision rule are fixed *before*
 the run, so a result cannot be reinterpreted afterwards.
 
-1. **Self-play in three classes** (generator = the champion of the previous
-   generation). Policy targets are expensive, value targets are cheap, so they
-   are bought separately, and the value half is split again by *how* the moves
-   are chosen:
+1. **Self-play in four classes** (generator = the reigning champion). Policy
+   targets are recorded only in the policy classes; the value classes buy
+   diversity instead (a forced deviation or an excursion per game). Since
+   `v35-b02` every class runs at 400 simulations, so a game costs the same in
+   every class:
 
    ```bash
-   # Base class: policy-carrying, greedy from move 1, one forced deviation
-   python -u self_play.py --mode network --model models/alphazero_<gen>_brierbest.onnx        --spec models/<champion>.spec.json --games 4000 --sims 100        --version <gen>-policy --threads 11 --chunk 10 --per-file 10 --seed <s1>        --tau-argmax-from-move 1 --deviate-prob 1.0
-   # Swarm a: value only, smooth action temperature (coverage)
-   python -u self_play.py ... --value-only --version <gen>-value-tempc --seed <s2>        --action-temp 2 --deviate-prob 1.0
-   # Swarm b: value only, one excursion per game, otherwise greedy (unbiased targets)
-   python -u self_play.py ... --value-only --version <gen>-value-excursion --seed <s3>        --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
+   # Since v35 the classes come from a recipe file; the chain is tools/v35_b02_generate.sh
+   python -u self_play.py --recipe models/v35_b02.recipe.json --class policy-s400
+   python -u self_play.py --recipe models/v35_b02.recipe.json --class policy-dice-v2-r1-s400
+   python -u self_play.py --recipe models/v35_b02.recipe.json --class value-deviate-s400
+   python -u self_play.py --recipe models/v35_b02.recipe.json --class value-excursion-s400
    ```
 
-   Measured on the v31 production run: 4.24 s per game for the base class,
-   14.7 h for all three classes on one machine (`docs/measured_runtimes.md`);
-   the eight search nodes added in v30 are most of the growth against the 9.9 h
-   of v28. Note that `--games` counts excursion identities as well, so the
-   excursion half needs the full number, not half of it.
+   Four classes: a policy-carrying base class, a policy class with the
+   dome-dice opening, and two value-only swarm classes (one forced deviation
+   per game, one excursion per game). Only the policy classes carry policy
+   targets; the carrier manifest (`data/policy_carrier_manifest_<window>.json`)
+   says which files those are. Measured on the v35-b02 run at 400 simulations
+   for every class: 6.9 s per game for both policy classes with the cache
+   watcher running alongside (`docs/measured_runtimes.md`); the v34 window
+   with its 100-simulation classes ran those at 3.2 s per game. Note that
+   `--games` counts excursion identities as well, so the excursion class
+   needs the full number, not half of it.
 
-2. **Replay window with generation rotation** (2,947 files, ~29,450 games):
-   the new base class plus a seed-determined subset of the two previous
-   generations as additional policy carriers (`data/policy_carrier_manifest_v<N>.json`,
-   whose content no longer enters the per-file cache key but is applied as a
-   mask when the window is assembled), plus all older swarm material as masked
-   value-only data. Each generation ages one step; the oldest rotates out.
-   Legacy-rule corpora are never mixed back in.
+2. **Replay window** (v35: 1,200 files, 12,000 games at 10 games per file,
+   all generated by the reigning champion `v34-b01`): the 400 files of the
+   policy classes are the policy carriers (`data/policy_carrier_manifest_v35.json`),
+   the 800 swarm files enter as value-only data. Carrier status is applied as a
+   mask when the window is assembled, not in the per-file cache key. Older
+   generations are no longer mixed in, and legacy-rule corpora never were
+   again. The validation split is 120 files drawn from the same pool
+   (`MOSAIC_VAL_POOL`), held fixed across the arms of a generation so that
+   their Brier scores stay comparable.
 
 3. **Training** (warm start from the champion):
 
    ```bash
-   MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v<N>.json    MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_<gen>-'    python -u train.py --name v<N>-b01 --load <champion>_brierbest        --file-list data/window_v<N>.txt --epochs 12 --lr 5e-05        --lr-schedule cosine --lr-t-max 12 --encoder 2d --value-head wdl        --value-target-variant nortv --value-target-lambda 0.7        --ownership-head-2d --opp-points-head --endgame-head --select-by-brier
+   MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v<N>.json    MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_<gen>-'    python -u train.py --name v<N>-b01 --load <champion>_brierbest        --file-list data/window_v<N>.txt --epochs 12 --lr 5e-05        --lr-schedule cosine --lr-t-max 12 --encoder 2d --value-head wdl        --value-target-variant nortv --value-target-lambda 0.7        --ownership-head-2d --opp-points-head --select-by-brier --fast-loader
    ```
 
    Early stopping requires a plateau on *both* sides (policy and value); the
@@ -180,9 +213,13 @@ the run, so a result cannot be reinterpreted afterwards.
 
 5. **Gating**: `tools/paired_gating.py` with paired seed blocks (block size 5,
    the seed changes per block, so score analyses have to run at block level),
-   swapped boards, Bernoulli SPRT (`H1: p1=0.65`), cap 200 pairs. An early stop
-   below ~150 pairs only counts after a fresh-seed replication (a false
-   positive taught us that). Only `ACCEPT_H1` promotes.
+   swapped boards, 200 pairs per seed and two seeds. The SPRT bounds stay
+   armed (alpha = beta = 0.001), but the decision rule since v34 is the
+   pooled block-z (`tools/gating_block_z.py`): a candidate carries at block-z
+   >= +1.96 or a pooled win rate >= 52.5 % without counter-evidence; if exactly
+   one seed clears the block-z line, a third seed runs
+   (`evaluations/PREREG_v34_window.md` par.2). An early SPRT stop only counts
+   after a fresh-seed replication to the cap (a false positive taught us that).
 
 6. **Promotion & bookkeeping**: `tools/set_champion.py` (server default for
    human games), `tools/elo_tracker.py add` (Bradley-Terry over the whole
@@ -191,7 +228,7 @@ the run, so a result cannot be reinterpreted afterwards.
    the wheel it was measured with, a golden probe and a manifest. The wheel
    travels with the artifact so that an old champion still plays the way it did
    when its Elo was measured. The artifact set holds the reigning champion and
-   its predecessor (today `v31-b01` and `v30-b02`); older ones are retired once
+   its predecessor (today `v34-b01` and `v32-b01`); older ones are retired once
    their edges are in the register. The full list is `docs/promotion_checklist.md`.
 
 7. **Diagnostics on the winner**: Platt calibration (`tools/platt_fit.py`),
@@ -205,7 +242,8 @@ A failed gating does **not** trigger more self-play games ("no top-up
 valve"): a candidate that only wins with additional data is not evidence
 for the change under test. Instead its measured components go into the
 recipe for the next generation; this is how the `endgame_margin` head
-entered the standard recipe despite a drawn arena result.
+entered the standard recipe despite a drawn arena result (it has since
+been dropped again; the current recipe trains without it).
 
 ## Directory Convention
 
@@ -214,7 +252,7 @@ the project's directory mantra: root executes, `tools/` measures, `evaluations/`
 ```text
 📦 mosaic-AI/
 ├── 📂 engine/       # Rust crate (mosaic_rust): game/search/self-play, PyO3 bindings
-│   └── 📂 py/       # neural_net.py (MosaicNet), corpus_dataset.py (MosaicDataset, value target)
+│   └── 📂 py/       # neural_net.py (Mosaic2DNet), corpus_dataset.py (MosaicDataset, value target)
 ├── 📂 evaluations/  # STATUS.md, elo_history.csv, arena_trends.csv, eval JSONs/reports
 ├── 📂 data/         # Self-play output (.pkl) + run manifests, data/archive_*/ = retired
 ├── 📂 models/       # Checkpoints (.pth/.onnx), loss plots, training manifests
@@ -265,7 +303,7 @@ supposed to alter a decision. The process diagrams live in `docs/`
 
 ### `tools/`
 
-The tool collection has grown past 200 files, and a hand-kept table in this
+The tool collection has grown past 150 entries, and a hand-kept table in this
 README could not answer the question that matters: **is this still used, or is
 it a leftover?** So the list is generated instead and lives in
 [`docs/tools_index.md`](docs/tools_index.md)
@@ -289,7 +327,8 @@ dialog exposes the simulation count (default 400) and the model name. The
 server-side `DIFFICULTY_PRESETS` (`easy`/`medium`/`hard`/`expert`) are not
 reachable from the web UI; a measured ladder of four levels (frozen heuristic
 anchor, then the champion in three search styles) is pre-registered in
-`evaluations/PREREG_difficulty_levels.md` and scheduled for v29. The AI
+`evaluations/PREREG_difficulty_levels.md` and deferred to the project close,
+so that it is calibrated on the model that ships. The AI
 debugger (`/debug`) shows a value-head
 breakdown (raw value, points forecast, win %, blended utility, floor shift)
 as well as a granular Gumbel trace (top-m candidates, Sequential Halving
@@ -315,15 +354,16 @@ state  (888)    → Linear(512) → BN → ReLU ──────────�
        ├→ Value Head (WDL): Linear(64)  → ReLU → Linear(2)    (logits → P(win))
        ├→ Moon-Order Head:  Linear(32)  → ReLU → Linear(5)    (Plackett-Luce scores)
        ├→ Points Heads:     own + opponent score forecast (aux, Tanh)
-       ├→ Ownership Head:   Linear(128) → ReLU → Linear(72)   (2×36 fields, aux)
-       └→ Endgame Head:     round-5 solver root margin (aux, Tanh)
+       ├→ Ownership Head:   Linear(32×36) → reshape 32×6×6 → Conv3×3(32) → ReLU → Conv1×1(2) → 72 (2×36 fields, aux)
+       └→ Endgame Head:     Linear(64) → ReLU → Linear(1) → Tanh (aux, optional; not in the champion)
 ```
 
-The champion ONNX export (`alphazero_v31-b01_brierbest.onnx`)
-carries two inputs (`planes`, `state`) and eight outputs (`policy`,
-`value`, `moon`, `points`, `ownership`, `value_wdl_logits`, `opp_points`,
-`endgame_margin`). Aux heads are training signal only; the search reads
-none of them. The legacy flat `MosaicNet` (708 -> 3×512 trunk, Tanh value)
+The champion ONNX export (`alphazero_v34-b01_brierbest.onnx`)
+carries two inputs (`planes` 79×6×6, `state` 888) and seven outputs (`policy`
+414, `value` 1, `moon` 5, `points` 1, `ownership` 72, `value_wdl_logits` 2,
+`opp_points` 1); the diagram above was checked against the export's weight
+shapes on 2026-10-05 (fusion input 2,240 = 48×36 conv features + 512). Aux heads are training signal only;
+the search reads none of them. The legacy flat `MosaicNet` (708 -> 3×512 trunk, Tanh value)
 remains loadable: the input layout is detected from the model file
 (`detect_layout`, `engine/src/net.rs`), never assumed.
 

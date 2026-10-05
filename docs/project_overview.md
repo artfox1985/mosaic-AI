@@ -4,7 +4,7 @@ Dieses Dokument erklärt das Projekt für Menschen ohne KI- oder
 Statistik-Hintergrund. Es beantwortet drei Fragen: Was machen wir?
 Wie machen wir es? Und warum ausgerechnet so?
 
-Stand: 2026-09-12. Der tagesaktuelle Detailstand steht immer in
+Stand: 2026-10-05. Der tagesaktuelle Detailstand steht immer in
 `evaluations/STATUS.md` (Fachdokument, deutsch); die technische
 Kurzfassung in der `README.md` (englisch).
 
@@ -69,66 +69,35 @@ Der Lernkreislauf, den wir "Generationszyklus" nennen:
   fest (dasselbe Zahlensystem wie im Schach). Als Fixpunkt dient ein
   regelbasierter Vergleichsspieler, den wir auf Elo 1000 setzen und
   eingefroren haben (mit eigenem Programmstand, damit ihn keine
-  spätere Änderung verschiebt). Der aktuelle Champion (Generation 28)
-  steht bei **1394**. Weil jedes Netz seit Generation 21 gegen den
+  spätere Änderung verschiebt). Der aktuelle Champion (Generation 34)
+  steht bei **1595**. Weil jedes Netz seit Generation 21 gegen den
   Fixpunkt rund neun von zehn Partien gewinnt, trägt die Leiter
   dazwischen auf eingefrorenen Zwischenstufen (ältere Champions),
   gegen die die Duelle noch etwas aussagen.
 
 Eine Besonderheit unseres Spiels: In der letzten Runde ist fast
-alles bekannt und berechenbar. Dort rechnet das Programm nicht mehr
-mit Bauchgefühl, sondern mit einem exakten Endspiel-Rechner
-(inklusive der Wahrscheinlichkeiten für die wenigen noch verdeckten
-Plättchen). Auch dessen Wissen fließt zurück ins Training.
+alles bekannt und berechenbar. Lange spielte dort ein Endspiel-Rechner
+statt des Netzes. Seit Generation 34 spielt das Netz auch die letzte
+Runde, weil es den Rechner im direkten Vergleich schlug (480:320,
+`evaluations/PREREG_r5_net_vs_solver.md`). Der Rechner bleibt im
+Programm für den Fixpunkt der Leiter und für ein Trainingsziel.
 
-## 3. Woran arbeiten wir gerade? (Die Wertungsplatten-Baustelle, Stand nach Generation 28)
+## 3. Wo wir stehen (Stand Generation 35)
 
-Der Champion spielt das Grundspiel stark – aber lange ließ er
-messbar Punkte liegen, die über die Wertungsplatten zu holen wären.
-Ein menschlicher Spieler, der gezielt "auf die Platten spielt", holt
-dort zweistellige Punktbeträge.
-
-Warum ist ausgerechnet das schwer? Weil eine Wertungsplatte eine
-**langfristige Absicht** verlangt: Wer eine 7-Punkte-Spalte bauen
-will, muss sich über mehrere Runden hinweg auf bestimmte Farben und
-Felder festlegen. In den Selbstspiel-Daten kam so ein konsequenter
-Spaltenbau anfangs fast nie vor – und was in den Trainingsdaten nicht
-vorkommt, kann das Netz nicht lernen.
-
-Was seit August dazu belegt ist:
-
-- Ein regelbasierter "Bauhelfer", der eine Seite zum Spaltenbau
-  drängt, hat als Lehr-Datensatz den Knoten gelöst: Der Champion baut
-  seither in jeder Generation mehr volle Spalten (heute rund eine je
-  Partie, vorher praktisch null) und gewinnt trotzdem die Duelle
-  gegen seinen Vorgänger. Das war das eigentliche Ziel dieser
-  Baustelle.
-- Ein "geometrisches Geländer" in der Suche (die Einhüllende: eine
-  Dreiecksform, in der Spalten überhaupt fertig werden können) bleibt
-  Teil des Rezepts, weil vier Champions in Folge damit ihre Duelle
-  bestanden haben. Der Versuch, seinen Nutzen auch am Bauchgefühl des
-  Netzes nachzuweisen, ist an einem ungeeigneten Maßstab gescheitert
-  und wurde bewusst geschlossen.
-- Drei Generationen lang wurde **nur das Material** getauscht (die
-  Aufzeichnungen, aus denen trainiert wird), sonst nichts – und jede
-  davon war stärker als die vorige. Das sagt, dass der Kreislauf
-  selbst trägt.
-- Zwei Fehler, die keine Messung zeigen konnte, weil sie beide
-  Seiten eines Duells gleich betrafen, wurden durch Spielen und Lesen
-  gefunden: die Suche vergaß eine Reihenfolge, die sie selbst gewählt
-  hatte, und die Startsetzung der Kuppel landete im Netz auf einer
-  falschen Kennung. Beide sind behoben, und aus beiden sind Wächter
-  im Code geworden.
-
-Was jetzt läuft: Generation 29 und 30. In 29 wird gemessen, ob die
-Suche am Rundenende schon das Legen der Fliesen sehen soll, ob die
-Startsetzung der Kuppel ein Suchentscheid wird, und woran genau die
-Züge eines stärkeren Gegners (Partien gegen ein großes Sprachmodell)
-vom Netz abweichen. Was davon trägt, kam in Generation 30.
-
-Das Projektende ist seither zweimal verschoben worden: erst galt v30 als
-Abschluss, dann v31, seit dem 2026-09-22 läuft v32. Der Champion heißt im
-Spiel Tessa, die technischen Generationsnamen bleiben daneben stehen.
+- **Champion ist Generation 34, im Spiel "Tessa"** (seit 2026-10-03),
+  Elo 1595. Sie schlug den Vorgänger 285:115 und den Fixpunkt 45:5.
+- **Die Wertungsplatten-Baustelle ist gelöst.** Ein regelbasierter
+  Lehr-Datensatz hat den Spaltenbau in die Trainingsdaten gebracht;
+  seither baut der Champion rund eine volle Spalte je Partie (vorher
+  praktisch null) und gewinnt trotzdem die Duelle.
+- **Generation 35 ist die letzte.** Der Kreislauf stagniert: Der
+  bewertende Teil des Netzes lernt aus Partien, die mit 100
+  Durchrechnungen je Zug erzeugt wurden, nichts Messbares mehr. Die
+  abschließende Reihe erzeugt das Material mit 400 Durchrechnungen
+  neu, probiert dann vier Varianten des Bewertungsziels und zuletzt
+  drei Änderungen an der Suche aus der Literatur. Trägt davon etwas,
+  wird es Champion; sonst endet das Projekt mit Generation 34 als
+  Tessa.
 
 ## 4. Warum so umständlich? (Unsere Arbeitsregeln, und woher sie kommen)
 
@@ -192,8 +161,9 @@ dann die `README.md`, dann `evaluations/STATUS.md`.
 ## 6. Ehrlichkeitsklausel
 
 Dieses Dokument ist eine Vereinfachung. Wo es mit den Fachdokumenten
-kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1394 für
-Generation 28, rund eine volle Spalte je Partie, neun von zehn
-Partien gegen den Fixpunkt) stammen aus den am 2026-09-12/13
-protokollierten Messungen; sie veralten mit dem Projekt, die
+kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1595 für
+Generation 34, rund eine volle Spalte je Partie, neun von zehn
+Partien gegen den Fixpunkt) stammen aus den am 2026-10-03/04
+protokollierten Messungen (`evaluations/PREREG_v34_window.md` par.10e,
+`PREREG_v35_window.md` par.11c); sie veralten mit dem Projekt, die
 Aussagen zur Methode nicht.
