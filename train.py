@@ -56,6 +56,15 @@ from torch.utils.data import DataLoader
 
 from freeze_trunk import (OwnershipValLoss, TrunkFreeze, plateau_series_for,
                           validate_freeze_args)
+from weight_average import (WEIGHT_AVERAGE_MODES, DEFAULT_WEIGHT_AVERAGE_DECAY,
+                            DEFAULT_WEIGHT_AVERAGE_FROM_EPOCH, WeightAverager,
+                            copy_bn_stats, preserved_rng, recompute_bn_stats,
+                            validate_weight_average_args)
+# Die Literale in der train()-Signatur und im argparse-Block (none / 0.75 / 2) MUESSEN diesen
+# Konstanten entsprechen: tools/tests/source_parser.py baut den Parser per exec ohne die
+# Importe nach, und ast.literal_eval liest die Signatur-Defaults (test_margin_thresholds.py).
+assert WEIGHT_AVERAGE_MODES == ("none", "ema", "swa")
+assert DEFAULT_WEIGHT_AVERAGE_DECAY == 0.75 and DEFAULT_WEIGHT_AVERAGE_FROM_EPOCH == 2
 
 
 # ── Diagnose-Instrumentierung (2026-07-31, Task #11 Phase 2, fs_2d_s1-
@@ -824,6 +833,23 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
     return {"t_loss": t_loss, "t_ploss": t_ploss, "t_vloss": t_vloss, "t_pointsloss": t_pointsloss, "t_opp_pointsloss": t_opp_pointsloss, "t_endgameloss": t_endgameloss, "t_rankingloss": t_rankingloss, "t_marginloss": t_marginloss}
 
 
+def _model_inputs_from_batch(batch, dataset, device, encoder, loss_setup) -> tuple:
+    """Nur die Netz-EINGABEN eines Trainings-Batches, fuer die BN-Neuschaetzung des
+    gemittelten Stands (PREREG_v35_window.md par.16). Abtrennen und Entpacken wie in
+    `_train_one_epoch`: Wertgewicht (par.5d) und Endmarge (E2-Arm) haengen hinten,
+    `planes` kommt bei 2D voran und ggf. bitgepackt."""
+    if getattr(dataset, "value_weights", None) is not None:
+        batch = batch[:-1]
+    if loss_setup.margin_log_scale is not None:
+        batch = batch[:-1]
+    if encoder == "2d":
+        planes, states = batch[0], batch[1]
+        if dataset.bitpacked:
+            planes = unpack_planes_batch(planes)
+        return planes.to(device).float(), states.to(device).float()
+    return (batch[0].to(device).float(),)
+
+
 def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, loss_setup) -> dict:
     """EINE Validierungsepoche. Herausgeloest aus `train()` (2026-08-27).
 
@@ -1213,7 +1239,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0,
           resume=False, epoch_checkpoint=True, fast_loader=False,
           overwrite_model=False, recipe_info=None,
-          margin_thresholds=False, margin_threshold_weight=1.0):
+          margin_thresholds=False, margin_threshold_weight=1.0,
+          weight_average="none", weight_average_decay=0.75,
+          weight_average_from_epoch=2):
     # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
     # Zwischenstand wird VOR dem teuren Daten-Laden gelesen: fehlt er, soll
     # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
@@ -1238,7 +1266,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Der Zwischenstand `_resume.pth` ist keine Ergebnisdatei und nicht betroffen.
     if not resume and not overwrite_model:
         _existing = [p for p in (MODELS_DIR / f"alphazero_{version_name}{suffix}.pth"
-                                 for suffix in ("", "_best", "_brierbest")) if p.exists()]
+                                 # `_avg`: gemittelter Stand (--weight-average, PREREG_v35_window.md par.16)
+                                 for suffix in ("", "_best", "_brierbest", "_avg")) if p.exists()]
         if _existing:
             sys.exit("❌ Unter --name " + repr(version_name) + " liegen schon Ergebnis-Checkpoints: "
                      + ", ".join(p.name for p in _existing)
@@ -1247,6 +1276,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
+    # PREREG_v35_window.md par.16: Gewichtsmittelung, ebenfalls VOR dem Datenaufbau.
+    validate_weight_average_args(weight_average, weight_average_decay, weight_average_from_epoch,
+                                 input_epoch, freeze_trunk)
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -1554,6 +1586,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # der Cache-Knopf MOSAIC_CACHE_FINAL_MARGIN steht in `mosaic_env`.
         "margin_thresholds": bool(margin_thresholds),
         "margin_threshold_weight": margin_threshold_weight,
+        # PREREG_v35_window.md par.16 (Arm v35-b08): Gewichtsmittelung der Epochen-Staende.
+        # Ergebnis je Epoche in `epoch_history` (avg_*), Endstand im Block `weight_average`.
+        "weight_average": weight_average,
+        "weight_average_decay": weight_average_decay,
+        "weight_average_from_epoch": weight_average_from_epoch,
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -2221,6 +2258,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             ("moon_target_source", moon_target_source, "label")):
         if _value != _default:
             _resume_fingerprint[_knob] = _value
+    # PREREG_v35_window.md par.16: Gewichtsmittelung. Nach dem E2-Muster nur mit Knopf im
+    # Fingerabdruck; decay und from_epoch definieren den Arm nur, wenn gemittelt wird.
+    weight_averager = None
+    if weight_average != "none":
+        _resume_fingerprint["weight_average"] = weight_average
+        _resume_fingerprint["weight_average_decay"] = weight_average_decay
+        _resume_fingerprint["weight_average_from_epoch"] = weight_average_from_epoch
+        weight_averager = WeightAverager(weight_average, weight_average_decay, weight_average_from_epoch)
     start_epoch = 0
     if _resume is not None:
         check_resume_fingerprint(_resume["fingerprint"], _resume_fingerprint)
@@ -2243,6 +2288,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         best_brier_state_dict = _resume["best_brier_state_dict"]
         policy_plateau_since = _resume["policy_plateau_since"]
         value_plateau_since = _resume["value_plateau_since"]
+        if weight_averager is not None:
+            weight_averager.load_state(_resume.get("weight_average"), model, device)
         # Zufallszustaende NACH dem Datenaufbau zuruecksetzen: der DataLoader
         # zieht seinen Shuffle-Seed je Epoche aus dem globalen torch-RNG, die
         # Batch-Reihenfolge der Fortsetzung entspricht so der eines
@@ -2399,6 +2446,29 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             best_brier_epoch = epoch + 1
             best_brier_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
+        # ── Gewichtsmittelung (PREREG_v35_window.md par.16, --weight-average) ──
+        # Das Mittel wird NACH der Epoche fortgeschrieben und dann mit derselben
+        # Val-Funktion gemessen. BN-Statistik hier = gemittelte Buffer (die
+        # Neuschaetzung kostet einen Lauf ueber den Trainingsanteil und kommt nur
+        # einmal am Ende). Die zusaetzliche Validierung laeuft unter
+        # `preserved_rng`, damit der Trainingspfad dem Lauf ohne Knopf gleicht
+        # (Begruendung im Modulkopf von weight_average.py). Kosten: eine weitere
+        # Validierung je gemittelter Epoche (HERLEITUNG: rund +10 % Trainingszeit).
+        # Nur Mitschrift, keine Rueckwirkung auf Auswahl, Plateau oder Scheduler.
+        _avg_val = None
+        _avg_val_combined = None
+        if weight_averager is not None and weight_averager.update(model, epoch + 1):
+            with preserved_rng():
+                _avg_val = _validate_one_epoch(
+                    weight_averager.model, val_dataloader, val_dataset, device, encoder, _loss_setup,
+                )
+            if _avg_val["epoch_val_ploss"] is not None:
+                _avg_value_term = (_avg_val["epoch_val_brier"]
+                                   if (select_by_brier and _avg_val["epoch_val_brier"] is not None)
+                                   else _avg_val["epoch_val_vloss"])
+                _avg_val_combined = (_avg_val["epoch_val_ploss"] + effective_value_weight * _avg_value_term
+                                     + effective_points_weight * _avg_val["epoch_val_pointsloss"])
+
         # ── Plateau-Erkennung (auf Val-Policy-Loss wenn vorhanden, sonst
         # Fallback auf Train-Loss) ───────────────────────────────────────────
         # WARUM Val statt Train: v8b zeigte, dass die Train-Policy-Loss noch
@@ -2531,9 +2601,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             _epoch_entry["margin_scale_points"] = _scales
             _vm_s = f"{epoch_val_margin_loss:.4f}" if epoch_val_margin_loss is not None else "n/a"
             margin_str = f" | Margen: {epoch_marginloss:.4f} / Val {_vm_s} / Skala {_scales}"
+        # par.16: drei Zusatzfelder NUR mit Knopf; vor --weight-average-from-epoch None.
+        avg_str = ""
+        if weight_averager is not None:
+            _epoch_entry["avg_value_val_brier"] = _avg_val["epoch_val_brier"] if _avg_val else None
+            _epoch_entry["avg_policy_val_loss"] = _avg_val["epoch_val_ploss"] if _avg_val else None
+            _epoch_entry["avg_val_combined"] = _avg_val_combined
+            if _avg_val is not None and _avg_val["epoch_val_brier"] is not None:
+                avg_str = (f" | Mittel({weight_average}, n={weight_averager.n_averaged}): "
+                           f"Brier={_avg_val['epoch_val_brier']:.4f}")
         epoch_history.append(_epoch_entry)
         print(f"Epoche {epoch+1:2d}/{epochs} | Policy Loss: {epoch_ploss:6.2f}{val_p_str} "
-              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{own_str}{endgame_str}{ranking_str}{margin_str}{plateau_marker}{lr_str}")
+              f"| Value: {epoch_vloss:.3f} | Points: {epoch_pointsloss:.3f}{val_r2_str}{val_brier_str}{own_str}{endgame_str}{ranking_str}{margin_str}{avg_str}{plateau_marker}{lr_str}")
 
         # LR-Schedule-Schritt NACH der Epoche (Standard-PyTorch-Reihenfolge:
         # optimizer.step() viele Male innerhalb der Epoche, scheduler.step()
@@ -2598,6 +2677,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             if margin_log_scale is not None:
                 # E2-Arm: Rundenskalen gehoeren nicht zum Modell, also eigens sichern.
                 _rs["margin_log_scale"] = margin_log_scale.detach().cpu().clone()
+            if weight_averager is not None:
+                # par.16: das Mittel ist Zustand des Laufs, nicht des Modells.
+                _rs["weight_average"] = weight_averager.state()
             try:
                 _dt = save_resume_state(_resume_file, _rs)
                 print(f"💾 Zwischenstand Epoche {epoch + 1} gespeichert ({_resume_file.name}, {_dt:.1f} s)",
@@ -2753,6 +2835,66 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     except Exception as e:
         print(f"  ⚠️  Auslastungsanalyse übersprungen: {e}")
 
+    # 5c. Gewichtsmittelung abschliessen (PREREG_v35_window.md par.16): BN-Statistik
+    #     des gemittelten Netzes auf dem Trainingsanteil neu schaetzen (ein
+    #     Vorwaertslauf ueber alle Trainings-Batches, Verfahren von
+    #     torch.optim.swa_utils.update_bn, siehe weight_average.py), dann eine
+    #     Schlussvalidierung GENAU des Stands, der als `_avg` gespeichert wird.
+    #     Scheitert die Neuschaetzung, gilt die BN-Statistik des letzten
+    #     Epochenstands (`bn_stats: "last_epoch"`).
+    weight_average_block = None
+    weight_average_final_val = None
+    if weight_averager is not None:
+        weight_average_block = {
+            "mode": weight_average,
+            "decay": weight_average_decay if weight_average == "ema" else None,
+            "from_epoch": weight_average_from_epoch,
+            "n_averaged": weight_averager.n_averaged,
+            "averaged_epochs": list(weight_averager.averaged_epochs),
+            "bn_stats": None, "bn_batches": None,
+            # Kennzahlen des GESPEICHERTEN `_avg`-Stands (nach der BN-Neuschaetzung);
+            # tools/brier_best_checkpoint.py vergleicht `value_val_brier` mit den Einzelstaenden.
+            # Feldnamen wie in `epoch_history`, damit tools/checkpoint_val_eval.py
+            # (Selbstpruefung) den `_avg` gegen diesen Block pruefen kann.
+            "value_val_brier": None, "policy_val_loss": None, "value_val_loss": None,
+            "points_val_loss": None, "val_combined": None,
+            "checkpoint": None,
+        }
+        if weight_averager.n_averaged == 0:
+            print(f"⚠️  --weight-average {weight_average}: kein Stand gemittelt (Lauf endete vor "
+                  f"Epoche {weight_average_from_epoch}) -- es entsteht kein _avg.")
+        else:
+            try:
+                _bn_batches = recompute_bn_stats(
+                    weight_averager.model, dataloader,
+                    lambda b: _model_inputs_from_batch(b, dataset, device, encoder, _loss_setup))
+                weight_average_block["bn_stats"] = "recomputed"
+                weight_average_block["bn_batches"] = _bn_batches
+            except Exception as e:
+                copy_bn_stats(model, weight_averager.model)
+                weight_average_block["bn_stats"] = "last_epoch"
+                print(f"  ⚠️  BN-Neuschaetzung des gemittelten Stands gescheitert ({e!r}) -- "
+                      f"BN-Statistik des letzten Epochenstands uebernommen (bn_stats=last_epoch).")
+            weight_average_final_val = _validate_one_epoch(
+                weight_averager.model, val_dataloader, val_dataset, device, encoder, _loss_setup)
+            _wf = weight_average_final_val
+            if _wf["epoch_val_ploss"] is not None:
+                _wf_value_term = (_wf["epoch_val_brier"]
+                                  if (select_by_brier and _wf["epoch_val_brier"] is not None)
+                                  else _wf["epoch_val_vloss"])
+                weight_average_block["val_combined"] = (
+                    _wf["epoch_val_ploss"] + effective_value_weight * _wf_value_term
+                    + effective_points_weight * _wf["epoch_val_pointsloss"])
+            weight_average_block["value_val_brier"] = _wf["epoch_val_brier"]
+            weight_average_block["policy_val_loss"] = _wf["epoch_val_ploss"]
+            weight_average_block["value_val_loss"] = _wf["epoch_val_vloss"]
+            weight_average_block["points_val_loss"] = _wf["epoch_val_pointsloss"]
+            weight_average_block["checkpoint"] = f"alphazero_{version_name}_avg.pth"
+            _wf_brier_s = f"{_wf['epoch_val_brier']:.4f}" if _wf["epoch_val_brier"] is not None else "n/a"
+            print(f"🧮 Gemittelter Stand ({weight_average}, {weight_averager.n_averaged} Epochen "
+                  f"{weight_averager.averaged_epochs}, BN {weight_average_block['bn_stats']}): "
+                  f"Value-Brier={_wf_brier_s}")
+
     # 6. Speichern
     model.cpu()
     # Epochen-Verlauf ins bereits geschriebene Manifest nachtragen (es entsteht VOR
@@ -2761,6 +2903,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     try:
         _m = json.loads(_mpath.read_text(encoding="utf-8"))
         _m["epoch_history"] = epoch_history
+        if weight_average_block is not None:
+            _m["weight_average"] = weight_average_block  # par.16, nur mit Knopf
         if _resume is not None:
             # Fortsetzung sichtbar machen: welche Epochen aus welchem Segment
             # stammen. Die Epochen 1..start_epoch sind aus dem Zwischenstand
@@ -2949,6 +3093,43 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print(f"🎯 Value-optimales Modell (Epoche {best_brier_epoch}, val_brier={best_brier_metric:.4f}) "
               f"zusätzlich gespeichert unter:\n📂 {bb_save_path}")
 
+    # PREREG_v35_window.md par.16: gemittelter Stand als eigener `_avg`, NEBEN den
+    # Bestandsstaenden (die oben unveraendert entstehen). Metadaten erben vom finalen
+    # Checkpoint; die Val-Kennzahlen stammen aus der Schlussvalidierung des Mittels,
+    # Trainingsverluste gibt es fuer ein Mittel nicht (None statt geerbter Zahl).
+    avg_version_name = None
+    if weight_average_final_val is not None:
+        _wf = weight_average_final_val
+
+        def _r4(x):
+            return round(x, 4) if x is not None else None
+
+        avg_checkpoint = dict(checkpoint)
+        avg_checkpoint["model_state"] = weight_averager.cpu_state_dict()
+        avg_checkpoint["epochs"] = actual_epochs
+        avg_checkpoint["is_averaged_checkpoint"] = True
+        avg_checkpoint["selected_by"] = f"weight_average({weight_average}, PREREG_v35_window.md par.16)"
+        avg_checkpoint["weight_average"] = weight_average_block
+        avg_checkpoint["policy_pct"] = None
+        for _k in ("final_policy_loss", "final_value_loss", "final_points_loss",
+                   "final_opp_points_loss", "final_ranking_loss"):
+            avg_checkpoint[_k] = None
+        avg_checkpoint["final_policy_val_loss"] = _r4(_wf["epoch_val_ploss"])
+        avg_checkpoint["final_value_val_loss"] = _r4(_wf["epoch_val_vloss"])
+        avg_checkpoint["final_points_val_loss"] = _r4(_wf["epoch_val_pointsloss"])
+        avg_checkpoint["final_value_val_r2"] = _r4(_wf["epoch_val_value_r2"])
+        avg_checkpoint["final_points_val_r2"] = _r4(_wf["epoch_val_points_r2"])
+        avg_checkpoint["final_opp_points_val_loss"] = _r4(_wf["epoch_val_opp_pointsloss"])
+        avg_checkpoint["final_opp_points_val_r2"] = _r4(_wf["epoch_val_opp_points_r2"])
+        avg_checkpoint["final_value_val_brier"] = _r4(_wf["epoch_val_brier"])
+        avg_checkpoint["final_ownership_val_loss"] = _r4(_wf["epoch_val_ownloss"])
+        avg_checkpoint["final_ranking_val_acc"] = _r4(_wf["epoch_val_ranking_acc"])
+        avg_version_name = f"{version_name}_avg"
+        avg_save_path = MODELS_DIR / f"alphazero_{avg_version_name}.pth"
+        save_checkpoint_atomic(avg_checkpoint, avg_save_path)
+        print(f"🧮 Gemitteltes Modell ({weight_average}, Epochen {weight_averager.averaged_epochs}) "
+              f"zusätzlich gespeichert unter:\n📂 {avg_save_path}")
+
     if plot is not None:
         try:
             plot_path = MODELS_DIR / f"alphazero_{version_name}_loss.png"
@@ -2978,6 +3159,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         except Exception as e:
             print(f"⚠️  ONNX-Export (Brierbest) übersprungen "
                   f"(manuell nachholbar: python export_onnx.py --version {brierbest_version_name}): {e}")
+    if avg_version_name is not None:
+        try:
+            from export_onnx import export
+            export(avg_version_name)
+        except Exception as e:
+            print(f"⚠️  ONNX-Export (Avg) übersprungen "
+                  f"(manuell nachholbar: python export_onnx.py --version {avg_version_name}): {e}")
 
     # 8. Modell-Snapshot ins OneDrive-Backup (Nutzer-Entscheid 2026-07-24 nach
     #    dem models/-Datenverlust: ereignisgesteuert nach JEDEM Training statt
@@ -3174,6 +3362,17 @@ if __name__ == "__main__":
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
     parser.add_argument("--select-by-brier", action="store_true",
                         help="Checkpoint-Auswahl: Brier statt roher Value-Loss im kombinierten Mass (Task #34 -- noetig bei --value-head wdl, sonst waehlt die Auswahl einen praktisch untrainierten frischen Kopf). Default AUS = byte-identisch.")
+    parser.add_argument("--weight-average", choices=("none", "ema", "swa"), default="none",
+                        help="PREREG_v35_window.md par.16: gemittelter Stand ueber die Epochen-"
+                             "Schnappschuesse ab --weight-average-from-epoch (ema: avg = decay*avg + "
+                             "(1-decay)*aktuell; swa: gleichgewichtet), je Epoche validiert "
+                             "(epoch_history avg_*), BN-Statistik am Ende neu geschaetzt, gespeichert "
+                             "als alphazero_<name>_avg.pth/.onnx NEBEN den Bestandsstaenden. Kosten "
+                             "HERLEITUNG rund +10 %% Trainingszeit. Default none = byte-identisch.")
+    parser.add_argument("--weight-average-decay", type=float, default=0.75,
+                        help="EMA-decay je Epoche (nur --weight-average ema; Default 0.75 nach KataGo).")
+    parser.add_argument("--weight-average-from-epoch", type=int, default=2,
+                        help="Erste Epoche (1-basiert), die ins Mittel eingeht (Default 2).")
     parser.add_argument("--wdl-label-smooth", type=float, default=0.0,
                         help="Erosions-Arm A: Label-Smoothing eps auf dem harten WDL-Ziel "
                              "(1 -> 1-eps/2, 0 -> eps/2) -- testet die Memorisierungs-Hypothese. "
@@ -3560,4 +3759,7 @@ if __name__ == "__main__":
           fast_loader=args.fast_loader, overwrite_model=args.overwrite_model,
           recipe_info=_recipe_info,
           margin_thresholds=args.margin_thresholds,
-          margin_threshold_weight=args.margin_threshold_weight)
+          margin_threshold_weight=args.margin_threshold_weight,
+          weight_average=args.weight_average,
+          weight_average_decay=args.weight_average_decay,
+          weight_average_from_epoch=args.weight_average_from_epoch)

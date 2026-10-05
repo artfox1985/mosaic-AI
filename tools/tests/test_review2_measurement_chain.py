@@ -35,6 +35,19 @@ class BrierBestCheckpoint(unittest.TestCase):
         with self.assertRaises(ValueError):
             choose_suffix([None], [1.0])
 
+    def test_averaged_checkpoint_only_when_strictly_better(self):
+        # PREREG_v35_window.md par.16: gespeicherter `_avg` streng unter dem Einzel-Minimum -> _avg
+        self.assertEqual(choose_suffix([0.3, 0.2, 0.25], [1.0, 1.1, 1.2], avg_brier=0.19)[0], "_avg")
+        # Gleichstand oder schlechter -> Bestandsregel (hier _brierbest)
+        self.assertEqual(choose_suffix([0.3, 0.2, 0.25], [1.0, 1.1, 1.2], avg_brier=0.2)[0], "_brierbest")
+        self.assertEqual(choose_suffix([0.3, 0.2, 0.25], [1.0, 1.1, 1.2], avg_brier=0.21)[0], "_brierbest")
+        # ohne Mittel (None, Default) unveraendert, auch im info-Dict
+        self.assertEqual(choose_suffix([0.1, 0.2, 0.3], [1.0, 1.1, 1.2], avg_brier=None),
+                         choose_suffix([0.1, 0.2, 0.3], [1.0, 1.1, 1.2]))
+        # ohne Einzel-Brier bleibt es ein Fehler, auch mit Mittel
+        with self.assertRaises(ValueError):
+            choose_suffix([None], [1.0], avg_brier=0.1)
+
 
 class BlockZ(unittest.TestCase):
     def test_single_block_has_no_z(self):

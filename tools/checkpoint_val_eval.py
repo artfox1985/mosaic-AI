@@ -51,7 +51,9 @@ zwischen Block und Monolith-Ausschnitt.
 
 SELBSTPRUEFUNG: mit `--train-manifest` vergleicht das Werkzeug jeden Checkpoint, dessen
 `version` zum Manifest passt, gegen `epoch_history[epochs]` (value_val_brier,
-policy_val_loss, value_val_loss, points_val_loss; Toleranz `--selfcheck-tol`).
+policy_val_loss, value_val_loss, points_val_loss; Toleranz `--selfcheck-tol`). Ein gemittelter
+Stand (`is_averaged_checkpoint`, train.py --weight-average) wird stattdessen gegen den Manifest-Block
+`weight_average` geprueft (PREREG_v35_window.md par.16).
 
 Aufruf (Selbstpruefung plus Epoche 0 plus Klassen, PREREG_v35_window.md par.11b):
     python -X utf8 -u tools/checkpoint_val_eval.py \\
@@ -552,7 +554,16 @@ def self_check(meta, metrics, manifest, tol, n_val_rows, batch_size) -> dict:
                 "reason": f"Checkpoint-Version {meta.get('version')!r} != Manifest-Version "
                           f"{manifest.get('version')!r}"}
     ep = meta.get("epochs")
-    entry = next((e for e in manifest.get("epoch_history") or [] if e.get("epoch") == ep), None)
+    if meta.get("is_averaged_checkpoint"):
+        # PREREG_v35_window.md par.16: der gemittelte Stand (`_avg`) ist kein Epochenstand;
+        # train.py legt seine Schlussvalidierung im Manifest-Block `weight_average` ab
+        # (dieselben Feldnamen wie epoch_history).
+        entry = manifest.get("weight_average")
+        if not entry or not entry.get("checkpoint"):
+            return {"status": "FAIL", "reason": "gemittelter Checkpoint, aber kein Block weight_average"}
+        ep = "weight_average"
+    else:
+        entry = next((e for e in manifest.get("epoch_history") or [] if e.get("epoch") == ep), None)
     if entry is None:
         return {"status": "FAIL", "reason": f"keine Epoche {ep} in epoch_history"}
     rows, ok = {}, True
@@ -748,7 +759,8 @@ def main() -> int:
     results, per_file_all, any_fail = [], {}, False
     meta_keys = ("version", "epochs", "is_best_checkpoint", "selected_by", "timestamp",
                  "load_version", "num_val_games", "batch_size", "hidden_size", "input_size",
-                 "num_actions", "final_value_val_brier", "final_policy_val_loss")
+                 "num_actions", "final_value_val_brier", "final_policy_val_loss",
+                 "is_averaged_checkpoint")
     for ci, cp in enumerate(ckpt_paths):
         label = f"{ci + 1}/{len(ckpt_paths)} {cp.name}"
         print(f"\n== Checkpoint {label}", flush=True)
