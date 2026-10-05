@@ -1,0 +1,50 @@
+{
+  "recipe_version": 1,
+  "tool": "self_play",
+  "description": "ARM v35-b09 (evaluations/PREREG_v35_window.md par.17; Nutzer 2026-10-05: 'registrier den policy-volumen-arm als b09'). 4.000 Policy-Partien @400, Modus 2, MEHR auf dem b02-Fenster, als EIGENE Klasse policy-s400-vol (Dateien selfplay_v34-b01-policy-s400-vol_*, 400 Dateien a 10 Partien). common, env und Einstellung byte-gleich Klasse policy-s400 aus models/v35_b02.recipe.json (Weg C, deviate_prob 1.0, tau_tiebreak_q 2, Spec models/v35_generation.spec.json, 400 Sims); anders sind nur version, seed und games. Eigene Rezeptdatei, weil die laufende b02-Kette models/v35_b02.recipe.json je Klasse neu liest (die Datei wird nicht angefasst). Seed-Basis 20263500, Chunk-Seed = Basis + Chunk-Index (self_play.py:1315), 400 Chunks, also 20263500 bis 20263899; frei laut par.17 (b02 belegt 20262100+399, 20262600+399, 20263100+99, 20263300+199; v35-b01 20260950-20260955 je +199). Start: tools/night_v35_b09_b10_chain.sh (Smoke, Erzeugung, Bloecke, Traeger-Manifest, Fenster, Training, Tor 1). Aufruf: python -X utf8 -u self_play.py --recipe models/v35_b09.recipe.json --class policy-s400-vol.",
+  "common": {
+    "mode": "network",
+    "model": "models/alphazero_v34-b01_brierbest.onnx",
+    "spec": "models/v35_generation.spec.json",
+    "games": 4000,
+    "sims": 400,
+    "tau_tiebreak_q": 2,
+    "threads": 11,
+    "chunk": 10,
+    "per_file": 10,
+    "return_order_random_p": 0.81,
+    "tau_argmax_from_move": 1,
+    "start_slot_random_p": 0.15,
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true
+  },
+  "env": {
+    "MOSAIC_STACK_DRAW_RESEARCH": "1",
+    "MOSAIC_SINGLE_PASS_OTHER_VAL": "1",
+    "MOSAIC_R5_NET_SOLVER": "0"
+  },
+  "classes": {
+    "policy-s400-vol": {
+      "description": "Policy-Volumen fuer v35-b09 (PREREG_v35_window.md par.17): Einstellung byte-gleich Klasse policy-s400 aus models/v35_b02.recipe.json (Sockel @400, Modus 2, Weg C, deviate_prob 1.0), nur version, seed 20263500 und games 4000 (400 Chunks).",
+      "version": "v34-b01-policy-s400-vol",
+      "seed": 20263500,
+      "games": 4000,
+      "deviate_prob": 1.0,
+      "expect_engine_config": {
+        "excursion_kl_weight": 0,
+        "dome_dice": 0,
+        "aggr_side": 0,
+        "tau_tiebreak_side": 0,
+        "tau_tiebreak_q": 2
+      }
+    }
+  },
+  "expect_engine_config": {
+    "tie_mirror_p": 0.5,
+    "label_rng_split": true,
+    "excursion_reshuffle": true,
+    "single_pass_other_val": true,
+    "r5_net_solver": false
+  }
+}

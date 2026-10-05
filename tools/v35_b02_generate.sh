@@ -105,7 +105,9 @@ checks = [
     ("recipe.engine_config_check.deviations", (rec.get("engine_config_check") or {}).get("deviations"), []),
     ("mosaic_env ohne MOSAIC_DATA_DIR", env,
      {"MOSAIC_STACK_DRAW_RESEARCH": "1", "MOSAIC_SINGLE_PASS_OTHER_VAL": "1", "MOSAIC_R5_NET_SOLVER": "0"}),
-    ("laufzeit.partien", lz.get("partien"), 10),
+    # Ausflug-Klasse: laufzeit.partien zaehlt die 10 Ausfluege mit (excursion_prob 1.0; PREREG_v35_window.md
+    # par.9 "Ausfluege mitgezaehlt"), also 20; sonst 10. Erster Lauf 2026-10-05 00:12 stoppte genau hier.
+    ("laufzeit.partien", lz.get("partien"), 20 if cls == "value-excursion-s400" else 10),
 ]
 per_class = {
     "policy-s400": [("engine_config.excursion_kl_weight", ec.get("excursion_kl_weight"), 0),
