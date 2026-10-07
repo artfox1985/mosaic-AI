@@ -147,6 +147,9 @@ fn main() {
         r5_net_sims: None,
         // Teilbaum-Wiederverwendung (PREREG_tree_reuse.md par.2): Bestand = aus.
         tree_reuse: false,
+        // Runde 5 im Reuse (PREREG_tree_reuse.md par.5.4): Default an, bei
+        // `tree_reuse: false` darueber wirkungslos.
+        tree_reuse_round5: mosaic_rust::net_mcts::TREE_REUSE_ROUND5_DEFAULT,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

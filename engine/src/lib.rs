@@ -955,6 +955,8 @@ fn engine_config_json() -> String {
         "r5_solver_node_budget": crate::round5::node_budget(),
         // PREREG_tree_reuse.md par.2: Env-Default der Seiten ohne Spec-Feld.
         "tree_reuse": crate::net_mcts::read_tree_reuse_env(),
+        // PREREG_tree_reuse.md par.2/par.5.4: ebenso, Runde 5 im Reuse (Default an).
+        "tree_reuse_round5": crate::net_mcts::read_tree_reuse_round5_env(),
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
         // Arm v29-b02). Gehoert ins Lauf-Manifest, weil er den EINGANG des Netzes

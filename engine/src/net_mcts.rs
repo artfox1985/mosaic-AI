@@ -409,6 +409,40 @@ pub(crate) fn read_tree_reuse_env() -> bool {
     }
 }
 
+/// Default von [`SearchConfig::tree_reuse_round5`] (`PREREG_tree_reuse.md`
+/// par.2/par.5.4, Nutzer-Entscheid 2026-10-06): `true` = Runde 5 wird bei
+/// eingeschaltetem `tree_reuse` MITGENOMMEN. Bei `tree_reuse == false` ist der
+/// Wert wirkungslos; der Bestand (Knopf aus) bleibt davon unberuehrt.
+pub const TREE_REUSE_ROUND5_DEFAULT: bool = true;
+
+/// `MOSAIC_TREE_REUSE_ROUND5` als 0/1 (`PREREG_tree_reuse.md` par.2/par.5.4):
+/// Env-Default des Seiten-Felds [`SearchConfig::tree_reuse_round5`] fuer Seiten
+/// ohne Spec-Feld.
+///
+/// `1` (Default, auch bei fehlender oder ungueltiger Variable,
+/// [`TREE_REUSE_ROUND5_DEFAULT`]) = Runde 5 mitnehmen; `0` = der Ausschluss ueber
+/// `round5::applies` aus dem ersten Entwurf. KEIN `OnceLock` fuer den Wert,
+/// gleiche Begruendung wie bei [`read_tree_reuse_env`]: Spec-Feld JE SEITE.
+pub(crate) fn read_tree_reuse_round5_env() -> bool {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_TREE_REUSE_ROUND5") else {
+        return TREE_REUSE_ROUND5_DEFAULT;
+    };
+    match raw.trim() {
+        "" => TREE_REUSE_ROUND5_DEFAULT,
+        "0" => false,
+        "1" => true,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "WARNUNG: MOSAIC_TREE_REUSE_ROUND5={raw:?} ungueltig (0 ohne Runde 5, 1 mit) -- mit Runde 5 (1) gilt."
+                );
+            });
+            TREE_REUSE_ROUND5_DEFAULT
+        }
+    }
+}
+
 /// Default von [`SearchConfig::moon_order_variants`]
 /// (`PREREG_moon_stack_order.md` par.4): `1` = BESTAND, der Fan-out ueber die
 /// Reihenfolge-Varianten bleibt an. `0` = nur die kanonische Restreihenfolge,
@@ -1321,6 +1355,18 @@ pub struct SearchConfig {
     /// gilt der Env-Default `MOSAIC_TREE_REUSE`, [`read_tree_reuse_env`]) --
     /// dasselbe Muster wie [`Self::r5_net_solver`].
     pub tree_reuse: bool,
+    /// Teilbaum-Wiederverwendung auch in Runde 5 (`PREREG_tree_reuse.md` par.2,
+    /// par.5.4 ENTSCHIEDEN 2026-10-06, ENTWURF, ungebaut). Wirkt NUR bei
+    /// `tree_reuse == true`: `true` (Default) = Runde 5 wird mitgenommen, `false`
+    /// = Runde 5 sucht frisch und haelt keinen Baum (Ausschluss ueber
+    /// `round5::applies` in [`net_search_drafting_action_reuse`]). Der
+    /// Runde-5-Loeser (`r5_solver_takes_over`) bleibt in beiden Faellen
+    /// ausgeschlossen.
+    ///
+    /// Spec-Feld je Seite (`tree_reuse_round5`, OPTIONAL, 0 oder 1 als Zahl;
+    /// fehlt es, gilt der Env-Default `MOSAIC_TREE_REUSE_ROUND5`,
+    /// [`read_tree_reuse_round5_env`], ohne Variable 1).
+    pub tree_reuse_round5: bool,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1549,6 +1595,7 @@ impl SearchConfig {
             // KEIN Env-Knopf (par.5b): nur ueber das Spec-Feld, sonst Bestand.
             r5_net_sims: None,
             tree_reuse: read_tree_reuse_env(),
+            tree_reuse_round5: read_tree_reuse_round5_env(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1629,6 +1676,8 @@ impl SearchConfig {
             "r5_net_sims",
             // PREREG_tree_reuse.md par.2: Teilbaum-Wiederverwendung je Seite.
             "tree_reuse",
+            // PREREG_tree_reuse.md par.2/par.5.4: Runde 5 im Reuse mitnehmen (Default an).
+            "tree_reuse_round5",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -2020,6 +2069,10 @@ impl SearchConfig {
         // Env-Default (ohne Variable `false` = Bestand). Jede vorhandene Spec
         // ohne das Feld beschreibt damit weiter bitgenau den Bestand.
         let tree_reuse = spec_flag("tree_reuse", read_tree_reuse_env())?;
+        // PREREG_tree_reuse.md par.2/par.5.4: OPTIONAL, 0 oder 1, fehlt es, gilt
+        // der Env-Default (ohne Variable `true` = Runde 5 mitnehmen). Wirkt nur
+        // bei `tree_reuse` an; eine Spec ohne beide Felder bleibt der Bestand.
+        let tree_reuse_round5 = spec_flag("tree_reuse_round5", read_tree_reuse_round5_env())?;
         let r5_solver_node_budget = match obj.get("r5_solver_node_budget") {
             None => crate::round5::node_budget(),
             Some(v) => {
@@ -2203,6 +2256,7 @@ impl SearchConfig {
             r5_solver_node_budget,
             r5_net_sims,
             tree_reuse,
+            tree_reuse_round5,
             heuristic_variant,
             sims,
             root_noise,
@@ -8178,7 +8232,8 @@ fn gumbel_final_root_action_among(nodes: &[Node], survivors: &[usize]) -> Option
 /// Faellt auf [`net_search_drafting_action`] zurueck (und verwirft den
 /// gehaltenen Baum), wenn der Knopf aus ist oder ein Fall vorliegt, fuer den der
 /// Entwurf nicht gebaut ist: PUCT-Pfad, ISMCTS mit k > 1, Klasse-W-
-/// Zufallsknoten, Runde 5 (par.2 Vorgabe; der Code zwingt das nicht, siehe
+/// Zufallsknoten, Runde 5 NUR bei `tree_reuse_round5 == false` (par.5.4,
+/// Default an = Runde 5 mit Reuse; der Code zwingt den Ausschluss nicht, siehe
 /// par.2a Punkt 7) und der Runde-5-Loeser. Wurzelrauschen gibt es hier nicht
 /// (Arena: `add_root_noise = false`).
 pub fn net_search_drafting_action_reuse<R: Rng + ?Sized>(
@@ -8195,7 +8250,9 @@ pub fn net_search_drafting_action_reuse<R: Rng + ?Sized>(
         || num_determinizations() > 1
         || search_config.dome_dice_side.is_some()
         || state.phase != Phase::Drafting
-        || crate::round5::applies(state)
+        // par.5.4 (ENTSCHIEDEN 2026-10-06): Runde 5 nur bei `tree_reuse_round5`
+        // aus ausgeschlossen; Default an = Runde 5 wird mitgenommen.
+        || (!search_config.tree_reuse_round5 && crate::round5::applies(state))
         || r5_solver_takes_over(state, search_config);
     if plain {
         *retained = None;
@@ -11001,6 +11058,10 @@ mod tests {
             r5_net_sims: None,
             // PREREG_tree_reuse.md: Bestand = kein Halten des Baums.
             tree_reuse: false,
+            // Default (an) als Konstante statt Env-Getter, gleiche Begruendung
+            // wie bei den Stilmitteln unten; bei `tree_reuse: false` darueber
+            // wirkungslos, die Konfiguration bleibt also "nichts ist an".
+            tree_reuse_round5: TREE_REUSE_ROUND5_DEFAULT,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in

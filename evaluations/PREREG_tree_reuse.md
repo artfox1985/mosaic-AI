@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | Beleg: nichts gemessen; Code-Lesung par.2a und additiver Entwurf im Code (Spec-Feld `tree_reuse`, UNKOMPILIERT, 2026-10-05); Nutzer-Entscheide par.5 offen. -->
+<!-- STATUS: OFFEN | Frage: Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | Beleg: nichts gemessen; Code-Lesung par.2a und additiver Entwurf im Code (Spec-Feld `tree_reuse`, UNKOMPILIERT, 2026-10-05); Runde-5-Schalter Default an, par.5.4 entschieden; uebrige Nutzer-Entscheide par.5 offen. -->
 
 # Vorregistrierung: Tree Reuse unterhalb der Wurzel (Suchknopf, Spieler-Identitaet)
 
@@ -30,6 +30,15 @@ beschreibt den Entwurf, nicht ein aktives Verhalten.
   `read_tree_reuse_env` ohne `OnceLock` (Seiten-Feld), `spec_flag(...)` in `from_spec_file`, `KNOWN_FIELDS`,
   `search_config_off` = `false`, `spec_env.py`-Zuordnung, Lauf-Manifest `engine_config_json` (Env-Default),
   Registratur `knob_registry.rs` und `docs/knobs.md` (Status aktiv, Default aus, Verdikt OFFEN).
+* **Runde-5-Schalter** (ergaenzt 2026-10-06 nach dem Entscheid par.5.4, ENTWURF, UNKOMPILIERT). Spec-Feld
+  `tree_reuse_round5` (OPTIONAL, 0 oder 1 als Zahl; fehlt es, gilt der Env-Default `MOSAIC_TREE_REUSE_ROUND5`,
+  ohne Variable **1**). Dasselbe Muster wie `tree_reuse`: `SearchConfig::tree_reuse_round5`,
+  `read_tree_reuse_round5_env` (Default `TREE_REUSE_ROUND5_DEFAULT = true`, auch bei ungueltigem Wert, einmalige
+  Warnung), `spec_flag(...)`, `KNOWN_FIELDS`, `search_config_off` = Default (bei `tree_reuse` = `false` dort
+  wirkungslos), `spec_env.py`, Lauf-Manifest, Registratur. **Wirkt nur bei `tree_reuse` 1:** bei 1 entfaellt der
+  Runde-5-Ausschluss in `net_search_drafting_action_reuse`, Runde 5 laeuft mit gehaltenem Baum wie R1-R4; bei 0
+  bleibt der Ausschluss ueber `round5::applies` aus dem ersten Entwurf stehen. Der Runde-5-Loeser
+  (`r5_solver_takes_over`) bleibt in beiden Faellen ohne Reuse.
 * **Wirkort.** NUR der Arena-Agent `self_play::NetArenaAgent` (paired_gating -> `net_vs_net_arena_match` ->
   `run_net_vs_net_arena` -> `play_net_vs_net_game`, und `play_net_game`). NICHT: Self-Play-Erzeugung (par.5
   Punkt 1 offen), Referee/eingefrorene Worker und GUI (zustandslos "Stellung rein, Zug raus", par.2a Punkt 2),
@@ -55,8 +64,9 @@ beschreibt den Entwurf, nicht ein aktives Verhalten.
   gibt "kein Treffer".
 * **Nichtuebereinstimmung.** Kein Treffer = frische Suche, Zeile fuer Zeile der Bestandsweg
   (`build_gumbel_tree_inner_for` mit `retained_root = None`, Zugwahl `select_final_root_child`); der alte Baum wird
-  verworfen und durch den neuen ersetzt. Ebenso frisch und ohne Halten: Runde 5 (`round5::applies`, Vorgabe; der
-  Code zwingt das nicht, par.2a Punkt 7), Runde-5-Loeser, ISMCTS k > 1, Klasse-W-Zufallsknoten, PUCT-Pfad.
+  verworfen und durch den neuen ersetzt. Ebenso frisch und ohne Halten: Runde-5-Loeser, ISMCTS k > 1,
+  Klasse-W-Zufallsknoten, PUCT-Pfad, und Runde 5 nur bei `tree_reuse_round5` 0 (`round5::applies`; Default 1 =
+  Runde 5 mit Reuse, par.5.4).
 * **Wurzel frisch, Kinder uebernommen.** Im Gumbel-Rumpf wandern die Kinder der uebernommenen Wurzel als
   (Aktion, Prior) zurueck in die Kandidatenliste; Gumbel-Top-m (Arena: g = 0, also Top-m nach Prior) und
   Sequential Halving laufen neu ueber ALLE Kandidaten. Gezogene Kandidaten mit vorhandenem Kind starten mit dessen
@@ -154,7 +164,8 @@ Gelesen in dieser Sitzung; Zeilen nach dem Entwurf (net_mcts.rs ist dadurch gewa
    `r5_net_solver: 0`, sucht in Runde 5 also mit demselben Gumbel-Baum (Sims aus `r5_net_sims`, fehlt in der
    Spec, also Basis-Sims). Der Code laesst Reuse in Runde 5 technisch zu; der Entwurf schliesst sie trotzdem aus
    (Vorgabe par.2, `round5::applies`, round5.rs:106). Nutzer-/Koordinator-Entscheid offen; eine Zeile in
-   `net_search_drafting_action_reuse`.
+   `net_search_drafting_action_reuse`. **Nachtrag 2026-10-06:** entschieden (par.5.4), der Ausschluss haengt jetzt
+   am Schalter `tree_reuse_round5` (par.2), Default 1 = Runde 5 mit Reuse.
 8. **Speicher.** Jede Simulation legt hoechstens einen Entscheidungsknoten an (Expansion in
    `descend_and_backprop` bzw. `visit_candidate!`, ohne Klasse-W-Zufallsknoten), also hoechstens sims + 1 = 401
    Knoten je Suche @400 (HERLEITUNG aus dem Code, nicht gezaehlt). Jeder Knoten traegt eine volle
@@ -178,8 +189,8 @@ nachzusuchen (Replay, Diagnose-Sonden) reproduziert den Arena-Zug mit Knopf an n
 
 ## par.3 Messung (Tor, vorab)
 
-Gepaarte Arena `tools/paired_gating.py`, A = `v34-b01_brierbest` mit Spec `v34-b01_brierbest` plus `tree_reuse` 1,
-B = dieselbe Spec ohne; 400 Sims beide, Blockgroesse 5, `--log-games`, Seeds 20261600/20261601 a 200 Paare,
+Gepaarte Arena `tools/paired_gating.py`, A = `v34-b01_brierbest` mit Spec `v34-b01_brierbest` plus `tree_reuse` 1
+und `tree_reuse_round5` 1 (Runde 5 MIT Reuse, par.5.4), B = dieselbe Spec ohne; 400 Sims beide, Blockgroesse 5, `--log-games`, Seeds 20261600/20261601 a 200 Paare,
 Stufenregel 20261602. Kriterium wie Tor 1: Block-z >= +1,96 oder gepoolt >= 52,5 Prozent ohne Gegenbefund.
 Berichtet: die sechs Standard-Kennzahlen, volle Spalten je Seite (Tor 2b), Zugzeit je Seite. Zuordnung vorab:
 ein Gewinn gehoert dem Knopf allein (gleiches Netz, gleiche Spec sonst).
@@ -213,6 +224,36 @@ Uebertragung auf ein Spiel mit Zufallsknoten je Runde ist ungemessen.
    `net_search_drafting_action_reuse`, `round5::applies`), gemaess der urspruenglichen Vorgabe. Nutzer-Entscheid:
    Ausschluss behalten (Vorschlag des Koordinators fuer die erste Arena: ja, damit der Knopf nur eine Sache
    aendert) oder Runde 5 mitnehmen.
+   **ENTSCHIEDEN (Nutzer 2026-10-06 06:5x: *"Mach den runde 5 schalter mit default an"*):** eigener Schalter
+   `tree_reuse_round5` (par.2), Default 1 = Runde 5 wird mitgenommen; der Ausschluss bleibt als Wert 0 erhalten.
+   Begruendung (aus dem Chat): in Runde 5 hat die Suche dem Netz am meisten voraus. Beleg `PREREG_v35_window.md`
+   par.12f, "Netz gegen Wurzel-Q" (Grundmenge b02-Val-Satz, 120 Dateien, 225.789 Zustaende aus @400-Partien;
+   Einheit Brier-Differenz Netz minus Wurzel-Q, > 0 = Suche besser): R5 +0,0264 (Warmstart `v34-b01_brierbest`)
+   und +0,0243 (`v35-b02_brierbest`), gegen R2-R4 +0,0031 bis +0,0145 (beide Netze). Folge fuer par.3: die erste
+   Arena faehrt Runde 5 MIT Reuse; die Variante ohne (`tree_reuse_round5` 0) laeuft nur, wenn das Ergebnis nahe
+   an der Linie liegt. Zuordnung damit: ein Gewinn gehoert dem Knopf einschliesslich Runde 5.
+   Hinweis aus dem Einbau (Agent, geprueft am Entwurf): `take_reuse_start` verlangt dieselbe `round_number`, der
+   erste eigene Entscheid in Runde 5 findet also keinen Treffer; Reuse greift in Runde 5 ab dem zweiten eigenen
+   Entscheid. Ob Runde-5-spezifische Teile der Suche (`r5_net_sims` als Budget, Blattwert bei `r5_net_solver` 0) mit
+   uebernommenem Teilbaum anders rechnen, ist UNGELESEN (HERLEITUNG: Budget = neue Sims wie R1-R4); vor der Arena pruefen.
 5. Verlaufsabhaengigkeit (par.2a): mit Knopf an haengt ein Entscheid vom Verlauf ab; Einzelstellungs-Werkzeuge
    (Replays, Sonden, GUI) liefern dann nicht mehr den Arena-Zug. Fuer Sonden gilt darum Knopf aus, und die
    Determinismus-Pruefung laeuft als ganze Partie bei gleichem Seed.
+
+6. **Fehltreffer durch falsch geratene Welt (Nutzer-Vorschlag 2026-10-06 07:2x: *"Ich wuerd nicht den gesamten ast
+   loeschen wenn falsch geraten wurde. Sondern nur den weg danach nicht den weg dorthin"*).** Stand des Entwurfs
+   (`net_mcts.rs`, `take_reuse_start`, `retained_world_matches`): gesucht wird ein Knoten, dessen Zustand EINSCHLIESSLICH
+   der geratenen verdeckten Teile zum echten Zustand passt; gibt es keinen, faellt die Suche komplett frisch an, der
+   gehaltene Baum ist weg. "Der Weg dorthin" (die Vorfahren der aktuellen Stellung) wird ohnehin nie wiederverwendet;
+   verwertbar ist nur der Teilbaum UNTER der aktuellen Stellung, und der liegt zeitlich komplett nach der Aufdeckung.
+   Der Vorschlag heisst darum praezise: den Teilbaum unter dem SICHTBAR passenden Knoten behalten, seine verdeckten
+   Zustandsteile auf die Wirklichkeit setzen (neu determinisieren), Aeste streichen, deren Aktionen im echten Zustand
+   nicht mehr legal sind (sie haengen an der falschen Annahme), und die uebrigen Statistiken als Naeherung behalten
+   (welt-tolerante Wiederverwendung). Preis: Besuchszahlen und Q dieser Aeste stammen aus einer Welt, die so nicht
+   eingetreten ist; wie gross der Fehler ist, haengt davon ab, wie tief die Abweichung lag (ein anderer Stapelpraefix
+   weit hinten aendert fast nichts, ein anderes verdecktes Plaettchen in der Auslage viel). Vorgehen: (a) die erste
+   Arena faehrt die STRENGE Variante des Entwurfs; (b) der Entwurf bekommt vorher zwei Zaehler in `TreeReuseDiag`,
+   Fehltreffer "kein passender Knoten" gegen "Knoten sichtbar passend, Welt falsch", damit die Logzeile
+   `[tree_reuse]` sagt, wie viel die tolerante Variante ueberhaupt holen kann; (c) dominieren die Welt-Fehltreffer,
+   wird die tolerante Variante als eigener Spec-Wert (`tree_reuse` 2) gebaut und gegen Variante 1 gemessen (gleicher
+   Aufbau wie par.3). Noch nicht gebaut; Nutzer-Entscheid ueber (c) nach den Zahlen aus (b).

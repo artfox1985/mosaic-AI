@@ -102,6 +102,11 @@ SPEC_TO_ENV = {
     # OPTIONAL, 0 oder 1, Default 0. Die Env ist nur der Default des Seiten-Felds
     # (net_mcts.rs read_tree_reuse_env); wirkt nur im Arena-Agenten.
     "tree_reuse": "MOSAIC_TREE_REUSE",
+    # PREREG_tree_reuse.md par.2/par.5.4 (ENTWURF, entschieden 2026-10-06): Runde 5 im Reuse
+    # mitnehmen, OPTIONAL, 0 oder 1, Default 1 (umgekehrte Polung wie `r5_net_solver`). Die
+    # Env ist nur der Default des Seiten-Felds (net_mcts.rs read_tree_reuse_round5_env);
+    # wirkt nur bei `tree_reuse` 1.
+    "tree_reuse_round5": "MOSAIC_TREE_REUSE_ROUND5",
 }
 
 # Felder aus `KNOWN_FIELDS`, die BEWUSST keinen Env-Knopf bekommen. Der Test
