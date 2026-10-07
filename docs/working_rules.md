@@ -155,6 +155,30 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   Nutzer-Entscheid; das Manifest traegt den Lader seit 2026-09-06 in
   `cli_args.fast_loader` und `laufzeit.lader` (das b03-Manifest 002718 noch
   nicht: Lauf startete vor dem Fix).
+- **Arena-Zwischenstand je Block: abgebrochenes Gating FORTSETZEN** (Nutzer
+  2026-10-07, nach einem Rechner-Neustart mitten in einer Kette; Muster ist
+  der Epochen-Zwischenstand oben). `tools/paired_gating.py` schreibt nach
+  jedem fertigen Block atomar `<out>.partial.json`: Konfiguration (Modelle per
+  Pfad und sha256, Specs, Sims, c_puct, Basis-Seed, Blockgroesse, max-pairs,
+  SPRT-Parameter, `--log-games`, alle `MOSAIC_*`), die fertigen Bloecke mit den
+  Partie-Records der Wertung (mit `--log-games` den vollen Records), Zaehler,
+  LLR und die bisher verbrauchte Wanduhr/CPU. Wiederaufnahme: derselbe Befehl
+  plus `--resume`. Jede Konfigurations-Abweichung bricht hart ab; die
+  uebernommenen Bloecke werden ueber dieselbe Wertung neu gerechnet und gegen
+  die gespeicherten LLR und Zaehler geprueft; weiter geht es beim naechsten
+  Blockindex, und weil der Blockseed `Basis-Seed + Blockindex x 1.000.000`
+  ist, bekommt Block k dieselben Partien wie im Erstlauf. Ohne `--resume` wird
+  ein liegender Zwischenstand ignoriert und ueberschrieben; nach dem fertigen
+  Artefakt (jetzt ebenfalls atomar geschrieben) wird er geloescht. Mit
+  `--resume` traegt `laufzeit` zusaetzlich `segment_wanduhr_s` und
+  `fortgesetzt_ab_block`; `wanduhr_s`, `cpu_s` und `s_je_partie` rechnen dann
+  ueber alle Segmente ohne den verlorenen angefangenen Block. Ketten setzen
+  `--resume` immer (ohne Zwischenstand harmlos); die Kette
+  `tools/night_v35_b09_b10_chain.sh` hat dazu einen Wiederaufnahme-Modus
+  `RESUME=1`, der liegende Schritte prueft und wiederverwendet statt zu
+  stoppen. Stand 2026-10-07 23:53: gebaut, 18 Tests in
+  `tools/tests/test_paired_gating_resume.py` gruen (Suite 531); der erste
+  echte Einsatz (Fortsetzung eines abgebrochenen Gatings) steht aus.
 
 - **Jede Kette setzt `MOSAIC_FEATURES_FROM_RUST=1` ausdruecklich im Kopfblock**
   (Nutzer-Entscheid 2026-09-17, `PREREG_rust_data_layer.md` par.9a/par.9b). Der

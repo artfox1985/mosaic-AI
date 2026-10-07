@@ -135,6 +135,29 @@ das Gating-Artefakt hatte gar kein `games`-Feld, die Sonde haette nur
 "keine Partie mit Log" gemeldet. `--log-games` schliesst genau diese Luecke --
 Default AUS, und bei AUS ist das Artefakt Feld fuer Feld das bisherige.
 
+## 2026-10-07: Zwischenstand je Block und `--resume`
+
+Anlass: ein Rechner-Neustart hat eine laufende Kette mitten in der Erzeugung
+getoetet; ein Gating von rund 2 h haette dasselbe Schicksal gehabt und waere
+von vorn gelaufen. Vorbild ist der Zwischenstand je Epoche in train.py
+(`resume_path()`). Nach JEDEM fertigen Block schreibt das Gating atomar
+`<out>.partial.json` (`partial_path_for`): vollstaendige Konfiguration mit
+sha256 der Modell- und Spec-Dateien, alle fertigen Bloecke mit den Partie-
+Records, die die Wertung braucht (bei `--log-games` die vollen Records),
+kumulative Zaehler, LLR und die bisher verbrauchte Wanduhr/CPU.
+
+`--resume` liest ihn, vergleicht die Konfiguration mit der Kommandozeile
+(Abweichung = harter Abbruch, ein gemischtes Artefakt waere ein anderes Mass),
+wertet die uebernommenen Bloecke ueber DIESELBE Funktion neu
+(`GatingTally.add_block`), vergleicht LLR und Zaehler mit den gespeicherten
+Werten und spielt ab dem naechsten Blockindex weiter. Die Blockseed-Formel
+`base_seed + block_index * 1_000_000` sorgt dafuer, dass Block k dieselben
+Partien bekommt wie im Erstlauf. Ohne `--resume` wird ein liegender
+Zwischenstand ignoriert und ueberschrieben; nach dem fertigen Artefakt wird er
+geloescht (wie `_resume.pth`). Mit `--resume` traegt `laufzeit` zusaetzlich
+`segment_wanduhr_s` und `fortgesetzt_ab_block`; `wanduhr_s`/`cpu_s` sind dann die
+Summe der Segmente OHNE den verlorenen angefangenen Block (Muster train.py).
+
 WICHTIG (Phase A, 2026-07-23): dieses Skript ist reine Code-Lieferung.
 Es wird NICHT fuer eine echte Gating-Entscheidung ausgefuehrt, solange der
 aktuelle netcq2-Self-Play-Batch das installierte Wheel nutzt -- nur ein
@@ -145,7 +168,9 @@ Gating als Standard").
 import sys
 import os
 import json
+import hashlib
 import time
+from datetime import datetime
 import math
 import random
 import argparse
@@ -365,6 +390,290 @@ def validate_gating_params(block_size: int, max_pairs: int, sprt_p1: float,
             raise ValueError(f"{name} muss zwischen 0 und 1 liegen, beide ausgeschlossen (war {v!r})")
 
 
+# ── Zwischenstand je Block und Wiederaufnahme (2026-10-07, Modul-Docstring) ──
+PARTIAL_FORMAT = 1
+PARTIAL_SUFFIX = ".partial.json"
+BLOCK_SEED_STRIDE = 1_000_000   # Blockseed = base_seed + Blockindex (ab 0) * Stride
+# Steht im Zwischenstand, wird aber NICHT verglichen: die Seed-Paarung haengt
+# nicht an der Thread-Zahl (Kommentar an DEFAULT_THREADS), nur die Laufzeit.
+RESUME_UNCHECKED_KEYS = ("threads",)
+# Felder je Partie, die `GatingTally.add_block` liest. Ohne `--log-games`
+# speichert der Zwischenstand nur diese (sonst waere er so gross wie ein
+# Artefakt mit Logs); mit `--log-games` den vollen Record, weil daraus das
+# Feld `games` des Artefakts entsteht.
+SCORING_RECORD_FIELDS = ("winner", "scores", "total_floor")
+
+
+def partial_path_for(out_path) -> Path:
+    """`<out>.partial.json` neben dem Ergebnis-Artefakt."""
+    return Path(str(out_path) + PARTIAL_SUFFIX)
+
+
+def file_sha256(path) -> str | None:
+    """sha256 einer Datei; None, wenn `path` leer ist oder keine Datei benennt
+    (z.B. eine Spec als JSON-Text statt als Pfad)."""
+    if not path or not os.path.isfile(path):
+        return None
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_json_atomic(path, payload, indent=None) -> None:
+    """Schreibt `payload` als JSON atomar (`.tmp` + `os.replace`): ein Abbruch
+    mitten im Schreiben hinterlaesst die alte Datei, nie eine halbe."""
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=indent), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def resume_config(*, model_a, model_b, name_a, name_b, spec_a, spec_b, sims_a, sims_b,
+                  c_puct_a, c_puct_b, base_seed, block_size, max_pairs, sprt_p1,
+                  sprt_alpha, sprt_beta, log_games, threads, mosaic_env,
+                  recipe_block=None, expected_engine_config=None) -> dict:
+    """Die Konfiguration, die eine Fortsetzung mit dem Erstlauf teilen muss.
+    Modelle per Pfad (Schraegstriche vereinheitlicht) UND sha256 der Datei;
+    Specs als Wert und, wenn sie eine Datei benennen, mit sha256."""
+    def norm(p):
+        return None if p is None else str(p).replace("\\", "/")
+    return {
+        "model_a": norm(model_a), "model_a_sha256": file_sha256(model_a),
+        "model_b": norm(model_b), "model_b_sha256": file_sha256(model_b),
+        "name_a": name_a, "name_b": name_b,
+        "spec_a": norm(spec_a), "spec_a_sha256": file_sha256(spec_a),
+        "spec_b": norm(spec_b), "spec_b_sha256": file_sha256(spec_b),
+        "sims_a": sims_a, "sims_b": sims_b, "c_puct_a": c_puct_a, "c_puct_b": c_puct_b,
+        "base_seed": base_seed, "block_size": block_size, "max_pairs": max_pairs,
+        "sprt_p0": SPRT_P0, "sprt_p1": sprt_p1, "sprt_alpha": sprt_alpha, "sprt_beta": sprt_beta,
+        "log_games": bool(log_games),
+        "mosaic_env": dict(mosaic_env),
+        "recipe_sha256": (recipe_block or {}).get("sha256"),
+        "recipe_class": (recipe_block or {}).get("class"),
+        "expected_engine_config": expected_engine_config,
+        "threads": threads,
+    }
+
+
+def resume_config_deviations(saved: dict, current: dict) -> list[str]:
+    """Liste der Abweichungen zwischen gespeicherter und aktueller
+    Konfiguration (ohne RESUME_UNCHECKED_KEYS). Der Vergleich laeuft auf der
+    JSON-Form, damit Tupel/Listen und int/float wie im Zwischenstand stehen."""
+    saved = json.loads(json.dumps(saved))
+    current = json.loads(json.dumps(current))
+    missing = "<fehlt>"
+    out = []
+    for key in sorted(set(saved) | set(current)):
+        if key in RESUME_UNCHECKED_KEYS:
+            continue
+        if saved.get(key, missing) != current.get(key, missing):
+            out.append(f"{key}: Zwischenstand {saved.get(key, missing)!r}, "
+                       f"jetzt {current.get(key, missing)!r}")
+    return out
+
+
+def load_partial(path) -> dict:
+    """Liest einen Zwischenstand; ein unlesbarer oder fremder Inhalt ist ein
+    harter Abbruch (er wuerde sonst still als "kein Zwischenstand" gelten)."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"--resume: Zwischenstand {path} nicht lesbar ({e!r}). Von Hand "
+                         f"pruefen; ohne --resume wird er ignoriert und ueberschrieben.")
+    if not isinstance(data, dict) or data.get("partial") is not True \
+            or data.get("partial_format") != PARTIAL_FORMAT:
+        raise SystemExit(f"--resume: {path} ist kein Zwischenstand im Format {PARTIAL_FORMAT} "
+                         f"(partial={data.get('partial') if isinstance(data, dict) else None!r}).")
+    return data
+
+
+def sprt_decision(llr: float, lower: float, upper: float, name_a: str) -> str | None:
+    """`name_a` bei LLR >= obere Schranke, "H0" bei LLR <= untere, sonst None."""
+    if llr >= upper:
+        return name_a
+    if llr <= lower:
+        return "H0"
+    return None
+
+
+class GatingTally:
+    """Alle kumulativen Groessen des Gatings. `add_block` ist die EINE Stelle,
+    die einen Block wertet: fuer frisch gespielte Bloecke und fuer die aus dem
+    Zwischenstand uebernommenen. So rechnet eine Fortsetzung bit-identisch
+    weiter (gleiche Operationen in gleicher Reihenfolge), statt gespeicherte
+    Summen zu uebernehmen."""
+
+    def __init__(self, name_a: str, name_b: str, sprt_p1: float,
+                 sprt_lower: float, sprt_upper: float, log_games: bool):
+        self.name_a, self.name_b = name_a, name_b
+        self.sprt_p1 = sprt_p1
+        self.sprt_lower, self.sprt_upper = sprt_lower, sprt_upper
+        self.log_games = log_games
+        self.pair_a_sweeps = self.pair_b_sweeps = self.splits = 0
+        self.a_wins_total = self.b_wins_total = 0
+        self.pair_diffs: list[int] = []
+        self.llr = 0.0
+        # Task #92: Score-/Floor-Trend zusaetzlich zu Sieg/Niederlage mitschreiben
+        # (beide Brett-Orientierungen aus Sicht von A/B, nicht nur wer gewinnt).
+        self.a_score_sum = self.b_score_sum = 0.0
+        self.a_floor_sum = self.b_floor_sum = 0.0
+        self.zerozero_count = 0
+        # Task #28 (2026-08-03, additiv): Per-Paar-Scores fuers Ergebnis-JSON --
+        # der lambda_aggr-Sweep braucht je Seed-Paar gepaarte Gegnerpunkte ueber
+        # mehrere Arme hinweg (identischer base_seed => Paar i ist ueber Arme
+        # vergleichbar). Reine Zusatzfelder, keine Verhaltensaenderung.
+        self.per_pair_scores: list[dict] = []
+        # 2026-09-09: Partie-Records mit Logzeilen (nur bei `log_games`), im Format
+        # von `tools/probes/arena_column_probe.py` (artifact["games"] -> je Partie
+        # `log` + Header-Felder). Bleibt leer und wird nicht ins JSON geschrieben,
+        # wenn der Schalter aus ist.
+        self.logged_games: list[dict] = []
+        self.done_pairs = 0
+        self.block_idx = 0
+        self.block_logs: list[dict] = []
+        # Zwischenstand (2026-10-07): je Block die Records, aus denen `add_block`
+        # ihn bei einer Fortsetzung neu wertet.
+        self.block_records: list[dict] = []
+        # 2026-10-01: Partien ohne `completed`-Feld (altes Wheel), siehe
+        # `count_completed_field_missing`.
+        self.completed_field_missing = 0
+
+    def add_block(self, g1: list[dict], g2: list[dict], n: int, seed: int, dur: float,
+                  missing: int) -> dict:
+        """Wertet einen vollstaendigen Block (`n` Paare, Blockseed `seed`) und
+        haengt sein Block-Log an. `missing` = Partien ohne `completed`-Feld."""
+        name_a, name_b = self.name_a, self.name_b
+        first_pair = self.done_pairs
+        for i in range(n):
+            a_won_o1 = g1[i]["winner"] == 0  # A auf Brett 0 (Orientierung 1)
+            a_won_o2 = g2[i]["winner"] == 1  # A auf Brett 1 (Orientierung 2, B auf Brett 0)
+            # Task #92: Score/Floor beider Spiele des Paares aus Sicht von A/B
+            # mitschreiben (Orientierung 1: A=Brett0, B=Brett1; Orientierung 2:
+            # vertauscht) -- unabhaengig davon, wer das Paar gewinnt.
+            self.a_score_sum += g1[i]["scores"][0] + g2[i]["scores"][1]
+            self.b_score_sum += g1[i]["scores"][1] + g2[i]["scores"][0]
+            self.a_floor_sum += g1[i]["total_floor"][0] + g2[i]["total_floor"][1]
+            self.b_floor_sum += g1[i]["total_floor"][1] + g2[i]["total_floor"][0]
+            self.per_pair_scores.append({
+                "pair_index": first_pair + i, "block_seed": seed,
+                "a_score": g1[i]["scores"][0] + g2[i]["scores"][1],
+                "b_score": g1[i]["scores"][1] + g2[i]["scores"][0],
+                "a_wins_pair": int(g1[i]["winner"] == 0) + int(g2[i]["winner"] == 1),
+            })
+            for g in (g1[i], g2[i]):
+                if g["scores"][0] == 0 and g["scores"][1] == 0:
+                    self.zerozero_count += 1
+            if self.log_games:
+                # Zuordnung explizit, weil die Engine BEIDE Orientierungen mit
+                # denselben generischen Spielernamen loggt ("NetzA"/"NetzB",
+                # self_play.rs:3708) -- die sind Brett-Etiketten, keine
+                # Modell-Etiketten. `names` bleibt darum unangetastet (der
+                # Replayer bildet daraus Name -> Brettindex ab,
+                # analyze_game_log.py:374); die Modellzuordnung steht daneben
+                # in `side_names`/`board0_name`.
+                for orientation, (rec, side) in enumerate(
+                        ((g1[i], [name_a, name_b]), (g2[i], [name_b, name_a])), start=1):
+                    entry = dict(rec)
+                    entry["pair_index"] = first_pair + i
+                    entry["orientation"] = orientation
+                    entry["block_seed"] = seed
+                    entry["side_names"] = side
+                    entry["board0_name"] = side[0]
+                    self.logged_games.append(entry)
+            a_wins_pair = int(a_won_o1) + int(a_won_o2)
+            b_wins_pair = 2 - a_wins_pair
+            self.a_wins_total += a_wins_pair
+            self.b_wins_total += b_wins_pair
+            self.pair_diffs.append(a_wins_pair - b_wins_pair)
+            if a_wins_pair == 2:
+                self.pair_a_sweeps += 1
+                self.llr += sprt_llr_delta(True, p1=self.sprt_p1)
+            elif b_wins_pair == 2:
+                self.pair_b_sweeps += 1
+                self.llr += sprt_llr_delta(False, p1=self.sprt_p1)
+            else:
+                self.splits += 1  # nicht informativ -- traegt NICHT zur LLR bei
+
+        self.done_pairs += n
+        self.block_idx += 1
+        self.completed_field_missing += missing
+        report_p = mcnemar_exact_p(self.pair_a_sweeps, self.pair_b_sweeps)
+        mean_d, ci_lo, ci_hi = paired_ci(self.pair_diffs)
+        block_log = {
+            "block": self.block_idx, "seed": seed, "n_pairs_block": n, "done_pairs": self.done_pairs,
+            "a_wins_total": self.a_wins_total, "b_wins_total": self.b_wins_total,
+            "pair_a_sweeps_b": self.pair_a_sweeps, "pair_b_sweeps_c": self.pair_b_sweeps,
+            "pair_splits": self.splits, "llr": self.llr,
+            "sprt_bounds": [self.sprt_lower, self.sprt_upper],
+            "report_mcnemar_p": report_p, "mean_pair_diff": mean_d, "ci95": [ci_lo, ci_hi],
+            "duration_s": dur,
+            # 2026-10-01: je Block ausgewiesen (bewusst nicht auf oberster
+            # Ebene: deren Feldmenge sichert test_paired_gating_recipe.py).
+            # `incomplete_games` ist hier per Konstruktion 0, sonst haette
+            # `IncompleteGamesError` vor der Wertung abgebrochen;
+            # `completed_field_missing` > 0 heisst altes Wheel.
+            "incomplete_games": 0,
+            "completed_field_missing": missing,
+        }
+        self.block_logs.append(block_log)
+
+        def keep(rec):
+            if self.log_games:
+                return dict(rec)
+            return {k: rec[k] for k in SCORING_RECORD_FIELDS if k in rec}
+        self.block_records.append({
+            "block": self.block_idx, "seed": seed, "n_pairs_block": n, "duration_s": dur,
+            "completed_field_missing": missing,
+            "g1": [keep(r) for r in g1[:n]], "g2": [keep(r) for r in g2[:n]],
+        })
+        return block_log
+
+
+def restore_tally_from_partial(tally: GatingTally, partial: dict, base_seed: int,
+                               block_size: int, max_pairs: int) -> None:
+    """Wertet die Bloecke des Zwischenstands ueber `tally.add_block` neu und
+    vergleicht Ergebnis und gespeicherte Werte (LLR je Block und gesamt,
+    Zaehler). Jede Abweichung ist ein harter Abbruch: dann passt der
+    Zwischenstand nicht zu diesem Code oder ist beschaedigt."""
+    records = partial.get("block_records") or []
+    saved_logs = partial.get("blocks") or []
+    if len(records) != len(saved_logs):
+        raise SystemExit(f"--resume: Zwischenstand traegt {len(records)} Block-Records, aber "
+                         f"{len(saved_logs)} Block-Logs -- beschaedigt, Abbruch.")
+    for idx, rec in enumerate(records):
+        want_seed = base_seed + idx * BLOCK_SEED_STRIDE
+        want_n = min(block_size, max_pairs - tally.done_pairs)
+        if rec.get("seed") != want_seed or rec.get("n_pairs_block") != want_n:
+            raise SystemExit(f"--resume: Block {idx + 1} im Zwischenstand hat Seed "
+                             f"{rec.get('seed')} und {rec.get('n_pairs_block')} Paare, erwartet "
+                             f"Seed {want_seed} und {want_n} Paare -- Abbruch.")
+        log = tally.add_block(rec["g1"], rec["g2"], rec["n_pairs_block"], rec["seed"],
+                              rec["duration_s"], rec.get("completed_field_missing", 0))
+        saved_llr = saved_logs[idx].get("llr")
+        if saved_llr is None or abs(log["llr"] - saved_llr) > 1e-9:
+            raise SystemExit(f"--resume: LLR nach Block {idx + 1} neu gerechnet {log['llr']!r}, "
+                             f"gespeichert {saved_llr!r} -- Abbruch.")
+    checks = [
+        ("done_pairs", tally.done_pairs, partial.get("done_pairs")),
+        ("a_wins_total", tally.a_wins_total, partial.get("a_wins_total")),
+        ("b_wins_total", tally.b_wins_total, partial.get("b_wins_total")),
+        ("pair_a_sweeps_b", tally.pair_a_sweeps, partial.get("pair_a_sweeps_b")),
+        ("pair_b_sweeps_c", tally.pair_b_sweeps, partial.get("pair_b_sweeps_c")),
+        ("pair_splits", tally.splits, partial.get("pair_splits")),
+        ("next_block_index", tally.block_idx, partial.get("next_block_index")),
+    ]
+    bad = [f"{name}: neu gerechnet {got!r}, gespeichert {want!r}"
+           for name, got, want in checks if got != want]
+    saved_llr = partial.get("sprt_llr")
+    if saved_llr is None or abs(tally.llr - saved_llr) > 1e-9:
+        bad.append(f"sprt_llr: neu gerechnet {tally.llr!r}, gespeichert {saved_llr!r}")
+    if bad:
+        raise SystemExit("--resume: der neu gewertete Zwischenstand weicht von den gespeicherten "
+                         "Werten ab -- Abbruch:\n  - " + "\n  - ".join(bad))
+
+
 def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        name_b: str | None = None, sims_a: int = DEFAULT_SIMS,
                        sims_b: int = DEFAULT_SIMS, c_puct_a: float = DEFAULT_C_PUCT,
@@ -375,7 +684,9 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        promote_winner: bool = False, spec_a: str | None = None,
                        spec_b: str | None = None, log_games: bool = False,
                        expected_engine_config: dict | None = None,
-                       recipe_block: dict | None = None) -> dict:
+                       recipe_block: dict | None = None,
+                       partial_path: str | Path | None = None,
+                       resume: bool = False) -> dict:
     """Orchestriert das volle gepaarte Gating (siehe Modul-Docstring). Die
     STOPP-Entscheidung ist ein Wald-SPRT auf den informativen Paaren (b/c);
     bricht NACH einem VOLLSTAENDIGEN Block ab, sobald die LLR eine der beiden
@@ -409,8 +720,59 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     beide additiv. `expected_engine_config` (Abschnitt des Rezepts): vor dem
     ersten Block gegen `mosaic_rust.engine_config_json()` geprueft; hier ist
     der Elternprozess der spielende Prozess, die Pruefung sieht also genau,
-    was spielt. Abweichung -> Abbruch mit Liste."""
+    was spielt. Abweichung -> Abbruch mit Liste.
+
+    `partial_path`/`resume` (2026-10-07, Modul-Docstring): mit `partial_path`
+    schreibt jeder fertige Block dorthin einen Zwischenstand; `resume` liest
+    einen liegenden, prueft die Konfiguration und setzt ab dem naechsten
+    Block fort. `partial_path=None` (Default fuer Bibliotheks-Aufrufer) =
+    Bestandsverhalten ohne Zwischenstand. Das LOESCHEN nach dem fertigen
+    Artefakt ist Sache des Aufrufers (`main`), weil erst er das Artefakt
+    schreibt."""
     validate_gating_params(block_size, max_pairs, sprt_p1, sprt_alpha, sprt_beta)
+
+    name_a = name_a or os.path.basename(model_a)
+    name_b = name_b or os.path.basename(model_b)
+    # Zwischenstand VOR dem Engine-Import und vor jedem Block lesen (Muster
+    # train.py: der Abbruch bei einem unpassenden Stand soll sofort kommen).
+    partial = None
+    if partial_path is not None:
+        partial_path = Path(partial_path)
+        if partial_path.exists():
+            if resume:
+                partial = load_partial(partial_path)
+            else:
+                print(f"  Hinweis: liegender Zwischenstand {partial_path} wird IGNORIERT "
+                      f"(ohne --resume) und nach dem ersten Block ueberschrieben.", flush=True)
+        elif resume:
+            print(f"  --resume: kein Zwischenstand {partial_path} -- normaler Lauf ab Block 1.",
+                  flush=True)
+    if base_seed is None and partial is not None:
+        base_seed = (partial.get("config") or {}).get("base_seed")
+        print(f"  --resume ohne --seed: Basis-Seed {base_seed} aus dem Zwischenstand.", flush=True)
+    base_seed = base_seed if base_seed is not None else random.randint(0, 10 ** 9)
+    config = None
+    if partial_path is not None:
+        config = resume_config(
+            model_a=model_a, model_b=model_b, name_a=name_a, name_b=name_b,
+            spec_a=spec_a, spec_b=spec_b, sims_a=sims_a, sims_b=sims_b,
+            c_puct_a=c_puct_a, c_puct_b=c_puct_b, base_seed=base_seed,
+            block_size=block_size, max_pairs=max_pairs, sprt_p1=sprt_p1,
+            sprt_alpha=sprt_alpha, sprt_beta=sprt_beta, log_games=log_games,
+            threads=threads, mosaic_env=mosaic_env_snapshot(),
+            recipe_block=recipe_block, expected_engine_config=expected_engine_config)
+    if partial is not None:
+        deviations = resume_config_deviations(partial.get("config") or {}, config)
+        if deviations:
+            raise SystemExit(
+                f"--resume: die Konfiguration weicht vom Zwischenstand {partial_path} ab -- "
+                f"Abbruch (ein gemischtes Artefakt waere ein anderes Mass):\n  - "
+                + "\n  - ".join(deviations))
+        saved_threads = (partial.get("config") or {}).get("threads")
+        if saved_threads != threads:
+            print(f"  Hinweis: --threads {threads} statt {saved_threads} im Zwischenstand "
+                  f"(Partien gleich, Laufzeit nicht vergleichbar).", flush=True)
+
     import mosaic_rust as mr
 
     engine_config_check = None
@@ -429,37 +791,10 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     # Gating war einer von drei Nachzueglern ohne den Pflichtblock).
     t_wall0, t_cpu0 = time.monotonic(), time.process_time()
 
-    name_a = name_a or os.path.basename(model_a)
-    name_b = name_b or os.path.basename(model_b)
-    base_seed = base_seed if base_seed is not None else random.randint(0, 10 ** 9)
     sprt_lower, sprt_upper = sprt_bounds(sprt_alpha, sprt_beta)
 
-    pair_a_sweeps = pair_b_sweeps = splits = 0
-    a_wins_total = b_wins_total = 0
-    pair_diffs: list[int] = []
-    llr = 0.0
-    # Task #92: Score-/Floor-Trend zusaetzlich zu Sieg/Niederlage mitschreiben
-    # (beide Brett-Orientierungen aus Sicht von A/B, nicht nur wer gewinnt).
-    a_score_sum = b_score_sum = 0.0
-    a_floor_sum = b_floor_sum = 0.0
-    zerozero_count = 0
-    # Task #28 (2026-08-03, additiv): Per-Paar-Scores fuers Ergebnis-JSON --
-    # der lambda_aggr-Sweep braucht je Seed-Paar gepaarte Gegnerpunkte ueber
-    # mehrere Arme hinweg (identischer base_seed => Paar i ist ueber Arme
-    # vergleichbar). Reine Zusatzfelder, keine Verhaltensaenderung.
-    per_pair_scores: list[dict] = []
-    # 2026-09-09: Partie-Records mit Logzeilen (nur bei `log_games`), im Format
-    # von `tools/probes/arena_column_probe.py` (artifact["games"] -> je Partie
-    # `log` + Header-Felder). Bleibt leer und wird nicht ins JSON geschrieben,
-    # wenn der Schalter aus ist.
-    logged_games: list[dict] = []
+    tally = GatingTally(name_a, name_b, sprt_p1, sprt_lower, sprt_upper, log_games)
     sprt_verdict = None   # None=laeuft noch, name_a=A signifikant besser, "H0"=kein Beleg fuer A
-    done_pairs = 0
-    block_idx = 0
-    block_logs: list[dict] = []
-    # 2026-10-01: Partien ohne `completed`-Feld (altes Wheel), siehe
-    # `count_completed_field_missing`.
-    completed_field_missing = 0
 
     print(f"Gepaartes Gating (Task #76): {name_a}@{sims_a} (c_puct={c_puct_a}) vs "
           f"{name_b}@{sims_b} (c_puct={c_puct_b}) -- Basis-Seed={base_seed}, "
@@ -467,9 +802,35 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     print(f"  SPRT: H0 p={SPRT_P0} vs. H1 p={sprt_p1}, alpha={sprt_alpha} beta={sprt_beta}, "
           f"Wald-Schranken [{sprt_lower:+.4f}, {sprt_upper:+.4f}]")
 
-    while done_pairs < max_pairs:
+    # Wiederaufnahme (2026-10-07): die fertigen Bloecke ueber DIESELBE Wertung
+    # (`GatingTally.add_block`) neu rechnen und gegen den Zwischenstand
+    # pruefen; die Laufzeit der frueheren Segmente wird aufaddiert.
+    prev_wall_s = prev_cpu_s = 0.0
+    prev_segments = 0
+    resumed_from_block = None
+    if partial is not None:
+        restore_tally_from_partial(tally, partial, base_seed, block_size, max_pairs)
+        lz_prev = partial.get("laufzeit_so_far") or {}
+        prev_wall_s = float(lz_prev.get("wanduhr_s") or 0.0)
+        prev_cpu_s = float(lz_prev.get("cpu_s") or 0.0)
+        prev_segments = int(lz_prev.get("segments") or 1)
+        resumed_from_block = tally.block_idx + 1
+        print(f"  Fortgesetzt ab Block {resumed_from_block} ({tally.done_pairs} Paare uebernommen; "
+              f"kumulativ {name_a} {tally.a_wins_total}:{tally.b_wins_total} {name_b}, "
+              f"LLR={tally.llr:+.3f} neu gerechnet = gespeichert, bisherige Wanduhr "
+              f"{prev_wall_s:.1f} s in {prev_segments} Segment(en))", flush=True)
+        # Ein Stand, dessen letzter Block die Schranke schon gerissen hat (Abbruch
+        # zwischen Zwischenstand und Artefakt), spielt keinen Block mehr.
+        sprt_verdict = sprt_decision(tally.llr, sprt_lower, sprt_upper, name_a)
+        if sprt_verdict is not None:
+            print(f"  SPRT-Entscheid stand schon im Zwischenstand ({tally.done_pairs} Paare, "
+                  f"LLR={tally.llr:+.3f}): {sprt_verdict}.", flush=True)
+
+    while sprt_verdict is None and tally.done_pairs < max_pairs:
+        done_pairs = tally.done_pairs
+        block_idx = tally.block_idx
         n = min(block_size, max_pairs - done_pairs)
-        seed = base_seed + block_idx * 1_000_000
+        seed = base_seed + block_idx * BLOCK_SEED_STRIDE
         t0 = time.time()
         g1, g2 = play_pair_block(mr, model_a, model_b, sims_a, sims_b, c_puct_a, c_puct_b,
                                   n, seed, threads, spec_a=spec_a, spec_b=spec_b,
@@ -491,10 +852,9 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         # Endwertung; sie zu werten hiesse, ein lastabhaengiges Ergebnis in
         # die SPRT-Statistik zu legen. Also: zaehlen, ausweisen, abbrechen.
         missing = count_completed_field_missing(g1, g2)
-        if missing and completed_field_missing == 0:
+        if missing and tally.completed_field_missing == 0:
             print(f"  WARNUNG: {missing} Partien ohne Feld `completed` -- das Wheel ist "
                   f"aelter als 2026-10-01, ein Abbruch waere NICHT erkennbar.", flush=True)
-        completed_field_missing += missing
         incomplete = find_incomplete_games(g1, g2, done_pairs, seed)
         if incomplete:
             reasons = sorted({str(x["abort_reason"]) for x in incomplete})
@@ -514,8 +874,8 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                 "done_pairs_before_abort": done_pairs,
                 "incomplete_games": len(incomplete),
                 "incomplete_game_list": incomplete,
-                "completed_field_missing": completed_field_missing,
-                "blocks": block_logs,
+                "completed_field_missing": tally.completed_field_missing + missing,
+                "blocks": tally.block_logs,
                 "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
                                            n_games=done_pairs * 2 + 2 * n),
                 "recipe": recipe_block,
@@ -523,98 +883,64 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
             }
             raise IncompleteGamesError(message, report)
 
-        for i in range(n):
-            a_won_o1 = g1[i]["winner"] == 0  # A auf Brett 0 (Orientierung 1)
-            a_won_o2 = g2[i]["winner"] == 1  # A auf Brett 1 (Orientierung 2, B auf Brett 0)
-            # Task #92: Score/Floor beider Spiele des Paares aus Sicht von A/B
-            # mitschreiben (Orientierung 1: A=Brett0, B=Brett1; Orientierung 2:
-            # vertauscht) -- unabhaengig davon, wer das Paar gewinnt.
-            a_score_sum += g1[i]["scores"][0] + g2[i]["scores"][1]
-            b_score_sum += g1[i]["scores"][1] + g2[i]["scores"][0]
-            a_floor_sum += g1[i]["total_floor"][0] + g2[i]["total_floor"][1]
-            b_floor_sum += g1[i]["total_floor"][1] + g2[i]["total_floor"][0]
-            per_pair_scores.append({
-                "pair_index": done_pairs + i, "block_seed": seed,
-                "a_score": g1[i]["scores"][0] + g2[i]["scores"][1],
-                "b_score": g1[i]["scores"][1] + g2[i]["scores"][0],
-                "a_wins_pair": int(g1[i]["winner"] == 0) + int(g2[i]["winner"] == 1),
+        tally.add_block(g1, g2, n, seed, dur, missing)
+        print(f"  Block {tally.block_idx} (Seed={seed}, n={n} Paare, {dur:.1f}s): kumulativ "
+              f"{name_a} {tally.a_wins_total}:{tally.b_wins_total} {name_b} | Paare "
+              f"{tally.done_pairs} (A-Sweep b={tally.pair_a_sweeps} B-Sweep "
+              f"c={tally.pair_b_sweeps} Split={tally.splits}) | "
+              f"LLR={tally.llr:+.3f} [{sprt_lower:+.3f},{sprt_upper:+.3f}] | "
+              f"Bericht-McNemar p={tally.block_logs[-1]['report_mcnemar_p']:.4f} | gepaarte Diff "
+              f"{tally.block_logs[-1]['mean_pair_diff']:+.3f} "
+              f"[{tally.block_logs[-1]['ci95'][0]:+.3f},{tally.block_logs[-1]['ci95'][1]:+.3f}]",
+              flush=True)
+
+        # Zwischenstand NACH jedem fertigen Block, VOR dem SPRT-Stopp: auch ein
+        # Abbruch zwischen dem letzten Block und dem Artefakt verliert nichts.
+        if partial_path is not None:
+            write_json_atomic(partial_path, {
+                "partial": True,
+                "partial_format": PARTIAL_FORMAT,
+                "saved_at": datetime.now().isoformat(timespec="seconds"),
+                "config": config,
+                "next_block_index": tally.block_idx,
+                "next_block_seed": base_seed + tally.block_idx * BLOCK_SEED_STRIDE,
+                "done_pairs": tally.done_pairs,
+                "a_wins_total": tally.a_wins_total, "b_wins_total": tally.b_wins_total,
+                "pair_a_sweeps_b": tally.pair_a_sweeps, "pair_b_sweeps_c": tally.pair_b_sweeps,
+                "pair_splits": tally.splits,
+                "sprt_llr": tally.llr, "sprt_bounds": [sprt_lower, sprt_upper],
+                "completed_field_missing": tally.completed_field_missing,
+                "laufzeit_so_far": {
+                    "wanduhr_s": prev_wall_s + (time.monotonic() - t_wall0),
+                    "cpu_s": prev_cpu_s + (time.process_time() - t_cpu0),
+                    "threads": threads,
+                    "segments": prev_segments + 1,
+                },
+                "blocks": tally.block_logs,
+                "block_records": tally.block_records,
             })
-            for g in (g1[i], g2[i]):
-                if g["scores"][0] == 0 and g["scores"][1] == 0:
-                    zerozero_count += 1
-            if log_games:
-                # Zuordnung explizit, weil die Engine BEIDE Orientierungen mit
-                # denselben generischen Spielernamen loggt ("NetzA"/"NetzB",
-                # self_play.rs:3708) -- die sind Brett-Etiketten, keine
-                # Modell-Etiketten. `names` bleibt darum unangetastet (der
-                # Replayer bildet daraus Name -> Brettindex ab,
-                # analyze_game_log.py:374); die Modellzuordnung steht daneben
-                # in `side_names`/`board0_name`.
-                for orientation, (rec, side) in enumerate(
-                        ((g1[i], [name_a, name_b]), (g2[i], [name_b, name_a])), start=1):
-                    entry = dict(rec)
-                    entry["pair_index"] = done_pairs + i
-                    entry["orientation"] = orientation
-                    entry["block_seed"] = seed
-                    entry["side_names"] = side
-                    entry["board0_name"] = side[0]
-                    logged_games.append(entry)
-            a_wins_pair = int(a_won_o1) + int(a_won_o2)
-            b_wins_pair = 2 - a_wins_pair
-            a_wins_total += a_wins_pair
-            b_wins_total += b_wins_pair
-            pair_diffs.append(a_wins_pair - b_wins_pair)
-            if a_wins_pair == 2:
-                pair_a_sweeps += 1
-                llr += sprt_llr_delta(True, p1=sprt_p1)
-            elif b_wins_pair == 2:
-                pair_b_sweeps += 1
-                llr += sprt_llr_delta(False, p1=sprt_p1)
-            else:
-                splits += 1  # nicht informativ -- traegt NICHT zur LLR bei
 
-        done_pairs += n
-        block_idx += 1
-        report_p = mcnemar_exact_p(pair_a_sweeps, pair_b_sweeps)
-        mean_d, ci_lo, ci_hi = paired_ci(pair_diffs)
-        block_log = {
-            "block": block_idx, "seed": seed, "n_pairs_block": n, "done_pairs": done_pairs,
-            "a_wins_total": a_wins_total, "b_wins_total": b_wins_total,
-            "pair_a_sweeps_b": pair_a_sweeps, "pair_b_sweeps_c": pair_b_sweeps,
-            "pair_splits": splits, "llr": llr, "sprt_bounds": [sprt_lower, sprt_upper],
-            "report_mcnemar_p": report_p, "mean_pair_diff": mean_d, "ci95": [ci_lo, ci_hi],
-            "duration_s": dur,
-            # 2026-10-01: je Block ausgewiesen (bewusst nicht auf oberster
-            # Ebene: deren Feldmenge sichert test_paired_gating_recipe.py).
-            # `incomplete_games` ist hier per Konstruktion 0, sonst haette
-            # `IncompleteGamesError` vor der Wertung abgebrochen;
-            # `completed_field_missing` > 0 heisst altes Wheel.
-            "incomplete_games": 0,
-            "completed_field_missing": missing,
-        }
-        block_logs.append(block_log)
-        print(f"  Block {block_idx} (Seed={seed}, n={n} Paare, {dur:.1f}s): kumulativ "
-              f"{name_a} {a_wins_total}:{b_wins_total} {name_b} | Paare {done_pairs} "
-              f"(A-Sweep b={pair_a_sweeps} B-Sweep c={pair_b_sweeps} Split={splits}) | "
-              f"LLR={llr:+.3f} [{sprt_lower:+.3f},{sprt_upper:+.3f}] | "
-              f"Bericht-McNemar p={report_p:.4f} | gepaarte Diff {mean_d:+.3f} "
-              f"[{ci_lo:+.3f},{ci_hi:+.3f}]", flush=True)
-
-        if llr >= sprt_upper:
-            sprt_verdict = name_a
-            print(f"  SPRT-Entscheid nach {done_pairs} Paaren: {name_a} signifikant besser "
-                  f"(LLR={llr:+.3f} >= obere Schranke {sprt_upper:+.3f}).")
-            break
-        if llr <= sprt_lower:
-            sprt_verdict = "H0"
-            print(f"  SPRT-Entscheid nach {done_pairs} Paaren: KEIN Beleg dass {name_a} besser "
-                  f"ist (LLR={llr:+.3f} <= untere Schranke {sprt_lower:+.3f}) -- {name_b} bleibt.")
-            break
-    else:
+        sprt_verdict = sprt_decision(tally.llr, sprt_lower, sprt_upper, name_a)
+        if sprt_verdict == name_a:
+            print(f"  SPRT-Entscheid nach {tally.done_pairs} Paaren: {name_a} signifikant besser "
+                  f"(LLR={tally.llr:+.3f} >= obere Schranke {sprt_upper:+.3f}).")
+        elif sprt_verdict == "H0":
+            print(f"  SPRT-Entscheid nach {tally.done_pairs} Paaren: KEIN Beleg dass {name_a} besser "
+                  f"ist (LLR={tally.llr:+.3f} <= untere Schranke {sprt_lower:+.3f}) -- {name_b} bleibt.")
+    if sprt_verdict is None:
         sprt_verdict = "UNDECIDED_CAP_REACHED"
         print(f"  {max_pairs} Paare (harter Deckel) erreicht OHNE SPRT-Entscheid "
-              f"(LLR={llr:+.3f}, Schranken [{sprt_lower:+.3f},{sprt_upper:+.3f}]) -- "
+              f"(LLR={tally.llr:+.3f}, Schranken [{sprt_lower:+.3f},{sprt_upper:+.3f}]) -- "
               f"Fixed-n-Auswertung unten gilt als Notbehelf.")
+
+    # Ab hier liest der Bestandscode die Summen unter ihren alten Namen.
+    pair_a_sweeps, pair_b_sweeps, splits = tally.pair_a_sweeps, tally.pair_b_sweeps, tally.splits
+    a_wins_total, b_wins_total = tally.a_wins_total, tally.b_wins_total
+    pair_diffs, llr, done_pairs = tally.pair_diffs, tally.llr, tally.done_pairs
+    a_score_sum, b_score_sum = tally.a_score_sum, tally.b_score_sum
+    a_floor_sum, b_floor_sum = tally.a_floor_sum, tally.b_floor_sum
+    zerozero_count, per_pair_scores = tally.zerozero_count, tally.per_pair_scores
+    logged_games, block_logs = tally.logged_games, tally.block_logs
 
     final_p = mcnemar_exact_p(pair_a_sweeps, pair_b_sweeps)
     mean_d, ci_lo, ci_hi = paired_ci(pair_diffs)
@@ -626,6 +952,20 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     avg_floor_a = a_floor_sum / n_games_total if n_games_total else None
     avg_floor_b = b_floor_sum / n_games_total if n_games_total else None
     zerozero_anteil = zerozero_count / n_games_total if n_games_total else None
+    if resume:
+        # 2026-10-07 (Muster train.py `fortgesetzt_ab_epoche`): Summe ueber alle
+        # Segmente OHNE den verlorenen angefangenen Block; die Startmarken werden
+        # um die Vorsegmente verschoben, damit `laufzeit_block` sie mitzaehlt und
+        # `s_je_partie` aus der Summe rechnet. Ohne Fortsetzung sind die
+        # Vorsegmente 0 und die beiden Zusatzfelder None.
+        runtime = laufzeit_block(t_wall0 - prev_wall_s, cpu_start=t_cpu0 - prev_cpu_s,
+                                  threads=threads, n_games=n_games_total)
+        runtime["segment_wanduhr_s"] = (round(time.monotonic() - t_wall0, 1)
+                                         if resumed_from_block is not None else None)
+        runtime["fortgesetzt_ab_block"] = resumed_from_block
+    else:
+        runtime = laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
+                                  n_games=n_games_total)
     result = {
         "name_a": name_a, "name_b": name_b, "model_a": model_a, "model_b": model_b,
         "spec_a": spec_a, "spec_b": spec_b,
@@ -645,8 +985,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         # CLAUDE.md-Pflichtblock. `cpu_s` ist hier aussagekraeftig: die Partien
         # laufen IM SELBEN Prozess (PyO3-Rust-Threads), und `process_time()`
         # summiert ueber alle Threads des Prozesses.
-        "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
-                                   n_games=n_games_total),
+        "laufzeit": runtime,
         # Rezeptdatei (additiv): None ohne Rezept; `mosaic_env` immer.
         "recipe": (None if recipe_block is None else
                    {**recipe_block, **({"engine_config_check": engine_config_check}
@@ -740,6 +1079,15 @@ def build_parser() -> argparse.ArgumentParser:
                          "schreiben (Feld `games`, Format der Arena-Artefakte) "
                          "-- Eingabe fuer tools/probes/arena_column_probe.py")
     p.add_argument("--out", default=None, help="Ziel-JSON-Pfad (Default: evaluations/paired_gating_result_<a>_vs_<b>.json)")
+    # 2026-10-07 (Modul-Docstring "Zwischenstand je Block"): Default AUS = der
+    # Lauf beginnt bei Block 1, ein liegender Zwischenstand wird ignoriert.
+    p.add_argument("--resume", dest="resume", action="store_true",
+                    help="Liegt <out>.partial.json (Zwischenstand, nach jedem Block geschrieben), "
+                         "die fertigen Bloecke uebernehmen und ab dem naechsten Block "
+                         "weiterspielen. Vorher wird die Konfiguration geprueft (Modelle per "
+                         "Pfad und sha256, Specs, Sims, c_puct, Seed, Blockgroesse, max-pairs, "
+                         "SPRT, --log-games, MOSAIC_*); jede Abweichung bricht hart ab. Ohne "
+                         "Zwischenstand laeuft der Lauf normal.")
     p.add_argument("--promote-winner", dest="promote_winner", action="store_true", default=True,
                     help="Setzt models/champion.txt automatisch auf --name-a, sobald der SPRT "
                          "signifikant zu dessen Gunsten entscheidet (Standard: an -- "
@@ -789,6 +1137,16 @@ def main(argv=None, recipe_pre=None) -> None:
     except ValueError as e:
         p.error(str(e))
 
+    # Zielpfad VOR dem Lauf (2026-10-07): daneben liegt der Zwischenstand je
+    # Block. Die Namen folgen derselben Ableitung wie in `run_paired_gating`.
+    name_a_eff = args.name_a or os.path.basename(args.model_a)
+    name_b_eff = args.name_b or os.path.basename(args.model_b)
+    out_path = Path(args.out) if args.out else (
+        Path(__file__).resolve().parent.parent / "evaluations"
+        / f"paired_gating_result_{name_a_eff}_vs_{name_b_eff}.json"
+    )
+    partial_path = partial_path_for(out_path)
+
     try:
         result = run_paired_gating(
             args.model_a, args.model_b, name_a=args.name_a, name_b=args.name_b,
@@ -798,28 +1156,38 @@ def main(argv=None, recipe_pre=None) -> None:
             base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
             spec_a=args.spec_a, spec_b=args.spec_b, log_games=args.log_games,
             expected_engine_config=expected_engine_config, recipe_block=recipe_block,
+            partial_path=partial_path, resume=args.resume,
         )
     except IncompleteGamesError as e:
         # Abbruch-Artefakt statt Ergebnis: unter --out (bzw. dem Default-Pfad)
         # mit dem Zusatz `_ABORTED`, damit kein Auswerter es fuer ein fertiges
         # Gating haelt; kein Trend-Log, keine Champion-Uebernahme.
         rep = e.report
-        base_out = Path(args.out) if args.out else (
-            Path(__file__).resolve().parent.parent / "evaluations"
-            / f"paired_gating_result_{rep['name_a']}_vs_{rep['name_b']}.json"
-        )
+        base_out = out_path
         abort_path = base_out.with_name(base_out.stem + "_ABORTED" + base_out.suffix)
         abort_path.write_text(json.dumps(rep, indent=2), encoding="utf-8")
         print(f"ABBRUCH: {e}", flush=True)
         print(f"Abbruch-Artefakt: {abort_path}", flush=True)
+        # Der Zwischenstand bleibt liegen (Stand nach dem letzten GEWERTETEN
+        # Block). Ein --resume spielt den abgebrochenen Block erneut.
+        if partial_path.exists():
+            print(f"Zwischenstand bleibt liegen: {partial_path}", flush=True)
         raise SystemExit(2)
 
-    out_path = Path(args.out) if args.out else (
-        Path(__file__).resolve().parent.parent / "evaluations"
-        / f"paired_gating_result_{result['name_a']}_vs_{result['name_b']}.json"
-    )
-    out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    # Atomar (2026-10-07): ein Abbruch mitten im Schreiben darf kein halbes
+    # Artefakt hinterlassen, das eine Kette fuer fertig halten wuerde. Inhalt
+    # byte-gleich zum frueheren `write_text(json.dumps(result, indent=2))`.
+    write_json_atomic(out_path, result, indent=2)
     print(f"Ergebnis gespeichert: {out_path}")
+    # Zwischenstand ist ein TRANSIENT (wie train.py `_resume.pth`): nach dem
+    # fertigen Artefakt weg, sonst setzte ein spaeteres --resume einen fremden
+    # Stand fort.
+    if partial_path.exists():
+        try:
+            partial_path.unlink()
+            print(f"Zwischenstand {partial_path.name} geloescht (Lauf vollstaendig).", flush=True)
+        except OSError as e:
+            print(f"  WARNUNG: Zwischenstand {partial_path} nicht loeschbar ({e!r}).", flush=True)
     # 2026-09-12: der Tracker zieht sein Intervall blockweise, wenn die Zeile ihre
     # Seed-Bloecke kennt; die Ableitung liest dieses Artefakt. Ein SPRT-Entscheid vor
     # dem Deckel ist ein Frueh-Stopp und gehoert als solcher ins Register.

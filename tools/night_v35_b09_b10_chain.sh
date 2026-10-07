@@ -44,6 +44,23 @@
 # KEINE PIPE dahinter, keine eigene Umleitung (weit ueber der 2-h-Grenze der Hintergrundaufgaben).
 # Darf vor dem Ende der Vorgaenger gestartet werden: sie wartet, bis kein Prozess mit
 # night_v35_b02_chain oder night_v35_arms_chain in der Kommandozeile mehr laeuft (Deckel 40 h).
+#
+# WIEDERAUFNAHME (2026-10-07, nach einem Rechner-Neustart mitten in der b09-Erzeugung):
+#   RESUME=1 bash tools/night_v35_b09_b10_chain.sh
+# Die Kette darf dann nach einem Abbruch an JEDER Stelle von vorn gestartet werden und faehrt nur die
+# fehlenden Schritte:
+#   - Fruehpruefung: statt "Klassendateien liegen schon -> Abbruch" wird gezaehlt; genau 400 Dateien
+#     selfplay_v34-b01-policy-s400-vol_*.pkl -> Smoke und Erzeugung entfallen, sonst Abbruch mit Zaehlstand.
+#   - b10 entfaellt, wenn models/alphazero_v35-b10_brierbest.onnx und zwei Artefakte
+#     gating_v35-b10_vs_v34-b01_s<Seed>.json liegen ("b10 fertig, uebersprungen").
+#   - run_b09: "liegt schon -> STOPP" wird "liegt schon -> wiederverwenden, Konsistenz pruefen"
+#     (Fenster 1.600 = b02 + neue Klasse, Traeger-Manifest 800, Split-Listen mit Val byte-gleich b02,
+#     Monolith mit passendem Stempel, Offline-Artefakt). Training: liegt _resume.pth -> train.py --resume;
+#     liegt der finale Stand mit laufzeit im Manifest -> uebersprungen; sonst Reste -> STOPP.
+#   - gate(): ein Seed mit fertigem Artefakt entfaellt; ein Zwischenstand <out>.partial.json wird von
+#     paired_gating.py --resume fortgesetzt (--resume steht auch im Standardmodus im Aufruf: ohne
+#     Zwischenstand laeuft das Gating normal).
+# Ohne RESUME (oder RESUME=0) gilt das bisherige Verhalten mit allen STOPP-Pruefungen.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
@@ -66,6 +83,12 @@ B09_SMOKE_DIR=data/probe_v35b09_smoke
 # b09: Pool = die fuenf b02-Klassen; die neue Klasse trifft NICHT (nach "policy" muss "_" folgen).
 B09_VAL_POOL='^selfplay_v34-b01-(policy|policy-s400|policy-dice-v2-r1-s400|value-deviate-s400|value-excursion-s400)_'
 B02_EXCLUDE='selfplay_v29-b11-probe_|selfplay_depth|selfplay_s4states|selfplay_tor2a|selfplay_probe-|selfplay_x35|selfplay_x35e2'
+RESUME_MODE="${RESUME:-0}"                                   # Wiederaufnahme-Modus, siehe Kopf
+case "$RESUME_MODE" in
+  0|1) ;;
+  *) echo "ABBRUCH: RESUME='$RESUME_MODE' -- erlaubt sind 0 und 1"; exit 1 ;;
+esac
+[ "$RESUME_MODE" = "1" ] && echo "########## RESUME=1: Wiederaufnahme-Modus (liegende Schritte werden geprueft und wiederverwendet)"
 SUMMARY_FILE=$(mktemp)
 STEPS_FILE=$(mktemp)
 
@@ -86,7 +109,13 @@ step_end() {  # schreibt die Wanduhr auch in die Zusammenfassung (Arm, Schritt, 
 for f in "$B09_RECIPE" models/v35_generation.spec.json; do
   [ -f "$f" ] || { echo "ABBRUCH: $f fehlt"; exit 1; }
 done
-if ls data/ | grep -q "^selfplay_${GEN}-${B09_CLASS}_\|^manifest_${GEN}-${B09_CLASS}_"; then
+if [ "$RESUME_MODE" = "1" ]; then
+  NCLS=$(ls data/ | grep -c "^selfplay_${GEN}-${B09_CLASS}_.*\.pkl$")
+  if [ "$NCLS" != "400" ]; then
+    echo "ABBRUCH (RESUME=1): data/ traegt ${NCLS} statt 400 Dateien selfplay_${GEN}-${B09_CLASS}_*.pkl -- Erzeugung erst vervollstaendigen"; exit 1
+  fi
+  echo "RESUME=1: 400 Dateien selfplay_${GEN}-${B09_CLASS}_*.pkl liegen -- Smoke und Erzeugung von b09 entfallen"
+elif ls data/ | grep -q "^selfplay_${GEN}-${B09_CLASS}_\|^manifest_${GEN}-${B09_CLASS}_"; then
   echo "ABBRUCH: data/ traegt schon Dateien der Klasse ${B09_CLASS} -- von Hand pruefen"; exit 1
 fi
 
@@ -200,7 +229,8 @@ PYEOF
   [ $? -eq 0 ] || { echo "STOPP $ARM: Schluessel-Abnahme ROT"; return 19; }
 }
 
-# Training mit den Flags von night_v35_b02_chain.sh:234-241. $1 Fensterliste, $2 Monolith, $3 val_frac.
+# Training mit den Flags von night_v35_b02_chain.sh:234-241. $1 Fensterliste, $2 Monolith, $3 val_frac,
+# ab $4 optionale Zusatzflags (nur RESUME=1: --resume). Ohne $4 ist der Aufruf der bisherige.
 train_arm() {
   python -X utf8 -u train.py --name "$ARM" --load "$LOAD" \
     --file-list "$1" --cache-file "$2" \
@@ -209,7 +239,7 @@ train_arm() {
     --value-target-lambda 0.7 --ownership-head-2d --ownership-weight 0.0 \
     --moon-loss-weight 0.0 --opp-points-head \
     --destretch-a 0.0051 --destretch-b 1.9269 \
-    --select-by-brier --fast-loader --seed $SEED
+    --select-by-brier --fast-loader --seed $SEED "${@:4}"
 }
 
 # Manifest-Diff gegen das neueste b02-Manifest. $1 erlaubte cli_args (Komma), $2 erlaubte
@@ -290,16 +320,30 @@ gate() {  # $1 Seed (Gegner immer $GEN, Praefix gating, wie night_v35_arms_chain
   local G0
   G0=$(date +%s)
   if [ -f "$OUT" ]; then
+    if [ "$RESUME_MODE" = "1" ]; then
+      # paired_gating.py schreibt das Artefakt atomar (tmp + os.replace): liegt es, ist es vollstaendig.
+      echo "   RESUME: $OUT liegt schon -- Seed $1 uebersprungen"
+      if [ ! -f "$ART/plate_points_${ARM}_vs_${GEN}_s${1}.json" ]; then
+        echo "   Auswertungen zu Seed $1 fehlen -- werden nachgezogen"
+        python -X utf8 -u tools/probes/arena_column_probe.py --artifact "$OUT"
+        python -X utf8 -u tools/plate_points_from_arena.py "$OUT" --block 5 \
+          --out "$ART/plate_points_${ARM}_vs_${GEN}_s${1}.json"
+      fi
+      return 0
+    fi
     echo "   STOPP $ARM: $OUT liegt schon -- wird nicht ueberschrieben"; return 1
   fi
   echo ""
   echo "===== $ARM gegen $GEN, Seed $1   Start $(date +%F' '%H:%M:%S)"
+  [ -f "${OUT}.partial.json" ] && echo "   Zwischenstand ${OUT}.partial.json liegt -- paired_gating.py --resume setzt dort fort"
+  # --resume (2026-10-07): setzt einen liegenden Zwischenstand <out>.partial.json fort (Konfiguration
+  # wird geprueft); ohne Zwischenstand laeuft das Gating normal. Darum auch im Standardmodus gesetzt.
   python -X utf8 -u tools/paired_gating.py \
     --model-a "$A" --spec-a "$SPEC" --model-b "$GEN_MODEL" --spec-b "$SPEC" \
     --name-a "$ARM" --name-b "$GEN" \
     --sims-a 400 --sims-b 400 --c-puct 1.5 \
     --block-size 5 --max-pairs 200 --sprt-alpha 0.001 --sprt-beta 0.001 \
-    --seed "$1" --threads 10 --log-games --no-promote-winner --out "$OUT"
+    --seed "$1" --threads 10 --log-games --no-promote-winner --out "$OUT" --resume
   local RCG=$?
   echo "   Exit $RCG ($(date +%H:%M:%S))"
   python -X utf8 -u tools/probes/arena_column_probe.py --artifact "$OUT"
@@ -361,17 +405,25 @@ run_b09() {
   local CARRIER_LIST=data/policy_carrier_list_v35_b02.txt
   echo ""
   echo "############################## ARM $ARM (Policy-Volumen, par.17)   Start $(date +%F' '%H:%M:%S)"
-  for f in models/alphazero_${ARM}*.pth; do
-    [ -f "$f" ] && { echo "STOPP $ARM: $f liegt schon (train.py wuerde ohnehin abbrechen)"; exit 4; }
-  done
-  for f in "data/$CARRIER" "${WIN}.txt"; do
-    [ -f "$f" ] && { echo "STOPP $ARM: $f liegt schon -- wird NICHT ueberschrieben"; exit 4; }
-  done
-  if ls data/ | grep -q "^selfplay_${GEN}-${B09_CLASS}_\|^manifest_${GEN}-${B09_CLASS}_"; then
-    echo "STOPP $ARM: data/ traegt schon Dateien der Klasse ${B09_CLASS}"; exit 4
-  fi
-  if [ -d "$B09_SMOKE_DIR" ] && [ -n "$(ls -A "$B09_SMOKE_DIR" 2>/dev/null)" ]; then
-    echo "STOPP $ARM: $B09_SMOKE_DIR ist nicht leer -- Reste eines frueheren Smokes von Hand beiseitelegen"; exit 4
+  if [ "$RESUME_MODE" = "1" ]; then
+    # RESUME: die "liegt schon -> STOPP"-Pruefungen werden je Schritt zu "wiederverwenden, pruefen"
+    # (Fenster 1b, Traeger 1d, Split 1e, Monolith 1f, Training 1g, Offline 1h, Tor 1 je Seed).
+    NCLS=$(ls data/ | grep -c "^selfplay_${GEN}-${B09_CLASS}_.*\.pkl$")
+    [ "$NCLS" = "400" ] || { echo "STOPP $ARM (RESUME): $NCLS statt 400 Dateien der Klasse ${B09_CLASS}"; exit 4; }
+    echo "   RESUME: 400 Dateien der Klasse ${B09_CLASS}; liegende Schritte werden geprueft und wiederverwendet"
+  else
+    for f in models/alphazero_${ARM}*.pth; do
+      [ -f "$f" ] && { echo "STOPP $ARM: $f liegt schon (train.py wuerde ohnehin abbrechen)"; exit 4; }
+    done
+    for f in "data/$CARRIER" "${WIN}.txt"; do
+      [ -f "$f" ] && { echo "STOPP $ARM: $f liegt schon -- wird NICHT ueberschrieben"; exit 4; }
+    done
+    if ls data/ | grep -q "^selfplay_${GEN}-${B09_CLASS}_\|^manifest_${GEN}-${B09_CLASS}_"; then
+      echo "STOPP $ARM: data/ traegt schon Dateien der Klasse ${B09_CLASS}"; exit 4
+    fi
+    if [ -d "$B09_SMOKE_DIR" ] && [ -n "$(ls -A "$B09_SMOKE_DIR" 2>/dev/null)" ]; then
+      echo "STOPP $ARM: $B09_SMOKE_DIR ist nicht leer -- Reste eines frueheren Smokes von Hand beiseitelegen"; exit 4
+    fi
   fi
   # Keine MOSAIC_*-Variable ausser denen des Rezepts darf in die Erzeugung lecken (Smoke prueft es).
 
@@ -407,6 +459,11 @@ PYEOF
   [ $? -eq 0 ] || { echo "STOPP $ARM: Rezept- oder Wheel-Pruefung rot"; exit 3; }
   step_end
 
+  # RESUME: Smoke und Erzeugung entfallen (400 Klassendateien oben gezaehlt). Sonst der bisherige Ablauf.
+  if [ "$RESUME_MODE" = "1" ]; then
+    echo ""
+    echo "== $ARM 1a) Smoke und Erzeugung: RESUME, 400 Dateien selfplay_${GEN}-${B09_CLASS}_*.pkl liegen -- uebersprungen"
+  else
   step_begin "$ARM 1a) Smoke (10 Partien nach $B09_SMOKE_DIR)"
   MOSAIC_DATA_DIR="$B09_SMOKE_DIR" python -X utf8 -u self_play.py --recipe "$B09_RECIPE" --class "$B09_CLASS" \
     --games 10 --version "smoke-v35b09-$B09_CLASS"
@@ -488,6 +545,7 @@ print(f"   Manifest {ms[-1]}: seed {c.get('seed')} (soll {seed}), games {c.get('
       f"laufzeit {m.get('laufzeit')}")
 PYEOF
   step_end
+  fi   # Ende "kein RESUME": Smoke und Erzeugung
 
   # Trainings-Umgebung ERST JETZT (Kopf): b02-Umgebung, Traeger-Manifest b09, Val-Pool der fuenf b02-Klassen.
   export_train_env "$CARRIER" "$B09_VAL_POOL"
@@ -496,6 +554,37 @@ PYEOF
   # Fensterliste VOR den Bloecken (Abweichung von der Auftragsreihenfolge): build_cache_incremental.py
   # braucht eine Dateiliste, und so laufen die Bloecke gleich ueber das ganze Fenster.
   step_begin "$ARM 1b) Fensterliste ${WIN}.txt (b02 1.200 + $B09_CLASS 400 = 1.600)"
+  if [ "$RESUME_MODE" = "1" ] && [ -f "${WIN}.txt" ]; then
+    echo "   RESUME: ${WIN}.txt liegt schon -- wiederverwenden, Konsistenz pruefen"
+    python -X utf8 - "$GEN" "$B09_CLASS" "$B02_WIN" "$WIN" "$N_VAL" <<'PYEOF'
+import glob, os, re, sys
+gen, cls, b02_win, win, n_val = sys.argv[1:6]
+rd = lambda p: [l.strip() for l in open(p, encoding="utf-8") if l.strip() and not l.startswith("#")]
+b02 = rd(f"{b02_win}.txt")
+new = sorted(os.path.basename(p) for p in glob.glob(f"data/selfplay_{gen}-{cls}_*.pkl"))
+assert len(b02) == 1200 and len(new) == 400, ("b02-Fenster / neue Klasse", len(b02), len(new))
+have = rd(f"{win}.txt")
+# Gleiche Bauvorschrift wie der Fensterbau unten: b02-Fenster, dann die neue Klasse sortiert.
+assert have == b02 + new, (f"Fensterliste weicht ab: {len(have)} Eintraege, erwartet 1600 "
+                           f"= b02 + neue Klasse in Bau-Reihenfolge")
+assert len(set(have)) == 1600, "Doppelte im Fenster"
+assert all(os.path.exists(os.path.join("data", b)) for b in have), "Datei fehlt"
+excl = os.environ.get("MOSAIC_DATA_EXCLUDE", "")
+assert not [b for b in have if excl and re.search(excl, b)], "Fensterdatei kollidiert mit MOSAIC_DATA_EXCLUDE"
+pool = os.environ["MOSAIC_VAL_POOL"]
+assert {b for b in have if re.search(pool, b)} == set(b02), "Val-Pool trifft nicht genau das b02-Fenster"
+vf = f"{int(n_val) / len(have):.8f}"
+vpath = f"{win}.valfrac"
+if os.path.exists(vpath):
+    got = open(vpath, encoding="utf-8").read().strip()
+    assert got == vf, f"{vpath} traegt {got}, erwartet {vf}"
+else:
+    open(vpath, "w", encoding="utf-8").write(f"{vf}\n")
+    print(f"   {vpath} fehlte -- nachgezogen ({vf})")
+print(f"   {win}.txt: 1600 Dateien = b02 1.200 + {cls} 400, Val-Pool trifft genau b02, val_frac {vf} -- GRUEN")
+PYEOF
+    [ $? -eq 0 ] || { echo "STOPP $ARM (RESUME): liegende Fensterliste ${WIN}.txt passt nicht -- von Hand beiseitelegen"; exit 13; }
+  else
   python -X utf8 - "$GEN" "$B09_CLASS" "$B02_WIN" "$WIN" "$N_VAL" <<'PYEOF'
 import glob, os, re, sys
 gen, cls, b02_win, win, n_val = sys.argv[1:6]
@@ -523,6 +612,7 @@ open(f"{win}.valfrac", "w", encoding="utf-8").write(f"{vf:.8f}\n")
 print(f"   {win}.txt: {len(allf)} Dateien; Val-Pool trifft {len(pool_hits)}; val_frac {vf:.8f} fuer {n_val} Val-Dateien")
 PYEOF
   [ $? -eq 0 ] || { echo "STOPP $ARM: Fensterbau gescheitert"; exit 13; }
+  fi   # Ende Fensterliste bauen / (RESUME) pruefen
   VF=$(tr -d '[:space:]' < "${WIN}.valfrac")
   step_end
 
@@ -537,6 +627,11 @@ PYEOF
   # b02-Traeger als Liste (Quelle data/$B02_CARRIER), dann generate_carrier_manifest.py:
   # --from-list schraenkt die Kandidaten auf genau diese 400 ein, --n-files 400 nimmt sie alle
   # (je Stratum eine Datei, Stratumgroesse 1); --include-glob nimmt die neue Klasse vollstaendig.
+  # RESUME: ein liegendes Manifest wird nicht neu erzeugt; die Konsistenzpruefung unten (800 =
+  # 100+100+200+400, b02-Traeger plus neue Klasse) laeuft in beiden Faellen.
+  if [ "$RESUME_MODE" = "1" ] && [ -f "data/$CARRIER" ]; then
+    echo "   RESUME: data/$CARRIER liegt schon -- wiederverwenden, Konsistenz unten"
+  else
   python -X utf8 - "data/$B02_CARRIER" "$CARRIER_LIST" <<'PYEOF'
 import json, sys
 src, out = sys.argv[1:3]
@@ -553,6 +648,7 @@ PYEOF
     --include-glob "selfplay_${GEN}-${B09_CLASS}_*.pkl" \
     --out "$CARRIER"
   [ $? -eq 0 ] || { echo "STOPP $ARM: generate_carrier_manifest.py gescheitert"; exit 15; }
+  fi   # Ende Traeger-Manifest erzeugen / (RESUME) wiederverwenden
   python -X utf8 - "$CARRIER" "$B02_CARRIER" "$GEN" "$B09_CLASS" <<'PYEOF'
 import json, sys
 name, b02name, gen, cls = sys.argv[1:5]
@@ -572,11 +668,20 @@ PYEOF
   step_end
 
   step_begin "$ARM 1e) Split (val_frac $VF, Val-Pool der fuenf b02-Klassen), Val-Satz gegen b02"
+  # RESUME: liegen beide Listen und ein Split-Protokoll MIT Schluessel (window_train_split.py druckt ihn
+  # erst nach dem Schreiben der Listen, Z. 96-107), wird der Split wiederverwendet; die Pruefungen
+  # unten (Val 120 byte-gleich b02, Trainingsanteil = b02 + neue, Schluessel != b02) laufen immer.
+  if [ "$RESUME_MODE" = "1" ] && [ -f "${WIN}_train.txt" ] && [ -f "${WIN}_val.txt" ] \
+     && grep -q "Fenster-Schluessel des Trainingsanteils: [0-9a-f]" "$SPLIT_OUT" 2>/dev/null; then
+    echo "   RESUME: ${WIN}_train.txt, ${WIN}_val.txt und $SPLIT_OUT liegen schon -- wiederverwenden, Konsistenz unten"
+    RC=0
+  else
   python -X utf8 tools/window_train_split.py --file-list "${WIN}.txt" --val-frac "$VF" \
     --val-pool "$MOSAIC_VAL_POOL" --encoder 2d --value-target-variant nortv \
     --train-list-out "${WIN}_train.txt" --val-list-out "${WIN}_val.txt" \
     > "$SPLIT_OUT"
   RC=$?
+  fi   # Ende Split rechnen / (RESUME) wiederverwenden
   cat "$SPLIT_OUT"
   [ $RC -eq 0 ] || { echo "STOPP $ARM: window_train_split.py mit Exit $RC"; exit 16; }
   NV=$(grep -vc '^#' "${WIN}_val.txt")
@@ -602,19 +707,60 @@ PYEOF
   step_end
 
   step_begin "$ARM 1f) Monolith unter dem Fenster-Schluessel $KEY"
+  # RESUME: der Stempel wird ZULETZT in den Monolithen geschrieben (build_cache_parallel.py:203-205);
+  # traegt ein liegender Monolith den Schluessel, war der Merge durch. Sonst (fehlt, ohne Stempel,
+  # unlesbar) wird neu gemergt; ein FREMDER Stempel bricht dort ab (Ueberschreib-Schutz, Z. 152-185).
+  # check_window_key unten laeuft in beiden Faellen.
+  RC=1
+  if [ "$RESUME_MODE" = "1" ] && [ -f "$CACHE" ] && python -X utf8 -c "import h5py,sys; h=h5py.File(sys.argv[1],'r'); k=h.attrs.get('mosaic_cache_key'); k=k.decode() if isinstance(k,bytes) else k; sys.exit(0 if k==sys.argv[2] else 1)" "$CACHE" "$KEY" 2>/dev/null; then
+    echo "   RESUME: $CACHE liegt schon mit Stempel $KEY -- Merge uebersprungen"
+    RC=0
+  else
   python -X utf8 -u tools/build_cache_incremental.py --data-dir data --encoder 2d \
     --value-target-variant nortv --workers 6 --file-list "${WIN}_train.txt" \
     --merge-out "$CACHE"
   RC=$?; echo "   Exit $RC ($(date +%H:%M:%S))"
+  fi   # Ende Merge / (RESUME) wiederverwenden
   [ $RC -eq 0 ] && [ -f "$CACHE" ] || { echo "STOPP $ARM: Monolith fehlt (Exit $RC)"; exit 14; }
   check_window_key "$KEY" "$CACHE" "${WIN}_train.txt" 800 "" || exit $?
   echo "##### FENSTER $ARM STEHT $(date +%F' '%H:%M:%S) -- Monolith $CACHE"
   step_end
 
-  # ABBRUCH? Fortsetzen mit demselben Aufruf plus --resume (Fingerabdruck-Waechter), von Hand.
+  # ABBRUCH? Fortsetzen mit demselben Aufruf plus --resume (Fingerabdruck-Waechter), von Hand --
+  # oder die ganze Kette mit RESUME=1 neu starten (dann entscheidet der Zustand unten).
   step_begin "$ARM 1g) Training -- WARMSTART von $LOAD (Rezept b02)"
+  if [ "$RESUME_MODE" = "1" ]; then
+    # train.py: Zwischenstand je Epoche models/alphazero_<name>_resume.pth (train.py:1144), am Ende
+    # erst ONNX-Export, dann laufzeit ins Manifest, dann Loeschen des Zwischenstands (train.py:3144-3210).
+    if [ -f "models/alphazero_${ARM}_resume.pth" ]; then
+      echo "   RESUME: models/alphazero_${ARM}_resume.pth liegt -- train.py --resume"
+      train_arm "${WIN}.txt" "$CACHE" "$VF" --resume
+      RC=$?
+    elif [ -f "models/alphazero_${ARM}.pth" ]; then
+      python -X utf8 - "$ARM" <<'PYEOF'
+import glob, json, sys
+ms = sorted(glob.glob(f"models/manifest_train_{sys.argv[1]}_*.json"))
+if not ms:
+    print("   kein Trainings-Manifest"); sys.exit(1)
+lz = json.load(open(ms[-1], encoding="utf-8")).get("laufzeit")
+print(f"   {ms[-1]}: laufzeit {lz}")
+sys.exit(0 if lz else 1)
+PYEOF
+      [ $? -eq 0 ] || { echo "STOPP $ARM (RESUME): models/alphazero_${ARM}.pth liegt ohne Zwischenstand, aber das Manifest traegt keine laufzeit -- von Hand pruefen"; exit 20; }
+      echo "   RESUME: Training $ARM ist durch (finaler Stand, kein Zwischenstand, laufzeit im Manifest) -- uebersprungen"
+      RC=0
+    else
+      for f in models/alphazero_${ARM}*.pth; do
+        [ -f "$f" ] && { echo "STOPP $ARM (RESUME): $f liegt ohne Zwischenstand und ohne finalen Stand -- von Hand pruefen"; exit 20; }
+      done
+      train_arm "${WIN}.txt" "$CACHE" "$VF"
+      RC=$?
+    fi
+  else
   train_arm "${WIN}.txt" "$CACHE" "$VF"
-  RC=$?; echo "   Training Exit $RC ($(date +%H:%M:%S))"
+  RC=$?
+  fi   # Ende Training / (RESUME) fortsetzen oder ueberspringen
+  echo "   Training Exit $RC ($(date +%H:%M:%S))"
   [ $RC -eq 0 ] || { echo "STOPP $ARM: Training mit Exit $RC -- kein Tor 1"; exit 20; }
   step_end
 
@@ -631,9 +777,13 @@ PYEOF
   MS=(models/manifest_train_${ARM}_*.json)
   if [ -n "$BEST_PTH" ] && [ -f "$BEST_PTH" ]; then
     local PRE_OUT="$ART/checkpoint_val_eval_${ARM}_vs_b02.json"
+    if [ "$RESUME_MODE" = "1" ] && [ -f "$PRE_OUT" ]; then
+      echo "   RESUME: $PRE_OUT liegt schon -- uebersprungen"
+    else
     python -X utf8 -u tools/checkpoint_val_eval.py --checkpoints "$B02_BEST_PTH" "$BEST_PTH" \
       --val-list "${WIN}_val.txt" --train-manifest "${MS[${#MS[@]}-1]}" --out "$PRE_OUT"
     RC=$?; echo "   Exit $RC ($(date +%H:%M:%S))"
+    fi   # Ende Offline-Messung / (RESUME) wiederverwenden
     [ -f "$PRE_OUT" ] && print_offline "$PRE_OUT" || echo "   HINWEIS: kein Artefakt $PRE_OUT (kein Stopp)"
   else
     echo "   HINWEIS: kein Brier-bestes $ARM-Netz (.pth) -- Offline-Vorabmessung entfaellt (kein Stopp)"
@@ -752,6 +902,18 @@ PYEOF
 #     ohne 7,7 h Erzeugung vorweg) ----------------------------------------------------------------
 for arm in v35-b10 v35-b09; do
   T0=$(date +%s)
+  # RESUME: b10 gilt als fertig, wenn das Brier-beste ONNX und zwei fertige Gating-Artefakte liegen
+  # (Regex statt Glob: <out>.partial.json und _ABORTED.json zaehlen nicht).
+  if [ "$RESUME_MODE" = "1" ] && [ "$arm" = "v35-b10" ]; then
+    NG=$(ls "$ART" | grep -cE "^gating_v35-b10_vs_${GEN}_s[0-9]+\.json$")
+    if [ -f models/alphazero_v35-b10_brierbest.onnx ] && [ "$NG" -ge 2 ]; then
+      echo ""
+      echo "== b10 fertig, uebersprungen (models/alphazero_v35-b10_brierbest.onnx und $NG Gating-Artefakte liegen)"
+      printf '%s\t%s\t%s\n' "$arm" "uebersprungen (RESUME, fertig)" "0" >> "$SUMMARY_FILE"
+      continue
+    fi
+    echo "   RESUME: b10 nicht vollstaendig (Brier-bestes ONNX oder zwei Gating-Artefakte fehlen; $NG Artefakte) -- run_b10 laeuft im Standardablauf"
+  fi
   case $arm in
     v35-b09) ( run_b09 ) ;;
     v35-b10) ( run_b10 ) ;;
