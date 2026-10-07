@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: GESCHLOSSEN 2026-09-22 nach 10 Partien (par.7), je gegen den Champion ihrer Zeit (par.8.8), gegen v31-b01 1:2. Zwei Befunde, die keine Arena zeigt: die Null-Klammer ist EROEFFNUNG, nicht Notnagel (g10: 13 Ziehungen in R1, Stand 0 bis R4), und das Netz bedient die aktiven Wertungsplatten unzuverlaessig (g09/g10 je drei leere Spezialfelder). Werkzeug bleibt in tools/ (par.8.6), Anzeige-Fix par.13 gebaut. KEINE Siegquote ueber die Reihe: wechselnde Gegner, Sicht ungleich (par.11). -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 10 Partien bis 2026-09-22 (par.7, zuletzt 1:2 gegen v31-b01): Null-Klammer ist EROEFFNUNG, Wertungsplatten unzuverlaessig bedient. Sicht-Audit par.11 am Code nachgelesen 2026-10-08: P.9/P.11 netzseitig gebaut, letzte Stelle (Vorderseiten gezogener Platten) am Fenster gefixt (`stop`, par.14). WIEDER OFFEN: g11/g12 gegen v35-b10 @400 in eigener Sitzung (Nutzer 2026-10-08). -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1461,3 +1461,42 @@ Zahl von Hand gegen die Fabrikzeilen und die Musterreihen nachgerechnet:
    angenommen und fuehrte zu R1 `T2/2` ohne Strafleiste.
 
 Damit ist par.13 abgeschlossen; es steht nichts mehr aus.
+
+## par.14 SICHT-AUDIT NACHGELESEN UND LETZTE STELLE GEFIXT (2026-10-08, Nutzer: "schau das im code auch wirklich nach")
+
+**Anlass:** Nutzer-Frage, ob ein Agent gegen v35-b10 spielen kann, und die Nachfrage, was an der Sicht
+"nicht gleich" sei. Die Antwort aus par.11 (Stand 2026-09-13) war ueberholt; am Code nachgelesen:
+
+| Stelle par.11 | Code 2026-10-08 | Gleich |
+| --- | --- | --- |
+| Beutel/Turm getrennt (par.11a.2) | Turm je Farbe 5 Werte in Abschnitt 16 (`features.rs:377`, Push `:391-393`); Fenster `claude_play.py:705` | ja |
+| Chipanzahl (par.11a.3) | Anzahl je Spieler (`features.rs:378`, `:394-395`, Quelle `unused_chip_count` `:467`); Fenster `:721` | ja |
+| Netz sieht mehr (par.11b) | Maske und Rueckgabe-Wissen im Fenster (`stack_lines`, `:653`, Waechter am Zug) | ja |
+| Vorderseiten gezogener Platten (par.11a.4) | `serialize.rs:423` liefert `pending_stack_draw` weiter mit Vorderseite; Fenster druckte sie mit Nummer; Netz kodiert nur Anzahl/Wild/Spezial (`features.rs:417-423`) | NEIN, gefixt unten |
+| Historie (par.11a.5) | unveraendert, entschaerft (Brett traegt den Verlauf bis auf die Zugreihenfolge in der Runde) | offen, ungeprueft ob tragend |
+
+**Fix am Fenster (nur `tools/claude_play.py`, kein Engine-Bau):** gezogene Stapelplatten zeigen bis zum neuen
+Befehl `stop` nur die Rueckseite, also Anzahl und Typ ("gezogen: 2 verdeckt (spezial, wild)"). Auch die
+Design-NUMMER bleibt verdeckt (Nutzer-Einwand: "welche nummer willst drucken?"), weil sie ueber den
+18er-Katalog die Vorderseite identifiziert. `stop` dreht um (Manifest-Flag `drawn_revealed`, kein Engine-Zug,
+zaehlt nicht als Zug), danach zeigt `show` Nummern, Vorderseiten und die `choose`-Zuege; `peek` setzt das Flag
+zurueck; `choose` vor `stop` wird abgewiesen; `known_designs` und die Platzierungs-Vorschau lesen die gezogenen
+Platten erst nach `stop`. Der Engine-Aufruf `apply_dome_stack_peek` gibt nur den Typ zurueck (`py.rs:396`),
+dort gab es kein Leck. Sieben Tests (`DrawnFrontsHiddenUntilStop`, `test_claude_play_board_hints.py`,
+Dateistand 35 gruen). Der Rechenweg zur Vorderseite bleibt, wie am Tisch, dem Spieler erlaubt: die Maske der
+noch verdeckten Designs steht im Fenster, mehr als am Tisch weiss er damit nicht.
+
+**Damit ist die Sicht Fenster/Netz nach heutiger Code-Lesung gleich** bis auf die Historie (par.11a.5, Zugreihenfolge
+in der Runde) und die Aggregate (par.11c, zaehlen nicht). Partien ab g11 taugen darum ueber die Beobachtung hinaus
+als Staerkebeobachtung gegen EIN Netz; eine Siegquote ueber die ganze Reihe bleibt aus par.8.8 (wechselnde Gegner)
+keine Groesse.
+
+**Registriert (Nutzer 2026-10-08, "dann spielt der agent umgehend", "lass den agent via chip in einer neuen
+sitzung spielen"):** g11 und g12 gegen `v35-b10_brierbest` @400 mit der Champion-Spec
+`models/v34-b01_brierbest.spec.json` (b10 hat keine eigene; Tor 1 lief unter dieser Spec, Kette Zeile 346),
+g11 Claude Spieler 0, g12 Claude Spieler 1, Startspieler jeweils 0, Seeds 20261008 / 20261009. Bericht wie par.7
+(Verlauf, Beobachtungen je Runde, Endwertung je Kriterium, die sechs Standard-Kennzahlen aus CLAUDE.md), Ergebnis
+als par.14a hier, Kopf nachziehen, Index generieren. Spieler ist eine EIGENE Sitzung (Arbeitsauftrag-Chip), nicht
+ein Subagent; Modellwahl beim Nutzer (Wunsch: Sonnet). Nebenlast: die Partien laufen auf Nutzer-Entscheid neben
+der b09-Kette (Training, dann Tor 1); die b09-Gating-Laufzeiten werden entsprechend als "mit claude_play daneben"
+markiert (CLAUDE.md, Markierungspflicht).

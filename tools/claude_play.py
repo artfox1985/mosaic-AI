@@ -51,8 +51,18 @@ Zugnotation (par.3.3), Farben blau gelb rot schwarz tuerkis (auch B G R S T):
                                                           Werkzeug ab und nennt die Reste. Unten zuerst,
                                                           erreichbar ist spaeter nur der oberste Stein.
     d <platte> <slot_r> <slot_c> [rot]                    Kuppelplatte aus der Auslage (rot 0/90/180/270)
-    peek                                                  verdeckt vom Stapel ziehen (Aktion A, Schritt 1)
-    choose <platte> <slot_r> <slot_c> [rot] [zurueck:<id,...>]  gezogene Platte legen
+    peek                                                  verdeckt vom Stapel ziehen (Aktion A, Schritt 1).
+                                                          Gezogene Platten zeigen bis `stop` NUR den Typ
+                                                          der Rueckseite (wild/spezial): keine Nummer,
+                                                          keine Vorderseite. Regel (Nutzer 2026-09-13):
+                                                          erst wer aufhoert zu ziehen, dreht um; die
+                                                          Nummer allein wuerde die Vorderseite ueber den
+                                                          18er-Katalog verraten (par.14, 2026-10-08).
+    stop                                                  Ziehen beenden und die gezogenen Platten
+                                                          umdrehen (kein Engine-Zug, nur Fenster-Sicht);
+                                                          danach zeigt `show` Nummern, Vorderseiten und
+                                                          die choose-Zuege
+    choose <platte> <slot_r> <slot_c> [rot] [zurueck:<id,...>]  gezogene Platte legen (erst nach `stop`)
     chip <fabrik>                                         Bonuschip nehmen
     start <platte> <slot_r> <slot_c> [rot]                Startplatte legen (Anfang der Partie)
     pass
@@ -289,6 +299,27 @@ def grid_lines(grid) -> list[str]:
 def tile_str(t: dict) -> str:
     sp = t.get("spaces") or []
     return f"#{t['id']}[{''.join(cell_char(s) for s in sp[:2])}/{''.join(cell_char(s) for s in sp[2:4])}]{'+' + str(t['bonus']) if t.get('bonus') else ''}"
+
+
+def drawn_revealed(st: dict, m: dict) -> bool:
+    """Darf das Fenster Nummern und Vorderseiten der gezogenen Stapelplatten zeigen?
+
+    Regel (Nutzer 2026-09-13, PREREG_stack_top_feature.md par.16): beim Weiterziehen sind nur
+    die Rueckseiten bekannt, erst wer aufhoert, dreht um. `serialize.rs:423` liefert
+    `pending_stack_draw` trotzdem mit voller Vorderseite ("vereinfacht"), und bis 2026-10-08
+    druckte `show` sie samt Design-Nummer; die Nummer allein identifiziert die Vorderseite
+    ueber den 18er-Katalog (`known_designs`). Das Fenster fuehrt darum selbst Buch
+    (Sicht-Audit par.11a.4, Fix par.14): `peek` setzt `drawn_revealed` im Manifest zurueck,
+    `stop` setzt es. Das Netz ist nicht betroffen, es bekommt von der Ziehserie nur Anzahl,
+    Wild- und Spezialzahl (`features.rs:417-423`, P.3).
+    """
+    return bool(st.get("pending_stack_draw")) and bool(m.get("drawn_revealed"))
+
+
+def drawn_back_str(draw: list) -> str:
+    """Rueckseiten-Sicht der Ziehserie: Anzahl und Typen, keine Nummern, keine Farbanordnung."""
+    types = ["spezial" if t.get("bonus") else "wild" for t in draw]
+    return f"{len(draw)} verdeckt ({', '.join(types)})"
 
 
 # Farb-Zaehlfelder der Engine (`bag_colors`, `tower_colors`): LISTE von 5 Zaehlern in der
@@ -580,7 +611,10 @@ def placement_warnings(st: dict, m: dict) -> list[str]:
     if m["me"] >= len(players):
         return []
     pl = players[m["me"]]
-    catalog = {t["id"]: t for t in (st.get("dome_display") or []) + (st.get("pending_stack_draw") or []) if t}
+    open_tiles = list(st.get("dome_display") or [])
+    if drawn_revealed(st, m):   # par.14: vor `stop` sind die gezogenen Platten verdeckt
+        open_tiles += list(st.get("pending_stack_draw") or [])
+    catalog = {t["id"]: t for t in open_tiles if t}
     # Menge, nicht Liste: `valid_moves` fuehrt denselben (Platte, Slot) mehrfach auf, sonst
     # stuende jede Drehung vierfach in der Warnung.
     cands: dict[tuple, set[int]] = {}
@@ -631,15 +665,18 @@ def design_str(spaces) -> str:
     return f"[{out[0]}{out[1]}/{out[2]}{out[3]}]"
 
 
-def known_designs(st: dict) -> dict:
+def known_designs(st: dict, include_drawn: bool = False) -> dict:
     """Farbanordnung je Platten-Id, soweit sie AKTUELL auf dem Tisch zu sehen ist.
 
-    Quellen sind ausschliesslich offene: die Auslage, die gerade gezogenen Platten und jede
-    schon gelegte Platte auf einem der beiden Bretter. Eine Platte, die nie offen lag, bleibt
-    ohne Design -- dann steht nur ihre Nummer da.
+    Quellen sind ausschliesslich offene: die Auslage, die gezogenen Platten NUR nach `stop`
+    (`include_drawn`, par.14) und jede schon gelegte Platte auf einem der beiden Bretter. Eine
+    Platte, die nie offen lag, bleibt ohne Design -- dann steht nur ihre Nummer da.
     """
     out: dict = {}
-    for t in (st.get("dome_display") or []) + (st.get("pending_stack_draw") or []):
+    open_tiles = list(st.get("dome_display") or [])
+    if include_drawn:
+        open_tiles += list(st.get("pending_stack_draw") or [])
+    for t in open_tiles:
         if t and t.get("id") is not None:
             out[t["id"]] = t.get("spaces")
     for pl in st.get("players") or []:
@@ -673,7 +710,7 @@ def stack_lines(st: dict, m: dict) -> list[str]:
         wild = round(frac * n)
         head += f": {wild} wild / {n - wild} spezial"
     if ids:
-        designs = known_designs(st)
+        designs = known_designs(st, drawn_revealed(st, m))
         head += " | Designs: " + " ".join(
             f"#{i}{design_str(designs[i]) if designs.get(i) else ''}" for i in ids)
     L.append(head)
@@ -704,7 +741,14 @@ def render(st: dict, m: dict, tiles_catalog: dict) -> str:
     L.append("Wertungsplatten: " + "; ".join(f"{i} {tiles_catalog.get(i, {}).get('name', '?')} ({tiles_catalog.get(i, {}).get('description', '')})" for i in ids))
     L.append(f"Beutel {counts_str(st.get('bag_colors'))} | Turm {counts_str(st.get('tower_colors'))} | Stapel {st.get('dome_stack_count')} (oben: {st.get('dome_stack_top_type')})")
     L.extend(stack_lines(st, m))
-    L.append("Auslage Kuppelplatten: " + "  ".join(tile_str(t) for t in st.get("dome_display", [])) + (f"  | gezogen: {'  '.join(tile_str(t) for t in st.get('pending_stack_draw', []))}" if st.get("pending_stack_draw") else ""))
+    draw = st.get("pending_stack_draw") or []
+    if draw and drawn_revealed(st, m):
+        drawn_s = f"  | gezogen (umgedreht): {'  '.join(tile_str(t) for t in draw)}"
+    elif draw:
+        drawn_s = f"  | gezogen: {drawn_back_str(draw)}  -- Vorderseiten erst nach `stop`"
+    else:
+        drawn_s = ""
+    L.append("Auslage Kuppelplatten: " + "  ".join(tile_str(t) for t in st.get("dome_display", [])) + drawn_s)
     for f in st.get("factories", []):
         chip = f.get("bonus_chip")
         chip_s = f" chip:{colors_str(chip['colors'])}" if chip and f.get("chip_revealed") else (" chip:?" if chip else "")
@@ -831,8 +875,12 @@ def legal_moves_text(st: dict, m: dict) -> str:
     for v in vm:
         if v["type"] == "dome_stack_choose":
             chooses.setdefault(v["chosen_id"], set()).add((v["slot_row"], v["slot_col"]))
-    for tid, slots in sorted(chooses.items()):
-        L.append(f"  choose {tid} <slot_r> <slot_c> [rot]  Slots: {sorted(slots)}")
+    if chooses and not drawn_revealed(st, m):
+        # par.14: die chosen_id ist die Design-Nummer und damit die Vorderseite.
+        L.append("  stop   (Ziehen beenden, gezogene Platten umdrehen; danach choose)")
+    else:
+        for tid, slots in sorted(chooses.items()):
+            L.append(f"  choose {tid} <slot_r> <slot_c> [rot]  Slots: {sorted(slots)}")
     for v in vm:
         if v["type"] == "bonus_chip":
             L.append(f"  chip {v['factory_id']}")
@@ -942,9 +990,18 @@ def apply_move(g, m: dict, text: str) -> str:
         g.apply_dome(tid, r, c, rot)
         return f"Claude: Platte {tid} -> Slot ({r},{c}) rot {rot}"
     if cmd == "peek":
-        res = g.apply_dome_stack_peek()
-        return f"Claude: Stapel gezogen -> {res}"
+        res = g.apply_dome_stack_peek()   # liefert nur den Typ (py.rs:396)
+        m["drawn_revealed"] = False
+        return f"Claude: Stapel gezogen -> {res} (Rueckseite; 'stop' dreht um)"
+    if cmd == "stop":
+        if not json.loads(g.state_json()).get("pending_stack_draw"):
+            raise ValueError("'stop' nur mit gezogenen Stapelplatten (erst 'peek')")
+        m["drawn_revealed"] = True
+        return "Claude: hoert auf zu ziehen -- die gezogenen Platten liegen jetzt offen"
     if cmd == "choose":
+        if not drawn_revealed(json.loads(g.state_json()), m):
+            raise ValueError("'choose' erst nach 'stop': beim Ziehen sind Nummern und Vorderseiten "
+                             "der gezogenen Platten verdeckt (par.14)")
         tid, r, c = int(parts[1]), int(parts[2]), int(parts[3]); rot = 0; back = []
         for extra in parts[4:]:
             if extra.startswith("zurueck:"):
@@ -1073,7 +1130,8 @@ def cmd_move(a) -> int:
         print(f"ZUG ABGEWIESEN ({a.move!r}): {e}")
         print("Die legalen Zuege stehen unter 'show' -- Kurzform genau so uebernehmen (auch mond:...).")
         return 1
-    m["moves_claude"] = m.get("moves_claude", 0) + 1
+    if a.move.split()[0].lower() != "stop":   # `stop` ist Fenster-Sicht, kein Engine-Zug (par.14)
+        m["moves_claude"] = m.get("moves_claude", 0) + 1
     m["trailing_pass"] = None; m["engine_logs_pass"] = True
     save_manifest(a.game, m)
     since = append_log(a.game, g, since)

@@ -328,3 +328,94 @@ class MoveParserTolerance(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def drawn_state():
+    """Ziehserie mit zwei gezogenen Platten (#17 spezial, #2 wild), #5 liegt in der Auslage."""
+    return {
+        "phase": "drafting", "current_player": 0, "round": 2,
+        "dome_display": [{"id": 5, "spaces": [space("gelb"), space("rot"), space(None, "WILD"), space("blau")]}],
+        "pending_stack_draw": [
+            {"id": 17, "bonus": 3, "spaces": [space("gelb"), space(None, "SPECIAL"), space("schwarz"), space("rot")]},
+            {"id": 2, "spaces": [space("blau"), space("rot"), space(None, "WILD"), space("gelb")]},
+        ],
+        "valid_moves": [
+            {"type": "dome_stack_peek"},
+            {"type": "dome_stack_choose", "chosen_id": 17, "slot_row": 0, "slot_col": 0},
+            {"type": "dome_stack_choose", "chosen_id": 2, "slot_row": 0, "slot_col": 0},
+        ],
+        "players": [],
+    }
+
+
+class DrawnFrontsHiddenUntilStop(unittest.TestCase):
+    """par.14 (2026-10-08): beim Ziehen zeigt das Fenster von gezogenen Stapelplatten nur die
+    Rueckseite (Typ). Die Design-Nummer wuerde die Vorderseite ueber den 18er-Katalog verraten
+    (`known_designs`), darum bleibt auch sie verdeckt, bis `stop` umdreht."""
+
+    def test_back_string_has_count_and_types_only(self):
+        s = cp.drawn_back_str(drawn_state()["pending_stack_draw"])
+        self.assertEqual(s, "2 verdeckt (spezial, wild)")
+        self.assertNotIn("#", s)
+
+    def test_known_designs_excludes_drawn_until_stop(self):
+        st = drawn_state()
+        self.assertNotIn(17, cp.known_designs(st))
+        self.assertIn(5, cp.known_designs(st))
+        self.assertIn(17, cp.known_designs(st, include_drawn=True))
+
+    def test_legal_moves_offer_stop_instead_of_choose(self):
+        txt = cp.legal_moves_text(drawn_state(), {"me": 0})
+        self.assertIn("  stop", txt)
+        self.assertNotIn("choose 17", txt)
+        self.assertNotIn("choose 2", txt)
+        self.assertIn("  peek", txt)
+
+    def test_after_stop_the_choose_moves_name_the_tiles(self):
+        txt = cp.legal_moves_text(drawn_state(), {"me": 0, "drawn_revealed": True})
+        self.assertIn("choose 17", txt)
+        self.assertIn("choose 2", txt)
+        self.assertNotIn("  stop", txt)
+
+    def test_revealed_needs_both_flag_and_drawn_tiles(self):
+        st = drawn_state()
+        self.assertFalse(cp.drawn_revealed(st, {"me": 0}))
+        self.assertTrue(cp.drawn_revealed(st, {"me": 0, "drawn_revealed": True}))
+        st["pending_stack_draw"] = []
+        self.assertFalse(cp.drawn_revealed(st, {"me": 0, "drawn_revealed": True}))
+
+    def test_render_hides_fronts_until_stop(self):
+        st = drawn_state()
+        hidden = cp.render(st, {"me": 0, "ai_player": 1}, {})
+        self.assertIn("gezogen: 2 verdeckt (spezial, wild)", hidden)
+        self.assertNotIn("#17", hidden)
+        self.assertNotIn("#2[", hidden)
+        shown = cp.render(st, {"me": 0, "ai_player": 1, "drawn_revealed": True}, {})
+        self.assertIn("#17[", shown)
+        self.assertIn("#2[", shown)
+
+    def test_choose_is_rejected_before_stop_and_peek_resets(self):
+        import json
+
+        class G:
+            def __init__(self):
+                self.peeked = 0
+
+            def state_json(self):
+                return json.dumps(drawn_state())
+
+            def apply_dome_stack_peek(self):
+                self.peeked += 1
+                return "wild"
+
+            def apply_dome_stack_choose(self, *a):
+                raise AssertionError("choose darf vor stop nicht bei der Engine ankommen")
+
+        g, m = G(), {"me": 0}
+        with self.assertRaises(ValueError):
+            cp.apply_move(g, m, "choose 17 0 0")
+        self.assertIn("offen", cp.apply_move(g, m, "stop"))
+        self.assertTrue(m["drawn_revealed"])
+        cp.apply_move(g, m, "peek")
+        self.assertFalse(m["drawn_revealed"])
+        self.assertEqual(g.peeked, 1)
