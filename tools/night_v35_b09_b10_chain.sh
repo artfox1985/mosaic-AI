@@ -748,8 +748,9 @@ PYEOF
   exit 0
 }
 
-# --- Arme in der registrierten Reihenfolge (par.18: "nach b09") ----------------------------------
-for arm in v35-b09 v35-b10; do
+# --- Arme: b10 VOR b09 (Nutzer 2026-10-06 "tausch b09 mit b10"; par.18: b10 nimmt die Frage (c) von par.17
+#     ohne 7,7 h Erzeugung vorweg) ----------------------------------------------------------------
+for arm in v35-b10 v35-b09; do
   T0=$(date +%s)
   case $arm in
     v35-b09) ( run_b09 ) ;;

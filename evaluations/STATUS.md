@@ -30,7 +30,35 @@ hoeher, Strafsteine in zwei Seeds rund 0,7 mehr. Tor 2a: policy-s400 0,807 +- 0,
 erst damit ins Register).** Erzeugung 18,9 h (11.000 Partien, je Partie 6,92 / 6,91 / 6,64 / 5,20 s), Training 1.676,8 s,
 Tor 1 5,2 h; alle Laufzeiten in `docs/measured_runtimes.md`.
 
-**NACH DER KETTE (01:3x bis 02:xx):** Python-Suite (unittest discover, 513 Tests) nach Korrektur der EMA-Defaults in
+**b03 (Trajektorien-Bootstrap k = 1) TRAEGT TOR 1 (10:46): Seeds 159:91 (SPRT-Stopp, z +5,28) und 222:178 (z +2,64), gepoolt 381:269 = 58,6 %, Block-z +5,12 ueber 65 Bloecke; Spalten 1,08/1,10 gegen 1,02/1,01, Punkte +3,5/+1,9; Val-Brier 0,18965 gegen b02 0,18942 (par.13a/13b). Deskriptiv ueber b02 (54,6 % auf denselben Seeds), Unterschied in Seed-Streuung; direkte Kante b03 gegen b02 nicht vorregistriert (Nutzer-Entscheid). **b05 (k = 2) TRAEGT TOR 1 (15:28): 224:176 (z +2,53) und 227:173 (z +2,93), gepoolt 451:349 = 56,4 %, Block-z +3,88; Spalten 1,05 gegen 1,01, Punkte +3,2/+2,3; Val-Brier 0,18970 (par.13c/13d). **b06 (k = 3) TRAEGT TOR 1 (20:10): 231:169 (z +3,05) und 224:176 (z +2,35), gepoolt 455:345 = 56,9 %, Block-z +3,83; Spalten 1,06 gegen 0,99, Strafsteine gleichauf, kleinster Spezialfeld-Abzug der Reihe (par.13e/13f). Bootstrap-Reihe komplett: alle drei Tiefen tragen, deskriptiv 2-4 Punkte ueber b02 ohne Monotonie in k, innerhalb der Seed-Streuung (par.13f Tabelle). **b04 (Margen-Bootstrap b = 20): Training 1.691 s, Val-Brier-Minimum 0,19034 in Epoche 4, schlechtester der Reihe (b02 0,18942), gegatet `_brierbest` (par.14a). Tor 1: 216:184 (z +1,65) und 236:164 (z +3,08), gepoolt 452:348 = 56,5 %, z +3,41; Seed 3 222:178 (z +2,05); GEPOOLT 674:526 = 56,2 %, Block-z +3,98 ueber 120 Bloecke: TRAEGT gegen v34-b01, aber nicht ueber b02 hinaus (56,8 %), bei schlechterem Brier: kein Hebel (par.14c). **b07 (lambda 1,0): Training 1.358 s auf dem b02-Monolithen, Val-Brier-Minimum 0,18946 in Epoche 2 (= b02), gegatet `_best` (par.15a). Tor 1: 216:184 (z +1,75) und 202:198 (z +0,18), gepoolt 418:382 = 52,25 %, z +1,26: **TRAEGT NICHT** (erster Arm ohne Kante; par.15b). Lesung: ohne den 30-%-Suchwert-Anteil faellt die Kante von z +2,50 (b02, gleiche Seeds) auf +1,26, offline unsichtbar; lambda 0,7 bleibt. b08 (EMA) trainiert seit 07:08.** **Dazu registriert (Nutzer 23:xx: *"Registrier mir die Punkte 1 bis 5 der trajektorien"*): Arme b11-b15 =
+Varianten des Trajektorien-Bootstraps (par.19: TD(lambda) ueber den echten Pfad, plus Gegnerstellungen, Mittel mit Rollout,
+Mischgewichte neu, Verlaesslichkeits-Gewichtung) mit dem Schnellblick-Protokoll par.19.0 (Gegner b02, Offline-Vorfilter,
+2 Seeds a 50 Paare, "spannend" bei >= 55 % oder Block-z >= +1,5, dann volle Breite). Bau erst NACH dem Ende der Ketten
+(Datenschicht wird von Workern und train.py frisch importiert); HERLEITUNG rund 1,9 h je Arm ohne Vollausbau.** **Neu registriert (Nutzer 23:xx: *"Registrier das, da koennen wir uns evtl. Eine Mini suche + netz daraus bauen"*):
+`PREREG_tiling_surprise_probe.md` (OFFEN): Diagnose-Sonde "Tiling-Ueberraschung" = Netzwert nach dem Tiling des Loesers minus
+Netzwert davor, je Runde, auf dem b02-Val-Satz, Referenz root_q und exakte Rundenpunkte; danach ggf. Mini-Suche ueber die
+Top-k Tilings mit Netzbewertung am echten Rundenende (par.4; Abgrenzung zu Variante B par.17.9 und zu
+`envelope_tiling_value_w` vorab noetig). Kein Arm, Bau nach den Ketten.** **ARM-KETTE FERTIG 2026-10-07 07:38 (24,9 h). b08 (EMA): Einzelstand-Pfad bitgleich b02, EMA je Epoche offline besser (Minimum
+0,18930 in Epoche 5), aber gespeicherter ENDSTAND 0,18967 schlechter als `_brierbest`: Vorab-Test -0,00025 [-0,00045; -0,00007],
+kein Tor 1 (par.16a; Folgevorschlag b08b = EMA am eigenen Minimum, Nutzer-Entscheid). ZUSAMMENFASSUNG der Netzarme in
+`PREREG_v35_window.md` par.13-16: fuenf tragen gegen v34-b01 (Fenster-Effekt), b07 nicht, b08 ohne Gewinn. LAEUFT seit 07:38:
+`tools/night_v35_b09_b10_chain.sh` (Tab c6): b10 (Manifest 1.200 Traeger, Merge Schluessel `c577aaeafe38`): **Training 1.714 s, Val-Brier-Minimum 0,18877 (bestes der
+Reihe), offline gegen b02 auf der b02-Maske Brier +0,00066 [+0,00030; +0,00104] und Policy-CE +0,030 [+0,028; +0,033], beide CI ueber 0
+(par.18a): Policy-Kopf WAR stichprobenbegrenzt.** Tor 1 Seed 1: 185:115 = 61,7 % nach 150 Paaren (SPRT-Stopp), Block-z +4,30, Punkte +4,3 je Partie, Spalten 1,03 gegen 0,98; Seed 2 235:155 = 60,3 % (SPRT-Stopp nach 195 Paaren), Block-z +4,44; **GEPOOLT 420:270 = 60,9 %, Block-z +6,22: b10 TRAEGT, staerkste
+Kante der Reihe; Lesart (a): Policy-Volumen traegt (par.18b).** b09 (frische Sockel-Partien) laeuft seit 11:25 ohne Gegenwort des Nutzers
+(Erzeugung rund 1 Datei/min, 400 Dateien bis gegen 18:10, danach Bloecke, Training, Tor 1); jederzeit per Tab c6 abbrechbar, dann b09 (Erzeugung 4.000 @400, rund 7,7 h). Waehrend der Laeufe kein Commit; Registrierungen
+seit `2a8d5d35` warten uncommittet.** **Zuvor: `tools/night_v35_arms_chain.sh` (Tab c4; b03 -> b05 -> b06 -> b04 -> b07 -> b08, je Bloecke/Merge,
+Training, Manifest-Diff, Tor 1 gegen v34-b01 mit Stufenregel; HERLEITUNG rund 14,5 h ohne zweite Seeds, Ende gegen 21:00) und
+daneben wartend `tools/night_v35_b09_b10_chain.sh` (Reihenfolge auf Nutzer-Entscheid 06:5x getauscht: b10 VOR b09; Tab neu
+gestartet; startet selbst, sobald die Arm-Kette aus der Prozessliste ist; b10 rund 2,2 h, b09 rund 9,4 h). Keine Promotion
+von b02 (Nutzer 06:5x: *"Promotion machen wir noch keine"*). Tree Reuse: Runde-5-Schalter `tree_reuse_round5` mit Default 1 (Nutzer 06:5x:
+*"Mach den runde 5 schalter mit default an"*; `PREREG_tree_reuse.md` par.5.4 entschieden); EINGETRAGEN 07:1x im unkompilierten Entwurf (`net_mcts.rs:8255`
+Ausschluss nur bei Schalter 0; Env-Default `MOSAIC_TREE_REUSE_ROUND5`, Knopfregister, `spec_env.py`, Manifest, Beispiel; docs/knobs.md 153
+Knoepfe), Konventions- und Knopf-Doku-Check gruen, nichts kompiliert. Waehrend der Laeufe: keine Builds, keine Sonden, kein Commit. COMMITTET 06:3x: fuenf
+Commits `fda75a63` (Bootstrap-Knoepfe), `f2aca6c5` (EMA), `a6825807` (Tree-Reuse-Entwurf, zwei Such-Preregs), `428b6e7e`
+(Ketten), `2a8d5d35` (b02-Ergebnis, Arme, README); 9 vor origin/main, NICHT gepusht.**
+
+**NACH DER b02-KETTE (01:3x bis 06:3x):** Python-Suite (unittest discover, 513 Tests) nach Korrektur der EMA-Defaults in
 train.py (Literale statt Konstanten im argparse-Block und in der train()-Signatur, Waechter-assert gegen die Konstanten;
 Grund: `tools/tests/source_parser.py` baut den Parser per exec nach) und Nachzug des Tests "vier atomare Checkpoints"
 (`_avg`); `generate_knob_docs.py --check` gruen (152 Knoepfe); Konventions-Check gruen nach Umbenennung `vorzug` ->

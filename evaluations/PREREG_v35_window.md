@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: b01 nicht entschieden (52,0 %, z +0,92, par.11c), Wertkopf lernt @100 nichts (par.11b). **b02 (alles @400, Modus 2) TRAEGT Tor 1: drei Seeds gepoolt 596:454 = 56,8 %, Block-z +4,07 (par.12e)**; Wertkopf lernt @400 messbar (dBrier +0,0011 [+0,0004; +0,0017], par.12f). Promotion = Nutzer-Entscheid. Arme b03-b10 registriert (par.13-18). -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07 (par.12e), b03 58,6 %, b05 56,4 %, b06 56,9 % (par.13), b04 56,2 % (par.14c), **b10 (Schwarm als Policy-Traeger) 60,9 % z +6,22, staerkste Kante, Policy-Volumen traegt (par.18a/b)**; b07 traegt NICHT (par.15b); b08 EMA ohne Gewinn (par.16a). Keine Promotion (Nutzer). b09 laeuft; b11-b15 registriert (par.19). -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -745,6 +745,152 @@ Kosten HERLEITUNG: 3 x 56 min Bau+Training, Seed 1 je Arm rund 1,5 h exklusiv (4
 nach Epoche 2-3 (Memorisierung); ein tieferer Bootstrap liegt naeher am Ausgang und koennte dieselbe Erosion zeigen.
 Die Brier-Auswahl faengt das ab; die Epochenkurve je Arm wird berichtet (Peak-Epoche, Erosion bis Epoche 12).
 
+### par.13a ERGEBNIS v35-b03 (k = 1): TRAINING UND TOR 1 SEED 1 (2026-10-06 06:45-08:46, `tools/night_v35_arms_chain.sh`, exklusiv)
+
+**Bau und Training:** Bloecke mit Marker `bootstraptraj_h1_v1` fuer alle 1.200 Dateien plus Merge in rund 20 min
+(06:45-07:05), Split byte-gleich b02 (Kette diffte Train- und Val-Liste), Training `v35-b03` 1.688,6 s
+(`manifest_train_v35-b03_20261006_070121.json`, `mosaic_env` MOSAIC_BOOTSTRAP_SOURCE=trajectory, HORIZON_ROUNDS=1,
+Traeger v35_b02), Manifest-Diff gegen b02 ohne unerwartete Abweichung (Kette lief weiter). Val-Brier auf denselben 120
+Val-Dateien wie b02: Epoche 1 0,19013, Minimum **0,18965 in Epoche 5**, Epoche 12 0,18994 (b02: 0,18942 in Epoche 5);
+`policy_val_loss` Minimum Epoche 2 (0,4784, b02 0,4785), danach steigend wie in allen Armen. Der `value_val_loss`
+(0,5442 gegen 0,5458) ist NICHT vergleichbar, weil b03 ein anderes Ziel mischt. Offline liegt b03 damit beim Brier
+0,0002 UNTER b02 (schlechter), ohne gepaartes CI; die gepaarte Messung (`checkpoint_val_eval.py`, b02 gegen b03) folgt
+nach der Arm-Kette.
+
+**Tor 1 Seed 20261600: v35-b03 159:91 = 63,6 %** nach 125 Paaren (n = 250 Partien), SPRT `ACCEPT_H1` (LLR +7,32,
+Stopp vor dem Deckel), Block-z **+5,28** (25 Bloecke, Mittel 0,636, sd 0,129), gepaarte Differenz +0,54 [+0,30; +0,79],
+McNemar p = 0,00004. Laufzeit 4.436,7 s (17,75 s je Partie, 10 Threads). Tor 2b GRUEN: volle Spalten je Brett 1,080
+gegen 1,016, Punkte 59,13 gegen 55,63, Strafsteine 8,13 gegen 7,65 (n = 250 Bretter je Modell). Artefakt
+`gating_v35-b03_vs_v34-b01_s20261600.json`. Auf demselben Seed 20261600 lag b02 bei 218:182 ueber 200 Paare (par.12c);
+die Zahl 159:91 ist zufaellig dieselbe wie b02 Seed 3 (anderer Seed). Stufe genommen, Seed 20261601 laeuft (seit 08:46).
+
+**Lesung vorab (ohne Verdikt):** ein fruehes SPRT-Ende zaehlt erst nach Replikation; das Verdikt faellt wie bei b02 auf
+dem gepoolten Block-z ueber alle Seeds. Offline (Brier) und Arena zeigen bei b03 nicht in dieselbe Richtung; welche
+Groesse die Staerke traegt, ist genau die Frage von par.13 ("Korpus wirkt, Gewicht nicht" oder umgekehrt).
+
+### par.13b VERDIKT v35-b03 (k = 1): TOR 1 SEED 2 UND GEPOOLT (2026-10-06 08:46-10:46, exklusiv)
+
+**Seed 20261601: v35-b03 222:178 = 55,5 %** (n = 400, 200 Paare, Deckel), Block-z **+2,64** (40 Bloecke, Mittel 0,555,
+sd 0,132), gepaarte Differenz +0,22 [+0,03; +0,41], SPRT `UNDECIDED_CAP_REACHED`, 17,86 s je Partie.
+
+**Gepoolt: 381:269 = 58,6 %** (n = 650 Partien, 325 Paare), **Block-z +5,12** (65 Bloecke, Mittel 0,586, sd 0,136).
+Beide Seeds einzeln ueber +1,96, die Stufenregel (dritter Seed nur bei genau einem) greift nicht; die Kette geht zu b05.
+
+**VERDIKT TOR 1: v35-b03 TRAEGT** (Kriterium par.13 wie par.12: Block-z >= +1,96 oder gepoolt >= 52,5 % ohne
+Gegenbefund; beides erfuellt). Die sechs Kennzahlen zeigen in beiden Seeds dieselbe Richtung wie bei b02:
+
+| Kennzahl je Brett | b03 Seed 1 / v34-b01 (n = 250) | b03 Seed 2 / v34-b01 (n = 400) |
+| --- | --- | --- |
+| Volle Spalten | 1,080 / 1,016 | 1,097 / 1,010 |
+| Spalten >= 4 / >= 3 | 2,45 / 3,38 gegen 2,29 / 3,12 | 2,45 / 3,39 gegen 2,28 / 3,12 |
+| Volle Zeilen / Zeilenfuellung | 0,10 / 18,30 gegen 0,04 / 17,48 | 0,10 / 18,38 gegen 0,06 / 17,39 |
+| Strafsteine | 8,13 / 7,65 | 7,90 / 7,04 |
+| Eigene Punkte | 59,13 / 55,63 | 58,47 / 56,62 |
+| Plattenpunkte gesamt | 8,68 / 7,76 | 8,81 / 7,86 |
+| Vertikale Reihen (nur aktiv) | 8,05 / 7,42 | 8,00 / 7,29 |
+| Mehrfarbige Felder | 4,87 / 4,15 | 4,35 / 3,86 |
+| Spezialfelder | -9,55 / -9,73 | -9,24 / -9,86 |
+
+**Einordnung gegen b02 (deskriptiv, gleicher Gegner, gleiche Seeds, gleiche Spec):** b02 kam auf denselben zwei Seeds
+auf 437:363 = 54,6 % (z +2,50, 80 Bloecke), b03 auf 381:269 = 58,6 % (z +5,12, 65 Bloecke; Seed 1 frueh gestoppt).
+Vier Punkte Unterschied bei n = 800 gegen 650 liegen in der Groessenordnung der Seed-Streuung (CLAUDE.md: 5,75 Punkte bei
+n = 400 fuer identische Konfiguration); ob b03 staerker als b02 ist, sagt nur eine direkte Kante b03 gegen b02, die hier
+nicht vorregistriert ist (Nutzer-Entscheid, s. par.13 Lesart). Offline lag b03 beim Brier 0,0002 unter b02 (par.13a), die
+gepaarte Offline-Messung folgt nach der Arm-Kette. Einziger Unterschied zu b02 ist die Bootstrap-Quelle im Wertziel
+(echter Suchwert eine Runde spaeter statt simulierter Rollout zwei Runden spaeter), bei bitgleichem Fenster, Val-Satz,
+Seed und Rezept.
+
+**Laufzeiten:** Bloecke und Merge rund 20 min, Training 1.688,6 s, Tor 1 4.437 + 7.142 s (gerundet; 17,7 bis 17,9 s je
+Partie, 10 Threads); Arm gesamt rund 4,0 h.
+
+### par.13c ERGEBNIS v35-b05 (k = 2): TRAINING UND TOR 1 SEED 1 (2026-10-06 10:46-13:27, Arm-Kette, exklusiv)
+
+**Training** `v35-b05` 1.674,7 s (`manifest_train_v35-b05_20261006_105829.json`, `mosaic_env` BOOTSTRAP_SOURCE=trajectory,
+HORIZON_ROUNDS=2), Val-Brier auf den 120 b02-Val-Dateien: Minimum **0,18970 in Epoche 2** (b02 0,18942, b03 0,18965),
+Epoche 12 0,19030; Brier-Minimum faellt mit der kombinierten Auswahl zusammen, darum kein eigenes `_brierbest`, gegatet
+wird `alphazero_v35-b05_best.onnx` (Epoche 2). `policy_val_loss` Minimum Epoche 2 (0,4784) wie in allen Armen.
+
+**Tor 1 Seed 20261600: v35-b05 224:176 = 56,0 %** (n = 400, 200 Paare, Deckel), Block-z **+2,53** (40 Bloecke, Mittel
+0,560, sd 0,150), gepaarte Differenz +0,24 [+0,05; +0,43], SPRT `UNDECIDED_CAP_REACHED`, 17,84 s je Partie. Tor 2b:
+volle Spalten je Brett 1,050 gegen 1,005, Punkte 58,65 gegen 55,46, Strafsteine 7,93 gegen 7,99. Stufe genommen,
+Seed 20261601 laeuft. Zum Vergleich auf demselben Seed: b02 218:182 (z +1,51), b03 159:91 nach 125 Paaren (z +5,28).
+
+### par.13d VERDIKT v35-b05 (k = 2): TOR 1 SEED 2 UND GEPOOLT (2026-10-06 13:27-15:28, exklusiv)
+
+**Seed 20261601: v35-b05 227:173 = 56,75 %** (n = 400, Deckel), Block-z **+2,93** (40 Bloecke, Mittel 0,5675, sd 0,146),
+gepaarte Differenz +0,27 [+0,08; +0,46], SPRT `UNDECIDED_CAP_REACHED`, 7.275 s (18,19 s je Partie).
+
+**Gepoolt: 451:349 = 56,4 %** (n = 800, 400 Paare), **Block-z +3,88** (80 Bloecke, Mittel 0,564, sd 0,147). Beide Seeds
+einzeln ueber +1,96, kein dritter Seed. **VERDIKT TOR 1: v35-b05 TRAEGT** (Kriterium par.13 wie par.12).
+
+| Kennzahl je Brett | Seed 1: b05 / v34-b01 (n = 400) | Seed 2: b05 / v34-b01 (n = 400) |
+| --- | --- | --- |
+| Volle Spalten | 1,050 / 1,005 | 1,048 / 1,010 |
+| Spalten >= 4 / >= 3 | 2,43 / 3,32 gegen 2,32 / 3,20 | 2,41 / 3,38 gegen 2,25 / 3,14 |
+| Volle Zeilen / Zeilenfuellung | 0,10 / 18,22 gegen 0,05 / 17,53 | 0,08 / 18,18 gegen 0,06 / 17,57 |
+| Strafsteine | 7,93 / 7,99 | 7,92 / 7,72 |
+| Eigene Punkte | 58,65 / 55,46 | 58,04 / 55,75 |
+| Plattenpunkte gesamt | 9,10 / 7,73 | 8,91 / 7,91 |
+| Vertikale / Mehrfarbige / Spezialfelder | 8,18 / 4,84 / -9,45 gegen 7,67 / 3,29 / -10,01 | 7,71 / 4,34 / -9,38 gegen 6,96 / 4,17 / -9,97 |
+
+Gleiche Richtung wie b02 und b03 in allen Kennzahlen; der Spaltenvorsprung ist kleiner (+0,04 je Brett gegen +0,07 bis
++0,11 bei b03), die Strafsteine liegen gleichauf statt darueber. Reihe auf den Seeds 20261600/01 gegen v34-b01, gepoolt:
+b02 54,6 % (z +2,50), b03 58,6 % (z +5,12, Seed 1 frueh gestoppt), b05 56,4 % (z +3,88); Unterschiede innerhalb der
+Seed-Streuung, keine direkten Kanten zwischen den Armen (Nutzer-Entscheid). Arm gesamt rund 4,7 h.
+
+### par.13e ERGEBNIS v35-b06 (k = 3): TRAINING (2026-10-06 15:28-16:10, Arm-Kette); Tor 1 laeuft
+
+**Training** `v35-b06` 1.689,5 s (`manifest_train_v35-b06_20261006_154232.json`, `mosaic_env` BOOTSTRAP_SOURCE=trajectory,
+HORIZON_ROUNDS=3), Val-Brier auf den 120 b02-Val-Dateien: Minimum **0,18965 in Epoche 2**, Epoche 12 0,19067; kein
+eigenes `_brierbest` (Minimum = Auswahl), gegatet `alphazero_v35-b06_best.onnx`. Brier-Minima der Bootstrap-Reihe auf
+demselben Val-Satz: b02 0,18942 (Epoche 5), b03 0,18965 (5), b05 0,18970 (2), b06 0,18965 (2); Spanne 0,0003, ohne
+gepaartes CI nicht unterscheidbar. Tor 1 Seed 20261600 seit 16:10.
+
+**Tor 1 Seed 20261600: v35-b06 231:169 = 57,75 %** (n = 400, Deckel), Block-z **+3,05** (40 Bloecke, Mittel 0,5775,
+sd 0,161), gepaarte Differenz +0,31 [+0,11; +0,51], SPRT `UNDECIDED_CAP_REACHED`, 17,76 s je Partie. Tor 2b: volle
+Spalten je Brett 1,062 gegen 0,990, Punkte 58,11 gegen 55,39, Strafsteine 7,97 gegen 8,32 (b06 WENIGER, erster Arm mit
+weniger Strafsteinen als der Champion), Plattenpunkte 8,88 gegen 7,68 (Spezialfelder -9,04 gegen -10,36, Eckplatten
+9,70 gegen 8,87). Stufe genommen, Seed 20261601 laeuft seit 18:11.
+
+### par.13f VERDIKT v35-b06 (k = 3): TOR 1 SEED 2 UND GEPOOLT (2026-10-06 18:11-20:10, exklusiv)
+
+**Seed 20261601: v35-b06 224:176 = 56,0 %** (n = 400, Deckel), Block-z **+2,35** (40 Bloecke, Mittel 0,560, sd 0,161),
+gepaarte Differenz +0,24 [+0,04; +0,44], SPRT `UNDECIDED_CAP_REACHED`, 7.096 s (17,74 s je Partie).
+
+**Gepoolt: 455:345 = 56,9 %** (n = 800, 400 Paare), **Block-z +3,83** (80 Bloecke, Mittel 0,569, sd 0,160). Beide Seeds
+einzeln ueber +1,96, kein dritter Seed. **VERDIKT TOR 1: v35-b06 TRAEGT** (Kriterium par.13 wie par.12).
+
+| Kennzahl je Brett | Seed 1: b06 / v34-b01 (n = 400) | Seed 2: b06 / v34-b01 (n = 400) |
+| --- | --- | --- |
+| Volle Spalten | 1,062 / 0,990 | 1,060 / 0,983 |
+| Spalten >= 4 / >= 3 | 2,35 / 3,35 gegen 2,27 / 3,21 | 2,35 / 3,37 gegen 2,28 / 3,15 |
+| Volle Zeilen / Zeilenfuellung | 0,12 / 18,20 gegen 0,08 / 17,67 | 0,12 / 18,22 gegen 0,08 / 17,55 |
+| Strafsteine | 7,97 / 8,32 | 8,03 / 8,03 |
+| Eigene Punkte | 58,11 / 55,39 | 58,78 / 55,98 |
+| Plattenpunkte gesamt | 8,88 / 7,68 | 9,02 / 7,67 |
+| Spezialfelder / Eckplatten / Mehrfarbige | -9,04 / 9,70 / 4,29 gegen -10,36 / 8,87 / 3,90 | -8,96 / 9,64 / 4,32 gegen -10,37 / 9,42 / 3,49 |
+
+Eigenart von b06 gegenueber b02, b03 und b05: Strafsteine nicht ueber dem Champion (Seed 1 darunter, Seed 2 gleich) und
+der kleinste Spezialfeld-Abzug der Reihe (-9,0 gegen -10,4); der Spaltenvorsprung (+0,07 je Brett) liegt zwischen b05 und
+b03.
+
+**Bootstrap-Reihe par.13 komplett, alle drei Tiefen tragen gegen v34-b01, gepoolt ueber die Seeds 20261600/01:**
+
+| Arm | k | Gepoolt | Block-z | Val-Brier-Minimum |
+| --- | --- | --- | --- | --- |
+| b02 (Referenz, simulierter Rollout, Horizont 2) | - | 437:363 = 54,6 % | +2,50 | 0,18942 |
+| b03 | 1 | 381:269 = 58,6 % (Seed 1 frueh gestoppt) | +5,12 | 0,18965 |
+| b05 | 2 | 451:349 = 56,4 % | +3,88 | 0,18970 |
+| b06 | 3 | 455:345 = 56,9 % | +3,83 | 0,18965 |
+
+Lesung zur Frage von par.13 (traegt die Bootstrap-Quelle etwas ueber b02 hinaus?): alle drei liegen deskriptiv ueber
+b02, mit 2 bis 4 Punkten Abstand bei n = 650 bis 800 je Arm, also innerhalb der Seed-Streuung (CLAUDE.md: 5,75 Punkte bei
+n = 400); keine Monotonie in k (k = 1 am hoechsten, k = 2 und 3 gleich). Offline unterscheiden sich die Brier-Minima
+um hoechstens 0,0003 (b02 am besten). Ein Verdikt "Bootstrap-Quelle traegt" ist damit NICHT belegt, nur "schadet
+nicht"; belegbar waere es allein durch direkte Kanten Arm gegen b02 (Nutzer-Entscheid) oder durch die gepaarte
+Offline-Messung nach der Kette (dort ist die Aufloesung hoch, aber der Brier zeigte bei b03 schon in die andere
+Richtung als die Arena). Arm b06 gesamt rund 4,7 h.
+
 ## par.14 ARM v35-b04: WERTZIEL MIT MARGEN-BOOTSTRAP (NUTZER 2026-10-05 00:3x: *"takte das ebenfalls ein als b04"*; REGISTRIERT VOR Bau-Abnahme und Lauf)
 
 **Anlass:** Nutzer-Vorschlag "Blend mit dem Point Head" (Diskussion 2026-10-04 spaet) und der Koordinator-Satz, ein Blend
@@ -771,6 +917,63 @@ harten Ausgang und dem Suchwert statt Ersatz); Erwartungswert des Koordinators n
 gehoert der Zielform "weiche Marge im Bootstrap-Anteil". Berichtet: Val-Brier, Epochenkurve (Erosion), Platt-B des
 gegateten Netzes gegen b02 (die tanh-Aera war hier der Vorfall).
 
+### par.14a ERGEBNIS v35-b04 (Margen-Bootstrap, b = 20): TRAINING (2026-10-06 20:10-20:51, Arm-Kette); Tor 1 laeuft
+
+**Training** `v35-b04` 1.691,1 s (`manifest_train_v35-b04_20261006_202256.json`, `mosaic_env` BOOTSTRAP_SOURCE=margin,
+MARGIN_SCALE=20), Val-Brier auf den 120 b02-Val-Dateien: Epoche 1 0,19068, Minimum **0,19034 in Epoche 4**, Epoche 12
+0,19052; `_brierbest` (Epoche 4) liegt getrennt vom `_best` (Epoche 2), gegatet wird `alphazero_v35-b04_brierbest.onnx`.
+Das ist das SCHLECHTESTE Brier-Minimum der Reihe (b02 0,18942, b03/b06 0,18965, b05 0,18970; Abstand zu b02 0,0009,
+groesser als die Spanne der Trajektorien-Arme) und der einzige Arm, dessen Brier in Epoche 1 ueber dem Warmstart-Niveau
+der anderen Arme startet (0,19068 gegen 0,1897 bis 0,1901). Lesung vorab: die realisierte Endmarge als Bootstrap-Quelle
+mischt ein Ziel ein, das vom Ausgang abhaengt und damit mehr Rauschen traegt als ein Suchwert; der Val-Brier rechnet
+gegen den reinen Ausgang und sieht das. `policy_val_loss` wie in allen Armen (Minimum Epoche 2). Tor 1 Seed 20261600
+seit 20:51.
+
+**Tor 1 Seed 20261600: v35-b04 216:184 = 54,0 %** (n = 400, Deckel), Block-z **+1,65** (40 Bloecke, Mittel 0,540, sd
+0,153), gepaarte Differenz +0,16 [-0,04; +0,36], SPRT `UNDECIDED_CAP_REACHED`, 17,55 s je Partie. Tor 2b: volle Spalten
+je Brett 1,060 gegen 1,020, Punkte 58,48 gegen 55,51, Strafsteine 7,70 gegen 7,67, Plattenpunkte 8,48 gegen 7,67. Der
+schwaechste erste Seed der Reihe (b02 +1,51 war aehnlich, b03 +5,28, b05 +2,53, b06 +3,05); Siegquote ueber 52,5 %,
+darum laeuft Seed 20261601 (seit 22:52), Verdikt gepoolt.
+
+### par.14b v35-b04: TOR 1 SEED 2, GEPOOLT, STUFENREGEL (2026-10-06 22:52 bis 2026-10-07 00:52)
+
+**Seed 20261601: v35-b04 236:164 = 59,0 %** (n = 400, Deckel), Block-z **+3,08** (40 Bloecke, Mittel 0,590, sd 0,185),
+gepaarte Differenz +0,36 [+0,17; +0,55], 7.197 s (17,99 s je Partie). Tor 2b: volle Spalten je Brett 1,115 gegen 0,988
+(groesster Spaltenvorsprung der Reihe in einem Seed, +0,13), Punkte 58,80 gegen 54,91, Strafsteine 8,01 gegen 8,18,
+Plattenpunkte 8,91 gegen 7,96 (Vertikale 8,46 gegen 7,25, Mehrfarbige 4,44 gegen 3,48).
+
+**Gepoolt Seed 1 + 2: 452:348 = 56,5 %** (n = 800), **Block-z +3,41** (80 Bloecke, Mittel 0,565, sd 0,171). Genau EIN
+Seed einzeln ueber +1,96 (Seed 1 +1,65, Seed 2 +3,08), darum Stufenregel: Seed 20261602 laeuft (seit 00:52), Verdikt
+auf dem gepoolten z ueber drei Seeds. Die beiden Seeds liegen 5 Punkte auseinander (54,0 gegen 59,0 %), die groesste
+Seed-Spreizung der Reihe; genau die Streuung, die CLAUDE.md fuer n = 400 nennt (5,75 Punkte).
+
+Lesung vorab: faellt Seed 3 um 50 %, bleibt der gepoolte z bei rund +2,8 (HERLEITUNG wie par.12d) und b04 traegt gegen
+v34-b01 trotz des schlechtesten Val-Briers der Reihe; die Zuordnung "Margen-Bootstrap traegt" ist damit NICHT belegt
+(Fenster-Effekt, par.14a-Lesung, Nutzer 2026-10-06), und offline ist die Quelle messbar schlechter.
+
+### par.14c VERDIKT v35-b04 (Margen-Bootstrap): SEED 3 UND GEPOOLT (2026-10-07 00:52-02:53)
+
+**Seed 20261602: v35-b04 222:178 = 55,5 %** (n = 400, Deckel), Block-z **+2,05** (40 Bloecke, Mittel 0,555, sd 0,169),
+gepaarte Differenz +0,22 [+0,03; +0,41], 7.107 s (17,77 s je Partie). Tor 2b: volle Spalten 1,093 gegen 0,995, Punkte
+59,72 gegen 56,52, Strafsteine 7,63 gegen 7,58, Plattenpunkte 9,51 gegen 8,44.
+
+**Gepoolt drei Seeds: 674:526 = 56,2 %** (n = 1.200, 600 Paare), **Block-z +3,98** (120 Bloecke, Mittel 0,562, sd
+0,170). **VERDIKT TOR 1: v35-b04 TRAEGT** (Kriterium par.14 wie par.12; Stufenregel erfuellt, Seed 3 ueber der Linie).
+
+| Seed | Ergebnis | Block-z | Spalten je Brett b04 / v34-b01 |
+| --- | --- | --- | --- |
+| 20261600 | 216:184 = 54,0 % | +1,65 | 1,060 / 1,020 |
+| 20261601 | 236:164 = 59,0 % | +3,08 | 1,115 / 0,988 |
+| 20261602 | 222:178 = 55,5 % | +2,05 | 1,093 / 0,995 |
+| gepoolt | 674:526 = 56,2 % | **+3,98** | |
+
+**Einordnung (par.14-Frage: traegt die Margen-Quelle etwas ueber b02 hinaus?):** NEIN, nicht belegbar. b04 liegt gepoolt
+bei 56,2 % gegen b02 56,8 % ueber jeweils drei Seeds auf denselben Seeds (b02 par.12e), bei schlechterem Val-Brier
+(0,19034 gegen 0,18942, par.14a) und derselben Kennzahlen-Richtung. Die Kante gegen v34-b01 ist der Fenster-Effekt
+(Nutzer-Lesung 2026-10-06: "kann es sich auch nur um den 400 Sims effekt handeln"); die Margen-Quelle hat offline
+messbar gekostet und in der Arena nichts Sichtbares gebracht. Lesart (c) von par.14: kein Hebel; b04 wird nicht weiter
+verfolgt (keine direkte Kante gegen b02 noetig). Arm gesamt rund 6,7 h (drei Seeds).
+
 ## par.15 ARM v35-b07: LAMBDA 1,0 (KEIN root_q-ANTEIL IM WERTZIEL) AUF DEM b02-FENSTER (NUTZER 2026-10-05 00:5x: *"registrier das so"*; REGISTRIERT VOR dem Lauf)
 
 **Anlass (an der Quelle verifiziert 2026-10-05):** `PREREG_lambda_wdl_arm.md` (ENTSCHEIDEN 2026-08-08) fand lambda 0,7
@@ -786,6 +989,45 @@ corpus_dataset.py:2164 ff.), also dieselben Bloecke und derselbe Monolith wie b0
 20260965, Warmstart `v34-b01_brierbest`, gegatet das Brier-beste Netz. **Tore:** Stufenform wie par.13 (Seed 20261600,
 Seed 2 nur ueber der Schwelle). Zuordnung vorab: ein Unterschied zu b02 gehoert dem root_q-Anteil. Berichtet: Val-Brier
 gegen b02, Epochenkurve, Platt-B. Reihenfolge: nach b03, b05, b06, b04.
+
+### par.15a ERGEBNIS v35-b07 (lambda 1,0, kein root_q-Anteil): TRAINING (2026-10-07 02:46-03:09, Arm-Kette); Tor 1 laeuft
+
+**Training** `v35-b07` 1.357,9 s (`manifest_train_v35-b07_20261007_024653.json`; derselbe Monolith wie b02
+`.cache_8e8096768cf0.h5`, kein Blockbau, `value_target_lambda` 1.0, keine Bootstrap-Variablen). Val-Brier auf den 120
+b02-Val-Dateien: Epoche 1 0,18966, Minimum **0,18946 in Epoche 2**, Epoche 12 0,19027; kein eigenes `_brierbest`,
+gegatet `alphazero_v35-b07_best.onnx`. Gegen b02 (0,18942, Epoche 5) praktisch gleich (0,00004), also: der
+root_q-Anteil von 30 % im Wertziel aendert den Val-Brier des Warmstart-Trainings nicht messbar; der `value_val_loss`
+(0,5477 gegen 0,5458) ist wegen des anderen Ziels nicht vergleichbar. `policy_val_loss` wie ueberall (Minimum Epoche 2).
+Tor 1 Seed 20261600 seit 03:09.
+
+**Tor 1 Seed 20261600: v35-b07 216:184 = 54,0 %** (n = 400, Deckel), Block-z **+1,75** (40 Bloecke, Mittel 0,540, sd
+0,145), gepaarte Differenz +0,16 [-0,03; +0,35], SPRT `UNDECIDED_CAP_REACHED`, 17,57 s je Partie. Tor 2b: volle
+Spalten je Brett 1,095 gegen 1,058, Punkte 57,63 gegen 55,77, Strafsteine **8,70 gegen 7,77** (groesster
+Strafstein-Aufschlag der Reihe, +0,93), Plattenpunkte 8,94 gegen 7,84 (Spezialfelder -8,86 gegen -10,56, Vertikale
+7,93 gegen 8,01: einziger Arm ohne Vorsprung bei den Vertikalen). Siegquote ueber 52,5 %, Block-z unter 1,96: Seed
+20261601 laeuft (seit 05:06), Verdikt gepoolt mit Stufenregel. Gleiche Zahl wie b04 Seed 1 (216:184) auf demselben Seed.
+
+### par.15b VERDIKT v35-b07 (lambda 1,0): TOR 1 SEED 2 UND GEPOOLT (2026-10-07 05:06-07:07)
+
+**Seed 20261601: v35-b07 202:198 = 50,5 %** (n = 400, Deckel), Block-z **+0,18** (40 Bloecke, Mittel 0,505, sd 0,174),
+gepaarte Differenz +0,02 [-0,18; +0,22], 7.095 s (17,74 s je Partie); Verlauf: bis Paar 135 hinten (LLR -6,38 nahe der
+unteren Schranke), danach aufgeholt. Tor 2b: volle Spalten 1,100 gegen 1,095 (gleich), Punkte 58,31 gegen 57,60,
+Strafsteine 8,10 gegen 8,02, Plattenpunkte 8,57 gegen 8,74 (einziger Seed der Reihe mit WENIGER Plattenpunkten als der
+Champion).
+
+**Gepoolt: 418:382 = 52,25 %** (n = 800), **Block-z +1,26** (80 Bloecke, Mittel 0,5225, sd 0,160). Kein Seed einzeln
+ueber +1,96, gepoolt unter 52,5 % und unter +1,96: **VERDIKT TOR 1: v35-b07 TRAEGT NICHT** (Kriterium par.15 wie par.12;
+Stufenregel greift nicht). Erster Arm der Reihe ohne Kante gegen v34-b01.
+
+**Lesung (par.15-Frage: braucht das Wertziel den root_q-Anteil?):** JA, nach dieser Messung. b07 unterscheidet sich von
+b02 (56,8 %, drei Seeds; auf denselben zwei Seeds 54,6 %, z +2,50) NUR darin, dass der 30-%-Anteil des Suchwerts der
+aktuellen Stellung aus dem Wertziel entfaellt (lambda 1,0 statt 0,7), bei identischem Monolithen, Val-Satz, Seed und
+Rezept; offline war der Val-Brier gleich (0,18946 gegen 0,18942, par.15a). Ohne den Suchwert-Anteil faellt die Kante
+gegen den Champion von z +2,50 auf +1,26 auf denselben Seeds. Das ist konsistent mit dem WDL-Aera-Befund (lambda 0,7 im
+Rezept seit v24-b02, `PREREG_lambda_wdl_arm.md`) und sagt zugleich: der Brier auf dem Val-Satz sieht diesen Unterschied
+nicht, die Arena schon. Vorsicht: 4 Punkte auf n = 800 liegen an der Grenze der Seed-Streuung; die Richtung passt aber
+zu Rezept und Vorgeschichte, und b07 ist der einzige Arm mit einem Seed um 50 %. b07 wird nicht weiterverfolgt; lambda
+0,7 bleibt. Arm gesamt rund 4,4 h.
 
 ## par.16 ARM v35-b08: GEWICHTSMITTELUNG DER CHECKPOINTS (EMA/SWA, Research E5) (NUTZER 2026-10-05 01:0x: *"die anderen 3 kandidaten kannst auch eintakten als eigene arme"*; REGISTRIERT VOR Bau und Lauf)
 
@@ -810,6 +1052,63 @@ plus EMA-Overhead, Vorab-Test 1 min, Tor 1 Seed 1 rund 1,5 h.
 **Rahmen (Nutzer 2026-10-05 01:1x: *"entweder ist dann was dabei, oder auch nicht. danach kann ich gut mit dem
 projektabschluss leben."*):** b02 bis b08 und die drei Such-Preregs sind die abschliessende Reihe von v35; danach
 Promotion, falls eine Kante faellt, sonst Abschluss mit v34-b01 als Tessa.
+
+### par.16a ERGEBNIS v35-b08 (EMA decay 0,75 ab Epoche 2): TRAINING UND VORAB-TEST, KEIN TOR 1 (2026-10-07 07:05-07:38, Arm-Kette)
+
+**Training** `v35-b08` 1.461,0 s (`manifest_train_v35-b08_20261007_070511.json`, `weight_average` ema / 0,75 / ab
+Epoche 2, b02-Monolith, Seed 20260965). **Der Einzelstand-Pfad ist bitgleich b02:** die Val-Brier-Kurve der Epochen ist
+Wert fuer Wert dieselbe wie bei b02 (0,18973 / 0,18943 / 0,18948 / 0,18943 / 0,18942 / ...; Minimum 0,18942 in Epoche 5),
+also hat die Zusatz-Validierung unter `preserved_rng` den Trainingspfad nicht verschoben (Abnahme des Knopfs, par.16).
+
+**Gemittelter Stand je Epoche** (`avg_value_val_brier`, BN-Statistik gemittelt, nicht neu geschaetzt):
+
+| Epoche | Einzelstand Brier | EMA Brier | Einzelstand Policy-Val | EMA Policy-Val |
+| --- | --- | --- | --- | --- |
+| 2 | 0,18943 | 0,18943 | 0,4785 | 0,4785 |
+| 3 | 0,18948 | 0,18940 | 0,4794 | 0,4778 |
+| 4 | 0,18943 | 0,18934 | 0,4819 | 0,4778 |
+| 5 | 0,18942 | **0,18930** | 0,4835 | 0,4781 |
+| 8 | 0,18988 | 0,18945 | 0,4904 | 0,4820 |
+| 12 | 0,18980 | 0,18966 | 0,4923 | 0,4880 |
+
+Das Mittel liegt ab Epoche 3 in JEDER Epoche unter dem Einzelstand derselben Epoche, beim Brier um bis zu 0,0004
+(Epoche 8) und beim Policy-Val um bis zu 0,0084; sein Minimum 0,18930 (Epoche 5) ist um 0,00012 besser als das beste
+Einzel-Brier der ganzen Reihe. Gespeichert wurde aber per Bauform der ENDSTAND des Mittels nach Epoche 12 (11 Epochen
+gemittelt, BN neu geschaetzt ueber 7.957 Batches): Brier 0,18967, Policy-Val 0,4882.
+
+**Vorab-Test par.16** (`checkpoint_val_eval_v35-b08_avg_vs_brierbest.json`, Referenz `_brierbest` = Epoche 5, gepaart ueber
+120 Val-Dateien): Brier Referenz minus `_avg` **-0,00025 [-0,00045; -0,00007]**, Policy-CE gepoolt -0,0119 [-0,0131;
+-0,0107]; das CI liegt ganz UNTER 0, der gemittelte Endstand ist schlechter als der Brier-beste Einzelstand. Regel par.16:
+**kein Tor 1**, Arm beendet (Kette: "Vorab-Test ohne Gewinn", 0,42 h).
+
+**Lesung:** die Mittelung wirkt (sie glaettet die Erosion ab Epoche 5 sichtbar), aber die Bauform nimmt den falschen
+Stand: der Endstand mittelt die ueberangepassten spaeten Epochen mit hinein. Der gemittelte Stand haette wie der
+Einzelstand nach SEINEM eigenen Brier-Minimum ausgewaehlt werden muessen (Epoche 5, 0,18930). Folgearm, NICHT gebaut,
+Nutzer-Entscheid: **b08b = EMA mit Auswahl des gemittelten Stands am eigenen Brier-Minimum** (speichern des Mittels je
+Epoche oder Mitfuehren des besten Mittels; BN-Neuschaetzung dann fuer diesen Stand), Vorab-Test wie par.16 gegen
+`_brierbest`; Erwartung aus der Tabelle: +0,00012 Brier, +0,005 Policy-Val, beides innerhalb der Val-Aufloesung
+(CI-Breite rund 0,0004 bei gepaarter Messung) und damit ein Fall fuer den Schnellblick par.19.0 gegen b02, nicht fuer
+eine volle Arena.
+
+### par.13-16 ZUSAMMENFASSUNG DER NETZARME (Arm-Kette 2026-10-06 06:45 bis 2026-10-07 07:38, 24,9 h)
+
+| Arm | Aenderung gegen b02 | Val-Brier-Minimum (Epoche) | Tor 1 gegen v34-b01, gepoolt | Block-z | Verdikt |
+| --- | --- | --- | --- | --- | --- |
+| b02 | Referenz: Fenster @400, Modus 2 | 0,18942 (5) | 596:454 = 56,8 % (3 Seeds) | +4,07 | traegt (par.12e) |
+| b03 | Trajektorien-Bootstrap k = 1 | 0,18965 (5) | 381:269 = 58,6 % (Seed 1 SPRT-Stopp) | +5,12 | traegt (par.13b) |
+| b05 | k = 2 | 0,18970 (2) | 451:349 = 56,4 % | +3,88 | traegt (par.13d) |
+| b06 | k = 3 | 0,18965 (2) | 455:345 = 56,9 % | +3,83 | traegt (par.13f) |
+| b04 | Margen-Bootstrap b = 20 | 0,19034 (4) | 674:526 = 56,2 % (3 Seeds) | +3,98 | traegt, kein Hebel (par.14c) |
+| b07 | lambda 1,0 (kein root_q) | 0,18946 (2) | 418:382 = 52,25 % | +1,26 | traegt NICHT (par.15b) |
+| b08 | EMA ueber Epochen | 0,18942 (5); EMA-Endstand 0,18967 | kein Tor 1 (Vorab-Test negativ) | - | kein Gewinn so gebaut (par.16a) |
+
+Laufzeiten je Arm (Kettenausgabe): b03 rund 4,0 h, b05 4,7 h, b06 4,7 h, b04 6,65 h (drei Seeds), b07 4,3 h, b08 0,42 h;
+Bloecke plus Merge je Arm rund 20 min, Training 1.358 bis 1.691 s, Tor-1-Seed 7.100 bis 7.300 s (17,5 bis 18,2 s je
+Partie, 10 Threads). Was die Reihe sagt: (1) der Fenster-Effekt @400 traegt in jedem Arm, der ihn hat; (2) die
+Bootstrap-Quelle (Trajektorie, Marge) legt nichts Belegbares darauf, Trajektorie schadet nicht, Marge kostet Brier;
+(3) der Suchwert-Anteil im Wertziel traegt (b07); (4) die Mittelung der Epochen ist offline sichtbar, aber in der
+gebauten Form nicht nutzbar. Keine direkte Kante zwischen den tragenden Armen gefahren (Nutzer-Entscheid offen; Vorschlag
+Schnellblick par.19.0 gegen b02 als Vorsortierung).
 
 ## par.17 ARM v35-b09: POLICY-VOLUMEN (4.000 POLICY-PARTIEN @400 MEHR AUF DEM b02-FENSTER) (NUTZER 2026-10-05 09:xx: *"registrier den policy-volumen-arm als b09"*; REGISTRIERT VOR Bau und Lauf)
 
@@ -885,9 +1184,9 @@ Policy-Ziel).
 **Kosten (HERLEITUNG aus `docs/measured_runtimes.md`):** Erzeugung 4.000 x 6,92 s = 27.680 s, rund 7,7 h
 exklusiv (Threads 11; ohne Cache-Waechter 6,21 s, rund 6,9 h); Bloecke 400 x 0,79 s rund 5 min; Merge rund 3 min;
 Training rund 2.930 s (b01 2.198 s bei 2,03 M Zustaenden, b09 rund 2,7 M); Tor 1 Seed 1 rund 1,5 h. Zusammen rund
-10,5 h mit einem Seed. **Reihenfolge:** die Erzeugung ist CPU-Last und kann neben keiner Arena laufen; Vorschlag
-des Koordinators: nach der Arm-Kette b03 bis b08, eigene Kette `tools/night_v35_b09_chain.sh` (Erzeugung,
-Bloecke, Manifest, Fenster, Training, Tor 1); der Nutzer kann sie vorziehen.
+10,5 h mit einem Seed. **Reihenfolge:** die Erzeugung ist CPU-Last und kann neben keiner Arena laufen; nach der Arm-Kette
+b03 bis b08 in `tools/night_v35_b09_b10_chain.sh`, dort HINTER b10 (Nutzer 2026-10-06 06:5x: *"tausch b09 mit
+b10"*; Grund par.18: b10 beantwortet Lesart (c) ohne Erzeugung, ein Nullbefund dort macht b09 entbehrlich).
 
 ## par.18 ARM v35-b10: SCHWARM ALS POLICY-TRAEGER (1.200 STATT 400 TRAEGER, KEINE NEUE ERZEUGUNG) (NUTZER 2026-10-05 09:xx: *"koennen wir noch immer machen nach b09. dann sind wir flexibel. registrier das als b10"*; REGISTRIERT VOR Bau und Lauf)
 
@@ -956,6 +1255,158 @@ die Herkunft der Traeger gleichgueltig und b10 der billigere Weg. Konfundiert ge
 **Kosten (HERLEITUNG, `docs/measured_runtimes.md`):** Manifest Sekunden, Merge rund 3 min (165 s bei b01), Training
 rund 37 min (2.198 s bei b01, gleiche Zustandszahl wie b02), Tor 1 Seed 1 rund 1,5 h; zusammen rund 2,2 h mit einem
 Seed, 3,7 h mit zweitem. **Reihenfolge (Nutzer: "nach b09"):** b10 braucht keine Erzeugung und kann als Arm in die
-Arm-Kette (Bauform wie b07: kein Blockbau, eigener Merge unter eigenem Schluessel); registriert hinter b09, der
-Nutzer kann es vorziehen, weil es die Antwort auf par.17 (c) ohne 7,7 h Erzeugung vorwegnimmt: faellt bei b10 kein
+Arm-Kette (Bauform wie b07: kein Blockbau, eigener Merge unter eigenem Schluessel); zunaechst hinter b09 registriert, am
+2026-10-06 06:5x vom Nutzer VORGEZOGEN (*"tausch b09 mit b10"*), weil es die Antwort auf par.17 (c) ohne 7,7 h Erzeugung vorwegnimmt: faellt bei b10 kein
 CE-Gewinn an, ist der Policy-Kopf nicht stichprobenbegrenzt und b09 entbehrlich.
+
+### par.18a ERGEBNIS v35-b10 (Schwarm als Policy-Traeger): TRAINING UND OFFLINE (2026-10-07 07:38-08:11, `tools/night_v35_b09_b10_chain.sh`); Tor 1 laeuft
+
+**Bau:** Traeger-Manifest `policy_carrier_manifest_v35_b10.json` mit allen 1.200 Fenster-Dateien, Split byte-gleich b02
+(Kette diffte Val- UND Train-Liste), Merge unter neuem Schluessel `c577aaeafe38` (b02: `8e8096768cf0`; Traegermenge im
+Schluessel), kein Blockbau. **Training** `v35-b10` 1.714,1 s (`manifest_train_v35-b10_20261007_073340.json`), Warmstart
+`v34-b01_brierbest`, Seed 20260965, Rezept byte-gleich b02; Manifest-Diff ohne unerwartete Abweichung (Kette lief weiter).
+
+**Val-Brier auf den 120 b02-Val-Dateien** (vergleichbar, der Brier haengt nicht an der Traegermaske): Epoche 1 0,18906,
+Minimum **0,18877 in Epoche 3**, Epoche 12 0,18938; `_brierbest` (Epoche 3) getrennt vom `_best`, gegatet wird
+`alphazero_v35-b10_brierbest.onnx`. Das ist das beste Brier-Minimum der Reihe (b02 0,18942, b03/b06 0,18965, b05 0,18970,
+b07 0,18946, b04 0,19034, b08-EMA 0,18930), obwohl b10 am Wertziel nichts aendert. Der `policy_val_loss` des Manifests
+(1,19) ist NICHT mit b02 vergleichbar (Policy-Gewicht auf 120 statt 45 Val-Dateien, par.18).
+
+**Offline gegen b02 auf der b02-Traegermaske** (`checkpoint_val_eval_v35-b10_vs_b02.json`, Referenz `v35-b02_brierbest`,
+`--train-manifest` b02, Policy-CE auf den 45 Traeger-Val-Dateien, Brier auf allen 120, gepaart, Block-Bootstrap):
+
+| Groesse | b02 minus b10 [CI95] | Lesung |
+| --- | --- | --- |
+| Val-Brier | **+0,00066 [+0,00030; +0,00104]** | b10 besser, CI ganz ueber 0 |
+| Policy-CE gepoolt | **+0,0301 [+0,0278; +0,0326]** | b10 besser, CI ganz ueber 0 |
+
+Zum Massstab: b02 gegen den Warmstart war Brier +0,00107 und Policy-CE +0,158 (par.12f); b10 legt auf den ganzen
+Fenster-Effekt beim Brier rund 60 % und bei der Policy-CE rund 20 % obendrauf. **Die Erwartung von par.18 ("stichproben-
+begrenzter Policy-Kopf -> CE-Gewinn mit CI ueber 0") ist eingetreten; Lesart (c) von par.17 (nicht stichprobenbegrenzt)
+entfaellt.** Dazu ein nicht vorhergesagter Nebenbefund: der Wertkopf wird besser, ohne dass sein Ziel sich aendert; die
+naheliegende Erklaerung ist der gemeinsame Rumpf, der von den zusaetzlichen Policy-Zielen auf 800 Schwarm-Dateien
+bessere Merkmale lernt (HERLEITUNG, nicht gemessen). Vorfilter par.19.0 waere bestanden.
+
+**Tor 1 gegen v34-b01** laeuft seit 08:11 (Seed 20261600, dann 20261601, Stufenregel). Offen danach: Lesart (a)
+(CE-Gewinn UND Kante: Volumen traegt, Zuordnung an die Traegermenge) oder (b) (CE-Gewinn ohne Kante: "Korpus wirkt,
+Gewicht nicht"); b09 (frische Sockel-Partien) ist nach Nutzer-Entscheid 2026-10-07 ("Mal schauen ob sich bei B10 was
+tut. Dann entscheidet sich die Erzeugung von b09") erst nach diesem Verdikt zu starten oder zu streichen.
+
+**Tor 1 Seed 20261600: v35-b10 185:115 = 61,7 %** nach 150 Paaren (n = 300), SPRT `ACCEPT_H1` fuer b10 (LLR +7,20,
+Stopp vor dem Deckel), Block-z **+4,30** (30 Bloecke, Mittel 0,617, sd 0,149), gepaarte Differenz +0,47 [+0,25; +0,68],
+5.202 s (17,34 s je Partie). Tor 2b: volle Spalten je Brett 1,027 gegen 0,983, Punkte 58,74 gegen 54,46 (+4,3, groesster
+Punktvorsprung der Reihe in einem Seed), Strafsteine 8,15 gegen 8,15 (gleich), Plattenpunkte 8,23 gegen 7,09
+(Spezialfelder -9,41 gegen -10,32, Vertikale 7,83 gegen 6,94, Mehrfarbige 4,18 gegen 3,56). Zum Vergleich auf demselben
+Seed: b02 218:182 (z +1,51), b03 159:91 nach 125 Paaren (z +5,28), b06 231:169 (z +3,05). Stufe genommen, Seed 20261601
+laeuft seit 09:30; der fruehe Stopp zaehlt nach Replikation bis zum Deckel.
+
+### par.18b VERDIKT v35-b10 (Schwarm als Policy-Traeger): TOR 1 SEED 2 UND GEPOOLT (2026-10-07 09:30-11:25)
+
+**Seed 20261601: v35-b10 235:155 = 60,3 %** nach 195 Paaren (n = 390), SPRT `ACCEPT_H1` fuer b10 (LLR +7,85, Stopp
+einen Block vor dem Deckel), Block-z **+4,44** (39 Bloecke, Mittel 0,603, sd 0,144), gepaarte Differenz +0,41 [+0,22;
++0,60], 6.878 s (17,64 s je Partie). Tor 2b: volle Spalten je Brett 1,036 gegen 1,010, Punkte 59,79 gegen 55,65
+(+4,1), Strafsteine 7,99 gegen 7,76, Plattenpunkte 9,42 gegen 7,91 (Mehrfarbige Felder 5,49 gegen 4,04, Vertikale 8,17
+gegen 7,22, Spezialfelder -9,11 gegen -10,23).
+
+**Gepoolt: 420:270 = 60,9 %** (n = 690 Partien, 345 Paare), **Block-z +6,22** (69 Bloecke, Mittel 0,609, sd 0,145).
+Beide Seeds einzeln ueber +1,96 mit SPRT-Annahme, kein dritter Seed. **VERDIKT TOR 1: v35-b10 TRAEGT**, mit der
+staerksten Kante der Reihe (b02 56,8 % z +4,07 ueber drei Seeds; b03 58,6 % z +5,12; auf denselben zwei Seeds b02 54,6 %
+z +2,50).
+
+| Seed | Ergebnis | Block-z | Punkte b10 / v34-b01 |
+| --- | --- | --- | --- |
+| 20261600 | 185:115 = 61,7 % (SPRT-Stopp nach 150 Paaren) | +4,30 | 58,74 / 54,46 |
+| 20261601 | 235:155 = 60,3 % (SPRT-Stopp nach 195 Paaren) | +4,44 | 59,79 / 55,65 |
+| gepoolt | 420:270 = 60,9 % | **+6,22** | |
+
+**Lesart (a) von par.17/par.18: Policy-Volumen TRAEGT.** Offline CE-Gewinn mit CI ueber 0 (par.18a) UND Kante; einziger
+Unterschied zu b02 ist die Traegermenge (1.200 statt 400 Dateien desselben Fensters, gleicher Val-Satz, gleicher Seed,
+gleiches Rezept). Zuordnung an die Traegermenge; dass die zusaetzlichen Traeger Schwarm-Partien (Abweichung, Ausflug)
+sind, hat nicht geschadet. Nebenbefund: der Punktvorsprung (+4,3 / +4,1 je Partie) ist der groesste der Reihe und kommt
+vor allem ueber die Plattenpunkte (Mehrfarbige Felder, Vertikale, Spezialfelder), der Spaltenvorsprung ist dagegen klein
+(+0,03 bis +0,04 je Brett). Arm gesamt rund 3,9 h (Manifest, Merge, Training 1.714 s, zwei Seeds 5.202 + 6.878 s).
+
+**Folgen:** (1) b09 (frische Sockel-Partien, 800 Traeger) laeuft seit 11:25 wie registriert (Nutzer-Frist ohne Gegenwort);
+seine Frage ist jetzt "Herkunft der Traeger" und "noch mehr Traeger", nicht mehr "ist der Kopf stichprobenbegrenzt".
+(2) Eine direkte Kante b10 gegen b02 waere die saubere Bestaetigung der Zuordnung (Schnellblick par.19.0 reicht als
+Vorsortierung nicht, hier ist die volle Kante angezeigt: Nutzer-Entscheid). (3) Fuer die Varianten par.19 (b11-b15) ist
+b10 die neue Referenz-Traegermenge, sofern der Nutzer das so festlegt; sonst bleibt b02 die Baseline.
+
+## par.19 ARME v35-b11 bis v35-b15: VARIANTEN DES TRAJEKTORIEN-BOOTSTRAPS (NUTZER 2026-10-06 23:xx: *"Registrier mir die Punkte 1 bis 5 der trajektorien. Dann haben wir die rundenuebergaenge schoen abgebildet"*; REGISTRIERT VOR Bau und Lauf)
+
+**Anlass und Diagnose (par.13a-13f):** die drei Trajektorien-Arme tragen gegen v34-b01 (58,6 / 56,4 / 56,9 %), liegen
+aber nur 2 bis 4 Punkte ueber b02 (Seed-Streuung), und ihre Brier-Minima liegen binnen 0,0003 mit b02 vorn. Lesung:
+die Trajektorie bringt Information (echte Fortsetzung, tiefe Suche an einer spaeteren Stellung), kostet aber Rauschen
+(ein einzelner Pfad, eine einzelne Suche); der Rollout glaettete, informierte aber nicht (par.12a). Die Varianten unten
+senken das Rauschen der Trajektorie, ohne ihre Information aufzugeben. Alle sind reine Datenschicht
+(`engine/py/trajectory_bootstrap.py`, `corpus_dataset.py`), Marker in BEIDEN Cache-Schluesseln, Standardweg bitgleich
+(Abnahme wie bei b03), Fenster, Val-Satz, Seed und Rezept byte-gleich b02.
+
+**par.19.0 Mess-Protokoll "Schnellblick" (Nutzer 2026-10-06: *"Ich brauch nicht gleich die volle Arena. Ich wuerd eher
+nur mal schnell reinschauen lassen (2x50 seeds) wenn was spannendes dabei ist laesst sich die volle Breite untersuchen"*):**
+
+1. Gegner ist **b02** (`alphazero_v35-b02_brierbest.onnx`), nicht v34-b01: die Frage ist, ob die Variante etwas AUF das
+   @400-Fenster legt; gegen den Champion steckt der Fenster-Effekt immer mit drin (par.14a-Lesung, Nutzer 2026-10-06).
+2. **Vorfilter offline** (rund 30 s): `tools/checkpoint_val_eval.py --checkpoints <b02 brierbest> <Arm brierbest>
+   --val-list data/window_v35_b02_val.txt --train-manifest <Arm-Manifest>`, gepaart ueber Dateien; liegt das CI der
+   Brier-Differenz (b02 minus Arm) GANZ UNTER 0 (Arm schlechter), entfaellt der Schnellblick, der Arm ist abgeschlossen.
+3. **Schnellblick:** `tools/paired_gating.py` @400 beidseits, Spec `v34-b01_brierbest`, Blockgroesse 5, feste Laenge
+   **2 Seeds a 50 Paare** (Seeds 20261700 und 20261701; n = 200 Partien), `--log-games`, SPRT-Schranken nur
+   mitgeschrieben. Aufloesung vorab: 95-%-Intervall einer Siegquote bei n = 200 rund +-7 Punkte; der Blick trennt
+   "deutlich" von "nicht deutlich", nicht die 2 bis 4 Punkte der bisherigen Arme.
+4. **Lesart vorab:** gepoolt >= 55 % ODER gepoolter Block-z >= +1,5 (20 Bloecke) = "spannend" -> volle Breite gegen b02
+   (2 x 200 Paare, Seeds 20261600/01, Stufenregel, Kriterium wie par.12). Zwischen 45 und 55 % ohne Block-z >= +1,5 =
+   abgeschlossen, kein Hebel. Unter 45 % = abgeschlossen mit Gegenbefund. Die sechs Standard-Kennzahlen werden auch im
+   Schnellblick berichtet.
+5. Kosten je Arm (HERLEITUNG aus den Arm-Messungen par.13): Bloecke 1.200 Dateien rund 20 min, Merge 3 min, Training
+   rund 28 min, Vorfilter 30 s, Schnellblick 200 Partien x rund 17,7 s = rund 1,0 h; zusammen rund 1,9 h je Arm, fuenf
+   Arme rund 9,5 h ohne Vollausbau.
+6. Dasselbe Protokoll steht fuer die Vorsortierung der tragenden Arme b03/b05/b06 gegen b02 zur Verfuegung (Nutzer-
+   Entscheid, par.13f).
+
+**par.19.1 Arm v35-b11: TD(lambda) ueber den echten Pfad (Punkt 1).** Statt des Suchwerts GENAU k Runden spaeter das
+gewichtete Mittel der Suchwerte ALLER spaeteren eigenen Drafting-Records derselben Partie, Gewicht lambda_traj^(j-1) fuer
+den j-ten spaeteren Record (j = 1 die naechste eigene Suchstellung), normiert; ohne spaeteren Record der Ausgang
+(Rueckfall wie b03). Knopf `MOSAIC_BOOTSTRAP_SOURCE=trajectory_lambda`, `MOSAIC_BOOTSTRAP_TRAJ_LAMBDA` (Default 0,5;
+Marker `bootstraptrajlambda_l<lambda>_v1`). Erwartung: Brier-Minimum nicht schlechter als b03, Schnellblick gegen b02
+positiv, wenn das Rauschen der Einzelsuche der begrenzende Faktor war.
+
+**par.19.2 Arm v35-b12: zusaetzlich die Gegnerstellungen (Punkt 2).** Wie b11, aber als Stuetzstellen auch die
+Drafting-Records des GEGNERS nach der Stellung, mit gespiegeltem Wert (1 - root_q aus Gegnersicht), Gewichte in
+Halbzug-Schritten (lambda_traj^((h-1)/2) fuer den h-ten spaeteren Record beider Seiten). Verdoppelt die Dichte der
+Stuetzstellen. Knopf `MOSAIC_BOOTSTRAP_TRAJ_OPPONENT=1` (nur mit `trajectory_lambda`; Marker `_opp1`). Voraussetzung,
+vor dem Bau zu pruefen: `root_q` der Gegner-Records ist aus Sicht des jeweiligen Ziehers gespeichert (Record-Feld
+`player`), die Spiegelung ist dann 1 - q.
+
+**par.19.3 Arm v35-b13: Mittel aus Trajektorie und Rollout (Punkt 3).** bvp = 0,5 x Trajektorie (wie b03, k = 1) +
+0,5 x Rollout (Bestand `bootstrap_value`). Beide Werte liegen im Record, keine neue Erzeugung. Knopf
+`MOSAIC_BOOTSTRAP_TRAJ_MIX=0.5` (nur mit `trajectory`; Marker `_mix0.5`). Billigste Kontrolle der Diagnose "Information
+gegen Glaettung": ist b13 besser als b03 UND b02, tragen beide Anteile.
+
+**par.19.4 Arm v35-b14: Mischgewichte neu (Punkt 4).** Die Anteile Ausgang / Bootstrap / Suchwert jetzt (heute 0,35 /
+0,35 / 0,30 ueber `TD_LAMBDA` 0,5 und `--value-target-lambda` 0,7) wurden mit dem Rollout als Quelle gemessen
+(`PREREG_lambda_wdl_arm.md`, Bootstrap-Horizont). Mit der Trajektorie als Quelle (b03-Form, k = 1) zwei Punkte:
+b14a `TD_LAMBDA` 0,7 (Bootstrap-Anteil hoch, Ausgang runter: 0,21 / 0,49 / 0,30), b14b `--value-target-lambda` 0,5
+(Suchwert jetzt hoch: 0,25 / 0,25 / 0,50). Dafuer wird `TD_LAMBDA` (heute Konstante `neural_net.py:1361`) zum Knopf
+`MOSAIC_TD_LAMBDA` mit Marker in beiden Schluesseln (Standardweg 0,5 bitgleich); lambda ist Trainingsflag (kein neuer
+Schluessel, wie b07). Zwei Trainings, zwei Schnellblicke.
+
+**par.19.5 Arm v35-b15: Gewichtung nach Verlaesslichkeit der spaeteren Suche (Punkt 5).** Der spaetere Suchwert zaehlt
+voll, wenn die Suche dort "sicher" war, sonst wird zum Ausgang hin abgeschwaecht: w = Konfidenz aus `root_child_q`
+(Abstand des besten zum zweitbesten Kind-Q, geclippt auf [0, 1] ueber eine Skala s), bvp = w x root_q_spaeter +
+(1 - w) x Ausgang. Die Skala s wird VOR dem Bau aus der Verteilung des Q-Abstands im b02-Fenster geeicht (Median als
+Startwert), die Eichung wird hier nachgetragen, bevor trainiert wird. Knopf `MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE=<s>`
+(nur mit `trajectory`; Marker `_conf<s>`). Hoechste Bau-Unsicherheit der fuenf; darum zuletzt.
+
+**Reihenfolge (Nutzer-Rang, par.13f-Diskussion):** b11 und b12 zusammen gebaut (gleiche Funktion), b13 als Kontrolle
+daneben, dann b14a/b14b, zuletzt b15. **Bau erst nach dem Ende der laufenden Ketten** (Arm-Kette, dann b10/b09): die
+Datenschicht (`corpus_dataset.py`, `trajectory_bootstrap.py`, `file_cache_key.py`) wird von den Cache-Workern und von
+train.py bei jedem Start neu importiert; eine Aenderung waehrend einer Kette aendert deren Verhalten
+(Memory "Waechter-Worker importieren frisch", "laufende Laeufe lesen ihre Dateien neu"). Abnahme vor dem ersten Lauf:
+Standardweg bitgleich (Datensatz-Hashes wie bei b03), Unit-Tests in `tools/tests/test_trajectory_bootstrap.py` je
+Variante (Gewichte, Normierung, Spiegelung, Rueckfall), Marker in beiden Schluesseln (`test_window_key_covers_data_knobs`).
+
+**Vorab festgelegt, was ein Gesamtergebnis heisst:** ist KEINE der fuenf Varianten im Schnellblick "spannend", ist die
+Bootstrap-Quelle als Hebel abgeschlossen; was von der Reihe bleibt, ist der Fenster-Effekt @400 (par.12) und die
+tragenden Arme b03/b05/b06 als gleichwertige Kandidaten neben b02. Ist eine "spannend", faehrt sie die volle Breite
+gegen b02, und erst eine dort gefallene Kante begruendet einen Vorzug vor b02.

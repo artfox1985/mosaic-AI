@@ -679,3 +679,19 @@ war "ohne Alt-Generationen"; gebaut wurde ein Manifest mit genau den Sockel-Klas
 **Regel:** jede Trainingskette benennt ihre Traeger ausdruecklich (Manifest mit Soll-Zahlen und Abbruch bei
 Abweichung), und der Diff des Trainings-Manifests liest `policy_carriers.traeger_dateien_je_praefix`, nicht nur
 `cli_args`. Siehe auch die Memory-Regel "Traeger-Status pruefen" (2026-08-16, Ownership-Korpus komplett maskiert).
+
+## Neue train.py-Flags brauchen LITERALE Defaults: der Parser wird im Test per exec nachgebaut (2026-10-06)
+
+`tools/tests/source_parser.py` (`parser_from_main_block`) schneidet den argparse-Block aus `train.py` aus und fuehrt ihn
+per `exec` in einem engen Namensraum aus: nur `argparse`, die Modul-Konstanten von train.py selbst und die vom Test
+uebergebenen `extra_names`. Ein `choices=` oder `default=`, das einen IMPORTIERTEN Namen traegt (hier
+`WEIGHT_AVERAGE_MODES`, `DEFAULT_WEIGHT_AVERAGE_DECAY` aus `weight_average.py`), ist dort ein NameError, und sieben
+Tests in `test_train_recipe.py` und `test_margin_thresholds.py` fallen auf einmal. Dazu liest
+`test_train_signature_defaults` die Defaults der `train()`-Signatur per `ast.literal_eval`; ein Name statt eines
+Literals bricht auch ihn.
+
+Handgriff: Parser- und Signatur-Defaults als Literale schreiben (`("none", "ema", "swa")`, `0.75`, `2`) und die
+Modulkonstanten per `assert` daneben festnageln (train.py, direkt unter dem Import), damit beides nicht auseinanderlaeuft.
+Und: die Suite laeuft mit `python -X utf8 -u -m unittest discover -s tools/tests -p "test_*.py"` (kein pytest installiert),
+513 Tests in rund 15 s; ein neuer atomarer Checkpoint (`_avg`) muss im Zaehltest `test_result_checkpoints_are_written_atomically`
+nachgezogen werden.

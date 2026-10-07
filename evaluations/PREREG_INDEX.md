@@ -77,20 +77,21 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 136 Dateien = 6 OFFEN + 116 ENTSCHIEDEN + 14 UEBERHOLT.**
+**Stand (automatisch generiert): 137 Dateien = 7 OFFEN + 116 ENTSCHIEDEN + 14 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (6)
+## OFFEN (7)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_asymmetric_selfplay.md` | Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | W-v2 Runde 1 TRAEGT: G-KL +0,054 [+0,036; +0,073], kein Versatz, W 44,5 % (par.5d3a/b) -> Sockel-Vorschlag. Stoerer, Exploiter v1 (46 %), v32-Gegner tragen nicht. Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3). @400 mit Modus 2: KL x2, Punkte gleich, aber -0,07 volle Spalten (par.8c1) -> Mischsockel-Vorschlag. Exploiter v2 (par.7c) vom Nutzer GESTRICHEN (2026-10-04 abends, par.7c1); kein Exploiter im v35-Fenster. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
 | `PREREG_subtree_value_bias.md` | Korrigiert eine laufzeitgelernte Bias-Tabelle je Zustandsklasse (KataGo Subtree Value Bias) systematische Netzfehler in der 400-Sim-Suche, bei unveraendertem Netz und reproduzierbarer Arena? | nichts gebaut, nichts gemessen; registriert 2026-10-05 auf Nutzer-Anweisung (par.1-par.4). |
-| `PREREG_tree_reuse.md` | Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | nichts gemessen; Code-Lesung par.2a und additiver Entwurf im Code (Spec-Feld `tree_reuse`, UNKOMPILIERT, 2026-10-05); Nutzer-Entscheide par.5 offen. |
-| `PREREG_v35_window.md` | Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | b01 nicht entschieden (52,0 %, z +0,92, par.11c), Wertkopf lernt @100 nichts (par.11b). **b02 (alles @400, Modus 2) TRAEGT Tor 1: drei Seeds gepoolt 596:454 = 56,8 %, Block-z +4,07 (par.12e)**; Wertkopf lernt @400 messbar (dBrier +0,0011 [+0,0004; +0,0017], par.12f). Promotion = Nutzer-Entscheid. Arme b03-b10 registriert (par.13-18). |
+| `PREREG_tiling_surprise_probe.md` | Wie gut antizipiert das Netz, was der Tiling-Loeser am Rundenende tut (Kennzahl "Tiling-Ueberraschung" je Runde), und liegt dort ein Hebel fuer eine Mini-Suche ueber das Tiling mit Netzbewertung? | nichts gebaut, nichts gemessen; registriert 2026-10-06 auf Nutzer-Anweisung ("Registrier das, da koennen wir uns evtl. eine Mini suche + netz daraus bauen"). Diagnose-Sonde, kein Arm. |
+| `PREREG_tree_reuse.md` | Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | nichts gemessen; Code-Lesung par.2a und additiver Entwurf im Code (Spec-Feld `tree_reuse`, UNKOMPILIERT, 2026-10-05); Runde-5-Schalter Default an, par.5.4 entschieden; uebrige Nutzer-Entscheide par.5 offen. |
+| `PREREG_v35_window.md` | Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07 (par.12e), b03 58,6 %, b05 56,4 %, b06 56,9 % (par.13), b04 56,2 % (par.14c), **b10 (Schwarm als Policy-Traeger) 60,9 % z +6,22, staerkste Kante, Policy-Volumen traegt (par.18a/b)**; b07 traegt NICHT (par.15b); b08 EMA ohne Gewinn (par.16a). Keine Promotion (Nutzer). b09 laeuft; b11-b15 registriert (par.19). |
 | `PREREG_variance_scaled_cpuct.md` | Macht eine mit der empirischen Nutzenvarianz des Knotens skalierte Explorationskonstante (KataGo-Form, ohne Unsicherheitskopf) die 400-Sim-Suche staerker, bei unveraendertem Netz? | nichts gebaut, nichts gemessen; registriert 2026-10-05 auf Nutzer-Anweisung (par.1-par.4). |
 
 ## ENTSCHIEDEN (116)

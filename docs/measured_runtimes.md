@@ -554,3 +554,7 @@ Planungszahl v34-Erzeugung (HERLEITUNG aus v33 12,99 h, E1 -39,4 %, R5-Netz +11,
 | Tor 1 gepaartes Gating @400 fuer v35-b02, 3 Seeds (200 + 200 + 125 Paare, dritter mit SPRT-Stopp), `--log-games` | 1.050 Partien | 10 | **18.629 s** = 5,2 h (17,5 bis 18,0 s je Partie; Nebenlast ungeprueft) | Artefakte `laufzeit` |
 | Offline-Vergleich 3 Checkpoints auf dem b02-Val-Satz (`checkpoint_val_eval.py`, cuda) | 3 x 225.789 Zustaende, 120 Dateien | 6 | **32,6 s** | Artefakt `laufzeit` |
 | **Kette `night_v35_b02_chain.sh` gesamt** (Smokes, Erzeugung, Abnahmen, Fenster, Training, Tor 1 drei Seeds) | | | **25,2 h** (00:21 bis 01:32:32) | Kettenausgabe |
+| Netzarm auf liegendem Fenster mit neuem Cache-Schluessel (Bloecke 1.200 Dateien + Merge + Training 12 Epochen + Tor 1 ein Seed) | 1 Arm | 6 / cuda / 10 | **rund 2,5 h** (Bloecke+Merge rund 20 min, Training 1.675-1.691 s, Seed 7.100-7.300 s) | Arm-Kette b03/b05/b06, Kettenausgabe |
+| Netzarm ohne Blockbau (b02-Monolith, Training + Tor 1 ein Seed) | 1 Arm | cuda / 10 | **rund 2,3 h** (Training 1.358 s, Seed 7.095 s) | Arm b07 |
+| EMA-Training (`--weight-average ema`, Zusatz-Validierung je Epoche, BN-Neuschaetzung 7.957 Batches) | 12 Epochen | cuda | **1.461,0 s** gegen 1.357,9 s ohne (+7,6 %) | Manifeste b08 / b07 |
+| **Arm-Kette `night_v35_arms_chain.sh` gesamt** (b03, b05, b06, b04 mit drei Seeds, b07, b08) | 6 Arme, 13 Gating-Seeds | | **24,9 h** (06:45 bis 07:38) | Kettenausgabe |
