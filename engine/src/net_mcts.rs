@@ -6899,7 +6899,9 @@ fn build_gumbel_tree_inner_for<R: Rng + ?Sized>(
         let kids = std::mem::take(&mut nodes[0].children);
         for cid in kids {
             if let Some(act) = nodes[cid].action.clone() {
-                nodes[0].untried.push((act.clone(), nodes[cid].prior));
+                // Prior zuerst lesen: `nodes[0]` wird gleich veraenderbar geliehen (E0502).
+                let prior = nodes[cid].prior;
+                nodes[0].untried.push((act.clone(), prior));
                 retained_children.push((act, cid));
             }
         }
