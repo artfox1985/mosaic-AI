@@ -161,6 +161,16 @@ def engine(m: dict):
     return mr
 
 
+# Schalter fuer die Umgehung unten, seit 2026-10-08 AUS: der Replayer leitet die
+# Mondreihenfolge jetzt selbst aus den `choose_moon_top`-Zeilen ab
+# (analyze_game_log.py, `Replayer.derive_moon_order_from_nodes`), ohne das Log
+# umzuschreiben. Die Funktion bleibt als Lesehilfe: sie hat g11/g12 schon
+# umgeschrieben (Manifest-Feld `moon_hint_normalized`), und diese Logs laufen
+# mit dem neuen Replayer weiter durch, weil Hinweis- und Knotenfolge dort gleich
+# sind. Nur wieder anschalten, wenn der Replayer-Weg ausfaellt.
+NORMALIZE_MOON_HINTS_BEFORE_REPLAY = False
+
+
 def normalize_moon_hints(log_path: Path) -> int:
     """`moon_order` der Netz-Steinzuege in `.engine.log` auf die tatsaechlich gespielte Reihenfolge setzen.
 
@@ -175,7 +185,10 @@ def normalize_moon_hints(log_path: Path) -> int:
     Umgehung NUR hier (der Replayer ist von laufenden Lauefen mitbenutzt und bleibt unberuehrt):
     die Reihenfolge wird aus den Knotenzeilen abgeleitet und idempotent ins Log zurueckgeschrieben.
     Unten -> oben = verbleibende Farben (in Hinweisreihenfolge) + umgekehrte Knotenfolge.
-    Gibt die Zahl umgeschriebener Zeilen zurueck."""
+    Gibt die Zahl umgeschriebener Zeilen zurueck.
+
+    Seit 2026-10-08 ruft `rebuild_game` sie nicht mehr auf (Schalter
+    `NORMALIZE_MOON_HINTS_BEFORE_REPLAY`); der saubere Fix sitzt im Replayer."""
     if not log_path.exists():
         return 0
     lines = log_path.read_text(encoding="utf-8").split("\n")
@@ -226,10 +239,11 @@ def rebuild_game(name: str, m: dict):
     mr = engine(m)
     import analyze_game_log as agl
     log_path = engine_log_path(name)
-    n_fixed = normalize_moon_hints(log_path)
-    if n_fixed:
-        m["moon_hint_normalized"] = int(m.get("moon_hint_normalized", 0)) + n_fixed
-        save_manifest(name, m)
+    if NORMALIZE_MOON_HINTS_BEFORE_REPLAY:
+        n_fixed = normalize_moon_hints(log_path)
+        if n_fixed:
+            m["moon_hint_normalized"] = int(m.get("moon_hint_normalized", 0)) + n_fixed
+            save_manifest(name, m)
     rep, _lines, li, div = agl.run(log_path, model_path=None, sims=1, c_puct=0.3, do_oracle=False, limit=None)
     if div:
         raise SystemExit(f"Replay-Divergenz in {log_path.name}: {div}")

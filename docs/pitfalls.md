@@ -192,6 +192,21 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   **Wer eine neue Diagnosezeile in die Engine schreibt, traegt ihren Marker im
   selben Zug dort ein** -- sonst ist die naechste Nacht-Auswertung wieder
   leer. Festgenagelt in `tools/tests/test_replayer_skips_diagnostic_lines.py`.
+- **Kanonische gegen gewaehlte Mondreihenfolge im Log** (2026-10-08). Bei
+  einem Netz-Steinzug mit Mondknoten traegt das `#a`-Feld `moon_order` nur die
+  KANONISCHE Restfolge (Fabrik-Reihenfolge der Sonnenseite,
+  `engine/src/validation.rs:176-183`); die gespielte Reihenfolge steht in den
+  folgenden `#a`-Zeilen vom Typ `choose_moon_top` desselben Spielers (oberster
+  Stein zuerst). Wer `moon_order` aus dem Hinweis fuer die gespielte haelt,
+  liegt bei jeder abweichenden Wahl falsch: der ID-Weg des Replayers brach
+  daran mit "Divergenz" ab (9 von 9 Logs mit Netz-Mondknoten in `static/log/`
+  hatten mindestens eine abweichende Wahl). Regel: unten -> oben = Reste in
+  Hinweisfolge ohne die gewaehlten Farben (je Wahl das erste Vorkommen) plus
+  die Knotenfolge UMGEKEHRT (`PendingMoonOrder::resolved_bottom_up`,
+  `engine/src/moves.rs:132-136`). Behoben in
+  `analyze_game_log.py::Replayer.derive_moon_order_from_nodes`; Tests in
+  `tools/tests/test_analyze_game_log_moon_nodes.py`. Die Logs selbst bleiben
+  unveraendert; die Text-Zeile `Mond-Stapel:` zeigt die gespielte Folge.
 - **Python schreibt auf Windows still CRLF** (2026-08-25). Ein Skript mit
   `write_text` wandelte in 137 Dateien LF in CRLF; in einer Datei waren das
   971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der

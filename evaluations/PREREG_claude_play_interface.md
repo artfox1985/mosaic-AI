@@ -1647,6 +1647,18 @@ d. **g11:** vor der Endwertung fuehrte ich 54:45, die Eckplatten unten und die V
    Testdatei `tools/tests/test_claude_play_board_hints.py` wurde NICHT neu gefahren (kein CPU-Lauf neben der Kette); die
    Aenderung ist durch den Echtbetrieb belegt (zwei Partien, keine weitere Divergenz). Die Aenderung an `tools/claude_play.py`
    ist uncommittet.
+   **Behoben 2026-10-08 in `tools/analyze_game_log.py`:** `Replayer.derive_moon_order_from_nodes` leitet die Reihenfolge
+   aus den `choose_moon_top`-Zeilen DESSELBEN Spielers ab, die dem Steinhinweis bis zur `Mond-Stapel`-Zeile folgen, und
+   `resolve_stone` (ID-Weg) probiert sie vor Hinweis- und kanonischer Reihenfolge; ohne Knotenzeilen ist die
+   Kandidatenliste die alte. Regel am Engine-Code geprueft: `PendingMoonOrder::resolved_bottom_up` (`engine/src/moves.rs:132-136`,
+   Reste plus umgekehrte Wahlfolge), Entfernen des ersten Vorkommens (`engine/src/game.rs:1145`, `:1154`). Das Log wird nicht
+   mehr umgeschrieben: `rebuild_game` ruft `normalize_moon_hints` nur noch hinter dem Schalter
+   `NORMALIZE_MOON_HINTS_BEFORE_REPLAY = False` (`tools/claude_play.py`). Abnahme: die 9 Logs mit Netz-Mondknoten in
+   `static/log/` laufen ueber die Mondzuege hinweg (5 vollstaendig; 4 brechen spaeter an anderen Stellen ab, je einmal Netz-Stapelzug
+   mit Knoten, dreimal Chip-Vollendung, kein Mondzug), g11/g12 weiter vollstaendig (342 bzw. 338 Zeilen). Tests:
+   `tools/tests/test_analyze_game_log_moon_nodes.py`. Korrektur zum Befund oben: die kanonische Reihenfolge ist die
+   Fabrik-Reihenfolge der Sonnenseite (`engine/src/validation.rs:176-183`), nicht nach Farbindex sortiert (Beleg:
+   Hinweis `["türkis","gelb","blau"]` in `game_20261003_113013_seed576020.log`, Zeile 14).
 2. **`peek` wurde vom Auto-Modus-Klassifikator abgelehnt** (Grund "Modify Shared Resources"); ich habe den Befehl nicht
    wiederholt und in beiden Partien nie vom Stapel gezogen. Folgen: (i) die `stop`-Logik aus par.14 wurde im Echtbetrieb
    NICHT ausgeuebt; von den Zuegen des Netzes sah ich nur die Rueckseiten ("Rueckseite: Wild/Special"), nie Vorderseiten, was

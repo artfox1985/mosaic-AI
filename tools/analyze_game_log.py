@@ -236,6 +236,13 @@ DIAGNOSTIC_LINE_MARKERS = ("[moon_order]", "[rt_leaf]")
 # tatsaechlich gespielte Reihenfolge holt sich `resolve_stone` weiter aus der
 # naechsten `Mond-Stapel:`-Zeile (Permutations-Kandidaten, s.u.).
 #
+# NACHTRAG 2026-10-08: das gilt fuer den TEXTWEG. Der ID-Weg probierte nur
+# Hinweis- und kanonische Reihenfolge, und die `moon_order` im `#a`-Hinweis
+# eines Netz-Steinzugs ist die kanonische -- die Wahl des Knotens steht in
+# eigenen `#a`-Zeilen (`choose_moon_top`, keine Textzeile). Jede andere Wahl
+# brach deshalb mit "Divergenz" ab. `derive_moon_order_from_nodes` liest sie
+# jetzt dort (PREREG_claude_play_interface.md par.14a Werkzeug-Befund 1).
+#
 # WENN das je anders wird (eigene Logzeile je Teilzug, oder das Tor auch im
 # GUI-Pfad), gehoert die neue Zeile in PATTERNS plus -- je nach Bauform -- in
 # PRIMARY_CATEGORIES oder in DIAGNOSTIC_LINE_MARKERS, und der Replayer braucht
@@ -454,6 +461,7 @@ class Replayer:
         self.chip_log_mehrdeutig = 0  # davon: mehrere Kandidaten mit gleicher Farbsignatur
         self.hint_used = 0      # Zuege, die ueber die ID aufgeloest wurden
         self.hint_missing = 0   # Stein-Zuege ohne Hinweis (Textweg)
+        self.moon_order_from_nodes = 0  # Netz-Steinzuege, deren Mondreihenfolge aus `choose_moon_top`-Zeilen kam
         self.action_log: list[tuple[str, tuple, dict]] = []
         self.g = self._fresh_game()
         self.turn_idx = 0
@@ -889,6 +897,77 @@ class Replayer:
                 return h
         return None
 
+    def derive_moon_order_from_nodes(self, lines: list[LogLine], li: int, hint: dict) -> list | None:
+        """Gespielte Mondstapel-Reihenfolge (unten -> oben) eines Netz-Steinzugs
+        aus den `choose_moon_top`-Zeilen, die ihm folgen; `None`, wenn keine da
+        sind oder sie nicht zum Hinweis passen.
+
+        Woher die Zeilen kommen: spielt eine Seite mit den Zusatzknoten (Weg A,
+        PREREG_moon_stack_order.md par.12.2), legt der Steinzug die Reststeine
+        NICHT ab (game.rs:1125-1133, `pending_moon_order`), sondern derselbe
+        Spieler waehlt sie mit `Action::ChooseMoonTop` von OBEN nach unten
+        (moves.rs:110-125); jede Wahl schreibt im Netz-Pfad eine eigene
+        `#a`-Zeile (py.rs:1185-1189) mit demselben `p` (py.rs:904-910 nimmt
+        `current_player`, der bis zum letzten Teilzug nicht wechselt,
+        game.rs:1156-1168). Die `moon_order` im Steinhinweis bleibt dabei die
+        kanonische des gewaehlten Zugs (self_play.rs:368), also die
+        Fabrik-Reihenfolge der Reste (validation.rs:176-183) -- dieselbe
+        Folge, die die Engine als `remaining` haelt (factory.rs:54-55,
+        execution.rs:207-213).
+
+        Regel, wie die Engine sie anwendet: `resolved_bottom_up`
+        (moves.rs:132-136) = verbleibende Reste in ihrer Folge plus die
+        gewaehlten Farben UMGEKEHRT; entfernt wird je Wahl das ERSTE
+        Vorkommen der Farbe (game.rs:1145 `position`, game.rs:1154 `remove`).
+
+        Gesucht wird in Dateireihenfolge ab dem Steinhinweis: erst die
+        restlichen Nutzlasten vor Zeile `li`, dann die vor jeder folgenden
+        Textzeile. Schluss bei der ersten Nutzlast, die kein `choose_moon_top`
+        DESSELBEN Spielers ist, nach der ersten `Mond-Stapel`-Zeile (die
+        Knoten stehen vor ihr, execution.rs:122-131) und an der naechsten
+        primaeren Aktionszeile. Fremde Knoten werden also nie verwendet."""
+        base = (hint.get("a") or {}).get("moon_order")
+        if not isinstance(base, list) or len(base) < 2:
+            return None
+        player = hint.get("p")
+        nodes: list = []
+
+        def node_color(h: dict):
+            a = h.get("a") or {}
+            if a.get("type") != "choose_moon_top" or h.get("p") != player:
+                return None
+            return a.get("color")
+
+        own = self.hints.get(li, [])
+        start = next((k for k, h in enumerate(own) if h is hint), len(own) - 1) + 1
+        stopped = False
+        for h in own[start:]:
+            c = node_color(h)
+            if c is None:
+                stopped = True
+                break
+            nodes.append(c)
+        j = li + 1
+        while not stopped and j < len(lines):
+            for h in self.hints.get(j, []):
+                c = node_color(h)
+                if c is None:
+                    stopped = True
+                    break
+                nodes.append(c)
+            cat, _ = classify(lines[j].body)
+            if cat == "MOON_STACK_INFO" or cat in PRIMARY_CATEGORIES:
+                break
+            j += 1
+        if not nodes:
+            return None
+        rest = list(base)
+        for c in nodes:
+            if c not in rest:
+                return None
+            rest.remove(c)
+        return rest + list(reversed(nodes))
+
     # ── Stein-Zug: Quelle/Kandidaten aufloesen ──────────────────────────────
     def resolve_stone(self, lines: list[LogLine], li: int, m: re.Match, is_global: bool, actor: int) -> int:
         color = m.group("color")
@@ -930,11 +1009,23 @@ class Replayer:
                 self.hint_used += 1
                 ha = hint["a"]
                 cand_calls = []
+                # Mondknoten (Befund 2026-10-08, PREREG_claude_play_interface.md
+                # par.14a Werkzeug-Befund 1): bei einem Netz-Steinzug traegt
+                # `moon_order` im Hinweis nur die KANONISCHE Restreihenfolge; die
+                # gespielte steht in den folgenden `choose_moon_top`-Zeilen.
+                # Sie geht als ERSTER Kandidat voran, danach unveraendert Hinweis
+                # und kanonische Reihenfolge. Ohne Knotenzeilen ist die Liste
+                # Eintrag fuer Eintrag die alte.
+                node_order = self.derive_moon_order_from_nodes(lines, li, hint)
+                if node_order is not None:
+                    self.moon_order_from_nodes += 1
                 # Exakte Reihenfolge aus dem Hinweis zuerst, danach die
                 # kanonische je Kandidat -- niemals raten, nur ordnen.
                 for mv in sorted(per_id, key=lambda m: 0 if m["source"] == ha.get("source") else 1):
                     orders = []
-                    if isinstance(ha.get("moon_order"), list):
+                    if node_order is not None and sorted(node_order) == sorted(mv["moon_order"]):
+                        orders.append(list(node_order))
+                    if isinstance(ha.get("moon_order"), list) and list(ha["moon_order"]) not in orders:
                         orders.append(list(ha["moon_order"]))
                     if list(mv["moon_order"]) not in orders:
                         orders.append(list(mv["moon_order"]))

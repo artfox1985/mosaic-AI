@@ -109,6 +109,13 @@ def build_report(header: dict, log_path: Path, rep: "Replayer", divergence: str 
     P(f"Aufloesung der Stein-Zuege: **{rep.hint_used} ueber die Aktions-ID** "
       f"(`#a`-Zeilen im Log, PREREG_action_id_logging.md), "
       f"**{rep.hint_missing} ueber den Textweg** (Rueckfall fuer Logs ohne IDs).")
+    # Befund 2026-10-08 (PREREG_claude_play_interface.md par.14a): die gespielte
+    # Mondreihenfolge eines Netz-Steinzugs steht in den `choose_moon_top`-Zeilen.
+    if getattr(rep, "moon_order_from_nodes", 0):
+        P("")
+        P(f"Mondreihenfolge aus den Knotenzeilen (`choose_moon_top`) abgeleitet: "
+          f"{rep.moon_order_from_nodes} Netz-Steinzug/-zuege (der `#a`-Hinweis traegt dort nur "
+          "die kanonische Restfolge).")
     if rep.emoji_toleriert:
         P("")
         P(f"⚠️ {rep.emoji_toleriert} Zeile(n) stimmten nur bis auf das Quellen-Emoji "
