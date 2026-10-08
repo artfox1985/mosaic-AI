@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 10 Partien bis 2026-09-22 (par.7, zuletzt 1:2 gegen v31-b01): Null-Klammer ist EROEFFNUNG, Wertungsplatten unzuverlaessig bedient. Sicht-Audit par.11 am Code nachgelesen 2026-10-08: P.9/P.11 netzseitig gebaut, letzte Stelle (Vorderseiten gezogener Platten) am Fenster gefixt (`stop`, par.14). WIEDER OFFEN: g11/g12 gegen v35-b10 @400 in eigener Sitzung (Nutzer 2026-10-08). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 12 Partien, zuletzt g11/g12 gegen v35-b10 @400: 48:54 und 30:38 (par.14a). Wie g09/g10: Null-Klammer in Runde 2 und 3-5 leere Spezialfelder, aber nur 8 statt 25-28 Stapelzuege. Endwertung kippt g11 (54:45 vor ihr). Keine Siegquote (par.8.8). -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1500,3 +1500,163 @@ als par.14a hier, Kopf nachziehen, Index generieren. Spieler ist eine EIGENE Sit
 ein Subagent; Modellwahl beim Nutzer (Wunsch: Sonnet). Nebenlast: die Partien laufen auf Nutzer-Entscheid neben
 der b09-Kette (Training, dann Tor 1); die b09-Gating-Laufzeiten werden entsprechend als "mit claude_play daneben"
 markiert (CLAUDE.md, Markierungspflicht).
+
+### par.14a ERGEBNIS g11/g12 gegen v35-b10_brierbest @400 (2026-10-08, eigene Sitzung, Auftrag aus par.14)
+
+**Aufbau (Manifeste `evaluations/artifacts/claude_play/g11` und `g12`):** Gegner `v35-b10_brierbest` @400 Sims, Spec
+`models/v34-b01_brierbest.spec.json`, Startspieler jeweils Spieler 0. **g11:** Seed 20261008, Claude Spieler 0,
+Wertungsplatten Eckplatten, Spezialfelder, Vertikale Reihen. **g12:** Seed 20261009, Claude Spieler 1, Wertungsplatten
+Diagonale Reihen, Farbenreiche Reihen, Spezialfelder. Dateien je Partie: `game.log` (Lesefassung), `.engine.log`
+(Maschinenstand), `manifest.json`, `notes.md`. **Laufzeit (Wanduhr inklusive Bedenkzeit; Manifest-Start bis letzte
+Aenderung von `game.log`):** g11 00:27:08 bis 01:21:08 = 54 min, g12 01:21:29 bis 01:59:07 = 38 min; Manifest-Feld
+`moves_claude` 79 und 76 (Zaehlweise ungeprueft). **MIT NEBENLAST (laut Auftrag):** die b09-Kette (Tor 1) lief daneben
+(Nutzer-Entscheid, par.14), die Netz-Zuege @400 liefen also unter Last; eine Dauer je Netzzug wurde nicht erhoben.
+
+**Endstand** (Grundmenge: je eine Partie, Einheit Punkte; Quelle `manifest.json` result.scores und `game.log`):
+
+| Partie | Claude | Netz | Margin Claude | vor der Endwertung (Claude : Netz) |
+| --- | --- | --- | --- | --- |
+| g11 (Claude Spieler 0) | 48 | 54 | -6 | 54 : 45, also +9 |
+| g12 (Claude Spieler 1) | 30 | 38 | -8 | 31 : 53, also -22 |
+
+Keine Siegquote ueber die Reihe (par.8.8): n = 2 Partien, ein Gegner, beide Seiten, wechselnde Wertungsplatten.
+
+**Punkte je Wertungsplatte** (Endwertung, `manifest.json` result.end_scoring):
+
+| Partie | Seite | Platte 1 | Platte 2 | Spezialfelder | Summe |
+| --- | --- | --- | --- | --- | --- |
+| g11 | Claude | Eckplatten +3 | Vertikale Reihen 0 | -9 (3 leer) | -6 |
+| g11 | Netz | Eckplatten +11 | Vertikale Reihen +7 | -9 (3 leer) | +9 |
+| g12 | Claude | Diagonale 0 | Farbenreiche +8 (Zeile 0 und 1 je 5 Farben) | -9 (3 leer) | -1 |
+| g12 | Netz | Diagonale 0 | Farbenreiche 0 | -15 (5 leer) | -15 |
+
+#### Verlauf g11 (Punkte am Rundenende nach Strafleiste, Claude : Netz)
+
+- **R1 9:2.** Netz zieht zweimal vom Stapel (beide Rueckseiten Spezial, 5 auf 3), legt Spezialplatte #7, nimmt den
+  Marker und baut sofort lange Reihen (R4 T4/5, R5 B3/6; R3 mit 4 Schwarz aus vier Quellen). Ich lege die Wildplatten
+  #14, #13, #9 untereinander in die linke Spalte und fuelle R0 (T), R1 (GG), R3 (RRRR).
+- **R2 17:7.** Netz nimmt den Marker (3 Rot in R2), faellt per Stapelzug von 2 auf 0 und zieht dort zwei Platten gratis,
+  waehlt Wildplatte #5, vollendet R5 (B5/6) mit 3 Chips; seine Spalte 0 steht danach bei 5 Steinen. Ich nehme 4 Schwarz
+  per Mondzug in R3 (vollendet) und vollende R2 mit 3 beliebigen Chips.
+- **R3 28:10.** Netz nimmt den Marker zum dritten Mal. Ich lege R0/R1/R2 (+3, +5, +2) und vollende R3 (S3/4) mit 2 Chips
+  (+1).
+- **R4 47:29.** Mein bester Zug: R2 mit 3 Rot auf (2,2) (+10 inklusive Spezialfeld (3,2) mit +4), dazu R1 +8, R0 +4. Das
+  Netz schliesst Spalte 0 (R2-Schwarz auf (1,0): +6 senkrecht, dazu +2 Spezialpunkte) und vollendet R5 per 3 Chips (untere
+  linke Eckplatte, +2 und +6 Spezial); bei mir -3 Beifang.
+- **R5 54:45, Endwertung 48:54.** Ich lege +17 (R0 +1, R1 +7, R2 +8, R5 per Chips +1), muss aber 7 Reste (T, T, R, T, S, S,
+  S) auf die Strafleiste nehmen: -10. Das Netz legt +18, steht bei 45; die Endwertung (+9 gegen -6) dreht 54:45 zu 48:54.
+
+#### Verlauf g12 (Claude : Netz)
+
+- **R1 8:3.** Ich nehme als Nichtstartspieler die Wildplatte #14 als Startplatte und danach #5 und #2; meine Zeilen 0 und
+  1 tragen damit die Zielfarben T B G S R * und * G T * T B. Das Netz legt die Spezialplatten #7 (Start) und #6 (2 leere
+  Spezialfelder) und baut R4 auf S4/5.
+- **R2 12:8.** Ich nehme Wildplatten #16/#11, R0 B, R1 GG; die leere Anzeige zwingt mich auf 3 Schwarz auf die
+  Strafleiste (-6). Netz nimmt den Marker, zieht 5 Platten (3 bezahlt, 2 gratis bei Stand 0) und findet dort die Wildplatte.
+- **R3 18:22.** Ich lege Wild #3 und Spezial #17 (Slot (2,2)), R0 G, R1 Rot-Paar (dritte Farbe in Zeile 1), R2 per 3 Chips
+  auf (2,1) (+5) und nehme den Marker (-2); Netz holt +16 (zwei 5er-Linien, R3 per Chips).
+- **R4 25:31.** Ich muss die letzten Spezialplatten #8/#12 nehmen, vollende R3 auf (3,0) (+5, Spalte 0 mit 5 Steinen), R0
+  S (+6) und R1 T (+6); die Fuenfernahme Rot erzwingt -10 (eigener Fehler, unten).
+- **R5 31:53, Endwertung 30:38.** Ich schliesse Zeile 0 und Zeile 1 mit je 5 Farben (R0 R auf (0,4) +5, R1 B auf (1,5)
+  +1, R2 BBB auf (2,2) +6), Beifang -6. Netz holt +24 in der Runde (R4 G5/5 schaltet ein Spezialfeld frei: +8 und +6)
+  und nimmt -8 (Marker plus RRR); seine fuenf leeren Spezialfelder (-15) verkleinern den Abstand von 22 auf 8.
+
+#### Die sechs Standard-Kennzahlen (CLAUDE.md), beide Seiten
+
+Quellen: `game.log` (Zeilen `Reihe k -> Kuppel`, `Strafe`, `auf Strafleiste`, `Stapel gezogen`, `Startspielerstein`),
+Endbrett aus `show`, `manifest.json`. `tools/analyze_game_log.py --no-oracle` lief auf g11 (Replay besteht, alle 342 Zeilen)
+und lieferte nur Rundenstand und Endwertung; die Kennzahlen unten sind von Hand aus Log und Endbrett gezaehlt.
+
+| Kennzahl (Grundmenge, Einheit) | g11 Claude | g11 Netz | g12 Claude | g12 Netz |
+| --- | --- | --- | --- | --- |
+| 1a Reihenvollendungen je Musterreihe R0..R5 (Tiling-Platzierungen, Stueck) | 5/5/4/3/0/1 = 18 | 5/3/4/1/2/1 = 16 | 5/5/3/1/1/0 = 15 | 4/5/3/3/2/1 = 18 |
+| 1b davon per Chips vollendet (Stueck) | 3 | 3 | 2 | 2 |
+| 1c Zugziele: Steinaktionen im Drafting mit Zielreihe je Reihe R0..R5 (Aktionen) | 5/6/6/3/2/3 = 25 | 5/4/7/3/9/6 = 34 | 5/8/6/3/3/2 = 27 | 4/6/6/5/8/6 = 35 |
+| 1d Steinaktionen direkt auf die Strafleiste (Aktionen) | 6 | 1 | 5 | 1 |
+| 1e unvollendete Musterreihen am Ende (Steine) | R4 G2/5 = 2 | R3 R2/4, R4 B2/5, R5 G5/6 = 9 | R4 S1/5, R5 G3/6 = 4 | R2 G1/3, R5 T3/6 = 4 |
+| 1f belegte Rasterzellen je Zeile z0..z5 am Ende (Zellen, inkl. gefuellter Spezialfliese) | 5/5/4/4/0/1 = 19 | 5/4/4/1/2/2 = 18 | 5/5/3/1/1/0 = 15 | 4/5/3/3/2/2 = 19 |
+| 2a belegte Zellen je Spalte c0..c5 am Ende | 2/4/4/5/2/2 | 6/5/2/3/2/0 | 5/3/3/2/1/1 | 4/6/3/2/2/2 |
+| 2b volle Spalten / hoechste Spalte / Spalten mit >= 4 / mit >= 3 | 0 / 5 / 3 / 3 | 1 / 6 / 2 / 3 | 0 / 5 / 1 / 3 | 1 / 6 / 2 / 3 |
+| 3a Strafleiste gesamt (Rundenende-Abrechnungen, Punkte) | -14 | -13, davon Marker -10 | -25, davon Marker -2 | -15, davon Marker -8 |
+| 3b ohne Marker: Punkte / Steine, die die Leiste erreichten (davon mit Leistenplatz) | -14 / 10 (7) | -3 / 3 (3) | -23 / 13 (11) | -7 / 4 (4) |
+| 4 Punkte je Wertungsplatte | siehe Tabelle oben | siehe oben | siehe oben | siehe oben |
+| 5a Platzierungspunkte (Zeilen `Reihe k -> Kuppel` plus Spezialpunkte, Punkte) | 59 + 4 = 63 | 51 + 8 = 59 | 51 + 0 = 51 | 63 + 6 = 69 |
+| 5b bezahlte / gesamte Stapelzuege (Stueck) | 0 / 0 | 6 / 8 | 0 / 0 | 6 / 8 |
+| 5c Endstand (Punkte) | 48 | 54 | 30 | 38 |
+| 6 Margin Claude minus Netz (Punkte) | -6 | | -8 | |
+
+Gegenrechnung (jede Zahl aus dem Log): g11 Claude 5 + 63 - 14 = 54 vor der Endwertung (stimmt), Netz 5 + 59 - 13 - 6 = 45
+(stimmt); g12 Claude 5 + 51 - 25 = 31 (stimmt), Netz 5 + 69 - 15 - 6 = 53 (stimmt). Zeilenzaehler 1c: Claude hat in g11
+31 Steinaktionen, davon 25 mit Zielreihe und 6 direkt auf die Strafleiste, das Netz 35 (34 + 1); g12 Claude 32 (27 + 5),
+Netz 36 (35 + 1).
+
+#### Beobachtungen (qualitatives Protokoll par.4 Punkt 4) und Vergleich mit g09/g10
+
+1. **Null-Klammer ist wieder Eroeffnung, aber klein.** In beiden Partien faellt das Netz in Runde 2 gezielt auf 0
+   (g11: Wild und Spezial bezahlt, dann zwei Zuege gratis; g12: drei bezahlt, zwei gratis) und sucht dort die Wildplatte
+   (g11 `game.log` Zeilen 97-100, g12 Zeilen 99-104). Es zieht aber nur 8 Platten je Partie (g11: 2 + 4 + 1 + 1, g12:
+   1 + 5 + 1 + 1; je 6 bezahlt, 2 gratis) gegen 25 (g09) und 28 (g10) mit v31-b01 (par.7). Gleiches Muster, anderes Mass;
+   Ursache ungeprueft (anderes Netz, andere Auslagen, Marker im Spiel).
+2. **Leere Spezialfelder wie in g09/g10 (Stelle 1 des Protokolls).** Das Netz laesst Spezialfelder leer: g11 3 (-9), g12 5
+   (-15); in g09/g10 waren es 3 und 3. Es legt in g11 fuenf, in g12 sechs Spezialplatten (g12 `game.log` Zeilen 3, 7, 173,
+   180, 218, 248), obwohl es gezielt die Wildplatten zieht; in g12 waren in R3/R4 nur noch Spezialplatten uebrig (die letzte Wildplatte #3
+   nahm ich in R3). In g12
+   bedient es damit keine der beiden Platten (Diagonale 0, Farbenreiche 0: Zeile 0 stand bei 4 Farben, Haupt- und Gegendiagonale
+   bei 1/6), in g11 dagegen beide (Eckplatten 11 = obere linke und untere linke, Vertikale 7 = Spalte 0). Ob eine
+   registrierte Sonde das Muster trifft: ungeprueft.
+3. **Unvollendete lange Reihen (Stelle 2).** Am Ende stehen beim Netz in g11 9 Steine in drei unvollendeten Reihen (R5
+   G5/6: ein Stein fehlt, es lag kein Gelb mehr auf dem Tisch) und in g12 R5 T3/6, dazu R2 G1/3. Das Netz beginnt R4/R5
+   schon in Runde 1 und vollendet per Chips (3 Vollendungen in g11, 2 in g12). Passt zum Bild "Vollendungs-Engpass"; Zuordnung
+   zu `column_completion_gap_probe.py` nicht geprueft.
+4. **Marker: 9 von 10 Runden beim Netz (Stelle 3)** (g11 5 von 5, g12 4 von 5; je -2). Es nimmt ihn meist mit einem
+   Einzelstein aus dem Mond der grossen Fabrik. In par.7 war das nicht erhoben (Vergleich zu g09/g10 offen). Marker plus
+   bezahlte Stapelzuege kosten das Netz -16 (g11) und -14 (g12), mich kostet der Beifang -14 und -25 (davon Marker -2): die
+   Summen sind aehnlich, die Form verschieden.
+5. **Beifang aus globalen Mondzuegen ist mein groesster Posten** (g11 -14 aus 10 Steinen, g12 -23 ohne Marker aus 13
+   Steinen; Netz -3 und -7). Ein Mondzug nimmt eine Farbe von ALLEN Stapeln; wer keine offene Reihe fuer die Farbe hat,
+   zahlt. Deutung (ungeprueft): das Netz haelt Reihen farboffen (R2/R3 leer) und findet den letzten freien Zug zuerst, die
+   Reste bleiben bei mir.
+6. **Spalten entstehen als Nebenprodukt.** g12 Netz hat eine volle Spalte (c1) ohne Vertikale-Platte; Linien von 5 und 6 Steinen
+   brachten ihm +7, +8 (Platzierung). Meine hoechsten Einzelwerte kamen ebenfalls aus verlaengerten Linien: g11 +10 und +8,
+   g12 +6 (Platzierungspunkte je Tile).
+
+**Eigene Fehler (Herleitung, nicht nachgemessen):**
+
+a. **g12 R4 -10:** ich legte ein einzelnes Blau (`m blau x1`) in R2 und sperrte damit die Reihe fuer die spaetere
+   Fuenfernahme Rot (alle Rot-Mondstapel plus Pool, nicht teilbar); sie fiel komplett auf die Strafleiste (-10). Mit
+   leerer R2 haette sie 3 Rot genommen und 2 Ueberlaeufe gezahlt (-3): Differenz etwa 7 Punkte; die Partie war auch dann bei
+   etwa -1 verloren (Herleitung).
+b. **g12 R2 -6:** nach drei Wildplatten war die Anzeige leer, die einzigen freien Mondzuege waren Schwarz x3 ohne Zielreihe.
+c. **g11 R5 -10:** 7 Reste, kein freier Zug mehr, weil alle meine Reihen farbgesperrt waren. Eine Endspielrechnung (Scratchpad,
+   nicht im Baum) ergab, dass die ersten Zuege gleichwertig kosten; vermeidbar waere es nur mit einer offenen Reihe gewesen
+   (Herleitung).
+d. **g11:** vor der Endwertung fuehrte ich 54:45, die Eckplatten unten und die Vertikalen Reihen des Netzes habe ich nicht
+   eingepreist: 15 Punkte Differenz kamen allein aus der Endwertung.
+
+#### Werkzeug-Befunde dieser Sitzung
+
+1. **Replayer-Divergenz bei Netz-Mondzuegen (g11 R2).** Das `#a`-Feld `moon_order` eines Netz-Steinzugs traegt die nach
+   Farbindex sortierte Reihenfolge; die wirklich gewaehlte Reihenfolge steht erst in den folgenden `choose_moon_top`-Zeilen
+   (Knoten, `engine/src/features.rs:2072`, `PREREG_moon_stack_order.md`). `tools/analyze_game_log.py` (ID-Weg,
+   `apply_ambiguous` mit Hinweis- und kanonischer Reihenfolge) kennt nur die sortierte und bricht bei jeder anderen Wahl mit
+   "Replay-Divergenz" ab; in R1 stimmten beide zufaellig ueberein. **Umgehung nur in `tools/claude_play.py`:**
+   `normalize_moon_hints()` setzt die Reihenfolge vor jedem Replay aus den Knoten (Reste in Hinweisordnung plus umgekehrte
+   Knotenfolge) und schreibt sie idempotent in `.engine.log`; Zaehler `moon_hint_normalized` im Manifest: g11 6, g12 10
+   umgeschriebene Zeilen. **Ursache offen:** der saubere Fix gehoert in `analyze_game_log.py` (Permutationskandidaten im
+   ID-Zweig); nicht gebaut, weil die Datei auch von der laufenden Kette importiert wird und ausserhalb des Auftrags lag. Die
+   Testdatei `tools/tests/test_claude_play_board_hints.py` wurde NICHT neu gefahren (kein CPU-Lauf neben der Kette); die
+   Aenderung ist durch den Echtbetrieb belegt (zwei Partien, keine weitere Divergenz). Die Aenderung an `tools/claude_play.py`
+   ist uncommittet.
+2. **`peek` wurde vom Auto-Modus-Klassifikator abgelehnt** (Grund "Modify Shared Resources"); ich habe den Befehl nicht
+   wiederholt und in beiden Partien nie vom Stapel gezogen. Folgen: (i) die `stop`-Logik aus par.14 wurde im Echtbetrieb
+   NICHT ausgeuebt; von den Zuegen des Netzes sah ich nur die Rueckseiten ("Rueckseite: Wild/Special"), nie Vorderseiten, was
+   zur par.14-Aussage passt; (ii) Claude hatte 0 Stapelzuege gegen 8 des Netzes, besonders in g12 (nur noch Spezialplatten).
+3. **Anzeige nach Netz-Tiling:** `show` meldet nach dem letzten Netz-Tiling-Schritt weiter "am Zug: Spieler N (KI)", bis `step`
+   laeuft (das Tiling-Ende des Netzes steht nicht im Log); `move` und `step` arbeiten danach richtig.
+
+**Was NICHT gemessen wurde:** die Uebereinstimmung mit dem Netz-Vorschlag @800 (par.4 Punkt 3, nicht freigegeben, par.8);
+das Orakel (`--no-oracle`, keine CPU neben der Kette), also kein delta-win% und keine Wendepunkte; keine Dauer je Netzzug und
+kein `laufzeit`-Block im Artefakt (die Partien sind kein automatischer Messlauf; Wanduhrzeiten oben mit Bedenkzeit); keine
+Stapelzuege durch Claude (Werkzeug-Befund 2); keine Siegquote und keine Staerkeaussage (n = 2, wechselnde Platten, Last durch die
+Kette); die Kennzahlen 1a bis 3b sind von Hand aus `game.log` und Endbrett gezaehlt, nicht mit einem Werkzeug, und nur ueber die
+Punktesummen gegengerechnet (oben); ob b10 die Endwertung gezielt einpreist, folgt aus zwei Partien nicht.

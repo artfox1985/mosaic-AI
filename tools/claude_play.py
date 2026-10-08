@@ -161,11 +161,75 @@ def engine(m: dict):
     return mr
 
 
+def normalize_moon_hints(log_path: Path) -> int:
+    """`moon_order` der Netz-Steinzuege in `.engine.log` auf die tatsaechlich gespielte Reihenfolge setzen.
+
+    Befund 2026-10-08 (g11, Runde 2): das `#a`-Feld `moon_order` eines Netz-Steinzugs traegt nur
+    die kanonische (nach Farbindex sortierte) Reihenfolge; die WIRKLICHE Reihenfolge der
+    Restfliesen entscheidet der Netz-Knoten `choose_moon_top`, der danach als eigene `#a`-Zeile
+    folgt (erste Zeile = oberster Stein, dann der naechste, der Rest bleibt unten). Der Replayer
+    (`analyze_game_log.py`, ID-Weg) probiert nur Hinweis- und kanonische Reihenfolge, die beide
+    gleich sind, und bricht bei jeder anderen Wahl mit "Replay-Divergenz" ab. In Runde 1 war die
+    Wahl zufaellig die sortierte, darum fiel es erst jetzt auf.
+
+    Umgehung NUR hier (der Replayer ist von laufenden Lauefen mitbenutzt und bleibt unberuehrt):
+    die Reihenfolge wird aus den Knotenzeilen abgeleitet und idempotent ins Log zurueckgeschrieben.
+    Unten -> oben = verbleibende Farben (in Hinweisreihenfolge) + umgekehrte Knotenfolge.
+    Gibt die Zahl umgeschriebener Zeilen zurueck."""
+    if not log_path.exists():
+        return 0
+    lines = log_path.read_text(encoding="utf-8").split("\n")
+    changed = 0
+    for i, ln in enumerate(lines):
+        if not ln.startswith("#a "):
+            continue
+        try:
+            rec = json.loads(ln[3:])
+        except ValueError:
+            continue
+        a = rec.get("a") or {}
+        order = a.get("moon_order")
+        if a.get("type") != "stone" or not order or len(order) < 2:
+            continue
+        nodes = []
+        for ln2 in lines[i + 1:]:
+            if not ln2.startswith("#a "):
+                if ln2.startswith("[R") or ln2.strip() == "":
+                    continue
+                break
+            try:
+                r2 = json.loads(ln2[3:])
+            except ValueError:
+                break
+            a2 = r2.get("a") or {}
+            if a2.get("type") != "choose_moon_top" or r2.get("p") != rec.get("p"):
+                break
+            nodes.append(a2["color"])
+        if not nodes:
+            continue
+        rest = list(order)
+        for c in nodes:
+            if c in rest:
+                rest.remove(c)
+        new_order = rest + list(reversed(nodes))
+        if sorted(new_order) == sorted(order) and new_order != order:
+            a["moon_order"] = new_order
+            lines[i] = "#a " + json.dumps(rec, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            changed += 1
+    if changed:
+        log_path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+    return changed
+
+
 def rebuild_game(name: str, m: dict):
     """PyGame aus dem Log rekonstruieren (Replayer), Netz laden, (g, log_len) zurueckgeben."""
     mr = engine(m)
     import analyze_game_log as agl
     log_path = engine_log_path(name)
+    n_fixed = normalize_moon_hints(log_path)
+    if n_fixed:
+        m["moon_hint_normalized"] = int(m.get("moon_hint_normalized", 0)) + n_fixed
+        save_manifest(name, m)
     rep, _lines, li, div = agl.run(log_path, model_path=None, sims=1, c_puct=0.3, do_oracle=False, limit=None)
     if div:
         raise SystemExit(f"Replay-Divergenz in {log_path.name}: {div}")
