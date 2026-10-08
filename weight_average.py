@@ -42,6 +42,16 @@ Bausteine:
    die Prereg-Zuordnung "ein Unterschied zu b02 gehoert der Mittelung"
    verlangt aber denselben Trainingspfad.
 
+6. Auswahl des gespeicherten Stands (`--weight-average-select`, PREREG_v35_window.md
+   par.16b, Arm v35-b08b): `final` (Default, Bestand) speichert das Mittel nach
+   der letzten Epoche; `brierbest` haelt nach jeder Epochen-Validierung des
+   Mittels eine CPU-Kopie des gemittelten `state_dict` fest, sobald dessen
+   Val-Brier STRENG unter dem bisher besten liegt (erstes Minimum, dieselbe
+   Regel wie `_brierbest` in train.py), und setzt am Ende diesen Stand ein,
+   BEVOR die BN-Neuschaetzung und die Schlussvalidierung laufen. Anlass
+   par.16a: der Endstand mittelt die ueberangepassten spaeten Epochen mit hinein.
+   Speicher: eine Modellkopie (b08-`_avg.pth` 11.532.710 Byte auf der Platte).
+
 Kosten (HERLEITUNG, nicht gemessen): je gemittelter Epoche eine zusaetzliche
 Validierung (Vorwaertslauf ueber den Val-Split, rund ein Zehntel der Zuege
 einer Trainingsepoche ohne Rueckwaertslauf), dazu am Ende EIN Vorwaertslauf
@@ -60,14 +70,24 @@ import torch
 WEIGHT_AVERAGE_MODES = ("none", "ema", "swa")
 DEFAULT_WEIGHT_AVERAGE_DECAY = 0.75
 DEFAULT_WEIGHT_AVERAGE_FROM_EPOCH = 2
+# par.16b: welcher gemittelte Stand als `_avg` gespeichert wird.
+WEIGHT_AVERAGE_SELECTS = ("final", "brierbest")
+DEFAULT_WEIGHT_AVERAGE_SELECT = "final"
 
 
 def validate_weight_average_args(mode: str, decay: float, from_epoch: int,
-                                 epochs: int | None, freeze_trunk: bool) -> None:
+                                 epochs: int | None, freeze_trunk: bool,
+                                 select: str = "final") -> None:
     """Harte Vorab-Validierung; kein stiller Rueckfall auf einen anderen Modus."""
     if mode not in WEIGHT_AVERAGE_MODES:
         sys.exit(f"❌ --weight-average {mode!r} unbekannt -- erlaubt: {WEIGHT_AVERAGE_MODES}.")
+    if select not in WEIGHT_AVERAGE_SELECTS:
+        sys.exit(f"❌ --weight-average-select {select!r} unbekannt -- erlaubt: {WEIGHT_AVERAGE_SELECTS}.")
     if mode == "none":
+        if select != DEFAULT_WEIGHT_AVERAGE_SELECT:
+            # Ohne Mittel gibt es nichts auszuwaehlen; ein gesetzter Knopf ohne
+            # Wirkung waere ein Bedienfehler, der im Manifest falsch aussaehe.
+            sys.exit(f"❌ --weight-average-select {select!r} ohne --weight-average (none) -- Abbruch.")
         return
     if mode == "ema" and not (0.0 <= decay < 1.0):
         sys.exit(f"❌ --weight-average-decay {decay!r} ausserhalb [0, 1) -- Abbruch "
@@ -92,15 +112,28 @@ class WeightAverager:
     swa: gleichgewichtetes Mittel, avg += (aktuell - avg) / (n + 1)
     Der ERSTE gemittelte Schnappschuss (Epoche `from_epoch`) wird in beiden
     Modi unveraendert uebernommen (Startwert des Mittels).
+
+    select (par.16b): `final` = das Mittel nach der letzten Epoche wird
+    gespeichert (Bestand); `brierbest` = `observe_val_brier` haelt den
+    gemittelten Stand mit dem kleinsten Val-Brier fest, `apply_selection`
+    setzt ihn am Ende in `self.model` ein.
     """
 
-    def __init__(self, mode: str, decay: float, from_epoch: int):
+    def __init__(self, mode: str, decay: float, from_epoch: int, select: str = "final"):
         self.mode = mode
         self.decay = float(decay)
         self.from_epoch = int(from_epoch)
+        self.select = select
         self.n_averaged = 0
         self.averaged_epochs: list[int] = []
         self.model = None  # angelegt beim ersten Mitteln (spart Speicher davor)
+        # Zuletzt gemessener Brier des Mittels (beide Modi, nur Mitschrift fuers Manifest).
+        self.last_epoch: int | None = None
+        self.last_brier: float | None = None
+        # Nur select=brierbest: bester gemittelter Stand (CPU-Kopie), erstes Minimum.
+        self.best_epoch: int | None = None
+        self.best_brier: float | None = None
+        self.best_state: dict | None = None
 
     def _ensure_model(self, model) -> None:
         if self.model is None:
@@ -131,13 +164,58 @@ class WeightAverager:
         self.averaged_epochs.append(int(epoch))
         return True
 
+    def observe_val_brier(self, brier: float | None, epoch: int) -> bool:
+        """Val-Brier des Mittels nach Epoche `epoch` mitschreiben; bei `brierbest`
+        den Stand festhalten, wenn er STRENG besser ist als der bisher beste
+        (erstes Minimum). True = neuer bester Stand festgehalten. Beruehrt
+        keinen Zufallsgenerator und nicht `self.model` (nur Lesen)."""
+        self.last_epoch = int(epoch)
+        self.last_brier = brier
+        if self.select != "brierbest" or brier is None or self.model is None:
+            return False
+        if self.best_brier is not None and not (brier < self.best_brier):
+            return False
+        self.best_brier = float(brier)
+        self.best_epoch = int(epoch)
+        self.best_state = {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}
+        return True
+
+    def apply_selection(self, device) -> int | None:
+        """Am Trainingsende: bei `brierbest` den festgehaltenen Stand in
+        `self.model` einsetzen (danach BN-Neuschaetzung und Schlussvalidierung
+        auf DIESEM Stand). Gibt die Epoche des eingesetzten Stands zurueck; bei
+        `final` die letzte gemittelte Epoche (das Mittel bleibt unveraendert).
+        None = `brierbest`, aber kein Brier gemessen -- dann bleibt der Endstand
+        stehen, und der Aufrufer muss das laut melden."""
+        if self.select != "brierbest":
+            return self.averaged_epochs[-1] if self.averaged_epochs else None
+        if self.best_state is None:
+            return None
+        self.model.load_state_dict({k: v.to(device) for k, v in self.best_state.items()})
+        return self.best_epoch
+
+    def selected_brier(self) -> float | None:
+        """Val-Brier (gemittelte BN-Buffer, vor der Neuschaetzung) des gewaehlten Stands."""
+        if self.select == "brierbest":
+            return self.best_brier
+        if self.averaged_epochs and self.last_epoch == self.averaged_epochs[-1]:
+            return self.last_brier
+        return None
+
     def state(self) -> dict:
-        """Fuer den Zwischenstand (`--resume`): Mittel plus Zaehler, auf der CPU."""
+        """Fuer den Zwischenstand (`--resume`): Mittel plus Zaehler, auf der CPU.
+        Die Felder ab `select` (par.16b) kamen spaeter hinzu; `load_state` liest
+        aeltere Zwischenstaende ohne sie als `final`."""
         return {
             "mode": self.mode, "decay": self.decay, "from_epoch": self.from_epoch,
             "n_averaged": self.n_averaged, "averaged_epochs": list(self.averaged_epochs),
             "model_state": (None if self.model is None else
                             {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}),
+            "select": self.select,
+            "last_epoch": self.last_epoch, "last_brier": self.last_brier,
+            "best_epoch": self.best_epoch, "best_brier": self.best_brier,
+            "best_state": (None if self.best_state is None else
+                           {k: v.clone() for k, v in self.best_state.items()}),
         }
 
     def load_state(self, state: dict | None, model, device) -> None:
@@ -149,11 +227,25 @@ class WeightAverager:
             if state[key] != getattr(self, key):
                 sys.exit(f"❌ --resume: weight_average {key}: Zwischenstand={state[key]!r} "
                          f"jetzt={getattr(self, key)!r} -- Abbruch.")
+        saved_select = state.get("select", "final")
+        if saved_select != self.select:
+            sys.exit(f"❌ --resume: weight_average select: Zwischenstand={saved_select!r} "
+                     f"jetzt={self.select!r} -- Abbruch.")
         self.n_averaged = int(state["n_averaged"])
         self.averaged_epochs = list(state["averaged_epochs"])
         if state["model_state"] is not None:
             self._ensure_model(model)
             self.model.load_state_dict({k: v.to(device) for k, v in state["model_state"].items()})
+        self.last_epoch = state.get("last_epoch")
+        self.last_brier = state.get("last_brier")
+        self.best_epoch = state.get("best_epoch")
+        self.best_brier = state.get("best_brier")
+        best_state = state.get("best_state")
+        self.best_state = None if best_state is None else {k: v.detach().cpu().clone()
+                                                           for k, v in best_state.items()}
+        if self.select == "brierbest" and self.best_epoch is not None and self.best_state is None:
+            sys.exit("❌ --resume: Zwischenstand nennt einen besten gemittelten Stand "
+                     f"(Epoche {self.best_epoch}), traegt ihn aber nicht -- Abbruch.")
 
     def cpu_state_dict(self) -> dict:
         return {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}

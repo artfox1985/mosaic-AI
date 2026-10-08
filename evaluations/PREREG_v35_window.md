@@ -1090,6 +1090,61 @@ Epoche oder Mitfuehren des besten Mittels; BN-Neuschaetzung dann fuer diesen Sta
 (CI-Breite rund 0,0004 bei gepaarter Messung) und damit ein Fall fuer den Schnellblick par.19.0 gegen b02, nicht fuer
 eine volle Arena.
 
+### par.16b ARM v35-b08b: EMA MIT AUSWAHL AM EIGENEN BRIER-MINIMUM (REGISTRIERT VOR dem Lauf, 2026-10-08)
+
+**Bauform:** EMA ueber die Epochen wie b08 (decay 0,75 ab Epoche 2), aber gespeichert wird als `_avg` nicht der
+Endstand des Mittels nach Epoche 12, sondern der gemittelte Stand mit dem besten EIGENEN Val-Brier
+(`avg_value_val_brier` je Epoche, erstes Minimum, streng kleiner, dieselbe Regel wie `_brierbest`). Neuer
+train.py-Knopf `--weight-average-select {final,brierbest}`, Default `final` = Bauform b08 (byte-gleich). Bei
+`brierbest` haelt der Averager nach jeder Epochen-Validierung des Mittels eine CPU-Kopie des gemittelten
+`state_dict` fest, wenn dessen Brier streng besser ist (Speicher: eine Modellkopie, b08-`_avg.pth` 11.532.710
+Byte); am Ende wird dieser Stand eingesetzt, DANN laufen BN-Neuschaetzung, Schlussvalidierung, `_avg.pth` und
+`_avg.onnx`. Manifest-Block `weight_average` neu mit `select`, `selected_epoch`, `selected_avg_value_val_brier`
+(Brier mit gemittelten BN-Buffern, vor der Neuschaetzung; `value_val_brier` bleibt der Brier des gespeicherten
+Stands nach der Neuschaetzung). Der festgehaltene Stand geht in den `_resume`-Zwischenstand; der Fingerabdruck
+traegt `weight_average_select` nur mit Knopf. Die Mitschrift zieht keinen Zufallszustand und steht im
+`preserved_rng`-Block der Zusatz-Validierung (Einzelstand-Pfad bitgleich wie par.16a).
+
+**Arm:** `v35-b08b` = b02-Monolith `data/.cache_8e8096768cf0.h5` (kein Blockbau, kein Merge; Schluessel und Stempel
+werden geprueft), Training byte-gleich b02 (`--file-list data/window_v35_b02.txt`, val_frac aus
+`data/window_v35_b02.valfrac`, Warmstart `v34-b01_brierbest`, Seed 20260965) plus `--weight-average ema
+--weight-average-decay 0.75 --weight-average-from-epoch 2 --weight-average-select brierbest`. Kette
+`tools/night_v35_b08b_chain.sh` (Manifest-Diff gegen b02: erlaubt `name`, `weight_average` none -> ema, neu
+`weight_average_select` = brierbest; `mosaic_env` byte-gleich b02; Einzelstand-Brier je Epoche Wert fuer Wert gleich
+b02; `selected_epoch` = erstes Minimum von `avg_value_val_brier`).
+
+**Messung:** (a) Vorab-Test wie par.16: `checkpoint_val_eval.py` gepaart ueber die 120 Val-Dateien
+(`data/window_v35_b02_val.txt`), Referenz `_brierbest` (Einzelstand desselben Laufs) gegen `_avg`, Artefakt
+`checkpoint_val_eval_v35-b08b_avg_vs_brierbest.json`. (b) Nur bei bestandenem Vorab-Test: Schnellblick par.19.0
+gegen `models/alphazero_v35-b02_brierbest.onnx` mit `alphazero_v35-b08b_avg.onnx`, Spec
+`models/v34-b01_brierbest.spec.json` beidseits, @400, `--fixed-length`, 2 x 50 Paare, Seeds 20261700/20261701,
+Artefakte `quicklook_v35-b08b_vs_v35-b02_s<seed>.json`, dazu `arena_column_probe.py`, `plate_points_from_arena.py`,
+`gating_block_z.py` gepoolt (sechs Standard-Kennzahlen).
+
+**Lesart, vorab:** Vorab-Test BESTANDEN heisst: das CI95 der Brier-Differenz Referenz minus `_avg` liegt NICHT ganz
+unter 0 (ganz unter 0 = das Mittel hat den groesseren Brier, Arm beendet ohne Schnellblick). Das ist bewusst
+schwaecher als die par.16-Regel (CI ganz ueber 0): die erwartete Differenz liegt innerhalb der Val-Aufloesung, die
+Entscheidung faellt im Schnellblick. Schnellblick-Lesart wie par.19.0 Punkt 4: gepoolt >= 55 % ODER Block-z >= +1,5 =
+"spannend" (volle Breite gegen b02 nur nach Koordinator-Entscheid); unter 45 % Gegenbefund; dazwischen kein Hebel.
+
+**Erwartung (HERLEITUNG aus der Tabelle par.16a, nicht gemessen):** da der Einzelstand-Pfad bitgleich b02 und b08
+ist, sollte das Mittel Epoche fuer Epoche das von b08 sein und die Auswahl auf Epoche 5 fallen (b08: Mittel-Brier
+0,18930 gegen bestes Einzel-Brier 0,18942 in Epoche 5, also +0,00012; Policy-Val Mittel 0,4781 gegen Einzelstand
+0,4835, also rund +0,005). Der Brier nach der BN-Neuschaetzung kann davon leicht abweichen (b08-Endstand: 0,18966
+vorher, 0,18967 nachher). Beide Unterschiede liegen innerhalb der Val-Aufloesung (gepaartes CI in par.16a rund
+0,0004 breit); erwartet ist darum ein bestandener Vorab-Test mit CI ueber 0 hinweg und ein Schnellblick nahe 50 %.
+
+**Pruefstellen des Baus:** `weight_average.py:74-75` (`WEIGHT_AVERAGE_SELECTS`, Default `final`),
+`weight_average.py:84-91` (Validierung: unbekannte Auswahl und `brierbest` ohne Mittelung brechen ab),
+`weight_average.py:167-181` (`observe_val_brier`, erstes Minimum, CPU-Kopie), `:183-195` (`apply_selection`),
+`:197-203` (`selected_brier`), `:205-249` (`state`/`load_state` mit festgehaltenem Stand, alte Zwischenstaende laden
+als `final`, Auswahlwechsel bricht ab); `train.py:1246` (Signatur-Default `"final"`), `:1283` (Validierung), `:1597`
+(Manifest `cli_args`), `:2273-2276` (Fingerabdruck nur mit Knopf, Averager), `:2475` (Mitschrift im
+`preserved_rng`-Block), `:2871-2894` (Manifest-Block und Auswahl VOR `recompute_bn_stats`), `:3140-3144`
+(`selected_by`), Parser `--weight-average-select` (Literal-Default `final`). Tests
+`tools/tests/test_weight_average.py` (Auswahl, `final` unveraendert, Resume, Validierung, Parser- und
+Signatur-Default, Quelltext-Reihenfolge).
+
 ### par.13-16 ZUSAMMENFASSUNG DER NETZARME (Arm-Kette 2026-10-06 06:45 bis 2026-10-07 07:38, 24,9 h)
 
 | Arm | Aenderung gegen b02 | Val-Brier-Minimum (Epoche) | Tor 1 gegen v34-b01, gepoolt | Block-z | Verdikt |
@@ -1858,6 +1913,22 @@ Breite ueber die Schwelle kaeme; nach Regel nicht zu fahren, Nutzer-Entscheid mo
 **Kosten der Reihe (gemessen):** 6 Trainings, 10 Schnellblick-Seeds (2.000 Partien), 10,1 h Kette; je Arm 1,4 h (b14b, ohne
 Blockbau) bis 1,76 h, Kostenschaetzung par.19.0 Punkt 5 (1,9 h je Arm) gehalten. Alle Laufzeiten in `docs/measured_runtimes.md`.
 
+### par.19.5c VOLLE BREITE v35-b15 GEGEN b02 (NUTZER-ENTSCHEID 2026-10-08 gegen die Lesart par.19.0, REGISTRIERT VOR dem Lauf)
+
+**Anlass:** b15 lag im Schnellblick mit 54,0 % (Block-z +0,95) als einzige Variante an der Schwelle (par.19.5b); die Lesart par.19.0
+Punkt 4 sagt "kein Hebel". Nutzer 2026-10-08 (Reihenfolge: "zuerst die technisch offenen themen. dann b08b, dann b5 und b16"):
+die volle Breite wird trotzdem gefahren. Das ist ein Entscheid GEGEN die vorregistrierte Lesart und wird als solcher gefuehrt
+(Hausregel: ein umgangenes Tor wird registriert, nicht still ueberschritten).
+
+**Messung:** `tools/paired_gating.py` @400 beidseits, A = `alphazero_v35-b15_best.onnx`, B = `alphazero_v35-b02_brierbest.onnx`, Spec
+`v34-b01_brierbest` beidseits, Blockgroesse 5, `--log-games`, `--resume`, Seeds 20261600/20261601 a 200 Paare (SPRT alpha = beta =
+0,001 darf frueher stoppen), Stufenregel 20261602 bei genau einem Seed ueber +1,96; Artefakte `gating_v35-b15_vs_v35-b02_s<seed>.json`,
+sechs Standard-Kennzahlen je Seed, Block-z gepoolt. **Kriterium wie par.12:** Block-z >= +1,96 oder gepoolt >= 52,5 % ohne
+Gegenbefund = b15 traegt gegen b02; dann (und nur dann) begruendet b15 einen Vorzug vor b02 (par.19, letzter Absatz). Die
+Schnellblick-Seeds 20261700/01 gehen NICHT in die Poolung ein (andere Seeds, andere Laenge). Vorab: Aufloesung bei n = 800 rund
++-3,5 Punkte Siegquote; Erwartung aus dem Schnellblick 50 bis 55 %, also eher "kein Hebel" mit besserer Aufloesung. Kosten
+HERLEITUNG 2 x rund 2 h (18 s je Partie). Kette `tools/night_v35_b15_full_chain.sh` (Muster `tree_reuse_arena_chain.sh`).
+
 **Reihenfolge (Nutzer-Rang, par.13f-Diskussion):** b11 und b12 zusammen gebaut (gleiche Funktion), b13 als Kontrolle
 daneben, dann b14a/b14b, zuletzt b15. **Bau erst nach dem Ende der laufenden Ketten** (Arm-Kette, dann b10/b09): die
 Datenschicht (`corpus_dataset.py`, `trajectory_bootstrap.py`, `file_cache_key.py`) wird von den Cache-Workern und von
@@ -1870,3 +1941,31 @@ Variante (Gewichte, Normierung, Spiegelung, Rueckfall), Marker in beiden Schlues
 Bootstrap-Quelle als Hebel abgeschlossen; was von der Reihe bleibt, ist der Fenster-Effekt @400 (par.12) und die
 tragenden Arme b03/b05/b06 als gleichwertige Kandidaten neben b02. Ist eine "spannend", faehrt sie die volle Breite
 gegen b02, und erst eine dort gefallene Kante begruendet einen Vorzug vor b02.
+
+## par.20 ARM v35-b16: POLICY-TRAEGER-HEBEL GESTAPELT (b10-TRAEGER PLUS b09-PARTIEN) (NUTZER 2026-10-08: "dann b5 und b16"; REGISTRIERT VOR Bau und Lauf)
+
+**Frage:** Addieren sich die beiden Policy-Traeger-Hebel der Reihe? b10 (alle 1.200 b02-Dateien als Policy-Traeger statt 400) trug
+60,9 % gegen v34-b01 (z +6,22, par.18b), b09 (400 neue Policy-Partien @400 dazu, Traeger 800 von 1.600) 59,1 % (z +4,15, par.17c);
+beide bestaetigten denselben Befund (Policy-Kopf stichprobenbegrenzt). b16 nimmt beides: das b09-Fenster (1.600 Dateien = b02 1.200
+plus 400 `policy-s400-vol`) mit ALLEN 1.600 Dateien als Policy-Traeger (Traeger-Manifest `policy_carrier_manifest_v35_b16.json`,
+`tools/generate_carrier_manifest.py --from-list data/window_v35_b09.txt --n-files 1600`).
+
+**Bau (keine Erzeugung, kein Blockbau, keine Code-Aenderung):** Bloecke sind traegeragnostisch und liegen fuer alle 1.600 Dateien
+(b09-Kette); nur ein neuer Merge unter neuem Fenster-Schluessel (Traegermenge im Schluessel, `corpus_dataset.py:539`). Split wie b09:
+Val-Pool der fuenf b02-Klassen, `val_frac` 0,075, Val-Liste byte-gleich b02 (120 Dateien, Kette diffed; Abweichung = STOPP),
+Trainingsanteil 1.480 Dateien. Training byte-gleich b02/b09 (Warmstart `v34-b01_brierbest`, Seed 20260965, 12 Epochen, lambda 0,7,
+Wertmaske, `--select-by-brier`); Manifest-Diff gegen b09: erlaubt nur `name`, `cache_file`, `MOSAIC_CARRIER_MANIFEST`.
+Erwartung HERLEITUNG: Samples wie b09 (2,83 M), Traegeranteil je Epoche 100 statt 50 %.
+
+**Messung:** (1) Offline vorab gegen b02 und gegen b10 (`checkpoint_val_eval.py`, b02-Val-Satz, gepaart): Brier und Policy-CE
+(auf der b02-Traegermaske, Werkzeug mit `--train-manifest` b02, wie par.18). (2) Tor 1 wie die Reihe: gepaart gegen v34-b01 @400,
+Spec `v34-b01_brierbest` beidseits, Seeds 20261600/20261601 a 200 Paare, Stufenregel, Kriterium Block-z >= +1,96 oder gepoolt
+>= 52,5 %. **Lesart vorab:** (a) b16 gepoolt ueber b10 UND b09 auf denselben Seeds (b10 60,9 %, b09 59,1 %) um mehr als die
+Seed-Streuung (CLAUDE.md: 5,75 Punkte bei n = 400; bei n rund 700 HERLEITUNG rund 4 Punkte) = die Hebel addieren sich; (b) b16 im
+Band von b10 (57 bis 65 %) = gesaettigt, der zweite Hebel legt nichts auf den ersten; (c) b16 unter b09 = die Stapelung schadet
+(Traegeranteil 100 % auf 1.600 Dateien verdraengt das Wertmaterial). Eine direkte Kante b16 gegen b10 (2 x 200 Paare, rund 4 h)
+laeuft nur nach Nutzer-Entscheid, wenn (a) oder (c) nahe der Grenze liegt. Die sechs Standard-Kennzahlen wie immer.
+
+**Kosten (HERLEITUNG aus b09/b10):** Manifest Sekunden, Merge rund 7 min (1.480 Bloecke, b09: 418 s), Training rund 40 min (b09:
+2.355 s mit Nebenlast), Offline 1 min, Tor 1 2 x rund 2 h; zusammen rund 5 h. Kette `tools/night_v35_b16_chain.sh` (Muster
+`night_v35_b09_b10_chain.sh`, Arm b09 ohne Erzeugung, Traeger 1.600 statt 800), Start nach b08b und b15 (Nutzer-Reihenfolge).

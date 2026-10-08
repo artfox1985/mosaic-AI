@@ -57,14 +57,16 @@ from torch.utils.data import DataLoader
 from freeze_trunk import (OwnershipValLoss, TrunkFreeze, plateau_series_for,
                           validate_freeze_args)
 from weight_average import (WEIGHT_AVERAGE_MODES, DEFAULT_WEIGHT_AVERAGE_DECAY,
-                            DEFAULT_WEIGHT_AVERAGE_FROM_EPOCH, WeightAverager,
+                            DEFAULT_WEIGHT_AVERAGE_FROM_EPOCH, WEIGHT_AVERAGE_SELECTS,
+                            DEFAULT_WEIGHT_AVERAGE_SELECT, WeightAverager,
                             copy_bn_stats, preserved_rng, recompute_bn_stats,
                             validate_weight_average_args)
-# Die Literale in der train()-Signatur und im argparse-Block (none / 0.75 / 2) MUESSEN diesen
+# Die Literale in der train()-Signatur und im argparse-Block (none / 0.75 / 2 / final) MUESSEN diesen
 # Konstanten entsprechen: tools/tests/source_parser.py baut den Parser per exec ohne die
 # Importe nach, und ast.literal_eval liest die Signatur-Defaults (test_margin_thresholds.py).
 assert WEIGHT_AVERAGE_MODES == ("none", "ema", "swa")
 assert DEFAULT_WEIGHT_AVERAGE_DECAY == 0.75 and DEFAULT_WEIGHT_AVERAGE_FROM_EPOCH == 2
+assert WEIGHT_AVERAGE_SELECTS == ("final", "brierbest") and DEFAULT_WEIGHT_AVERAGE_SELECT == "final"
 
 
 # ── Diagnose-Instrumentierung (2026-07-31, Task #11 Phase 2, fs_2d_s1-
@@ -1241,7 +1243,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           overwrite_model=False, recipe_info=None,
           margin_thresholds=False, margin_threshold_weight=1.0,
           weight_average="none", weight_average_decay=0.75,
-          weight_average_from_epoch=2):
+          weight_average_from_epoch=2, weight_average_select="final"):
     # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
     # Zwischenstand wird VOR dem teuren Daten-Laden gelesen: fehlt er, soll
     # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
@@ -1278,7 +1280,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
     # PREREG_v35_window.md par.16: Gewichtsmittelung, ebenfalls VOR dem Datenaufbau.
     validate_weight_average_args(weight_average, weight_average_decay, weight_average_from_epoch,
-                                 input_epoch, freeze_trunk)
+                                 input_epoch, freeze_trunk, weight_average_select)
     # Task #34: harte Validierung wie bei --value-target-lambda -- kein
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
@@ -1591,6 +1593,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "weight_average": weight_average,
         "weight_average_decay": weight_average_decay,
         "weight_average_from_epoch": weight_average_from_epoch,
+        # par.16b (Arm v35-b08b): welcher gemittelte Stand als `_avg` gespeichert wird.
+        "weight_average_select": weight_average_select,
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -2265,7 +2269,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         _resume_fingerprint["weight_average"] = weight_average
         _resume_fingerprint["weight_average_decay"] = weight_average_decay
         _resume_fingerprint["weight_average_from_epoch"] = weight_average_from_epoch
-        weight_averager = WeightAverager(weight_average, weight_average_decay, weight_average_from_epoch)
+        # par.16b: nur mit Knopf im Fingerabdruck, damit Zwischenstaende von `final`-Laeufen passen.
+        if weight_average_select != "final":
+            _resume_fingerprint["weight_average_select"] = weight_average_select
+        weight_averager = WeightAverager(weight_average, weight_average_decay, weight_average_from_epoch,
+                                         weight_average_select)
     start_epoch = 0
     if _resume is not None:
         check_resume_fingerprint(_resume["fingerprint"], _resume_fingerprint)
@@ -2462,6 +2470,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 _avg_val = _validate_one_epoch(
                     weight_averager.model, val_dataloader, val_dataset, device, encoder, _loss_setup,
                 )
+                # par.16b: Brier mitschreiben; bei --weight-average-select brierbest den Stand
+                # festhalten, wenn er streng besser ist (CPU-Kopie, kein RNG-Zug).
+                weight_averager.observe_val_brier(_avg_val["epoch_val_brier"], epoch + 1)
             if _avg_val["epoch_val_ploss"] is not None:
                 _avg_value_term = (_avg_val["epoch_val_brier"]
                                    if (select_by_brier and _avg_val["epoch_val_brier"] is not None)
@@ -2842,6 +2853,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     #     Schlussvalidierung GENAU des Stands, der als `_avg` gespeichert wird.
     #     Scheitert die Neuschaetzung, gilt die BN-Statistik des letzten
     #     Epochenstands (`bn_stats: "last_epoch"`).
+    #     par.16b (--weight-average-select brierbest): VOR der Neuschaetzung wird
+    #     der festgehaltene gemittelte Stand mit dem besten eigenen Val-Brier
+    #     eingesetzt; Neuschaetzung, Schlussvalidierung und `_avg` gelten dann ihm.
     weight_average_block = None
     weight_average_final_val = None
     if weight_averager is not None:
@@ -2851,6 +2865,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             "from_epoch": weight_average_from_epoch,
             "n_averaged": weight_averager.n_averaged,
             "averaged_epochs": list(weight_averager.averaged_epochs),
+            # par.16b: Auswahl des gespeicherten Stands. selected_epoch = Epoche, nach der das
+            # gespeicherte Mittel stand; selected_avg_value_val_brier = sein Brier aus
+            # epoch_history (gemittelte BN-Buffer, VOR der Neuschaetzung).
+            "select": weight_average_select,
+            "selected_epoch": None, "selected_avg_value_val_brier": None,
             "bn_stats": None, "bn_batches": None,
             # Kennzahlen des GESPEICHERTEN `_avg`-Stands (nach der BN-Neuschaetzung);
             # tools/brier_best_checkpoint.py vergleicht `value_val_brier` mit den Einzelstaenden.
@@ -2864,6 +2883,15 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             print(f"⚠️  --weight-average {weight_average}: kein Stand gemittelt (Lauf endete vor "
                   f"Epoche {weight_average_from_epoch}) -- es entsteht kein _avg.")
         else:
+            _selected_epoch = weight_averager.apply_selection(device)
+            if _selected_epoch is None:
+                # brierbest ohne einen einzigen gemessenen Brier: kein stiller Wechsel der
+                # Bauform -- der Endstand bleibt, selected_epoch bleibt None im Manifest.
+                print(f"⚠️  --weight-average-select {weight_average_select}: kein Val-Brier des Mittels "
+                      f"gemessen -- gespeichert wird der ENDSTAND des Mittels (selected_epoch=None).")
+            weight_average_block["selected_epoch"] = _selected_epoch
+            weight_average_block["selected_avg_value_val_brier"] = (
+                weight_averager.selected_brier() if _selected_epoch is not None else None)
             try:
                 _bn_batches = recompute_bn_stats(
                     weight_averager.model, dataloader,
@@ -2892,7 +2920,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             weight_average_block["checkpoint"] = f"alphazero_{version_name}_avg.pth"
             _wf_brier_s = f"{_wf['epoch_val_brier']:.4f}" if _wf["epoch_val_brier"] is not None else "n/a"
             print(f"🧮 Gemittelter Stand ({weight_average}, {weight_averager.n_averaged} Epochen "
-                  f"{weight_averager.averaged_epochs}, BN {weight_average_block['bn_stats']}): "
+                  f"{weight_averager.averaged_epochs}, Auswahl {weight_average_select}: Stand nach "
+                  f"Epoche {_selected_epoch}, BN {weight_average_block['bn_stats']}): "
                   f"Value-Brier={_wf_brier_s}")
 
     # 6. Speichern
@@ -3108,7 +3137,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         avg_checkpoint["model_state"] = weight_averager.cpu_state_dict()
         avg_checkpoint["epochs"] = actual_epochs
         avg_checkpoint["is_averaged_checkpoint"] = True
-        avg_checkpoint["selected_by"] = f"weight_average({weight_average}, PREREG_v35_window.md par.16)"
+        avg_checkpoint["selected_by"] = (
+            f"weight_average({weight_average}, PREREG_v35_window.md par.16)"
+            if weight_average_select == "final" else
+            f"weight_average({weight_average}, select {weight_average_select} epoch "
+            f"{weight_average_block['selected_epoch']}, PREREG_v35_window.md par.16b)")
         avg_checkpoint["weight_average"] = weight_average_block
         avg_checkpoint["policy_pct"] = None
         for _k in ("final_policy_loss", "final_value_loss", "final_points_loss",
@@ -3373,6 +3406,12 @@ if __name__ == "__main__":
                         help="EMA-decay je Epoche (nur --weight-average ema; Default 0.75 nach KataGo).")
     parser.add_argument("--weight-average-from-epoch", type=int, default=2,
                         help="Erste Epoche (1-basiert), die ins Mittel eingeht (Default 2).")
+    parser.add_argument("--weight-average-select", choices=("final", "brierbest"), default="final",
+                        help="PREREG_v35_window.md par.16b: welcher gemittelte Stand als _avg gespeichert "
+                             "wird. final = Mittel nach der letzten Epoche (Default, byte-identisch); "
+                             "brierbest = der gemittelte Stand mit dem kleinsten eigenen Val-Brier "
+                             "(epoch_history avg_value_val_brier, erstes Minimum), BN-Neuschaetzung und "
+                             "Schlussvalidierung fuer DIESEN Stand. Nur mit --weight-average ungleich none.")
     parser.add_argument("--wdl-label-smooth", type=float, default=0.0,
                         help="Erosions-Arm A: Label-Smoothing eps auf dem harten WDL-Ziel "
                              "(1 -> 1-eps/2, 0 -> eps/2) -- testet die Memorisierungs-Hypothese. "
@@ -3762,4 +3801,5 @@ if __name__ == "__main__":
           margin_threshold_weight=args.margin_threshold_weight,
           weight_average=args.weight_average,
           weight_average_decay=args.weight_average_decay,
-          weight_average_from_epoch=args.weight_average_from_epoch)
+          weight_average_from_epoch=args.weight_average_from_epoch,
+          weight_average_select=args.weight_average_select)

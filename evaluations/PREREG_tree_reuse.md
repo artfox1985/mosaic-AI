@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | Beleg: nichts gemessen; Code-Lesung par.2a und additiver Entwurf im Code (Spec-Feld `tree_reuse`, UNKOMPILIERT, 2026-10-05); Runde-5-Schalter Default an, par.5.4 entschieden; uebrige Nutzer-Entscheide par.5 offen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | Beleg: TRAEGT, KNAPP (par.3c): v35-b17 = v34-b01 + tree_reuse-Spec gegen v34-b01 ohne, drei Seeds 637:563 = 53,1 %, Block-z +2,22 (120 Bloecke), Punkte +1,1 bis +2,1 je Seed; gleiches Netz, Gewinn gehoert der Suche. Kompilat, Wheel cd8995bf, Anker-Drift GRUEN (par.2b). b18 (Spec auf b10/b16) und par.5.6 = Nutzer-Entscheid. -->
 
 # Vorregistrierung: Tree Reuse unterhalb der Wurzel (Suchknopf, Spieler-Identitaet)
 
@@ -187,6 +187,45 @@ gut besuchte alte Kinder mit kleinem Prior; (f) Trefferquote unbekannt: ein Tref
 als expandierten Knoten unter dem gespielten Kind; (g) Entscheide werden verlaufsabhaengig: eine Einzelstellung
 nachzusuchen (Replay, Diagnose-Sonden) reproduziert den Arena-Zug mit Knopf an nicht mehr.
 
+## par.2b KOMPILAT, WHEEL, ANKER, NAMEN UND SMOKE (2026-10-08 15:35-15:55, Nutzer: "zuerst die technisch offenen themen")
+
+**Kompilat.** Der Entwurf aus par.2 (seit 2026-10-05 unkompiliert) hatte genau einen Fehler: E0502 an der Wurzel-Uebernahme
+(`net_mcts.rs` um Zeile 6902, `nodes[0].untried.push((act, nodes[cid].prior))` leiht `nodes` doppelt); behoben durch Lesen des
+Priors vor dem Push (Commit `1b256d1a`). Danach `cargo test --release --no-run` ohne Warnung (Bibliothek, Tests, Beispiele,
+Benches), `cargo test --release` **861 bestanden, 0 fehlgeschlagen, 23 ignoriert** (325 s), darin die Netz-Paritaets-Fixture
+`net_parity_hash_matches_champion_fixture` und die Knopfregister-Waechter (`knob_registry::tests`, mit den sechs neuen
+Eintraegen aus par.19 der v35-Prereg).
+
+**Wheel und Anker.** `python -m maturin build --release` 36,6 s, Wheel `mosaic_rust-1.1.0-cp314-cp314-win_amd64.whl` sha256
+`cd8995bf71c6…db21`, installiert. Anker-Drift gegen `hv4_anchor` (`/mosaic-anchor-invariance`): **GRUEN, 1.763 Schritte Feld
+fuer Feld gleich** (`anchor_drift_live_wheel_20261008_treereuse.json`, 25 s). Der Knopf ist per Default aus (`MOSAIC_TREE_REUSE`
+ohne Variable 0, `net_mcts.rs:395-405`), der Anker bewegt sich mit dem neuen Wheel nicht; die Konservierungs-Pruefung (`--venv`)
+war nicht faellig (kein Umgebungswechsel).
+
+**Namen (gemessene Identitaet = Modell plus Spec, Hausregel):**
+
+| Name | Netz | Spec | Zweck |
+| --- | --- | --- | --- |
+| **v35-b17** | `alphazero_v34-b01_brierbest.onnx` | `models/v35-b17.spec.json` = Champion-Spec plus `tree_reuse` 1, `tree_reuse_round5` 1 | Arm A von par.3; Gewinn gehoert dem Knopf allein |
+| v35-b18 (reserviert) | `alphazero_v35-b10_brierbest.onnx` | dieselbe Spec | nur falls b17 traegt: Knopf auf dem staerksten Netz der Reihe |
+
+Nutzer 2026-10-08: Namen vorgeschlagen, keine Aenderung gewuenscht (Chat "haben wir schon namen registriert", Antwort: nein,
+Vorschlag b17/b18).
+
+**Smoke (`smoke_tree_reuse_v35-b17_vs_v34-b01_s20261690.json`, 5 Paare @400, `--fixed-length`, 10 Threads):** laeuft durch,
+3:7 (n = 10, keine Aussage), 204,6 s = 20,5 s je Partie. Diagnose je Partie aus dem Log (`[tree_reuse]`, `self_play.rs:6869-6876`,
+`TreeReuseDiag` `net_mcts.rs:8035`): die Reuse-Seite uebernimmt den Baum in rund zwei Dritteln ihrer Suchen (Beispiele: 46 von
+71, 45 von 70, 47 von 66, 49 von 73 Suchen; Grundmenge Suchen je Partie und Seite), uebernommene Besuche 4.919 bis 8.310 je Partie
+gegen 26.400 bis 30.400 neue Sims (also rund 18 bis 29 % Zusatzbesuche), die Gegenseite 0/0 (Knopf wirkt nur ueber die Spec der
+Seite A, wie gebaut). Nicht uebernommen wird, wenn der Zustandsvergleich `retained_world_matches` keinen Treffer gibt (Zufallsknoten,
+Stapelzuege, andere Mondreihenfolge; par.2); der Anteil der Fehlschlaege (rund ein Drittel) ist damit die erste Zahl zu par.5.6.
+**Zugzeit:** 20,5 s je Partie gegen 17,6 bis 18,1 s in den Schnellblick-Laeufen desselben Tages (beide Seiten ohne Reuse); ob der
+Aufschlag der Reuse-Seite gehoert (Zustandsvergleich, Baum-Halten) oder der Nebenlast (ein Agent lief Unit-Tests), ist UNGEPRUEFT;
+die Arena misst es ohne Nebenlast, aber nicht je Seite getrennt (paired_gating fuehrt keine Zugzeit je Seite).
+
+**Arena par.3** startet als `tools/tree_reuse_arena_chain.sh` (Seeds 20261600/20261601 a 200 Paare, Stufenregel 20261602,
+`--resume`, sechs Kennzahlen je Seed, Block-z gepoolt; Kosten HERLEITUNG rund 2 h je Seed bei 18 bis 20 s je Partie).
+
 ## par.3 Messung (Tor, vorab)
 
 Gepaarte Arena `tools/paired_gating.py`, A = `v34-b01_brierbest` mit Spec `v34-b01_brierbest` plus `tree_reuse` 1
@@ -194,6 +233,103 @@ und `tree_reuse_round5` 1 (Runde 5 MIT Reuse, par.5.4), B = dieselbe Spec ohne; 
 Stufenregel 20261602. Kriterium wie Tor 1: Block-z >= +1,96 oder gepoolt >= 52,5 Prozent ohne Gegenbefund.
 Berichtet: die sechs Standard-Kennzahlen, volle Spalten je Seite (Tor 2b), Zugzeit je Seite. Zuordnung vorab:
 ein Gewinn gehoert dem Knopf allein (gleiches Netz, gleiche Spec sonst).
+
+### par.3a ERGEBNIS SEED 1 (2026-10-08 16:24-18:53, `tools/tree_reuse_arena_chain.sh`, Tab c10; Nebenlast: Sekunden-Trockenpruefungen eines Ketten-Agenten, s. u.)
+
+**Seed 20261600: v35-b17 223:177 = 55,8 %** (n = 400, 200 Paare, Deckel), SPRT `UNDECIDED_CAP_REACHED` (LLR +2,26), **Block-z
++2,42** (40 Bloecke, Mittel 0,558, sd 0,150), gepaarte Differenz +0,23, McNemar p = 0,030, A-Sweep 63 / B-Sweep 40 / Split 97.
+Laufzeit 7.480,2 s = **18,70 s je Partie** (10 Threads; Schnellblick-Laeufe ohne Reuse am selben Tag 17,6 bis 18,2 s: der Aufschlag
+der Reuse-Seite liegt damit HERLEITUNG bei rund 3 bis 6 % der Partiezeit, nicht je Seite getrennt erhoben). Nebenlast: ein Agent
+hat waehrend des Laufs Trockenpruefungen von wenigen Sekunden gefahren (Importe, Dry-Runs), gemeldet nach CLAUDE.md; Block-
+zeiten unauffaellig.
+
+Die sechs Kennzahlen (Grundmenge Bretter je Modell, n = 400 je Seite; gleiches Netz beidseits, Unterschied allein der Knopf):
+
+| Kennzahl je Brett | v35-b17 (Reuse) | v34-b01 (ohne) | gepaart [KI95] |
+| --- | --- | --- | --- |
+| Volle Spalten | **1,160 +- 0,037** | 1,048 +- 0,036 | - |
+| Spalten >= 4 | 2,34 | 2,34 | - |
+| Zeilenfuellung H | 0,620 | 0,598 | - |
+| Strafsteine | 8,07 | 7,82 | - |
+| Eigene Punkte | 58,62 | 56,55 | - |
+| Margin | +2,06 | -2,06 | - |
+| Plattenpunkte gesamt | 8,76 | 8,12 | - |
+| Platzierungspunkte | 54,94 | 53,22 | - |
+| davon Vertikale Reihen (83 Paare) | | | **+1,60 [+0,61; +2,60]** |
+| davon Spezialfelder (76 Paare) | | | -0,34 [-1,12; +0,45] |
+
+**Lesung vorab (ohne Verdikt, das faellt gepoolt):** der Knopf aendert nicht die Priorwahl (Spalten >= 4 gleich), sondern die
+Vollendung: 0,11 volle Spalten je Brett mehr bei gleichem Netz ist der groesste Spalteneffekt der v35-Reihe (b02 gegen v34-b01:
++0,05 bis +0,08; b09 +0,02 bis +0,08), und die vertikalen Reihen tragen als einziges Kriterium mit CI ueber 0. Passt zur
+Erwartung par.1/S3 (Absichtspersistenz: der gehaltene Teilbaum traegt die begonnene Spalte ueber mehrere Zuege). Seed 20261601
+laeuft seit 18:53 (Stand nach 40 Paaren 37:43).
+
+### par.3b ERGEBNIS SEED 2 UND STUFENREGEL (2026-10-08 18:53-20:31, exklusiv)
+
+**Seed 20261601: v35-b17 204:196 = 51,0 %** (n = 400, 200 Paare, Deckel), SPRT `UNDECIDED_CAP_REACHED` (LLR -3,29), Block-z **+0,42**
+(40 Bloecke, Mittel 0,510, sd 0,150), gepaarte Differenz +0,04, McNemar p = 0,76, A-Sweep 50 / B-Sweep 46 / Split 104. Laufzeit
+7.333,0 s = 18,33 s je Partie (Seed 1 18,70 s).
+
+Die sechs Kennzahlen (Bretter je Modell, n = 400 je Seite):
+
+| Kennzahl je Brett | v35-b17 (Reuse) | v34-b01 (ohne) | gepaart [KI95] |
+| --- | --- | --- | --- |
+| Volle Spalten | 1,045 +- 0,037 | 1,025 +- 0,037 | - |
+| Spalten >= 4 | 2,36 | 2,35 | - |
+| Zeilenfuellung H | 0,609 | 0,593 | - |
+| Strafsteine | 7,81 | 8,01 | - |
+| Eigene Punkte | 57,87 | 56,80 | - |
+| Margin | +1,07 | -1,07 | - |
+| Plattenpunkte gesamt | 8,41 | 8,55 | - |
+| Platzierungspunkte | 54,34 | 53,62 | - |
+| davon Vertikale Reihen (84 Paare) | | | -0,25 [-1,30; +0,80] |
+
+Der Spalteneffekt aus Seed 1 (+0,11 volle Spalten, Vertikale +1,6) fehlt auf Seed 2 (+0,02, Vertikale -0,25); Punkte und Margin
+bleiben leicht positiv. **Gepoolt nach zwei Seeds: 427:373 = 53,4 %** (n = 800), **Block-z +2,00** (80 Bloecke, Mittel 0,534, sd 0,151).
+Seeds einzeln ueber +1,96: genau einer (Seed 1), darum greift die Stufenregel aus par.3: **dritter Seed 20261602 laeuft seit
+20:31** (Kette automatisch), Verdikt danach gepoolt ueber drei Seeds nach dem Kriterium Block-z >= +1,96 oder gepoolt >= 52,5 %
+ohne Gegenbefund. Lesung vorab: nach zwei Seeds liegt b17 genau an der Schwelle (gepoolt +2,00, 53,4 %); der dritte Seed
+entscheidet, ob der Knopf die Suche bei gleichem Netz messbar staerker macht, oder ob Seed 1 ein Ausreisser war. Zum Vergleich auf
+denselben beiden Seeds: b02 (anderes Netz, gleiche Spec) 54,6 %, z +2,50.
+
+### par.3c VERDIKT: TREE REUSE TRAEGT, KNAPP (dritter Seed 2026-10-08 20:31-23:12; Kette fertig 23:12:08, 24.480 s = 6,8 h)
+
+**Seed 20261602 (Stufenregel): v35-b17 210:190 = 52,5 %** (n = 400, 200 Paare, Deckel), SPRT `UNDECIDED_CAP_REACHED` (LLR -1,34),
+Block-z **+1,01** (40 Bloecke, Mittel 0,525, sd 0,157), gepaarte Differenz +0,10, McNemar p = 0,35, A-Sweep 52 / B-Sweep 42 / Split 106.
+Laufzeit 9.656,8 s = **24,14 s je Partie**, deutlich ueber Seed 1 und 2 (18,70 / 18,33 s); Ursache UNGEKLAERT (keine bekannte
+Nebenlast ausser den Warteschleifen der drei wartenden Ketten, die alle paar Sekunden die Prozessliste per PowerShell lesen;
+HERLEITUNG, nicht gemessen). Die Partien selbst sind davon nicht betroffen (Determinismus unter Last: gleiche Seeds, gleiche Zuege;
+nicht einzeln geprueft).
+
+Die sechs Kennzahlen Seed 3 (Bretter je Modell, n = 400 je Seite): volle Spalten 1,032 gegen 1,042, Spalten >= 4 2,38 gegen 2,30,
+H 0,595 gegen 0,594, Strafsteine 7,71 gegen 8,23, Punkte 58,05 gegen 56,61, Margin +1,45, Plattenpunkte 8,73 gegen 9,14,
+Platzierung 53,98 gegen 53,06; gepaart je Kriterium nur Mehrfarbige Felder mit CI unter 0 (-0,95 [-1,85; -0,04], 76 Paare).
+
+**Gepoolt ueber drei Seeds: 637:563 = 53,1 %** (n = 1.200 Partien, 600 Paare), **Block-z +2,22** (120 Bloecke, Mittel 0,531, sd 0,152).
+
+| Seed | b17 : v34-b01 | Block-z | s je Partie | volle Spalten b17 / b01 | Punkte b17 / b01 |
+| --- | --- | --- | --- | --- | --- |
+| 20261600 | 223:177 = 55,8 % | +2,42 | 18,70 | 1,160 / 1,048 | 58,62 / 56,55 |
+| 20261601 | 204:196 = 51,0 % | +0,42 | 18,33 | 1,045 / 1,025 | 57,87 / 56,80 |
+| 20261602 | 210:190 = 52,5 % | +1,01 | 24,14 | 1,032 / 1,042 | 58,05 / 56,61 |
+| **gepoolt** | **637:563 = 53,1 %** | **+2,22** | | | |
+
+**VERDIKT nach dem Kriterium par.3 (Block-z >= +1,96 ODER gepoolt >= 52,5 %, ohne Gegenbefund): TREE REUSE TRAEGT.** Beide Teile des
+Kriteriums sind erfuellt, kein Seed zeigt ein negatives Vorzeichen, die eigenen Punkte liegen in allen drei Seeds 1,1 bis 2,1 ueber
+dem Gegner bei gleichem Netz. Die Kante ist KLEIN: 3,1 Punkte Siegquote bei n = 1.200 (95-%-Intervall rund +-2,8 Punkte), die
+Zuordnung aber sauber: gleiches Netz, gleiche Spec bis auf den Knopf, der Gewinn gehoert der Suche (par.3, vorab). Zum Massstab
+der Reihe: die Netzarme legten 4,6 bis 10,9 Punkte auf v34-b01 (b02 56,8, b09 59,1, b10 60,9 %), aber mit neuem Training; der
+Knopf legt 3,1 Punkte ohne Training und laesst sich mit jedem dieser Netze kombinieren (b18, par.2b).
+
+**Was der Knopf tut (ueber die drei Seeds):** der Spalteneffekt aus Seed 1 (+0,11 volle Spalten, Vertikale +1,6) wiederholt sich in
+Seed 2 und 3 nicht (+0,02, -0,01); stabil ueber alle drei Seeds sind nur die eigenen Punkte (+1,1 bis +2,1) und die Margin. Die
+Lesung "Absichtspersistenz haelt begonnene Spalten" aus par.3a traegt damit nicht als Mechanismus-Befund; was traegt, ist ein kleiner
+Punktgewinn aus tieferer Suche bei gleichem Budget (uebernommene Besuche rund 18 bis 29 %, par.2b). Die Reuse-Fehlschlagquote
+(rund ein Drittel der Suchen ohne Treffer, Smoke) bleibt der Ansatz fuer par.5.6 (welt-tolerante Variante).
+
+**Offen / Nutzer-Entscheid:** (1) b18 = dieselbe Spec auf dem staerksten Netz der Reihe (b10, oder b16 nach par.20), Tor 1 gegen
+v34-b01 mit denselben Seeds; (2) Reuse in der Erzeugung (par.5.1, Sonde Durchlaufzeit/Diversitaet) nur, wenn eine weitere Erzeugung
+ansteht; (3) par.5.6 nur, wenn die Fehlschlagquote als Grenze gilt. Laufzeiten in `docs/measured_runtimes.md`.
 
 ## par.4 Kosten (HERLEITUNG)
 
