@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07 (par.12e), b03 58,6 %, b05 56,4 %, b06 56,9 % (par.13), b04 56,2 % (par.14c), **b10 (Schwarm als Policy-Traeger) 60,9 % z +6,22, staerkste Kante, Policy-Volumen traegt (par.18a/b)**; b07 traegt NICHT (par.15b); b08 EMA ohne Gewinn (par.16a). Keine Promotion (Nutzer). b09 laeuft; b11-b15 registriert (par.19). -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07 (par.12e), b03 58,6 %, b05 56,4 %, b06 56,9 % (par.13), b04 56,2 % (par.14c), **b10 (Schwarm als Policy-Traeger) 60,9 % z +6,22, staerkste Kante (par.18b)**, **b09 (Policy-Volumen) 59,1 % z +4,15 (par.17c)**; b07 NICHT (par.15b); b08 EMA ohne Gewinn (par.16a). Policy-Kopf stichprobenbegrenzt. Keine Promotion (Nutzer). Naechster Schritt b11-b15 (par.19). -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -1101,6 +1101,8 @@ eine volle Arena.
 | b04 | Margen-Bootstrap b = 20 | 0,19034 (4) | 674:526 = 56,2 % (3 Seeds) | +3,98 | traegt, kein Hebel (par.14c) |
 | b07 | lambda 1,0 (kein root_q) | 0,18946 (2) | 418:382 = 52,25 % | +1,26 | traegt NICHT (par.15b) |
 | b08 | EMA ueber Epochen | 0,18942 (5); EMA-Endstand 0,18967 | kein Tor 1 (Vorab-Test negativ) | - | kein Gewinn so gebaut (par.16a) |
+| b10 | Schwarm als Policy-Traeger (1.200 statt 400), 0 h Erzeugung | 0,18877 (3) | 420:270 = 60,9 % (2 Seeds, beide SPRT-Stopp) | +6,22 | traegt, staerkste Kante (par.18b) |
+| b09 | Policy-Volumen: +4.000 Partien @400 (rund 7 h Erzeugung) | 0,18880 (3) | 390:270 = 59,1 % (Seed 1 SPRT-Stopp) | +4,15 | traegt, Lesart (a) (par.17c) |
 
 Laufzeiten je Arm (Kettenausgabe): b03 rund 4,0 h, b05 4,7 h, b06 4,7 h, b04 6,65 h (drei Seeds), b07 4,3 h, b08 0,42 h;
 Bloecke plus Merge je Arm rund 20 min, Training 1.358 bis 1.691 s, Tor-1-Seed 7.100 bis 7.300 s (17,5 bis 18,2 s je
@@ -1187,6 +1189,130 @@ Training rund 2.930 s (b01 2.198 s bei 2,03 M Zustaenden, b09 rund 2,7 M); Tor 1
 10,5 h mit einem Seed. **Reihenfolge:** die Erzeugung ist CPU-Last und kann neben keiner Arena laufen; nach der Arm-Kette
 b03 bis b08 in `tools/night_v35_b09_b10_chain.sh`, dort HINTER b10 (Nutzer 2026-10-06 06:5x: *"tausch b09 mit
 b10"*; Grund par.18: b10 beantwortet Lesart (c) ohne Erzeugung, ein Nullbefund dort macht b09 entbehrlich).
+
+### par.17a ERGEBNIS v35-b09 (Policy-Volumen): ERZEUGUNG, TRAINING UND OFFLINE (2026-10-07 11:25 bis 2026-10-08 00:46, `tools/night_v35_b09_b10_chain.sh`); Tor 1 laeuft
+
+**Erzeugung** `v34-b01-policy-s400-vol`, 4.000 Partien @400 Modus 2, Seed 20263500, ohne Cache-Waechter: Hauptlauf 11:25 bis
+17:32:41 vom Rechner-Neustart bei 389 von 400 Dateien gekillt (Manifest `..._112529.json` ohne `laufzeit`; nach Dateistempeln
+21.968 s = 5,65 s je Partie, HERLEITUNG), Rest 110 Partien per Chunk-Seed `--games 110 --seed 20263889` (Basis + 389 fertige
+Chunks, `self_play.py:1315`) 23:33 bis 23:50, 1.016,6 s = 9,24 s je Partie (Manifest `..._233354.json`). Genau 400 Dateien.
+Kette danach im Wiederaufnahme-Modus `RESUME=1` (ab 23:54): Bloecke fuer die 400 neuen Dateien 294 s, Traeger-Manifest 800 =
+100 policy + 100 policy-s400 + 200 dice-v2 + 400 vol, Split val_frac 0,075 ueber den Pool der fuenf b02-Klassen, **Val-Liste
+byte-gleich b02** (120 Dateien), Trainingsanteil 1.480 = 1.080 b02 + 400 neue, Monolith `1e0bdfe0d133` (725 von 1.480 Bloecken
+policy-maskiert), Merge rund 7 min.
+
+**Training** `v35-b09` 2.355,4 s (`manifest_train_v35-b09_20261008_000652.json`, 2.832.807 Samples gegen 2.037.090 bei b02,
++39 %; ab 00:30 lief eine claude_play-Partie daneben, Nutzer-Entscheid), Manifest-Diff gegen b02 ohne unerwartete Abweichung
+(erlaubt: cache_file, file_list, name, val_frac, val_pool, Traeger-Manifest). Epochenkurve auf denselben 120 Val-Dateien:
+
+| Epoche | b09 Val-Brier | b02 Val-Brier | b09 Policy-Val | b02 Policy-Val |
+| --- | --- | --- | --- | --- |
+| 1 | 0,18913 | 0,18973 | 0,4758 | 0,4798 |
+| 2 | 0,18928 | 0,18943 | 0,4739 | 0,4785 |
+| 3 | **0,18880** | 0,18948 | **0,4737** | 0,4794 |
+| 5 | 0,18909 | **0,18942** | 0,4751 | 0,4835 |
+| 8 | 0,18941 | 0,18988 | 0,4782 | 0,4904 |
+| 12 | 0,18958 | 0,18980 | 0,4800 | 0,4923 |
+
+Auswahl `_best` = `_brierbest` = Epoche 3. Der Policy-Kopf ueberpasst spaeter und flacher als bei b02 (Minimum Epoche 3 statt 2,
+Anstieg bis Epoche 12 +0,006 statt +0,014), der Wertkopf liegt in JEDER Epoche unter b02.
+
+**Offline gegen b02 (par.17 Punkt 2)** (`checkpoint_val_eval_v35-b09_vs_b02.json`, Referenz `v35-b02_brierbest` minus
+`v35-b09_best`, gepaart ueber 120 Val-Dateien, Selbstpruefung PASS, 27,4 s):
+
+| Groesse | Referenz minus b09 [CI95] | Lesung | zum Vergleich b10 (par.18a) |
+| --- | --- | --- | --- |
+| Val-Brier | **+0,00063 [+0,00008; +0,00115]** | b09 besser, CI ueber 0 (knapp) | +0,00066 [+0,00030; +0,00104] |
+| Policy-CE gepoolt | **+0,0249 [+0,0224; +0,0274]** | b09 besser, CI ganz ueber 0 | +0,0301 [+0,0278; +0,0326] |
+
+**Lesung vorab (ohne Verdikt):** die These von par.17 (Policy-Kopf stichprobenbegrenzt) bestaetigt sich offline ein zweites
+Mal, mit 4.000 neuen Partien etwa so stark wie bei b10 mit 800 zusaetzlichen Traegern aus dem Schwarm, bei rund 7 h
+Erzeugung gegen 0 h. Der Wertkopf gewinnt mit, obwohl die neuen Partien reine Policy-Partien sind (mehr Zustaende, 2,83 M
+statt 2,04 M Samples). Was die Staerke daraus macht, sagt Tor 1 (Seed 20261600 seit 00:46:41, Seed 20261601 danach; beide
+Seeds laufen mit claude_play-Partien g11/g12 daneben, Nutzer-Entscheid 2026-10-08, Laufzeiten entsprechend markiert).
+
+### par.17b ERGEBNIS v35-b09 (Policy-Volumen): TOR 1 SEED 1 (2026-10-08 00:46-02:15; Nebenlast: claude_play g11/g12 bis 02:00, Nutzer-Entscheid)
+
+**Seed 20261600: v35-b09 164:96 = 63,1 %** nach 130 Paaren (n = 260 Partien), SPRT **ACCEPT_H1** (LLR +7,22 ueber +6,91,
+Stopp vor dem Deckel), Block-z **+4,18** (26 Bloecke, Mittel 0,631, sd 0,159), gepaarte Differenz +0,52 [+0,29; +0,76],
+McNemar p = 0,00006, informative Paare A-Sweep 52 / B-Sweep 18 / Split 60. Laufzeit 5.301,2 s = 20,39 s je Partie bei 10
+Threads, GEBREMST (claude_play-Partien bis 02:00 daneben; Vorlaeufe 17,3 bis 18,0 s). Artefakt
+`gating_v35-b09_vs_v34-b01_s20261600.json`; der Zwischenstand `.partial.json` wurde nach jedem Block geschrieben und nach dem
+Artefakt geloescht (erster Echtbetrieb des Mechanismus, Fortsetzung nicht gebraucht). Stufe genommen, Seed 20261601 laeuft
+seit 02:15:05.
+
+Die sechs Kennzahlen (Grundmenge Bretter je Modell, n = 260 je Seite; `arena_column_probe`, `plate_points_from_arena`):
+
+| Kennzahl je Brett | v35-b09 | v34-b01 | gepaart b09 minus b01 [KI95] |
+| --- | --- | --- | --- |
+| Volle Spalten | 1,069 +- 0,088 | 0,992 +- 0,091 | - |
+| Spalten >= 4 / lange Reihen | 2,47 / 3,23 | 2,26 / 3,15 | - |
+| Zeilenfuellung H | 0,606 | 0,594 | - |
+| Strafsteine | 8,21 | 7,93 | Boden +0,28 [-0,68; +1,25] |
+| Eigene Punkte | 59,39 | 55,40 | +3,99 [+1,93; +6,04] |
+| Margin | +3,98 | -3,98 | +7,97 [+3,86; +12,08] |
+| Plattenpunkte gesamt | 8,95 | 7,65 | +1,30 [+0,40; +2,21] |
+| davon Vertikale Reihen (106 Bretter) | 8,65 | 7,33 | +1,32 [-0,02; +2,66] |
+| davon Mehrfarbige Felder (112) | 4,82 | 3,52 | +1,30 [+0,21; +2,40] |
+| davon Spezialfelder (98) | -9,89 | -9,80 | -0,09 [-1,15; +0,97] |
+
+Platzierungspunkte gepaart +3,77 [+2,30; +5,23]: der Gewinn kommt wie bei b02/b03/b10 zuerst aus der Grundwertung und den
+Spalten, die Spezialfelder bleiben bei beiden Netzen bei rund drei leeren je Brett (vgl. claude_play g11/g12 gegen b10,
+`PREREG_claude_play_interface.md` par.14a).
+
+**Einordnung auf demselben Seed (deskriptiv, gleicher Gegner, gleiche Spec):** b02 218:182 ueber 200 Paare (54,5 %), b03 159:91
+nach 125 Paaren (63,6 %), b10 185:115 nach 150 Paaren (61,7 %), b09 164:96 nach 130 Paaren (63,1 %). Verdikt wie bei allen Armen
+erst gepoolt ueber beide Seeds (par.17c), Kriterium par.12.
+
+### par.17c VERDIKT v35-b09 (Policy-Volumen): TOR 1 SEED 2 UND GEPOOLT, LESART (a) (2026-10-08 02:15-04:15, exklusiv)
+
+**Seed 20261601: v35-b09 226:174 = 56,5 %** (n = 400, 200 Paare, Deckel), Block-z **+2,21** (40 Bloecke, Mittel 0,565, sd 0,186),
+gepaarte Differenz +0,26 [+0,06; +0,46], McNemar p = 0,015, A-Sweep 66 / B-Sweep 40 / Split 94, SPRT `UNDECIDED_CAP_REACHED`
+(LLR +3,05). Laufzeit 7.238,3 s = 18,10 s je Partie, 10 Threads, exklusiv (claude_play war seit 02:00 fertig).
+
+**Gepoolt: 390:270 = 59,1 %** (n = 660 Partien, 330 Paare), **Block-z +4,15** (66 Bloecke, Mittel 0,591, sd 0,178). Beide Seeds einzeln
+ueber +1,96 (Kette: "Seeds einzeln >= +1,96: 2 von 2"), die Stufenregel greift nicht.
+
+**VERDIKT TOR 1: v35-b09 TRAEGT.** Lesart nach par.17, vorab festgelegt: **(a) CE-Gewinn UND Tor 1 faellt**, also "Volumen traegt",
+Zuordnung an die 400 neuen Traegerdateien (einziger Unterschied zu b02 bei gleichem Val-Satz, gleichem Rezept, gleichem Seed,
+gleicher Spec). Die Erwartung zum Policy-Kopf trifft zu (CE gepoolt +0,0249 [+0,0224; +0,0274], Minimum spaeter: Epoche 3 statt 2).
+Die Erwartung zum Wertkopf ("innerhalb 0,001 von b02, nicht stichprobenbegrenzt") trifft nur zur Haelfte: der Brier liegt zwar
+innerhalb 0,001, aber mit CI ueber 0 BESSER (+0,00063 [+0,00008; +0,00115]); 4.000 reine Policy-Partien haben also auch dem
+Wertkopf Zustaende gebracht, die ihm fehlten (2,83 M statt 2,04 M Samples). Dasselbe Muster wie bei b10 (par.18a).
+Promotion NUR nach Nutzer-Entscheid (Ein-Promotion-Regel), hier nichts entschieden.
+
+Die sechs Kennzahlen Seed 2 (Grundmenge Bretter je Modell, n = 400 je Seite):
+
+| Kennzahl je Brett | v35-b09 | v34-b01 | gepaart b09 minus b01 [KI95] |
+| --- | --- | --- | --- |
+| Volle Spalten | 1,085 +- 0,071 | 1,070 +- 0,071 | - |
+| Spalten >= 4 / lange Reihen | 2,44 / 3,27 | 2,31 / 3,15 | - |
+| Zeilenfuellung H | 0,597 | 0,600 | - |
+| Strafsteine | 7,38 | 7,61 | Boden -0,23 [-0,98; +0,53] |
+| Eigene Punkte | 60,17 | 57,59 | +2,58 [+0,85; +4,31] |
+| Margin | +2,58 | -2,58 | +5,16 [+1,70; +8,61] |
+| Plattenpunkte gesamt | 9,23 | 8,24 | +1,00 [+0,28; +1,71] |
+| davon Eckplatten (132 Bretter) | 10,18 | 9,11 | +1,07 [+0,40; +1,74] |
+| davon Horizontale Reihen (130) | 0,37 | 0,07 | +0,30 [+0,12; +0,49] |
+| davon Spezialfelder (136) | -9,31 | -9,73 | +0,42 [-0,30; +1,13] |
+
+Auf Seed 2 ist der Spalteneffekt klein (1,085 gegen 1,070; auf Seed 1 1,069 gegen 0,992), der Gewinn kommt aus Grundwertung
+(Platzierung +2,05 [+0,71; +3,38]) und Platten; welches Kriterium traegt, wechselt zwischen den Seeds (Seed 1 Mehrfarbige Felder
+und Vertikale, Seed 2 Eckplatten und Horizontale), das ist Seed-Streuung bei 47 bis 85 Paaren je Kriterium, kein Befund.
+
+**Einordnung in die Reihe (deskriptiv, gleiche Seeds, gleicher Gegner):** b09 59,1 % / z +4,15 liegt zwischen b02 (54,6 % auf
+denselben zwei Seeds) und b10 (60,9 % / z +6,22); b10 erreicht das ohne Erzeugung (0 h) aus 800 zusaetzlichen Schwarm-Traegern,
+b09 mit 4.000 neuen Partien (rund 7 h Erzeugung @400). Beide bestaetigen dieselbe These (Policy-Kopf stichprobenbegrenzt), b10 ist
+der billigere Hebel; ob b09 und b10 sich addieren (b16 = b10 + b09-Partien, Nutzer: "warten wir mal bis wir durch sind mit allen
+aesten"), ist offen. Direkte Kante b09 gegen b02 oder b10 nicht vorregistriert (Nutzer-Entscheid).
+
+**Laufzeiten (Kettenausgabe und Artefakte):** Bloecke 400 neue 295 s, Merge 418 s, Training 2.360 s (GEBREMST, claude_play
+daneben), Offline 29 s, Tor 1 5.301 s (Seed 1, GEBREMST, 20,4 s je Partie) + 7.238 s (Seed 2, exklusiv, 18,1 s je Partie);
+Arm ohne Erzeugung 15.658 s = 4,35 h; mit Erzeugung (rund 6,4 h Haupt- plus Rest-Lauf) rund 10,8 h.
+
+**Nachlauf, offen:** `MOSAIC_DATA_EXCLUDE` folgender Ketten um `^selfplay_v34-b01-policy-s400-vol_` ergaenzen, sobald eine Kette
+wieder ueber den Pool statt ueber eine feste Fensterliste baut (die v35-Ketten lesen feste Listen `window_v35_*.txt`; dort ist
+die Klasse nur drin, wo sie hingehoert). Eintrag in STATUS Abschnitt 1.
 
 ## par.18 ARM v35-b10: SCHWARM ALS POLICY-TRAEGER (1.200 STATT 400 TRAEGER, KEINE NEUE ERZEUGUNG) (NUTZER 2026-10-05 09:xx: *"koennen wir noch immer machen nach b09. dann sind wir flexibel. registrier das als b10"*; REGISTRIERT VOR Bau und Lauf)
 
