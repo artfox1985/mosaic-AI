@@ -30,8 +30,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from file_cache_key import per_file_cache_key, _special_planes_off_key  # noqa: F401
-from trajectory_bootstrap import (format_margin_counts, format_trajectory_counts,
-                                  margin_bootstrap_value, trajectory_bootstrap_values)
+from trajectory_bootstrap import (confidence_bootstrap_value, format_margin_counts,
+                                  format_trajectory_counts, margin_bootstrap_value,
+                                  mixed_bootstrap_value, trajectory_bootstrap_values,
+                                  trajectory_confidence_values, trajectory_lambda_values)
 from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND, REACH_BUF_CAP,
                           reach_columns, reach_target_k1_active,
                           reach_buffer_mode, reach_buffer_columns)
@@ -788,16 +790,34 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     # aus der echten Trajektorie (`trajectory_bootstrap`). Steht auch im
     # BLOCK-Schluessel (`file_cache_key._bootstrap_trajectory_horizon_key`),
     # denn der Block traegt `values_wdl`. Nur ANHAENGEN, wenn gesetzt.
-    from file_cache_key import _bootstrap_trajectory_horizon_key
+    # par.19.3/par.19.5 (Arme v35-b13/b15): Zusatz `_mix<m>` bzw. `_conf<s>` vor
+    # "_v1" (`file_cache_key._bootstrap_trajectory_suffix_key`, auch im
+    # BLOCK-Schluessel); ohne diese Knoepfe leer, der b03-Marker bleibt.
+    from file_cache_key import (_bootstrap_trajectory_horizon_key,
+                                _bootstrap_trajectory_suffix_key)
     _traj_horizon = _bootstrap_trajectory_horizon_key()
     if _traj_horizon is not None:
-        cache_key_material += "+bootstraptraj_h" + str(_traj_horizon) + "_v1"
+        cache_key_material += ("+bootstraptraj_h" + str(_traj_horizon)
+                               + _bootstrap_trajectory_suffix_key() + "_v1")
+    # par.19.1/par.19.2 (Arme v35-b11/b12): lambda-Mittel ueber den echten Pfad;
+    # steht auch im BLOCK-Schluessel (`file_cache_key._bootstrap_trajectory_lambda_key`).
+    from file_cache_key import _bootstrap_trajectory_lambda_key
+    _traj_lambda = _bootstrap_trajectory_lambda_key()
+    if _traj_lambda is not None:
+        cache_key_material += "+bootstraptrajlambda_" + _traj_lambda + "_v1"
     # par.14 (Arm v35-b04): Margen-Bootstrap, Skala b im Marker; steht auch im
     # BLOCK-Schluessel (`file_cache_key._bootstrap_margin_scale_key`).
     from file_cache_key import _bootstrap_margin_scale_key
     _margin_scale = _bootstrap_margin_scale_key()
     if _margin_scale is not None:
         cache_key_material += "+bootstrapmargin_b" + _margin_scale + "_v1"
+    # par.19.4 (Arm v35-b14): MOSAIC_TD_LAMBDA. str(TD_LAMBDA) steht oben schon im
+    # Material; der Marker kommt nur bei Abweichung vom Bestand 0.5 dazu (auch im
+    # BLOCK-Schluessel, `file_cache_key.td_lambda_marker`).
+    from file_cache_key import td_lambda_marker
+    _td_marker = td_lambda_marker(TD_LAMBDA)
+    if _td_marker is not None:
+        cache_key_material += "+" + _td_marker + "_v1"
     digest = hashlib.md5(cache_key_material.encode()).hexdigest()
     return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
                           carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,
@@ -1423,49 +1443,54 @@ class MosaicDataset(Dataset):
                 print(f"🔧 Arm K aktiv: MOSAIC_BOOTSTRAP_COHERENCE={bootstrap_coherence} "
                       f"-- Bootstrap-Paare werden vor dem TD-Blend auf Summe 1 normiert.",
                       flush=True)
-            # par.12a (Arm v35-b03): Bootstrap-Quelle im WDL-Ziel, EINMAL je
-            # Bau aufgeloest (dieselbe Quelle wie beide Cache-Schluessel).
-            # None = Bestand (Netz-Rollout `bootstrap_value`), sonst die
-            # Obergrenze k fuer `trajectory_bootstrap_values`.
-            from file_cache_key import _bootstrap_trajectory_horizon_key
-            bootstrap_horizon = _bootstrap_trajectory_horizon_key()
+            # par.12a (Arm v35-b03) und par.19 (Arme v35-b11 bis b15):
+            # Bootstrap-Quelle im WDL-Ziel, EINMAL je Bau aufgeloest, aus
+            # derselben Pruefstelle wie beide Cache-Schluessel
+            # (`file_cache_key._bootstrap_variant_config`). None = Bestand
+            # (Netz-Rollout `bootstrap_value`).
+            from file_cache_key import (TD_LAMBDA_DEFAULT, _bootstrap_margin_scale_key,
+                                        _bootstrap_variant_config)
+            bootstrap_variant = _bootstrap_variant_config()
+            _bv_cfg = bootstrap_variant or {}
+            # Obergrenze k der Quelle 'trajectory' (b03/b05/b06, b13, b15), sonst None.
+            bootstrap_horizon = _bv_cfg.get("horizon")
+            # par.19.3 (b13): Mischanteil der Trajektorie gegen den Rollout.
+            bootstrap_traj_mix = _bv_cfg.get("mix")
+            # par.19.5 (b15): Skala s des Konfidenzgewichts.
+            bootstrap_traj_conf_scale = _bv_cfg.get("conf_scale")
+            # par.19.1/par.19.2 (b11/b12): lambda des Pfad-Mittels, Gegnerstellungen.
+            bootstrap_traj_lambda = _bv_cfg.get("traj_lambda")
+            bootstrap_traj_opponent = bool(_bv_cfg.get("opponent"))
             # par.14 (Arm v35-b04): Margen-Bootstrap, Skala b in Punkten
             # (kanonischer String fuer Marker und Log, float fuer die Formel).
-            # Beide Leser pruefen dieselbe Umgebung (`_bootstrap_source_config`),
-            # hoechstens einer ist nicht None.
-            from file_cache_key import _bootstrap_margin_scale_key
             bootstrap_margin_scale_str = _bootstrap_margin_scale_key()
-            bootstrap_margin_scale = (None if bootstrap_margin_scale_str is None
-                                      else float(bootstrap_margin_scale_str))
-            # Zaehlung je Runde: [aus der Quelle (spaeterer Record bzw. Marge),
-            # aus dem Ausgang, ohne bootstrap_value (Bestand: Ausgang ohne
-            # Blend)] -- nur vollstaendige Partien, nur mit gesetzter Quelle.
-            traj_counts = ({} if (bootstrap_horizon is not None
-                                  or bootstrap_margin_scale is not None) else None)
-            if bootstrap_horizon is not None:
-                # Arm K normiert ein Bootstrap-PAAR beider Seiten; die
-                # Trajektorien-Quelle liefert nur den Wert der eigenen Seite.
-                # Die Kombination hat keine Bedeutung -- harter Abbruch statt
-                # einer still gewaehlten Lesart.
+            bootstrap_margin_scale = _bv_cfg.get("margin_scale")
+            # Zaehlung je Runde: [aus der Quelle (spaeterer Record, Pfad-Mittel
+            # bzw. Marge), aus dem Ausgang, ohne bootstrap_value (Bestand:
+            # Ausgang ohne Blend)] -- nur vollstaendige Partien, nur mit
+            # gesetzter Quelle.
+            traj_counts = {} if bootstrap_variant is not None else None
+            if bootstrap_variant is not None:
+                # Arm K normiert ein Bootstrap-PAAR beider Seiten; keine der
+                # Quellen liefert ein Paar. Die Kombination hat keine Bedeutung
+                # -- harter Abbruch statt einer still gewaehlten Lesart.
                 if bootstrap_coherence != "off":
                     raise ValueError(
-                        "MOSAIC_BOOTSTRAP_SOURCE=trajectory ist mit "
+                        f"MOSAIC_BOOTSTRAP_SOURCE={bootstrap_variant['source']} ist mit "
                         f"MOSAIC_BOOTSTRAP_COHERENCE={bootstrap_coherence} nicht kombinierbar "
-                        "(die Trajektorie liefert kein Bootstrap-Paar zum Normieren).")
-                print(f"🔧 Arm v35-b03 aktiv: MOSAIC_BOOTSTRAP_SOURCE=trajectory, "
-                      f"Obergrenze {bootstrap_horizon} Runde(n) -- WDL-Bootstrap = root_q des "
-                      f"ersten spaeteren Records derselben Seite, sonst der Ausgang.",
-                      flush=True)
-            if bootstrap_margin_scale is not None:
-                # Gleiche Begruendung wie oben: die Marge liefert kein PAAR.
-                if bootstrap_coherence != "off":
-                    raise ValueError(
-                        "MOSAIC_BOOTSTRAP_SOURCE=margin ist mit "
-                        f"MOSAIC_BOOTSTRAP_COHERENCE={bootstrap_coherence} nicht kombinierbar "
-                        "(die Marge liefert kein Bootstrap-Paar zum Normieren).")
-                print(f"🔧 Arm v35-b04 aktiv: MOSAIC_BOOTSTRAP_SOURCE=margin, "
-                      f"b = {bootstrap_margin_scale_str} Punkte -- WDL-Bootstrap = "
-                      f"sigmoid(Endmarge des Ziehers / b).", flush=True)
+                        "(die Quelle liefert kein Bootstrap-Paar zum Normieren).")
+                # Log nennt Quelle und Knoepfe statt eines Arm-Namens (dieselbe
+                # Quelle kann mehrere Arme tragen).
+                _bv_knobs = ", ".join(
+                    f"{k}={v}" for k, v in _bv_cfg.items()
+                    if k != "source" and v not in (None, False))
+                print(f"🔧 Bootstrap-Quelle aktiv: MOSAIC_BOOTSTRAP_SOURCE={bootstrap_variant['source']} "
+                      f"({_bv_knobs}), TD_LAMBDA={TD_LAMBDA} -- WDL-Bootstrap aus dieser Quelle, "
+                      f"ohne Stuetzstelle der Ausgang.", flush=True)
+            elif TD_LAMBDA != TD_LAMBDA_DEFAULT:
+                # par.19.4 (b14a) ohne Quellenwechsel waere zulaessig; die
+                # Zeile macht den Knopf im Log sichtbar.
+                print(f"🔧 TD_LAMBDA={TD_LAMBDA} (MOSAIC_TD_LAMBDA, Bestand 0.5).", flush=True)
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
             polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
@@ -1542,8 +1567,19 @@ class MosaicDataset(Dataset):
                     own_dtype = np.float16 if reach_buf else np.int8
                     # par.12a: Trajektorien-Bootstrap je Record, ein Vorlauf je
                     # Datei (gruppiert nach game_id, Dateireihenfolge).
-                    traj_bootstrap = (None if bootstrap_horizon is None
-                                      else trajectory_bootstrap_values(game_data, bootstrap_horizon))
+                    # par.19.5 (b15): statt des Werts das Paar (root_q_spaeter, w).
+                    # par.19.1/19.2 (b11/b12): das lambda-Mittel ueber den Pfad.
+                    if bootstrap_horizon is None:
+                        traj_bootstrap = None
+                    elif bootstrap_traj_conf_scale is not None:
+                        traj_bootstrap = trajectory_confidence_values(
+                            game_data, bootstrap_horizon, bootstrap_traj_conf_scale)
+                    else:
+                        traj_bootstrap = trajectory_bootstrap_values(game_data, bootstrap_horizon)
+                    traj_lambda_bootstrap = (
+                        None if bootstrap_traj_lambda is None
+                        else trajectory_lambda_values(game_data, bootstrap_traj_lambda,
+                                                      opponent=bootstrap_traj_opponent))
                     for record_index, step in enumerate(game_data):
                         states_l.append(state_to_tensor(step["state"]).numpy())
                         if planes_l is not None:
@@ -1742,6 +1778,40 @@ class MosaicDataset(Dataset):
                                     _traj_value = traj_bootstrap[record_index]
                                     _traj_round = int(step["state"].get("round") or 0)
                                     _traj_slot = traj_counts.setdefault(_traj_round, [0, 0, 0])
+                                    if _traj_value is None:
+                                        bvp = wdl_outcome_val
+                                        _traj_slot[1] += 1
+                                    elif bootstrap_traj_conf_scale is not None:
+                                        # par.19.5 (b15): w x root_q_spaeter
+                                        # + (1 - w) x Ausgang, w aus dem
+                                        # Q-Abstand des spaeteren Records.
+                                        _later_q, _conf_w = _traj_value
+                                        bvp = confidence_bootstrap_value(_later_q, _conf_w,
+                                                                         wdl_outcome_val)
+                                        _traj_slot[0] += 1
+                                    else:
+                                        bvp = _traj_value
+                                        _traj_slot[0] += 1
+                                    if bootstrap_traj_mix is not None:
+                                        # par.19.3 (b13): mix x (b03-Wert, ohne
+                                        # Treffer der Ausgang) + (1 - mix) x
+                                        # Rollout, der Rollout genau wie im
+                                        # Bestandszweig unten (roh, Blockliste
+                                        # entstaucht; Arm K ist oben verboten).
+                                        _rollout = float(bv[p])
+                                        if not bootstrap_native:
+                                            _rollout = _destretch_prob(_rollout)
+                                        bvp = mixed_bootstrap_value(bvp, _rollout, bootstrap_traj_mix)
+                                    value_wdl = TD_LAMBDA * bvp + (1.0 - TD_LAMBDA) * wdl_outcome_val
+                                elif bv is not None and bootstrap_traj_lambda is not None:
+                                    # par.19.1/par.19.2 (b11/b12): lambda-Mittel
+                                    # der Suchwerte aller spaeteren Stuetzstellen
+                                    # (b12: beider Seiten, gespiegelt); ohne
+                                    # Stuetzstelle der Ausgang. Gleiche Records
+                                    # und gleiche λ-Formel wie im Bestand.
+                                    _traj_value = traj_lambda_bootstrap[record_index]
+                                    _traj_slot = traj_counts.setdefault(
+                                        int(step["state"].get("round") or 0), [0, 0, 0])
                                     if _traj_value is None:
                                         bvp = wdl_outcome_val
                                         _traj_slot[1] += 1
@@ -2067,9 +2137,13 @@ class MosaicDataset(Dataset):
             # statt je Datei sechs Zeilen in den Fortschritt zu streuen.
             self.trajectory_bootstrap_counts = traj_counts
             if traj_counts is not None and not _block_mode:
-                _lines = (format_trajectory_counts(traj_counts, bootstrap_horizon)
-                          if bootstrap_horizon is not None
-                          else format_margin_counts(traj_counts, bootstrap_margin_scale_str))
+                _lines = (format_margin_counts(traj_counts, bootstrap_margin_scale_str)
+                          if bootstrap_margin_scale is not None
+                          else format_trajectory_counts(traj_counts, bootstrap_horizon,
+                                                        label=", ".join(
+                                                            f"{k}={v}" for k, v in _bv_cfg.items()
+                                                            if k not in ("source", "horizon", "margin_scale")
+                                                            and v not in (None, False)) or None))
                 for _line in _lines:
                     print(_line, flush=True)
 

@@ -158,6 +158,21 @@ geloescht (wie `_resume.pth`). Mit `--resume` traegt `laufzeit` zusaetzlich
 `segment_wanduhr_s` und `fortgesetzt_ab_block`; `wanduhr_s`/`cpu_s` sind dann die
 Summe der Segmente OHNE den verlorenen angefangenen Block (Muster train.py).
 
+## 2026-10-08: `--fixed-length` (feste Laenge, SPRT nur mitgeschrieben)
+
+`PREREG_v35_window.md` par.19.0 Punkt 3 (Schnellblick): je Seed GENAU
+`--max-pairs` Paare, die Wald-Schranken werden nur mitgeschrieben. Ohne den
+Schalter bricht ein frueher SPRT-Entscheid den Blick ab, und zwei Seeds
+haetten verschieden viele Partien. Mit `--fixed-length` laeuft die Schleife bis
+zum Deckel; das Artefakt traegt `sprt_verdict = "FIXED_LENGTH"` (es gab keine
+Stopp-Regel), dazu `fixed_length: true`, `sprt_first_crossing` (erster Block,
+nach dem der LLR eine Schranke erreicht haette, sonst null) und
+`sprt_decision_at_end` (was der SPRT mit dem End-LLR sagen wuerde: Name von A,
+"H0" oder null). Keine Champion-Uebernahme (das Urteil ist kein SPRT-Entscheid).
+Default AUS: Ergebnis-Artefakt, Zwischenstand und `--resume`-Pruefung sind ohne
+den Schalter Feld fuer Feld die bisherigen (der Schluessel `fixed_length`
+erscheint in der Zwischenstand-Konfiguration nur, wenn er an ist).
+
 WICHTIG (Phase A, 2026-07-23): dieses Skript ist reine Code-Lieferung.
 Es wird NICHT fuer eine echte Gating-Entscheidung ausgefuehrt, solange der
 aktuelle netcq2-Self-Play-Batch das installierte Wheel nutzt -- nur ein
@@ -433,13 +448,14 @@ def write_json_atomic(path, payload, indent=None) -> None:
 def resume_config(*, model_a, model_b, name_a, name_b, spec_a, spec_b, sims_a, sims_b,
                   c_puct_a, c_puct_b, base_seed, block_size, max_pairs, sprt_p1,
                   sprt_alpha, sprt_beta, log_games, threads, mosaic_env,
-                  recipe_block=None, expected_engine_config=None) -> dict:
+                  recipe_block=None, expected_engine_config=None,
+                  fixed_length=False) -> dict:
     """Die Konfiguration, die eine Fortsetzung mit dem Erstlauf teilen muss.
     Modelle per Pfad (Schraegstriche vereinheitlicht) UND sha256 der Datei;
     Specs als Wert und, wenn sie eine Datei benennen, mit sha256."""
     def norm(p):
         return None if p is None else str(p).replace("\\", "/")
-    return {
+    config = {
         "model_a": norm(model_a), "model_a_sha256": file_sha256(model_a),
         "model_b": norm(model_b), "model_b_sha256": file_sha256(model_b),
         "name_a": name_a, "name_b": name_b,
@@ -455,6 +471,11 @@ def resume_config(*, model_a, model_b, name_a, name_b, spec_a, spec_b, sims_a, s
         "expected_engine_config": expected_engine_config,
         "threads": threads,
     }
+    # 2026-10-08: nur bei gesetztem Schalter, damit Zwischenstaende ohne ihn
+    # (auch aeltere) weiter ohne Abweichung fortsetzbar sind.
+    if fixed_length:
+        config["fixed_length"] = True
+    return config
 
 
 def resume_config_deviations(saved: dict, current: dict) -> list[str]:
@@ -495,6 +516,19 @@ def sprt_decision(llr: float, lower: float, upper: float, name_a: str) -> str | 
         return name_a
     if llr <= lower:
         return "H0"
+    return None
+
+
+def first_sprt_crossing(block_logs: list[dict], lower: float, upper: float,
+                        name_a: str) -> dict | None:
+    """Erster Block, nach dem der kumulative LLR eine Wald-Schranke erreicht
+    (dieselbe Regel wie `sprt_decision`), oder None. Fuer `--fixed-length`:
+    wo ein SPRT-Lauf gestoppt haette."""
+    for log in block_logs:
+        verdict = sprt_decision(log["llr"], lower, upper, name_a)
+        if verdict is not None:
+            return {"block": log["block"], "done_pairs": log["done_pairs"],
+                    "llr": log["llr"], "verdict": verdict}
     return None
 
 
@@ -686,7 +720,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        expected_engine_config: dict | None = None,
                        recipe_block: dict | None = None,
                        partial_path: str | Path | None = None,
-                       resume: bool = False) -> dict:
+                       resume: bool = False, fixed_length: bool = False) -> dict:
     """Orchestriert das volle gepaarte Gating (siehe Modul-Docstring). Die
     STOPP-Entscheidung ist ein Wald-SPRT auf den informativen Paaren (b/c);
     bricht NACH einem VOLLSTAENDIGEN Block ab, sobald die LLR eine der beiden
@@ -760,7 +794,8 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
             block_size=block_size, max_pairs=max_pairs, sprt_p1=sprt_p1,
             sprt_alpha=sprt_alpha, sprt_beta=sprt_beta, log_games=log_games,
             threads=threads, mosaic_env=mosaic_env_snapshot(),
-            recipe_block=recipe_block, expected_engine_config=expected_engine_config)
+            recipe_block=recipe_block, expected_engine_config=expected_engine_config,
+            fixed_length=fixed_length)
     if partial is not None:
         deviations = resume_config_deviations(partial.get("config") or {}, config)
         if deviations:
@@ -821,7 +856,8 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
               f"{prev_wall_s:.1f} s in {prev_segments} Segment(en))", flush=True)
         # Ein Stand, dessen letzter Block die Schranke schon gerissen hat (Abbruch
         # zwischen Zwischenstand und Artefakt), spielt keinen Block mehr.
-        sprt_verdict = sprt_decision(tally.llr, sprt_lower, sprt_upper, name_a)
+        sprt_verdict = (None if fixed_length
+                        else sprt_decision(tally.llr, sprt_lower, sprt_upper, name_a))
         if sprt_verdict is not None:
             print(f"  SPRT-Entscheid stand schon im Zwischenstand ({tally.done_pairs} Paare, "
                   f"LLR={tally.llr:+.3f}): {sprt_verdict}.", flush=True)
@@ -920,6 +956,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                 "block_records": tally.block_records,
             })
 
+        if fixed_length:
+            # Feste Laenge (par.19.0 Punkt 3): der SPRT wird nur mitgeschrieben,
+            # die erste Schranken-Beruehrung steht spaeter aus den Block-Logs im
+            # Artefakt (`sprt_first_crossing`).
+            continue
         sprt_verdict = sprt_decision(tally.llr, sprt_lower, sprt_upper, name_a)
         if sprt_verdict == name_a:
             print(f"  SPRT-Entscheid nach {tally.done_pairs} Paaren: {name_a} signifikant besser "
@@ -927,6 +968,16 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         elif sprt_verdict == "H0":
             print(f"  SPRT-Entscheid nach {tally.done_pairs} Paaren: KEIN Beleg dass {name_a} besser "
                   f"ist (LLR={tally.llr:+.3f} <= untere Schranke {sprt_lower:+.3f}) -- {name_b} bleibt.")
+    sprt_first_crossing = None
+    sprt_decision_at_end = None
+    if fixed_length:
+        sprt_verdict = "FIXED_LENGTH"
+        sprt_first_crossing = first_sprt_crossing(tally.block_logs, sprt_lower, sprt_upper, name_a)
+        sprt_decision_at_end = sprt_decision(tally.llr, sprt_lower, sprt_upper, name_a)
+        print(f"  Feste Laenge: {tally.done_pairs} Paare gespielt, SPRT nur mitgeschrieben "
+              f"(LLR={tally.llr:+.3f}, Schranken [{sprt_lower:+.3f},{sprt_upper:+.3f}]; erste "
+              f"Beruehrung: {sprt_first_crossing}; Entscheid mit End-LLR: {sprt_decision_at_end}).",
+              flush=True)
     if sprt_verdict is None:
         sprt_verdict = "UNDECIDED_CAP_REACHED"
         print(f"  {max_pairs} Paare (harter Deckel) erreicht OHNE SPRT-Entscheid "
@@ -992,6 +1043,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                                        if engine_config_check is not None else {})}),
         "mosaic_env": mosaic_env_snapshot(),
     }
+    # 2026-10-08: nur mit --fixed-length, sonst bleibt das Artefakt das bisherige.
+    if fixed_length:
+        result["fixed_length"] = True
+        result["sprt_first_crossing"] = sprt_first_crossing
+        result["sprt_decision_at_end"] = sprt_decision_at_end
     # 2026-09-09: `games` NUR anhaengen, wenn der Schalter an war -- sonst
     # bleibt das Artefakt schluesselgleich zum Bestand (Tor-2b-Sonde meldet
     # bei fehlendem Feld ohnehin "kein `games`-Feld").
@@ -1012,6 +1068,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         name_a: f"{name_a} signifikant besser (SPRT)",
         "H0": f"kein Beleg, dass {name_a} besser ist (SPRT H0 angenommen)",
         "UNDECIDED_CAP_REACHED": "harter Deckel erreicht, KEIN SPRT-Entscheid",
+        "FIXED_LENGTH": "feste Laenge, KEINE Stopp-Regel (SPRT nur mitgeschrieben)",
     }[sprt_verdict]
 
     print("-" * 60)
@@ -1088,6 +1145,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "Pfad und sha256, Specs, Sims, c_puct, Seed, Blockgroesse, max-pairs, "
                          "SPRT, --log-games, MOSAIC_*); jede Abweichung bricht hart ab. Ohne "
                          "Zwischenstand laeuft der Lauf normal.")
+    # 2026-10-08 (PREREG_v35_window.md par.19.0 Punkt 3): Default AUS = SPRT-Stopp
+    # wie bisher.
+    p.add_argument("--fixed-length", dest="fixed_length", action="store_true",
+                    help="Feste Laenge: genau --max-pairs Paare, der SPRT stoppt NICHT, sondern "
+                         "wird nur mitgeschrieben (sprt_first_crossing, sprt_decision_at_end); "
+                         "sprt_verdict = FIXED_LENGTH, keine Champion-Uebernahme.")
     p.add_argument("--promote-winner", dest="promote_winner", action="store_true", default=True,
                     help="Setzt models/champion.txt automatisch auf --name-a, sobald der SPRT "
                          "signifikant zu dessen Gunsten entscheidet (Standard: an -- "
@@ -1156,7 +1219,7 @@ def main(argv=None, recipe_pre=None) -> None:
             base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
             spec_a=args.spec_a, spec_b=args.spec_b, log_games=args.log_games,
             expected_engine_config=expected_engine_config, recipe_block=recipe_block,
-            partial_path=partial_path, resume=args.resume,
+            partial_path=partial_path, resume=args.resume, fixed_length=args.fixed_length,
         )
     except IncompleteGamesError as e:
         # Abbruch-Artefakt statt Ergebnis: unter --out (bzw. dem Default-Pfad)
@@ -1191,7 +1254,8 @@ def main(argv=None, recipe_pre=None) -> None:
     # 2026-09-12: der Tracker zieht sein Intervall blockweise, wenn die Zeile ihre
     # Seed-Bloecke kennt; die Ableitung liest dieses Artefakt. Ein SPRT-Entscheid vor
     # dem Deckel ist ein Frueh-Stopp und gehoert als solcher ins Register.
-    early = " --early-stop" if result.get("sprt_verdict") != "UNDECIDED_CAP_REACHED" else ""
+    early = (" --early-stop" if result.get("sprt_verdict") not in ("UNDECIDED_CAP_REACHED", "FIXED_LENGTH")
+             else "")
     print(f"  Register-Zusatz fuer elo_tracker add: --units-from-paired-artifact \"{out_path}\"{early}")
 
 

@@ -38,7 +38,7 @@ FILE_CACHE_KEY = REPO / "engine" / "py" / "file_cache_key.py"
 
 # Knopf -> was er an den GECACHTEN Daten aendert. Jeder Eintrag MUSS im
 # Quelltext von `window_cache_key` auftauchen.
-DATEN_KNOEPFE = {
+DATA_KNOBS = {
     "INPUT_SIZE": "Breite des Flachvektors -- andere Eingabe je Sample",
     "NUM_ACTIONS": "Breite des Policy-Ziels",
     "VALUE_SCHEMA_VERSION": "Aufbau der Wertziele",
@@ -56,6 +56,9 @@ DATEN_KNOEPFE = {
     "_mask_dice_phase_value_key": "W-Wertmaske: Zusatzfeld value_weights, 0 auf dice_phase-Records (par.5d)",
     "_bootstrap_trajectory_horizon_key": "Bootstrap-Quelle im WDL-Ziel aus der echten Trajektorie (v35 par.12a)",
     "_bootstrap_margin_scale_key": "Bootstrap-Quelle im WDL-Ziel aus der Endmarge, sigmoid(Marge/b) (v35 par.14)",
+    "_bootstrap_trajectory_suffix_key": "Mix mit dem Rollout (b13) bzw. Konfidenzgewicht (b15) im WDL-Ziel (v35 par.19.3/19.5)",
+    "_bootstrap_trajectory_lambda_key": "lambda-Mittel ueber den echten Pfad im WDL-Ziel, b11/b12 (v35 par.19.1/19.2)",
+    "td_lambda_marker": "MOSAIC_TD_LAMBDA: Gewicht des TD-Blends (b14, v35 par.19.4); Wert steht zusaetzlich als TD_LAMBDA",
 }
 
 # Knoepfe, die in BEIDEN Schluesseln stehen muessen: der Wert steckt schon in den
@@ -72,6 +75,9 @@ BOTH_KEYS = {
     "_mask_dice_phase_value_key": "value_weights stecken je Datei im Block (Klasse W, par.5d)",
     "_bootstrap_trajectory_horizon_key": "values_wdl stecken je Datei im Block (v35 par.12a)",
     "_bootstrap_margin_scale_key": "values_wdl stecken je Datei im Block (v35 par.14)",
+    "_bootstrap_trajectory_suffix_key": "values_wdl stecken je Datei im Block (v35 par.19.3/19.5)",
+    "_bootstrap_trajectory_lambda_key": "values_wdl stecken je Datei im Block (v35 par.19.1/19.2)",
+    "td_lambda_marker": "values, points_forecast und values_wdl stecken je Datei im Block (v35 par.19.4)",
 }
 
 # Knoepfe, die BEWUSST nicht im Fenster-Schluessel stehen, mit Grund.
@@ -106,12 +112,12 @@ class WindowKeyCoversDataKnobs(unittest.TestCase):
         self.body = text[start:end]
 
     def test_every_data_knob_appears_in_the_window_key(self):
-        fehlend = [k for k in DATEN_KNOEPFE if k not in self.body]
+        missing = [k for k in DATA_KNOBS if k not in self.body]
         self.assertEqual(
-            fehlend, [],
+            missing, [],
             "Diese datenveraendernden Knoepfe fehlen im Fenster-Cache-Schluessel. Zwei "
             "Datensaetze bekaemen denselben Monolith-Namen, und die Pruefung beim Laden "
-            f"waere GRUEN: {[(k, DATEN_KNOEPFE[k]) for k in fehlend]}",
+            f"waere GRUEN: {[(k, DATA_KNOBS[k]) for k in missing]}",
         )
 
     def test_block_level_knobs_are_in_the_per_file_key_too(self):
@@ -123,26 +129,26 @@ class WindowKeyCoversDataKnobs(unittest.TestCase):
         frisch aus und traegt die alten Ziele.
         """
         block = FILE_CACHE_KEY.read_text(encoding="utf-8")
-        fehlend = [k for k in BOTH_KEYS if k not in block]
+        missing = [k for k in BOTH_KEYS if k not in block]
         self.assertEqual(
-            fehlend, [],
+            missing, [],
             "Diese Knoepfe veraendern den Inhalt der BLOECKE, fehlen aber im "
-            f"Block-Schluessel: {[(k, BOTH_KEYS[k]) for k in fehlend]}",
+            f"Block-Schluessel: {[(k, BOTH_KEYS[k]) for k in missing]}",
         )
         # und im Fenster-Schluessel ebenso
-        fehlend_w = [k for k in BOTH_KEYS if k not in self.body]
+        missing_window = [k for k in BOTH_KEYS if k not in self.body]
         self.assertEqual(
-            fehlend_w, [],
-            f"Im Fenster-Schluessel fehlen: {fehlend_w}",
+            missing_window, [],
+            f"Im Fenster-Schluessel fehlen: {missing_window}",
         )
 
     def test_exceptions_are_documented_and_really_absent(self):
         """Was als 'nicht im Schluessel' gefuehrt wird, darf dort auch nicht auftauchen."""
-        unerwartet = [k for k in NOT_IN_KEY if k in self.body]
+        unexpected = [k for k in NOT_IN_KEY if k in self.body]
         self.assertEqual(
-            unerwartet, [],
+            unexpected, [],
             "Diese Knoepfe stehen als bewusste Ausnahme in NOT_IN_KEY, tauchen aber "
-            f"im Schluessel auf -- Liste oder Code korrigieren: {unerwartet}",
+            f"im Schluessel auf -- Liste oder Code korrigieren: {unexpected}",
         )
 
     def test_key_material_is_a_single_expression(self):

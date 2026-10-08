@@ -1524,6 +1524,40 @@ voll, wenn die Suche dort "sicher" war, sonst wird zum Ausgang hin abgeschwaecht
 Startwert), die Eichung wird hier nachgetragen, bevor trainiert wird. Knopf `MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE=<s>`
 (nur mit `trajectory`; Marker `_conf<s>`). Hoechste Bau-Unsicherheit der fuenf; darum zuletzt.
 
+### par.19.5a EICHUNG DER KONFIDENZ-SKALA s FUER b15 (2026-10-08 05:0x, VOR dem Training nachgetragen, wie par.19.5 verlangt)
+
+Werkzeug `tools/probes/traj_conf_scale_calibration.py`, Artefakt `evaluations/artifacts/traj_conf_scale_calibration_v35_b02.json`
+(Laufzeit 787,7 s Wanduhr, 1 Thread, 0,66 s je Datei). Basis: die 1.200 Dateien aus `data/window_v35_b02.txt`, 2.262.879
+Records. **Einheit:** Differenz bestes minus zweitbestes Kind-Q aus `root_child_q` (completed-Q, aus Sicht des Ziehenden,
+`net_mcts.rs:5124-5133`; Liste parallel zu `policy`, `self_play.rs:8676-8681`), Gewinnwahrscheinlichkeit auf der [0,1]-Skala.
+
+| Grundmenge | n | Q1 | Median | Q3 | p90 | Anteil exakt 0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Drafting-Stuetzstellen (Records mit root_q, Phase drafting) | 1.514.238 | 0,00426 | 0,01236 | 0,0285 | 0,0547 | 1,2 % |
+| Verbraucher k = 1 (je verbrauchendem Record der SPAETERE Record, so oft gezaehlt wie verbraucht) | 1.873.732 | 0,00465 | 0,01224 | 0,02694 | 0,0491 | 0,6 % |
+
+**s = 0,01224** (Median der Verbraucher-Verteilung, denn das ist die Menge, die der Knopf sieht; Startwert laut par.19.5).
+Nebenzaehlungen: 0 Stuetzstellen ohne `root_child_q`, 0 mit weniger als zwei Kindern, 0 Records mit root_q ausserhalb des
+Draftings, 0 Verbraucher mit Rueckfall auf den Ausgang bei k = 1. Festlegung im Bau (Agent, geprueft am Code
+`trajectory_bootstrap.py:279-323`): weniger als zwei Kinder ergibt w = 1; der Runde-5-Loeser-Zweig schreibt in alle
+Kind-Eintraege denselben Wert (`net_mcts.rs:8641-8650`), dort waere der Abstand 0 und w = 0 (im b02-Fenster 0 Faelle, da
+Runde 5 keine root_q-Records traegt). Marker `bootstraptraj_h1_conf0.01224_v1`. Agenten-Zahlen gegen das Artefakt
+geprueft (`recommended_scale_s` 0,01224, n beider Grundmengen).
+
+**Bau b11-b15 abgenommen (2026-10-08 05:0x):** Knoepfe `MOSAIC_BOOTSTRAP_SOURCE=trajectory_lambda`, `MOSAIC_BOOTSTRAP_TRAJ_LAMBDA`,
+`MOSAIC_BOOTSTRAP_TRAJ_OPPONENT`, `MOSAIC_BOOTSTRAP_TRAJ_MIX`, `MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE`, `MOSAIC_TD_LAMBDA` (Konstante
+wird Knopf, Default 0,5 bitgleich), eine Pruefstelle fuer alle (`file_cache_key.py:220 _bootstrap_source_config`), Marker in
+beiden Schluesseln (Fenster `corpus_dataset.py:801-818`, Block `file_cache_key.py:411-432/616-630`); Standardweg bitgleich
+(Fenster- und Blockschluessel gegen die HEAD-Fassung fuer ohne Knopf / trajectory k = 1..3 / margin 20 identisch, Blockinhalt einer
+b02-Datei alle 22 Datasets byte-gleich; Stolperdraht `test_trajectory_variant_cache_keys.py`). `paired_gating.py --fixed-length`
+(Default aus) fuer den Schnellblick: genau `--max-pairs` Paare, SPRT nur mitgeschrieben (`sprt_verdict = FIXED_LENGTH`,
+`sprt_first_crossing`). Suite 575 Tests gruen (vorher 538), Konventionen gruen. Kette `tools/night_v35_b11_b15_chain.sh`
+(Reihenfolge b11, b12, b13, b14a, b14b, b15; Vorfilter, Schnellblick 2 x 50 Paare Seeds 20261700/01 gegen b02, sechs Kennzahlen,
+Lesart; volle Breite startet sie nicht). Nebenbefund des Baus: `MOSAIC_TD_LAMBDA` wirkt auch auf die tanh-Ziele `values`,
+`points_forecast`, `opp_points_forecast` (`corpus_dataset.py` Blend um Zeile 1707); b14a aendert also mehr als die WDL-Anteile
+aus par.19.4, das gehoert zum Arm und wird so gelesen. `engine/src/knob_registry.rs` um die sechs Eintraege ergaenzt, NICHT
+kompiliert (vor dem naechsten Push `cargo test --release --no-run`).
+
 **Reihenfolge (Nutzer-Rang, par.13f-Diskussion):** b11 und b12 zusammen gebaut (gleiche Funktion), b13 als Kontrolle
 daneben, dann b14a/b14b, zuletzt b15. **Bau erst nach dem Ende der laufenden Ketten** (Arm-Kette, dann b10/b09): die
 Datenschicht (`corpus_dataset.py`, `trajectory_bootstrap.py`, `file_cache_key.py`) wird von den Cache-Workern und von

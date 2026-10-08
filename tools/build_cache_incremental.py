@@ -124,6 +124,36 @@ def _block_path(data_dir, basename, kwargs):
     return os.path.join(data_dir, f".filecache_{key}.h5")
 
 
+def _variant_label(variant) -> str | None:
+    """Kopfzeilen-Zusatz der Bootstrap-Zaehlung: die gesetzten Varianten-Knoepfe
+    (par.19), None ohne Variante (dann die bisherige Kopfzeile)."""
+    if not variant:
+        return None
+    parts = [f"{k}={v}" for k, v in variant.items()
+             if k not in ("source", "horizon", "margin_scale") and v not in (None, False)]
+    if variant["source"] == "trajectory" and not parts:
+        return None
+    return f"Quelle {variant['source']}" + (", " + ", ".join(parts) if parts else "")
+
+
+def _bootstrap_source_report(variant, margin_scale) -> dict | None:
+    """Feld `bootstrap_source` des Artefakts: Quelle plus Parameter. Fuer b03
+    (trajectory ohne Zusatz) und b04 (margin) dieselbe Form wie bisher."""
+    if variant is None:
+        return None
+    if variant["source"] == "margin":
+        return {"source": "margin", "margin_scale": margin_scale}
+    out = {"source": variant["source"]}
+    if variant["horizon"] is not None:
+        out["horizon_rounds"] = variant["horizon"]
+    for key in ("mix", "conf_scale", "traj_lambda"):
+        if variant[key] is not None:
+            out[key] = variant[key]
+    if variant["opponent"]:
+        out["opponent"] = True
+    return out
+
+
 def _build_one_file(args):
     """Laeuft im Worker: baut GENAU EINE Datei in ihren Block-Cache.
 
@@ -275,9 +305,13 @@ def main():
     # par.14: dieselbe Zaehlung fuer den Margen-Bootstrap (Arm v35-b04).
     from trajectory_bootstrap import (add_trajectory_counts, format_margin_counts,
                                       format_trajectory_counts)
-    from file_cache_key import _bootstrap_margin_scale_key, _bootstrap_trajectory_horizon_key
+    # par.19 (Arme v35-b11 bis b15): Varianten derselben Zaehlung; die
+    # Kopfzeile nennt Quelle und Knoepfe.
+    from file_cache_key import (_bootstrap_margin_scale_key, _bootstrap_trajectory_horizon_key,
+                                _bootstrap_variant_config)
     traj_horizon = _bootstrap_trajectory_horizon_key()
     margin_scale = _bootstrap_margin_scale_key()
+    bootstrap_variant = _bootstrap_variant_config()
     traj_counts_total = {}
     all_entries = []
     built_total = 0
@@ -303,7 +337,12 @@ def main():
     wall = time.time() - t0
     cpu = time.process_time() - t_cpu0
     if traj_horizon is not None:
-        for line in format_trajectory_counts(traj_counts_total, traj_horizon):
+        for line in format_trajectory_counts(traj_counts_total, traj_horizon,
+                                             label=_variant_label(bootstrap_variant)):
+            print(line, flush=True)
+    elif bootstrap_variant is not None and bootstrap_variant["source"] == "trajectory_lambda":
+        for line in format_trajectory_counts(traj_counts_total, None,
+                                             label=_variant_label(bootstrap_variant)):
             print(line, flush=True)
     elif margin_scale is not None:
         for line in format_margin_counts(traj_counts_total, margin_scale):
@@ -368,13 +407,12 @@ def main():
         # par.12a/par.14: nur NEU gebaute Bloecke; None ohne
         # MOSAIC_BOOTSTRAP_SOURCE. Quelle und Parameter stehen daneben, weil
         # dieses Artefakt die Umgebung sonst nicht festhaelt.
-        "bootstrap_source": ({"source": "trajectory", "horizon_rounds": traj_horizon}
-                             if traj_horizon is not None else
-                             {"source": "margin", "margin_scale": margin_scale}
-                             if margin_scale is not None else None),
+        # par.19: Varianten-Knoepfe nur, wenn gesetzt (b03/b04 behalten die
+        # bisherige Form).
+        "bootstrap_source": _bootstrap_source_report(bootstrap_variant, margin_scale),
         "trajectory_bootstrap_counts": (
             {str(rd): c for rd, c in sorted(traj_counts_total.items())}
-            if (traj_horizon is not None or margin_scale is not None) else None),
+            if bootstrap_variant is not None else None),
         # Pflichtfelder nach CLAUDE.md "Laufzeiten messen, nicht schaetzen".
         # `threads` ist hier die Worker-Zahl des Pools; `cpu_s` misst NUR den
         # Elternprozess (die Worker sind eigene Prozesse), taugt also als

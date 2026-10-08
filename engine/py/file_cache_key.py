@@ -179,54 +179,112 @@ def _mask_dice_phase_value_key() -> bool:
 
 
 BOOTSTRAP_HORIZON_ROUNDS_ALLOWED = (1, 2, 3)
-BOOTSTRAP_SOURCES = ("trajectory", "margin")
+BOOTSTRAP_SOURCES = ("trajectory", "trajectory_lambda", "margin")
+# par.19.1 (Arm v35-b11): Default von MOSAIC_BOOTSTRAP_TRAJ_LAMBDA, wenn die
+# Quelle trajectory_lambda ohne eigenes lambda gesetzt ist.
+BOOTSTRAP_TRAJ_LAMBDA_DEFAULT = "0.5"
+# par.19.4 (Arm v35-b14): Bestandswert des TD-Blends (bis 2026-10-08 die
+# Konstante `neural_net.TD_LAMBDA = 0.5`). Ohne MOSAIC_TD_LAMBDA genau dieser
+# Wert -- `str(0.5)` steht seit jeher in beiden Schluesseln, der Bestand
+# bleibt also bitgleich.
+TD_LAMBDA_DEFAULT = 0.5
+
+
+def _canonical_number(value: float) -> str:
+    """Kanonischer Marker-String einer Zahl: `repr(float)` ohne ein
+    abschliessendes ".0" ("20" statt "20.0", "0.5", "12.5"), damit "0.50" und
+    "0.5" denselben Schluessel bekommen und zwei Werte zwei."""
+    canonical = repr(float(value))
+    if canonical.endswith(".0"):
+        canonical = canonical[:-2]
+    return canonical
+
+
+def _parse_number(raw: str, name: str, *, low: float, high: float | None,
+                  low_inclusive: bool, rule: str) -> str:
+    """Prueft eine Zahl aus der Umgebung und gibt sie kanonisch zurueck.
+    `rule` ist der Klartext der erlaubten Menge fuer die Fehlermeldung."""
+    import math
+    try:
+        value = float(raw)
+    except ValueError:
+        value = float("nan")
+    ok = math.isfinite(value) and (value >= low if low_inclusive else value > low)
+    if high is not None:
+        ok = ok and value <= high
+    if not ok:
+        raise ValueError(f"{name}={raw!r} ungueltig -- erlaubt: {rule}.")
+    return _canonical_number(value)
 
 
 def _bootstrap_source_config():
-    """Liest und prueft `MOSAIC_BOOTSTRAP_SOURCE` mit seinen Parametern
-    `MOSAIC_BOOTSTRAP_HORIZON_ROUNDS` und `MOSAIC_BOOTSTRAP_MARGIN_SCALE`.
+    """Liest und prueft `MOSAIC_BOOTSTRAP_SOURCE` mit ALLEN seinen Parametern.
 
-    EINE Pruefstelle fuer beide Quellen, damit die beiden Schluessel-Leser
-    darunter (`_bootstrap_trajectory_horizon_key`,
-    `_bootstrap_margin_scale_key`) nie verschiedene Lesarten derselben Umgebung
-    haben. Rueckgabe:
+    EINE Pruefstelle fuer alle Quellen, damit die Schluessel-Leser darunter
+    (`_bootstrap_trajectory_horizon_key`, `_bootstrap_trajectory_suffix_key`,
+    `_bootstrap_trajectory_lambda_key`, `_bootstrap_margin_scale_key`) und die
+    Bauschleife (`_bootstrap_variant_config`) nie verschiedene Lesarten
+    derselben Umgebung haben. Rueckgabe:
 
-    - `None`: Bestand (alle drei ungesetzt oder leer), kein Marker.
-    - `("trajectory", k)`: par.12a, Arm v35-b03; k in 1..3, Pflicht.
-    - `("margin", b)`: par.14, Arm v35-b04; b = Skala in Punkten, endliche
-      Zahl > 0, Pflicht; als KANONISCHER String (Dezimalzahl ohne
-      ueberfluessige Nullen: "20", "12.5"), damit "20" und "20.0" denselben
-      Schluessel bekommen und zwei Skalen zwei.
+    - `None`: Bestand (alles ungesetzt oder leer), kein Marker.
+    - `("trajectory", k, extras)`: par.12a, Arm v35-b03; k in 1..3, Pflicht.
+      `extras` = {"mix": str|None, "conf_scale": str|None}: par.19.3 (b13,
+      `MOSAIC_BOOTSTRAP_TRAJ_MIX`, Zahl in [0, 1]) und par.19.5 (b15,
+      `MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE`, Zahl > 0); hoechstens einer gesetzt.
+    - `("trajectory_lambda", lambda, extras)`: par.19.1, Arm v35-b11; lambda aus
+      `MOSAIC_BOOTSTRAP_TRAJ_LAMBDA` (Zahl in [0, 1], Default "0.5"),
+      `extras` = {"opponent": bool} aus `MOSAIC_BOOTSTRAP_TRAJ_OPPONENT`
+      (par.19.2, b12; "1" an, "0" oder leer aus).
+    - `("margin", b, {})`: par.14, Arm v35-b04; b = Skala in Punkten, endliche
+      Zahl > 0, Pflicht.
+
+    Zahlen stehen KANONISCH im Tupel (`_canonical_number`), damit "20" und
+    "20.0" denselben Schluessel bekommen und zwei Werte zwei.
 
     Harte Fehler statt stillem Default: unbekannte Quelle, fehlender oder
     ungueltiger Pflichtparameter, und jeder Parameter, der zur gesetzten Quelle
     nicht gehoert oder ohne Quelle gesetzt ist (ein verwaister Parameter waere
-    ein Knopf, der unbemerkt nichts tut).
+    ein Knopf, der unbemerkt nichts tut). MIX und CONF_SCALE zusammen sind
+    ebenfalls ein Fehler: ihre Kombination ist nicht registriert.
     """
-    import math
     import os
     source = (os.environ.get("MOSAIC_BOOTSTRAP_SOURCE") or "").strip().lower()
     raw_horizon = (os.environ.get("MOSAIC_BOOTSTRAP_HORIZON_ROUNDS") or "").strip()
     raw_scale = (os.environ.get("MOSAIC_BOOTSTRAP_MARGIN_SCALE") or "").strip()
+    raw_lambda = (os.environ.get("MOSAIC_BOOTSTRAP_TRAJ_LAMBDA") or "").strip()
+    raw_opponent = (os.environ.get("MOSAIC_BOOTSTRAP_TRAJ_OPPONENT") or "").strip()
+    raw_mix = (os.environ.get("MOSAIC_BOOTSTRAP_TRAJ_MIX") or "").strip()
+    raw_conf = (os.environ.get("MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE") or "").strip()
+    if raw_opponent not in ("", "0", "1"):
+        raise ValueError(
+            f"MOSAIC_BOOTSTRAP_TRAJ_OPPONENT={raw_opponent!r} ungueltig -- erlaubt '1' (an), '0' oder leer (aus).")
+    opponent = raw_opponent == "1"
+    # Welche Parameter zu welcher Quelle gehoeren (Name, gesetzt?, Quelle).
+    params = (
+        ("MOSAIC_BOOTSTRAP_HORIZON_ROUNDS", raw_horizon, "trajectory"),
+        ("MOSAIC_BOOTSTRAP_TRAJ_MIX", raw_mix, "trajectory"),
+        ("MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE", raw_conf, "trajectory"),
+        ("MOSAIC_BOOTSTRAP_TRAJ_LAMBDA", raw_lambda, "trajectory_lambda"),
+        ("MOSAIC_BOOTSTRAP_TRAJ_OPPONENT", "1" if opponent else "", "trajectory_lambda"),
+        ("MOSAIC_BOOTSTRAP_MARGIN_SCALE", raw_scale, "margin"),
+    )
     if not source:
-        if raw_horizon:
-            raise ValueError(
-                f"MOSAIC_BOOTSTRAP_HORIZON_ROUNDS={raw_horizon!r} ist gesetzt, aber "
-                "MOSAIC_BOOTSTRAP_SOURCE nicht -- ohne 'trajectory' waere der Horizont wirkungslos.")
-        if raw_scale:
-            raise ValueError(
-                f"MOSAIC_BOOTSTRAP_MARGIN_SCALE={raw_scale!r} ist gesetzt, aber "
-                "MOSAIC_BOOTSTRAP_SOURCE nicht -- ohne 'margin' waere die Skala wirkungslos.")
+        for name, raw, owner in params:
+            if raw:
+                raise ValueError(
+                    f"{name}={raw!r} ist gesetzt, aber MOSAIC_BOOTSTRAP_SOURCE nicht -- ohne "
+                    f"'{owner}' waere der Parameter wirkungslos.")
         return None
     if source not in BOOTSTRAP_SOURCES:
         raise ValueError(
             f"MOSAIC_BOOTSTRAP_SOURCE={source!r} unbekannt -- erlaubt sind {BOOTSTRAP_SOURCES} "
             "(ungesetzt = Bestand, Netz-Rollout bootstrap_value).")
-    if source == "trajectory":
-        if raw_scale:
+    for name, raw, owner in params:
+        if raw and owner != source:
             raise ValueError(
-                f"MOSAIC_BOOTSTRAP_MARGIN_SCALE={raw_scale!r} gehoert zur Quelle 'margin', "
-                "nicht zu 'trajectory' -- dort waere sie wirkungslos.")
+                f"{name}={raw!r} gehoert zur Quelle '{owner}', nicht zu '{source}' -- dort waere "
+                "er wirkungslos.")
+    if source == "trajectory":
         try:
             horizon = int(raw_horizon)
         except ValueError:
@@ -235,24 +293,86 @@ def _bootstrap_source_config():
             raise ValueError(
                 f"MOSAIC_BOOTSTRAP_HORIZON_ROUNDS={raw_horizon!r} ungueltig -- bei "
                 f"MOSAIC_BOOTSTRAP_SOURCE=trajectory Pflicht, erlaubt {BOOTSTRAP_HORIZON_ROUNDS_ALLOWED}.")
-        return ("trajectory", horizon)
+        if raw_mix and raw_conf:
+            raise ValueError(
+                "MOSAIC_BOOTSTRAP_TRAJ_MIX und MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE sind beide gesetzt -- "
+                "die Kombination ist nicht registriert (PREREG_v35_window.md par.19.3/par.19.5).")
+        mix = (_parse_number(raw_mix, "MOSAIC_BOOTSTRAP_TRAJ_MIX", low=0.0, high=1.0,
+                             low_inclusive=True, rule="endliche Zahl in [0, 1]")
+               if raw_mix else None)
+        conf = (_parse_number(raw_conf, "MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE", low=0.0, high=None,
+                              low_inclusive=False, rule="endliche Zahl > 0 (Q-Abstand)")
+                if raw_conf else None)
+        return ("trajectory", horizon, {"mix": mix, "conf_scale": conf})
+    if source == "trajectory_lambda":
+        traj_lambda = _parse_number(raw_lambda or BOOTSTRAP_TRAJ_LAMBDA_DEFAULT,
+                                    "MOSAIC_BOOTSTRAP_TRAJ_LAMBDA", low=0.0, high=1.0,
+                                    low_inclusive=True, rule="endliche Zahl in [0, 1]")
+        return ("trajectory_lambda", traj_lambda, {"opponent": opponent})
     # source == "margin"
-    if raw_horizon:
-        raise ValueError(
-            f"MOSAIC_BOOTSTRAP_HORIZON_ROUNDS={raw_horizon!r} gehoert zur Quelle 'trajectory', "
-            "nicht zu 'margin' -- dort waere er wirkungslos.")
-    try:
-        scale = float(raw_scale)
-    except ValueError:
-        scale = float("nan")
-    if not (math.isfinite(scale) and scale > 0.0):
-        raise ValueError(
-            f"MOSAIC_BOOTSTRAP_MARGIN_SCALE={raw_scale!r} ungueltig -- bei "
-            "MOSAIC_BOOTSTRAP_SOURCE=margin Pflicht, endliche Zahl > 0 (Punkte).")
-    canonical = repr(scale)
-    if canonical.endswith(".0"):
-        canonical = canonical[:-2]
-    return ("margin", canonical)
+    scale = _parse_number(raw_scale, "MOSAIC_BOOTSTRAP_MARGIN_SCALE", low=0.0, high=None,
+                          low_inclusive=False,
+                          rule="bei MOSAIC_BOOTSTRAP_SOURCE=margin Pflicht, endliche Zahl > 0 (Punkte)")
+    return ("margin", scale, {})
+
+
+def _bootstrap_variant_config() -> dict | None:
+    """Die Varianten-Parameter fuer die BAUSCHLEIFE (corpus_dataset.py), aus
+    derselben Pruefstelle wie die Schluessel (`_bootstrap_source_config`).
+
+    None ohne Quelle, sonst {"source", "horizon", "mix", "conf_scale",
+    "traj_lambda", "opponent", "margin_scale"} mit None fuer alles, was zur
+    Quelle nicht gehoert; Zahlen als float (die Marker tragen den kanonischen
+    String)."""
+    config = _bootstrap_source_config()
+    if config is None:
+        return None
+    source, param, extras = config
+    out = {"source": source, "horizon": None, "mix": None, "conf_scale": None,
+           "traj_lambda": None, "opponent": False, "margin_scale": None}
+    if source == "trajectory":
+        out["horizon"] = param
+        out["mix"] = None if extras["mix"] is None else float(extras["mix"])
+        out["conf_scale"] = None if extras["conf_scale"] is None else float(extras["conf_scale"])
+    elif source == "trajectory_lambda":
+        out["traj_lambda"] = float(param)
+        out["opponent"] = bool(extras["opponent"])
+    else:
+        out["margin_scale"] = float(param)
+    return out
+
+
+def td_lambda_from_env() -> float:
+    """`MOSAIC_TD_LAMBDA` (par.19.4, Arm v35-b14): Gewicht des Bootstraps im
+    TD-Blend `TD_LAMBDA * Bootstrap + (1 - TD_LAMBDA) * Ausgang`, bis
+    2026-10-08 die Konstante `neural_net.TD_LAMBDA = 0.5`.
+
+    Gelesen EINMAL beim Import von `neural_net` (dort `TD_LAMBDA =
+    td_lambda_from_env()`); alle Verbraucher (Bauschleife, beide Schluessel,
+    train.py, Trainings-Manifest) lesen den Namen von dort und sehen damit
+    denselben Wert. Ungesetzt oder leer: `TD_LAMBDA_DEFAULT` (0.5, Bestand
+    bitgleich). Sonst endliche Zahl in (0, 1]; 0 ist verboten, weil
+    `train.py::_destretch_wdl_target` durch TD_LAMBDA teilt. Harter Fehler
+    statt stillem Rueckfall.
+    """
+    import os
+    raw = (os.environ.get("MOSAIC_TD_LAMBDA") or "").strip()
+    if not raw:
+        return TD_LAMBDA_DEFAULT
+    return float(_parse_number(raw, "MOSAIC_TD_LAMBDA", low=0.0, high=1.0, low_inclusive=False,
+                               rule="endliche Zahl in (0, 1]"))
+
+
+def td_lambda_marker(td_lambda: float) -> str | None:
+    """Marker-Teil fuer BEIDE Schluessel: None beim Bestandswert 0.5, sonst
+    "tdlambda<wert>" (kanonisch). Bekommt den WIRKSAMEN Wert (den Namen
+    `TD_LAMBDA` aus `neural_net`), nicht die Umgebung -- so koennen Marker und
+    Bauschleife nicht auseinanderlaufen. Der Wert steht zusaetzlich seit jeher
+    als `str(TD_LAMBDA)` im Material; der Marker macht die Abweichung vom
+    Bestand im Material lesbar, wie bei den anderen Arm-Knoepfen."""
+    if float(td_lambda) == TD_LAMBDA_DEFAULT:
+        return None
+    return "tdlambda" + _canonical_number(td_lambda)
 
 
 def _bootstrap_trajectory_horizon_key() -> int | None:
@@ -286,6 +406,46 @@ def _bootstrap_margin_scale_key() -> str | None:
     """
     config = _bootstrap_source_config()
     return config[1] if config is not None and config[0] == "margin" else None
+
+
+def _bootstrap_trajectory_suffix_key() -> str:
+    """Marker-Zusatz der Quelle 'trajectory' fuer BEIDE Cache-Schluessel.
+
+    `PREREG_v35_window.md` par.19.3 (Arm v35-b13, `MOSAIC_BOOTSTRAP_TRAJ_MIX`)
+    und par.19.5 (Arm v35-b15, `MOSAIC_BOOTSTRAP_TRAJ_CONF_SCALE`): beide
+    aendern `values_wdl` im BLOCK. Der Zusatz steht im Marker
+    `bootstraptraj_h<k><zusatz>_v1` VOR "_v1": "" (b03/b05/b06, Marker
+    unveraendert), "_mix<m>" oder "_conf<s>" (kanonische Zahl). Ausserhalb
+    der Quelle 'trajectory' immer "". Pruefung: `_bootstrap_source_config`.
+    """
+    config = _bootstrap_source_config()
+    if config is None or config[0] != "trajectory":
+        return ""
+    extras = config[2]
+    if extras["mix"] is not None:
+        return "_mix" + extras["mix"]
+    if extras["conf_scale"] is not None:
+        return "_conf" + extras["conf_scale"]
+    return ""
+
+
+def _bootstrap_trajectory_lambda_key() -> str | None:
+    """Marker-Teil der Quelle 'trajectory_lambda' fuer BEIDE Cache-Schluessel.
+
+    `PREREG_v35_window.md` par.19.1 (Arm v35-b11): Bootstrap im WDL-Wertziel
+    ist das lambda-gewichtete Mittel der Suchwerte aller spaeteren eigenen
+    Stuetzstellen (`trajectory_bootstrap.trajectory_lambda_values`), par.19.2
+    (Arm v35-b12) zusaetzlich die Gegnerstellungen gespiegelt. Aendert
+    `values_wdl` im BLOCK, also beide Schluessel.
+
+    Rueckgabe: None = nicht diese Quelle, sonst "l<lambda>" bzw.
+    "l<lambda>_opp1" (Marker `bootstraptrajlambda_l<lambda>[_opp1]_v1`).
+    Pruefung: `_bootstrap_source_config`.
+    """
+    config = _bootstrap_source_config()
+    if config is None or config[0] != "trajectory_lambda":
+        return None
+    return "l" + config[1] + ("_opp1" if config[2]["opponent"] else "")
 
 
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
@@ -448,12 +608,26 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     # par.12a (Arm v35-b03): Bootstrap-Quelle im WDL-Ziel aus der echten
     # Trajektorie. Nur ANGEHAENGT, wenn gesetzt -- der Hash jedes vorhandenen
     # Blocks bleibt.
+    # par.19.3/par.19.5 (Arme v35-b13/b15): Zusatz `_mix<m>` bzw. `_conf<s>`
+    # vor "_v1"; ohne diese Knoepfe leer, der b03-Marker bleibt.
     _traj_horizon = _bootstrap_trajectory_horizon_key()
     if _traj_horizon is not None:
-        material += "|bootstraptraj_h" + str(_traj_horizon) + "_v1"
+        material += ("|bootstraptraj_h" + str(_traj_horizon)
+                     + _bootstrap_trajectory_suffix_key() + "_v1")
+    # par.19.1/par.19.2 (Arme v35-b11/b12): lambda-Mittel ueber den echten Pfad.
+    # Nur ANGEHAENGT, wenn gesetzt.
+    _traj_lambda = _bootstrap_trajectory_lambda_key()
+    if _traj_lambda is not None:
+        material += "|bootstraptrajlambda_" + _traj_lambda + "_v1"
     # par.14 (Arm v35-b04): Margen-Bootstrap, Skala b im Marker. Nur ANGEHAENGT,
     # wenn gesetzt.
     _margin_scale = _bootstrap_margin_scale_key()
     if _margin_scale is not None:
         material += "|bootstrapmargin_b" + _margin_scale + "_v1"
+    # par.19.4 (Arm v35-b14): MOSAIC_TD_LAMBDA. Der wirksame Wert steht seit
+    # jeher als str(TD_LAMBDA) oben im Material; der Marker kommt nur bei
+    # Abweichung vom Bestand 0.5 dazu, der Hash jedes vorhandenen Blocks bleibt.
+    _td_marker = td_lambda_marker(TD_LAMBDA)
+    if _td_marker is not None:
+        material += "|" + _td_marker + "_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

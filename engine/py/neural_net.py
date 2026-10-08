@@ -21,6 +21,7 @@ from torch.utils.data import Dataset
 # Ratsche (tools/check_conventions.py Regel 1) ohnehin ueber der Schwelle.
 # Re-Export, damit Aufrufer weiter `neural_net.per_file_cache_key` sehen.
 from file_cache_key import per_file_cache_key  # noqa: F401
+from file_cache_key import td_lambda_from_env as _td_lambda_from_env
 # E4-Arm: gemeinsame Schaltstelle fuer beide Bauer (Rust und Zwilling), damit sie
 # nicht auseinanderlaufen. Die Regel selbst steckt in engine/src/supply_demand.rs.
 from supply_demand_features import append_supply_demand
@@ -1358,7 +1359,10 @@ VALUE_SCALE = 50.0
 # (Endergebnis bzw. rtv-Override), 1.0 = nur der kurze Bootstrap-Horizont.
 # 0.5 als erster, ungetesteter Startwert (gleichgewichtiger Blend) -- noch
 # keine Arena-/R²-Validierung, bei Bedarf anpassen.
-TD_LAMBDA = 0.5
+# Seit 2026-10-08 Knopf `MOSAIC_TD_LAMBDA` (PREREG_v35_window.md par.19.4, Arm
+# v35-b14), einmal beim Import gelesen; ungesetzt 0.5 wie bisher (Pruefung
+# und Marker: file_cache_key.td_lambda_from_env / td_lambda_marker).
+TD_LAMBDA = _td_lambda_from_env()
 
 # λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z" --
 # Varianzreduktion des HAUPT-Value-Targets durch Mischen mit dem
