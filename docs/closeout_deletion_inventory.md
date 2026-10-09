@@ -139,7 +139,7 @@ Promotionskette. Knoten mit Netz im Baum: `v29-b11` (1 Kante), `v31-b01` (7), `v
 | --- | --- | --- | --- | --- | --- |
 | `models/alphazero_v35-b*_resume.pth` (b02-b08, b10) | 8 | 433,2 | Fortsetzungsstaende abgeschlossener Trainings | restic + `run:` | **L** |
 | `models/alphazero_v35-{b01,b03,b04,b05,b06,b07,b08,b08b,b09,b11,b12,b13,b14a,b14b,b15,b19}*` ohne `_resume` | (in 168) | (in 1.155,4) | Arme ohne Kante, Ergebnis nur in der Prereg (`PREREG_v35_window.md` par.11-21, Kopf: b07 traegt nicht, b08/b08b/b11-b15/b19 ohne Hebel, die uebrigen tragen, aber unter b16) | restic + `run:` | **L** |
-| `models/alphazero_v35-b10*` ohne `_resume` | (in 168) | (in 1.155,4) | staerkste Kante vor b16 (par.18b); Prereg-Kopf: "Offen: Kante b16 gegen b10" | restic + `run:` | **N** (nur falls die Kante noch gefahren werden soll) |
+| `models/alphazero_v35-b10*` ohne `_resume` | (in 168) | (in 1.155,4) | staerkste Kante vor b16 (par.18b); Prereg-Kopf: "Offen: Kante b16 gegen b10" | restic + `run:` | **N** (nur falls die Kante noch gefahren werden soll; Nutzer 2026-10-09 abends: keine Kante mehr gegen b10, damit Loeschkandidat auf Freigabe) |
 | `models/alphazero_v35-b02*` ohne `_resume` | (in 168) | (in 1.155,4) | Bezug der Reihe (b08b, b11-b15 gegen b02) | restic + `run:` | **N**, eher L |
 | Summe v35-Arme ohne b16, ohne `_resume` | 168 | 1.155,4 | | | |
 | `models/alphazero_v35-b16.{onnx,pth}`, `_best.*`, `_loss.png`, die zugehoerigen `.ref.txt` | 7 | 46,2 | Nebenstaende des Champions (Endstand, Val-Loss-Bester); promoviert ist `_brierbest` | restic + `run:` | **N** |
@@ -179,6 +179,7 @@ Hilfetexte in `tools/brier_best_checkpoint.py`, `tools/checkpoint_val_eval.py` (
 | `engine/target/` | ungeprueft | 10.793 (Zaehlung Auftraggeber) | cargo-Ausgabe; jeder spaetere `cargo build`/`cargo test` und der pre-push-Hook bauen dann komplett neu (Dauer ungeprueft) | NICHT gesichert, nur Neubau | **L** |
 | `dist/Mosaic-AI/` | 127 | 95,0 | entpacktes PyInstaller-Bundle (`tools/build_release.py`) | NICHT gesichert, nur Neubau | **L** |
 | `dist/Mosaic-AI_v1.1-alpha31.zip` | 1 | 45,0 | gepacktes Release-Bundle | NICHT gesichert, unwiederbringlich als Datei | **N** (liegt es woanders, z. B. als Release?) |
+| `dist/Mosaic-AI_v1.1-alpha35.zip` (NEU 2026-10-09 19:08, Champion v35-b16) und das neu gebaute `dist/Mosaic-AI/` | 1 + 127 | 43,1 + 91,0 | Abschluss-Release (STATUS Abschnitt 7) | NICHT gesichert; Zip ausserhalb ablegen | **B** (Zip), **L** (Bundle-Ordner, Neubau 40 s) |
 | `dist/mosaic_release.spec`, `run_mosaic.py`, `README_GAME.txt` | 3 | klein | getrackte Build-Quellen (`.gitignore` Ausnahmen) | Git | **B** |
 | `build/` | 16 | 25,8 | PyInstaller-Zwischenstand | NICHT gesichert, nur Neubau | **L** |
 

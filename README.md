@@ -30,7 +30,9 @@ to the `v34-b01` spec (start-dome search, round 5 played by the net search); tre
 reuse is not part of the spec. **Tessa** is the name the game shows for the
 reigning champion; the technical name stays in the ladder and the files
 (`models/champion.txt`). This is the final champion: `v35` was the last
-generation and the project is closed with it.
+generation and the project is closed with it. The distributable Windows bundle
+with this champion is `dist/Mosaic-AI_v1.1-alpha35.zip` (built 2026-10-09 with
+`tools/build_release.py`; not tracked and not in the backup).
 
 Edges measured for `v35-b16`: gate 1 against the reigning champion `v34-b01`
 289:161 = 64.2 % (n = 450, both seeds stopped by the SPRT, block-z +6.63,

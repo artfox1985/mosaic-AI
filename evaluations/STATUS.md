@@ -116,13 +116,13 @@ b02/b10/b16, Fortsetzungsstaende, alte Knoten, Artefakt `frozen_champions/v32-b0
 Gruppe. Preregs geschlossen (Abschnitt 4). Nach dem Loeschen von `engine/target` baut der naechste `cargo`-Lauf komplett neu.
 
 Noch offen:
-1. **Direkte Kante b16 gegen b10** (2 x 200 Paare, rund 4 h, HERLEITUNG par.20b): fuer die Promotion nicht noetig; b10 ist
-   dafuer im Baum geblieben.
+1. **Direkte Kante b16 gegen b10: ENTSCHIEDEN, wird nicht gefahren** (Nutzer 2026-10-09 abends: *"Wir machen keine kante
+   mehr gegen b10"*). b10 war dafuer im Baum geblieben und ist damit Loeschkandidat (69,3 MB, restic), nur auf Freigabe.
 2. **Claude-Partien g13/g14 gegen Tessa** (Nutzer 2026-10-08: erst gegen das finale Modell; das ist jetzt v35-b16).
 3. **Server-Neustart**, damit die Anzeige Champion, Spec und Kalibrierung von v35-b16 zieht (par.22a, 5b). Ob er seit
    16:4x erfolgt ist: ungeprueft.
 4. **Push** (Abschnitt 7).
-5. Verbliebene N-Gruppen der Loeschvorlage (Korpora 2.471 MB, b02/b10, Nebenstaende b16/v34-b01, `hv2_generator`,
+5. Verbliebene N-Gruppen der Loeschvorlage (Korpora 2.471 MB, b02, b10 [s. Punkt 1], Nebenstaende b16/v34-b01, `hv2_generator`,
    Release-Zip `dist/Mosaic-AI_v1.1-alpha31.zip`, `player_profiles.json.bak`): bleiben, bis der Nutzer anders entscheidet.
 6. Aeltere Punkte aus dem frueheren Abschnitt 6 (Code-Review 2 #17-#19, Budget-Knopf der Hilfsknoten, Gruppe B des
    Aufraeumens, Sichtluecke bei gezogenen Stapelplatten, `-Deep`-Lauf der Backup-Verifikation u. a.) stehen woertlich
@@ -152,7 +152,16 @@ Planungsgroessen aus v35 (exklusiv, sofern nicht vermerkt; Quelle `docs/measured
 | Arm ohne Erzeugung und Blockbau (b16) | 3,0 h | par.20b |
 | Promotionskette v35-b16 | 4 h 27 min (Replikation 7.397 s, Bloecke 1-9 GEBREMST) | par.22a |
 
-## 7. PUSH-STAND
+## 7. RELEASE UND PUSH-STAND
+
+**Abschluss-Release gebaut 2026-10-09 19:08** (Nutzer: *"Leg den build an"*): `tools/build_release.py` (PyInstaller onedir, rund
+30 s Analyse und Bau, Zip wenige Sekunden) -> `dist/Mosaic-AI_v1.1-alpha35.zip`, 43,1 MB gepackt, 91,0 MB entpackt, 127 Eintraege.
+Inhalt geprueft: `models/champion.txt` = `v35-b16_brierbest`, `alphazero_v35-b16_brierbest.onnx`, `v35-b16_brierbest.spec.json`,
+`mosaic_rust.cp314-win_amd64.pyd` (Wheel-Stand cd8995bf), README_GAME, engine_manual. Das Zip ist wie das alpha31-Zip NICHT im
+restic-Backup (`dist/` ausgeschlossen); wer es behalten will, legt es ausserhalb ab. `dist/Mosaic-AI/` ist durch den Build neu
+entstanden (Build-Ausgabe, nicht gesichert). Das alte `Mosaic-AI_v1.1-alpha31.zip` (v31-b01) liegt weiter daneben.
+
+
 
 **25 Commits vor `origin/main`, NICHT gepusht** (`git rev-list --count origin/main..HEAD` am 2026-10-09; letzter Commit
 `a3fa6be3`, 2026-10-09 16:50:03). Kein Push ohne Anweisung. Vor einem Push: `cargo test --release --no-run` (CLAUDE.md,
