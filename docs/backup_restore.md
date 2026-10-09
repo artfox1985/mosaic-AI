@@ -157,7 +157,12 @@ macOS und FreeBSD beschraenkt. Es bleibt bei `find`, `ls`, `dump`,
 
 ## Betrieb
 
-`tools/mosaic_backup.ps1` ist der Tageslauf. Schalter:
+`tools/mosaic_backup.ps1` ist der Tageslauf. Er lief als Aufgabe `Mosaic-AI Backup` der
+Windows-Aufgabenplanung taeglich um 12:00 (`pwsh -NoProfile -ExecutionPolicy Bypass -File
+tools/mosaic_backup.ps1`). **Seit 2026-10-09 ist die Aufgabe DEAKTIVIERT** (Nutzer-Anweisung zum
+Projektabschluss; letzter automatischer Lauf 2026-10-09 12:00, Snapshot `e6990f49`, letzter
+Handlauf 18:46, Snapshot `60e490bd`). Wieder einschalten: `Enable-ScheduledTask -TaskName
+"Mosaic-AI Backup"`; ein Handlauf geht jederzeit ueber das Skript. Schalter:
 
 - `-Prune` -- fuehrt `forget` mit der Aufbewahrungsrichtlinie aus und gibt
   Platz frei. **LOESCHT Snapshots.** Ohne den Schalter wird nichts entfernt,
