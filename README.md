@@ -23,14 +23,14 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-**Champion change in progress: `v35-b16` is being promoted** (user decision
-2026-10-09; the promotion chain started at 12:06 that day,
-`evaluations/PREREG_v35_window.md` par.22). The package is the network
-`alphazero_v35-b16_brierbest` with a spec byte-identical to the `v34-b01` spec
-(start-dome search, round 5 played by the net search); tree reuse is not part of
-the spec. Once the promotion is complete, the name the game shows for the
-reigning champion, **Tessa**, moves from `v34-b01` to `v35-b16`; the technical
-name stays in the ladder and the files (`models/champion.txt`).
+**Champion: `v35-b16`, shown in the game as Tessa** (promoted 2026-10-09 after
+the full checklist, `evaluations/PREREG_v35_window.md` par.22 and par.22a). The
+package is the network `alphazero_v35-b16_brierbest` with a spec byte-identical
+to the `v34-b01` spec (start-dome search, round 5 played by the net search); tree
+reuse is not part of the spec. **Tessa** is the name the game shows for the
+reigning champion; the technical name stays in the ladder and the files
+(`models/champion.txt`). This is the final champion: `v35` was the last
+generation and the project is closed with it.
 
 Edges measured for `v35-b16`: gate 1 against the reigning champion `v34-b01`
 289:161 = 64.2 % (n = 450, both seeds stopped by the SPRT, block-z +6.63,
@@ -65,7 +65,7 @@ the stronger net. The tiling-surprise probe found no systematic room for a
 mini-search over the round-end tiling (`PREREG_tiling_surprise_probe.md`
 par.3b). The one lesson of the series: the lever sat in the policy carriers,
 not in the value target and not in the search. The project closes with
-`v35-b16` as Tessa once the promotion is complete.
+`v35-b16` as Tessa.
 
 **The cold-start question is settled.** `v30-b01` and `v30-b02` trained on the
 same replay window with the same seed and the same recipe and differed in a

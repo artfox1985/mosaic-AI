@@ -77,22 +77,21 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 137 Dateien = 5 OFFEN + 118 ENTSCHIEDEN + 14 UEBERHOLT.**
+**Stand (automatisch generiert): 137 Dateien = 4 OFFEN + 119 ENTSCHIEDEN + 14 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (5)
+## OFFEN (4)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_asymmetric_selfplay.md` | Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | W-v2 Runde 1 TRAEGT: G-KL +0,054 [+0,036; +0,073], kein Versatz, W 44,5 % (par.5d3a/b) -> Sockel-Vorschlag. Stoerer, Exploiter v1 (46 %), v32-Gegner tragen nicht. Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3). @400 mit Modus 2: KL x2, Punkte gleich, aber -0,07 volle Spalten (par.8c1) -> Mischsockel-Vorschlag. Exploiter v2 (par.7c) vom Nutzer GESTRICHEN (2026-10-04 abends, par.7c1); kein Exploiter im v35-Fenster. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. |
 | `PREREG_subtree_value_bias.md` | Korrigiert eine laufzeitgelernte Bias-Tabelle je Zustandsklasse (KataGo Subtree Value Bias) systematische Netzfehler in der 400-Sim-Suche, bei unveraendertem Netz und reproduzierbarer Arena? | nichts gebaut, nichts gemessen; registriert 2026-10-05 auf Nutzer-Anweisung (par.1-par.4). |
-| `PREREG_v35_window.md` | Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, Replikation 62,3 % z +5,07 (par.20b/22a)**; b07, b08/b08b, b11-b15, b19 (Wertziel), b18 (Tree Reuse) ohne Hebel. **v35-b16 PROMOVIERT 2026-10-09 (par.22a), Tessa. Reihe und Projekt DURCH.** |
 | `PREREG_variance_scaled_cpuct.md` | Macht eine mit der empirischen Nutzenvarianz des Knotens skalierte Explorationskonstante (KataGo-Form, ohne Unsicherheitskopf) die 400-Sim-Suche staerker, bei unveraendertem Netz? | nichts gebaut, nichts gemessen; registriert 2026-10-05 auf Nutzer-Anweisung (par.1-par.4). |
 
-## ENTSCHIEDEN (118)
+## ENTSCHIEDEN (119)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -212,6 +211,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_v32_window.md` | Wie wird das v32-Fenster zugeschnitten, und traegt der erste Arm? | Fenster 2.947 Dateien, Training `v32-b01` warm in 63 min (par.10). TOR 1 TRAEGT nach Vorregistrierung: 434:366 = 54,25 Prozent, Block-z +2,37 -- aber nur ein Seed einzeln (+3,26 gegen +0,10). PROMOVIERT 2026-09-25 (par.11): Elo 1480 [1431; 1529] gegen 1450 des Vorgaengers, Champion-2 94:56 trifft die transitive Erwartung, alle Pflicht-Diagnostiken gepaart gegen v31 und unauffaellig; Spec unveraendert, Startkuppel-Suche erst ab v33. |
 | `PREREG_v33_window.md` | Wie wird das v33-Fenster zugeschnitten, und traegt der erste Arm? | Tor 1 auf der Kante getragen (420:380, Block-z +1,41, par.10); Fenster-Arme b02-b04 ohne messbaren Unterschied (par.6a/par.6d); v33-b02 verfehlt die Champion-Kante (405:395, z +0,37, par.6e), keine Promotion. v33-b01 war Generator der v34-Erzeugung; v34-Fenster im b04-Zuschnitt. Geschlossen 2026-10-02 (Nutzer). |
 | `PREREG_v34_window.md` | Wie wird das v34-Fenster zugeschnitten und erzeugt (letzte Generation dieser Architektur), und traegt ein Arm? | v34-b01 ist Champion seit 2026-10-03 (par.10e): Replikation gegen v32-b01 285:115, Block-z +10,00; Elo 1595 [1546; 1646]. Die Arme E2 (z -0,36) und E4 (z +0,96) tragen nicht (par.10b/10c). Rest: Paritaets-Fixture (5d) nach der v35-Erzeugung. |
+| `PREREG_v35_window.md` | Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, Replikation 62,3 % z +5,07 (par.20b/22a)**; b07, b08/b08b, b11-b15, b19 (Wertziel), b18 (Tree Reuse) ohne Hebel. **v35-b16 PROMOVIERT 2026-10-09 (par.22a), Tessa. Reihe und Projekt DURCH.** |
 | `PREREG_value_rank_metric.md` | Validiert die Value-Rangmetrik `value_kendall_tau_vs_oracle_q` (Task #29) gegen arena-entschiedene Paare? | Nicht validiert (2/6 Richtungen korrekt, Zufallsniveau); `archive/history.md` Z. ~7532-7567 |
 | `PREREG_value_scale_correction.md` | Hebt eine monotone Value-Skalen-Korrektur (Task #30, `MOSAIC_VALUE_CAL_A/B`) die Spielstaerke? | Erstlauf +6pp n.s., Replikation zeigte KEINEN Effekt; `archive/history.md` Z. ~7461-7489 und ~9431-9457 |
 

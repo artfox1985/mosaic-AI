@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, Replikation 62,3 % z +5,07 (par.20b/22a)**; b07, b08/b08b, b11-b15, b19 (Wertziel), b18 (Tree Reuse) ohne Hebel. **v35-b16 PROMOVIERT 2026-10-09 (par.22a), Tessa. Reihe und Projekt DURCH.** -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, Replikation 62,3 % z +5,07 (par.20b/22a)**; b07, b08/b08b, b11-b15, b19 (Wertziel), b18 (Tree Reuse) ohne Hebel. **v35-b16 PROMOVIERT 2026-10-09 (par.22a), Tessa. Reihe und Projekt DURCH.** -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -2236,3 +2236,9 @@ restic-Beleg und pfadgenauer Nutzer-Freigabe (`docs/closeout_deletion_inventory.
 Block 10 154-182 s = rund 16,5 s je Partie), Anker 442 s, Champion-2 2.375 s, R4 2.6xx s (einkernig, 72 Zustaende), R4b Sekunden,
 R5 895 s, Platt 2 x rund 15 s, sigma/Prior 719 s, Golden Probe 1.191 s, venv 8 s, Selbsttest 91 s; Kette 4 h 27 min (v34: 5 h 18 min,
 dort mit R5-Mehrlauf und laengerer Replikation).
+
+**Nachtrag 5d (2026-10-09 16:4x):** Netz-Paritaets-Fixture mit `MOSAIC_UPDATE_NET_PARITY_FIXTURE=1` neu geschrieben
+(`engine/tests/fixtures/net_parity_champion.txt`: champion v35-b16_brierbest, Hash `f9892cce9c5176f0`, 3 Partien @8 Sims,
+15,3 s; Kompilat 56 s), danach derselbe Test ohne die Variable in einem FRISCHEN Prozess GRUEN (16,6 s). Checkliste damit
+vollstaendig: 1 Champion gesetzt, 2-4 Register, 5 Diagnostiken, 5b Platt, 5c sigma, 5d Fixture, 6 STATUS/history
+(Neufassung 2026-10-09 abends), 7 Artefakt.

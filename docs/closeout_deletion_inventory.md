@@ -16,7 +16,7 @@ Abschnitte 2 bis 5):
 - **Loeschung nur auf pfadgenaue Nutzer-Freigabe.** Eine Frage ist keine Anweisung.
 - **Gesicherte Dateien:** vorher daily-Snapshot, dann `restic find --snapshot <id> "<Muster>"` je
   Gruppe, Trefferzahl gegen die Dateizahl im Baum; beides ins Protokoll. Ohne diesen Beleg wird
-  nichts geloescht (Praezedenz: Loeschprotokoll 2026-10-05, Snapshot `46be756f`, `evaluations/STATUS.md`).
+  nichts geloescht (Praezedenz: Loeschprotokoll 2026-10-05, Snapshot `46be756f`, `archive/history.md` Kapitel "Vollstaendiger STATUS-Stand vom 2026-10-09").
 - **Modelle:** zusaetzlich `restic snapshots --tag "run:<name>"` je Arm (train.py sichert jeden Lauf
   als Snapshot, `train.py` Z.3249-3267). Ohne Marke kein Loeschvorschlag (Skill Abschnitt 5).
 - **Nicht im Backup** (`docs/backup_restore.md`, `tools/backup_excludes.txt`): alle `*.h5`,
@@ -64,7 +64,7 @@ unwiederbringlich, nur Neubau. Empfehlung: **L** = Loeschkandidat, **N** = Nutze
 | `data/.filecache_*.h5` (Bloecke, alle) | 13.900 | 7.272,7 | Datei-Bloecke je Korpusdatei und Marker (rund fuenf je Datei, HERLEITUNG 13.900 / 2.700); kein Training folgt | NICHT gesichert, unwiederbringlich | **L** |
 | `data/.cache_*.h5` grosse Monolithe toter Arme (14 Schluessel, s. Tabelle unten) | 14 | 8.475,6 | Fenster-Caches der Arme b01-b15, b19 | NICHT gesichert, unwiederbringlich | **L** |
 | `data/.cache_58500785fe54.h5` (b16) | 1 | 791,5 | Trainings-Cache des Champions (`manifest_train_v35-b16_*.json`) | NICHT gesichert, unwiederbringlich | **L** (nur fuer ein Nachtraining von b16 noetig) |
-| `data/.cache_*.h5` kleine Val-Monolithe (15 Schluessel) | 15 | 872,6 | Val-Caches (je rund 58 MB); kein Manifest nennt ihren Schluessel, Besitz klaert `tools/cache_doctor.py`; `81bef1158189` gehoert zu b01 (`STATUS.md`) | NICHT gesichert, unwiederbringlich | **L** |
+| `data/.cache_*.h5` kleine Val-Monolithe (15 Schluessel) | 15 | 872,6 | Val-Caches (je rund 58 MB); kein Manifest nennt ihren Schluessel, Besitz klaert `tools/cache_doctor.py`; `81bef1158189` gehoert zu b01 (`archive/history.md`, Archivkapitel vom 2026-10-09) | NICHT gesichert, unwiederbringlich | **L** |
 | **Summe `*.h5`** | **13.930** | **17.412,4** | | | |
 
 Neubau-Kosten, falls doch noch einmal trainiert wird: Bloecke 400 Dateien 269 s gemessen
