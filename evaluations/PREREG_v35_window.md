@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, staerkste Kante (par.20b)**; b07 NICHT; b08/b08b EMA ohne Gewinn; b11-b15 ohne Hebel (par.19). Laufen: Schnellblick b18 (b16 + Tree Reuse) und b19 (b16 + Trajektorie, par.21) gegen b16. Offen: Promotion, Kante b16 gegen b10. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, staerkste Kante (par.20b)**; b07 NICHT; b08/b08b EMA ohne Gewinn; b11-b15 ohne Hebel (par.19). b18 (Tree Reuse) und b19 (Trajektorie) auf b16 ohne Hebel (Tree-Reuse-Prereg par.3e, par.21a). Reihe DURCH. Offen (Nutzer): Promotion b16 (Kette liegt), Kante b16 gegen b10. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -2130,3 +2130,37 @@ mehr ist als der Fenster-Effekt.
 
 **Kosten (HERLEITUNG):** Bloecke 400 Dateien 5 min, Merge 6 min, Training rund 35 min (2,83 M Samples), Vorfilter 30 s, Schnellblick
 rund 1 h; zusammen rund 2 h. Kette `tools/night_v35_b19_chain.sh`, laeuft nach b18.
+
+### par.21a ERGEBNIS v35-b19: KEIN HEBEL (2026-10-09 08:50-10:49, `tools/night_v35_b19_chain.sh`, 1,99 h; Schnellblick GEBREMST, s.u.)
+
+**Bau:** Bloecke 400 Dateien unter `bootstraptraj_h1_v1` 269 s, Merge unter `72ebe9e201c0` 359 s, Split 4 s (Val byte-gleich b02),
+Training 2.042,8 s (2.832.807 Samples wie b16), Manifest-Diff gegen b16 nur die erlaubten Felder. **Val-Brier-Minimum 0,18876 in
+Epoche 3** (b16 0,18857), policy_val_loss-Minimum 1,18578 in Epoche 5 (b16 1,18596). **Vorfilter** (b02-Val-Satz, 120 Dateien,
+b16 minus b19): Brier -0,00018 [-0,00057; +0,00021], Policy-CE +0,00019 [-0,00008; +0,00046]: offline ununterscheidbar, CI nicht
+unter 0, Schnellblick gelaufen.
+
+| Seed | b19 : b16 | Block-z (10 Bloecke) | gepaarte Diff | McNemar p | A-Sweep / B-Sweep / Split | Laufzeit |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261700 | 48:52 = 48,0 % | -0,32 | -0,08 | 0,845 | 12 / 14 / 24 | 1.998 s (20,0 s je Partie) |
+| 20261701 | 56:44 = 56,0 % | +1,62 | +0,24 | 0,307 | 15 / 9 / 26 | 2.472 s (24,7 s je Partie) |
+| **gepoolt** | **104:96 = 52,0 %** | **+0,54 (20 Bloecke, sd 0,164)** | | | | 4.473 s |
+
+Seed 1 stand nach 30 Paaren 25:35 (McNemar p 0,04 nach Block 4) und holte in den letzten 20 Paaren 23:17 auf; der fruehe
+Rueckstand war Rauschen auf Blockebene, kein Befund.
+
+Die sechs Kennzahlen (Bretter je Modell, n = 100 je Seed und Seite, b19 gegen b16): volle Spalten 0,96 / 0,98 gegen 1,03 / 1,01,
+Spalten >= 4 2,46 / 2,42 gegen 2,26 / 2,33, lange Reihen 3,12 / 3,30 gegen 3,06 / 3,09, H 0,600 / 0,580 gegen 0,593 / 0,587,
+Strafsteine 8,87 / 7,26 gegen 7,78 / 7,93, Punkte 55,49 / 58,75 gegen 56,31 / 57,88, Margin -0,82 / +0,87, Plattenpunkte
+6,71 / 8,97 gegen 7,07 / 8,79. Kein Kriterium der Plattenpunkte mit CI-Trennung (beide Seeds). Bild wie b11-b15 (par.19.6):
+weniger volle Spalten, Platten und Punkte im Rauschen.
+
+**Lesart par.21 (vorab festgelegt): 45 bis 55 % ohne Block-z >= +1,5 = KEIN HEBEL.** Der ungeglaettete Trajektorien-Bootstrap legt
+auf dem b16-Fenster mit allen 1.600 Traegern nichts, was der Schnellblick sieht; Seed 2 allein liegt mit +1,62 ueber der Schwelle,
+gepoolt nicht, und die Regel gilt gepoolt. Damit sind alle Bootstrap-Varianten (b03-Form, b11-b15, b19) gegen den jeweils besten
+Bezug ohne Hebel; die Trajektorie bleibt in der b02/b09/b16-Linie draussen. Volle Breite gegen b16 nach Regel nicht faellig.
+
+**Laufzeiten, GEBREMST (Blockdauern aus `blocks[].duration_s` der Artefakte):** Seed 1 Bloecke 1-4 155-165 s (sauber), Bloecke 5-6
+186 / 195 s (daneben rund zwei Minuten `elo_tracker.py report` des Koordinators, abgebrochen), Bloecke 7-10 218-281 s und Seed 2
+durchgehend 232-258 s: ab 09:52:42 lief ein Spielprozess des Nutzers (`GraveyardKeeper2`, rund 2,3 Kerne dauerhaft, Prozessliste
+10:5x). Die 20,0 / 24,7 s je Partie sind darum keine Kostenzahlen (sauberer Schnellblick 16,5-18,2 s, par.3e der Tree-Reuse-Prereg);
+der Determinismus der Partien unter Nebenlast ist nicht belegt, das Verdikt haengt nicht daran (Band 45-55 %, beide Seeds).

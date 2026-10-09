@@ -1,0 +1,63 @@
+{
+ "champion": "v35-b16_brierbest",
+ "freeze_date": "2026-10-09",
+ "preliminary": true,
+ "preliminary_note": "VORLAGE vor dem Nutzer-Entscheid (PREREG_v35_window.md par.20b: Promotion NUR nach Nutzer-Entscheid). Golden Probe, venv und Selbsttest fehlen noch (tools/v35_promotion_chain.sh Schritt 7); erst danach auf false setzen.",
+ "name_dialect": "hv",
+ "model_file": "model.onnx",
+ "pth_file": "model.pth",
+ "spec_file": "spec.json",
+ "model_source": "models/alphazero_v35-b16_brierbest.onnx",
+ "pth_source": "models/alphazero_v35-b16_brierbest.pth",
+ "spec_source": "models/v35-b16_brierbest.spec.json",
+ "spec_note": "Byte-gleiche Kopie von models/v34-b01_brierbest.spec.json (sha256 721e08f0..., byte-gleich models/frozen_champions/v34-b01/spec.json), der Spec, mit der die Tor-1-Kante par.20b BEIDSEITS lief (b16 gegen v34-b01, Seeds 20261600/01, 289:161 = 64,2 %): Startkuppel-Suche an, Runde 5 per Netz (r5_net_solver 0). Tree Reuse NICHT in der Spec (b18-Schnellblick gegen b16 nicht spannend). Promoviert wird das PAKET Netz b16 plus diese Spec.",
+ "spec_content": {
+  "implicit_minimax_alpha": 0.0,
+  "long_row_init_shaping_w": 0.0,
+  "score_utility_c": 0.0,
+  "score_utility_b": 20.0,
+  "envelope_search_c": 1.0,
+  "envelope_tiling_w": 0.0,
+  "envelope_profile": [
+   1.0,
+   0.92,
+   0.67,
+   0.33,
+   0.0
+  ],
+  "envelope_tiling_value_w": 0.0,
+  "envelope_projection_mode": 1,
+  "envelope_flush_w": 0.0,
+  "envelope_hull_form": 2,
+  "special_row6_w": 1.0,
+  "heuristik_variante": "hv1",
+  "start_by_search": 1,
+  "r5_net_solver": 0
+ },
+ "sha256": {
+  "model.onnx": "68f2e058511c7ffd75806bd2fa646f87c4d43699e3372378dcb569fa39e2b018",
+  "model.pth": "ad6a76231368245b95581459ea232c88de322a257f1529d64a93093f526595db",
+  "spec.json": "721e08f0bdc61b7902f5e96b22889e837e51d7c6c7114c85732ddb86c212a8ab"
+ },
+ "input_size": 888,
+ "num_actions": 414,
+ "contract_hash": "6ef829e564c58bd5",
+ "contract_note": "contract_hash, input_size und num_actions aus dem Trainings-Manifest models/manifest_train_v35-b16_20261009_041044.json (dort Zeilen 74, 107, 115; geprueft 2026-10-09), gleich v34-b01.",
+ "engine_version": "1.1.0",
+ "wheels": [
+  "mosaic_rust-1.1.0-cp314-cp314-win_amd64.whl"
+ ],
+ "wheel_sha256": "cd8995bf71c6bb54b8c9e461e19b3093dafae9d49091543ca83ca15fc235db21",
+ "wheel_note": "Das live installierte Wheel zur Einfrierzeit (direct_url.json sha256 cd8995bf..., geprueft 2026-10-09 gegen die Datei engine/target/wheels/mosaic_rust-1.1.0-cp314-cp314-win_amd64.whl): Build mit Tree-Reuse-Knopf (Default 0, also im Paket aus); Anker-Drift am 2026-10-08 GRUEN (1.763 Schritte). Gleiche Versionsnummer 1.1.0 wie v32-b01 (e11ea6d5) und v34-b01 (9449b63c), verschiedene Builds.",
+ "worker_python": {
+  "interpreter_relative": "venv/Scripts/python.exe",
+  "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, pip install --no-index --no-deps aus der Wheel-Kopie (nur mosaic_rust). OFFEN: venv legt tools/v35_promotion_chain.sh Schritt 7 an."
+ },
+ "training_manifest": "models/manifest_train_v35-b16_20261009_041044.json",
+ "prereg": "evaluations/PREREG_v35_window.md",
+ "display_name": "Tessa",
+ "display_name_note": "Informativ. Die GUI liest den Anzeigenamen NICHT aus dem Artefakt, sondern aus static/js/app.js (AI_DISPLAY_NAME).",
+ "repo_note": "model.onnx, model.pth und das Wheel sind NICHT im Repo (.gitignore, Nutzer-Entscheid 2026-09-23); getrackt werden Spec, Manifest, Golden Probe und wheel.sha256.",
+ "golden_probe_note": "OFFEN, Kette Schritt 7 (tools/v35_promotion_chain.sh: build_frozen_golden_probe --per-round 2 --sims 400 --c-puct 1.5 --seed-base 916001 --probe-seed-base 916101 --max-games 40, Seeds wie v34-b01). Nach dem Lauf nachtragen.",
+ "selftest": "OFFEN, Kette Schritt 7 (frozen_referee_match --n-games 2 aus dem venv; Artefakt evaluations/artifacts/referee_selftest_v35-b16.json). Nach dem Lauf nachtragen."
+}
