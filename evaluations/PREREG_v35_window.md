@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, staerkste Kante (par.20b)**; b07 NICHT; b08/b08b EMA ohne Gewinn; b11-b15 ohne Hebel (par.19). b18 (Tree Reuse) und b19 (Trajektorie) auf b16 ohne Hebel (Tree-Reuse-Prereg par.3e, par.21a). Reihe DURCH. Offen (Nutzer): Promotion b16 (Kette liegt), Kante b16 gegen b10. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, Replikation 62,3 % z +5,07 (par.20b/22a)**; b07, b08/b08b, b11-b15, b19 (Wertziel), b18 (Tree Reuse) ohne Hebel. **v35-b16 PROMOVIERT 2026-10-09 (par.22a), Tessa. Reihe und Projekt DURCH.** -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -2164,3 +2164,75 @@ Bezug ohne Hebel; die Trajektorie bleibt in der b02/b09/b16-Linie draussen. Voll
 durchgehend 232-258 s: ab 09:52:42 lief ein Spielprozess des Nutzers (`GraveyardKeeper2`, rund 2,3 Kerne dauerhaft, Prozessliste
 10:5x). Die 20,0 / 24,7 s je Partie sind darum keine Kostenzahlen (sauberer Schnellblick 16,5-18,2 s, par.3e der Tree-Reuse-Prereg);
 der Determinismus der Partien unter Nebenlast ist nicht belegt, das Verdikt haengt nicht daran (Band 45-55 %, beide Seeds).
+
+## par.22 NUTZER-ENTSCHEID 2026-10-09 mittags: v35-b16 WIRD PROMOVIERT (Kette laeuft seit 12:06:52)
+
+Nach par.20b (b16 64,2 %, Block-z +6,63 gegen den Champion v34-b01), par.3e der Tree-Reuse-Prereg (b18 nicht spannend) und par.21a
+(b19 kein Hebel) auf die Vorlage "Kandidat ist b16": *"starte die promotion"*. Promoviert wird das PAKET der Kante par.20b: Netz
+`alphazero_v35-b16_brierbest` mit `models/v35-b16_brierbest.spec.json` (byte-gleich der v34-b01-Spec, sha256 721e08f0...: Startkuppel-
+Suche, Runde 5 per Netz; Tree Reuse nicht in der Spec). Ablauf `/mosaic-champion-promotion`, Checkliste `docs/promotion_checklist.md`,
+Kette `tools/v35_promotion_chain.sh` (Tab c16): 2r Replikation gegen v34-b01 (Seed 20261603, 200 Paare, SPRT 1e-12), 3 Anker hv4_anchor
+n = 50, 4 Champion-2 gegen das Artefakt v32-b01 n = 150, 5 R4/R4b/R5/Platt/sigma gepaart gegen v34-b01, 7 Golden Probe, venv,
+Referee-Selbsttest. Vorpruefungen gruen (Spec-Paket, Artefakt-Kopien, Wheel cd8995bf live = Artefakt). HERLEITUNG Kosten rund 5,5 h
+(v34: 5 h 18 min).
+
+**Nebenlast, vom Nutzer in Kauf genommen:** seit 09:52 laeuft ein Spielprozess (rund 2,3 Kerne); Nutzer: *"wann etwas sauber laufen
+muss sag ich dir schon"*. Die Laufzeiten dieser Kette gelten darum als GEBREMST, solange der Prozess laeuft; die Register-Zeilen
+tragen den Vermerk. Danach von Hand: `set_champion.py`, 5b Platt in `server.py`, 5d Paritaets-Fixture (cargo), Register-Zeilen,
+STATUS und history, Zwei-Champion-Regel (`frozen_champions/v32-b01` faellt heraus, nur mit restic-Beleg und pfadgenauer Freigabe).
+
+### par.22a PROMOTION v35-b16 DURCHGEFUEHRT (2026-10-09 12:06:52 bis 16:33:23, `tools/v35_promotion_chain.sh`, 4 h 27 min)
+
+Ablauf `docs/promotion_checklist.md`. `models/champion.txt` = `v35-b16_brierbest` (16:4x), Champion-Spec
+`models/v35-b16_brierbest.spec.json` (byte-gleich `v34-b01_brierbest.spec.json`, sha256 `721e08f0...`: Startkuppel-Suche, Runde 5 per
+Netz, Tree Reuse aus). Wheel live und im Artefakt `cd8995bf...` (Tree-Reuse-Build, Anker-Drift gruen 2026-10-08).
+
+**Elo-Kanten** (Register `evaluations/elo_history.csv`, fuenf Zeilen 2026-10-09):
+
+| Kante | Ergebnis | Aufbau |
+| --- | --- | --- |
+| Tor 1 gegen v34-b01, Seeds 20261600/01 (par.20a/20b) | 135:75 und 154:86, frueh gestoppt nach 105/120 Paaren | paired_gating, SPRT 0,001, beidseits dieselbe Spec |
+| **Replikation bis zum Deckel**, Seed 20261603 | **249:151 = 62,3 %**, 200 Paare, Block-z **+5,07** (40 Bloecke, sd 0,153), gepaarte Diff +0,49 [+0,30; +0,68], McNemar p 2e-6 | paired_gating, SPRT 1e-12, Champion mit Artefakt-Spec; Bloecke 1-9 GEBREMST (Spielprozess, s. u.) |
+| Anker `hv4_anchor` @150 | **46:4** (n = 50 fest) | frozen_referee_match, Worker 150 Sims / c_puct 0,3 ausdruecklich; Handshake ROT (Cross-Aera, vorgesehen), Golden GRUEN; 442 s |
+| Champion-2 gegen das Artefakt `v32-b01` | **107:43 = 71,3 %** (n = 150) | frozen_referee_match, Handshake GRUEN, Golden GRUEN; 2.375 s |
+
+**Elo nach dem Fit:** `v35-b16@400` **1660 [1607; 1713]** aus 1.050 Partien (2 von 5 Kanten frueh gestoppt); `v34-b01@400` 1575 [1527; 1624] (vorher 1595, die neuen Kanten verschieben die Leiter), `v32-b01@400` 1450 [1405; 1497]; kein Knoten ohne Ankerverbindung (`elo_tracker.py report`, 92 Zeilen). Transitive Pruefung, HERLEITUNG: 85 Elo ueber v34-b01 entsprechen 62 %, gemessen 62,3 % in der Replikation; 210 Elo ueber v32-b01 entspraechen 77 %, gemessen 71,3 % (n = 150, unpaarig).
+
+Die sechs Kennzahlen der Replikation (Bretter je Modell, n = 400 je Seite, b16 gegen v34-b01): volle Spalten **1,067 gegen 0,990**
+(+-0,071), Spalten >= 4 2,42 gegen 2,24, lange Reihen 3,18 gegen 3,10, H 0,603 gegen 0,592, Strafsteine 7,98 gegen 8,11,
+**Punkte 59,67 gegen 54,49 (Margin +5,18)**, Plattenpunkte 8,39 gegen 7,14, Platzierung 57,23 gegen 52,38; gepaart mit CI-Trennung nur
+Spezialfelder +0,75 [+0,07; +1,43] (82 Paare); Vertikale +0,92 [-0,23; +2,06], Mehrfarbige +0,90 [-0,11; +1,91]. Bild wie in Tor 1:
+mehr volle Spalten, +5 Punkte, Platten +1,2.
+
+**Pflicht-Diagnostiken, gepaart gegen v34-b01** (gleiches Substrat, gleiche Seeds, gleicher API-ONNX v32-b01 bei R5):
+
+| | v34-b01 | **v35-b16** | Paarungs-Beleg |
+| --- | --- | --- | --- |
+| R4: Value-Kopf Steigung / R2 | 0,457 / 0,419 | 0,446 / 0,384 | eingefrorenes Substrat sha256 `f2e173d1...`, Eingabe-Sonde 0,087 / 0,034 beidseits identisch |
+| R4: Punkte-Kopf Steigung / R2 | 1,225 / 0,331 | 1,261 / 0,326 | dieselben |
+| R4: Vorzeichen-Anker | 50/70 | 50/70 | dieselben |
+| R4b: Trunk -> Marge / Siegwahrscheinlichkeit | 0,930 / 0,905 | 0,891 / 0,893 | Decke 0,983 / 0,914 beidseits |
+| R4b: Koepfe realisiert (Siegskala gegen Erwartung) | 0,415 | 0,373 | dieselben |
+| R5: Value-Daempfung Steigung / R2 | 0,272 / 0,392 | 0,237 / 0,370 | Kennlinie BITGLEICH (a = -0,78786, b = 0,39438), 24 Zustaende x 6 |
+| R5: Punkte-Kopf Steigung / R2 | 1,080 / 0,380 | 1,095 / 0,396 | dieselben |
+| Platt `frozen_v3`: A / B / Brier | +0,0059 / 0,5804 / 0,22806 | **-0,0312 / 0,5870 / 0,22688** | v34-b01 reproduziert seine Werte EXAKT |
+| Platt `frozen_v1` (Trend): A / B / Brier | +0,4738 / 0,5204 / 0,26848 | +0,3981 / 0,5530 / **0,25353** | dieselben Laeufe |
+| sigma/Prior, Median (Runden 1-4) | 1,544 | **2,027** (je Runde 1,53 / 2,36 / 3,28 / 2,34) | 233 verwertbare von 300 Zustaenden |
+
+**Lesart, knapp:** Rumpf und Wertkopf geben in R4/R4b/R5 leicht nach (Richtung, kein Intervall), waehrend Arena, Policy-CE und
+beide Brier-Saetze deutlich gewinnen: der Hebel der Reihe sass bei der Policy (par.18-20). **Brier-Regel haelt** auf frozen_v3 UND
+frozen_v1. sigma/Prior gesamt unter 3, die c_visit/c_scale-Familie oeffnet sich NICHT; Runde 3 allein 3,28 (Nebenbefund, kein
+Regelfall). Die R5-Daempfung bleibt spielrelevant (Champion spielt Runde 5 per Netz) und ist etwas kleiner als bei v34-b01.
+
+**5b Anzeige-Kalibrierung:** `server.py` `_DISPLAY_CAL_A/_B` auf -0,0312 / 0,5870 (wirkt nach Server-Neustart). **5d Paritaets-Fixture:**
+siehe Nachtrag unten. **Punkt 7, Artefakt `models/frozen_champions/v35-b16/`:** `model.onnx`, `model.pth`, `spec.json`, Wheel `cd8995bf...`
+(byte-gleich dem installierten, `direct_url.json`), Manifest (vorlaeufig-Marke entfernt), Golden Probe (10 Sonden, 3 mit
+pending_dome_choice, 40 Partien, 1.191 s einkernig), venv ohne Netz (8 s), Referee-Selbsttest GRUEN (Handshake, 10/10, zwei
+Echtpartien 1:1). Netze und Wheel per `.gitignore` NICHT im Repo.
+**Zwei-Champion-Regel:** `frozen_champions/v32-b01` faellt heraus (amtierend v35-b16, Vorgaenger v34-b01); Loeschung nur mit
+restic-Beleg und pfadgenauer Nutzer-Freigabe (`docs/closeout_deletion_inventory.md`).
+
+**Laufzeiten (Artefakte):** Replikation 7.397 s (18,5 s je Partie; Bloecke 1-9 230-256 s mit Spielprozess des Nutzers daneben, ab
+Block 10 154-182 s = rund 16,5 s je Partie), Anker 442 s, Champion-2 2.375 s, R4 2.6xx s (einkernig, 72 Zustaende), R4b Sekunden,
+R5 895 s, Platt 2 x rund 15 s, sigma/Prior 719 s, Golden Probe 1.191 s, venv 8 s, Selbsttest 91 s; Kette 4 h 27 min (v34: 5 h 18 min,
+dort mit R5-Mehrlauf und laengerer Replikation).

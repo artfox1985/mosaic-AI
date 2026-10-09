@@ -4,7 +4,7 @@ Dieses Dokument erklärt das Projekt für Menschen ohne KI- oder
 Statistik-Hintergrund. Es beantwortet drei Fragen: Was machen wir?
 Wie machen wir es? Und warum ausgerechnet so?
 
-Stand: 2026-10-05. Der tagesaktuelle Detailstand steht immer in
+Stand: 2026-10-09 (Projektabschluss). Der tagesaktuelle Detailstand steht immer in
 `evaluations/STATUS.md` (Fachdokument, deutsch); die technische
 Kurzfassung in der `README.md` (englisch).
 
@@ -69,8 +69,9 @@ Der Lernkreislauf, den wir "Generationszyklus" nennen:
   fest (dasselbe Zahlensystem wie im Schach). Als Fixpunkt dient ein
   regelbasierter Vergleichsspieler, den wir auf Elo 1000 setzen und
   eingefroren haben (mit eigenem Programmstand, damit ihn keine
-  spätere Änderung verschiebt). Der aktuelle Champion (Generation 34)
-  steht bei **1595**. Weil jedes Netz seit Generation 21 gegen den
+  spätere Änderung verschiebt). Der bisherige Champion (Generation 34)
+  stand bei **1595** (nach dem neuen Fit 1575), der neue (Generation 35)
+  steht bei **1660**. Weil jedes Netz seit Generation 21 gegen den
   Fixpunkt rund neun von zehn Partien gewinnt, trägt die Leiter
   dazwischen auf eingefrorenen Zwischenstufen (ältere Champions),
   gegen die die Duelle noch etwas aussagen.
@@ -82,22 +83,55 @@ Runde, weil es den Rechner im direkten Vergleich schlug (480:320,
 `evaluations/PREREG_r5_net_vs_solver.md`). Der Rechner bleibt im
 Programm für den Fixpunkt der Leiter und für ein Trainingsziel.
 
-## 3. Wo wir stehen (Stand Generation 35)
+## 3. Wo wir stehen (Abschluss, Generation 35)
 
-- **Champion ist Generation 34, im Spiel "Tessa"** (seit 2026-10-03),
-  Elo 1595. Sie schlug den Vorgänger 285:115 und den Fixpunkt 45:5.
-- **Die Wertungsplatten-Baustelle ist gelöst.** Ein regelbasierter
+- **Generation 35 ist die letzte, und sie stellt den neuen Champion.**
+  Nutzer-Entscheid vom 2026-10-09: die Variante "b16" der Generation
+  35 wird Champion und trägt damit im Spiel den Namen **"Tessa"**;
+  die Promotion (die Pflichtmessungen beim Champion-Wechsel) läuft am
+  selben Tag. Gegen den bisherigen Champion (Generation 34) gewann
+  sie 289:161 Partien (64,2 %), in der Wiederholung mit neuen
+  "Würfeln" 249:151 (62,3 %); gegen den Fixpunkt 46:4 und gegen den
+  Champion der Generation 32 107:43. Ihre Elo-Zahl: 1660 (der
+  Vorgänger stand bei 1595, nach dem neuen Fit 1575).
+- **Die Wertungsplatten-Baustelle bleibt gelöst.** Ein regelbasierter
   Lehr-Datensatz hat den Spaltenbau in die Trainingsdaten gebracht;
   seither baut der Champion rund eine volle Spalte je Partie (vorher
-  praktisch null) und gewinnt trotzdem die Duelle.
-- **Generation 35 ist die letzte.** Der Kreislauf stagniert: Der
-  bewertende Teil des Netzes lernt aus Partien, die mit 100
-  Durchrechnungen je Zug erzeugt wurden, nichts Messbares mehr. Die
-  abschließende Reihe erzeugt das Material mit 400 Durchrechnungen
-  neu, probiert dann vier Varianten des Bewertungsziels und zuletzt
-  drei Änderungen an der Suche aus der Literatur. Trägt davon etwas,
-  wird es Champion; sonst endet das Projekt mit Generation 34 als
-  Tessa.
+  praktisch null) und gewinnt trotzdem die Duelle. Der neue Champion
+  baut rund 1,1 volle Spalten je Partie gegen rund 1,0 beim alten
+  und holt je Partie rund 5,7 Punkte mehr als sein Gegner.
+
+Was die abschließende Reihe gelernt hat, in Alltagssprache:
+
+1. **Gründlicheres Nachdenken beim Üben ergibt besseres
+   Übungsmaterial.** Die Übungspartien der letzten Generation wurden
+   mit 400 statt 100 Durchrechnungen je Zug neu gespielt. Schon das
+   allein hob die Siegquote gegen den alten Champion von 50 auf rund
+   57 Prozent.
+2. **Der größte Hebel war, woraus das Netz seine Zugwahl lernt.** Das
+   Netz lernt zwei Dinge: welche Züge gut aussehen (Zugwahl) und wie
+   gut eine Stellung steht (Bewertung). Bisher diente nur ein Drittel
+   der Übungspartien als Lehrer für die Zugwahl. Alle Partien als
+   Lehrer zuzulassen brachte 60,9 Prozent gegen den alten Champion,
+   4.000 frische Partien dazu 59,1 Prozent; beides zusammen ergab den
+   neuen Champion mit 64,2 Prozent, die stärkste Kante der ganzen
+   Reihe.
+3. **Am Bewertungsziel war nichts mehr zu holen.** Alle Varianten
+   davon, woraus das Netz lernt, wie gut eine Stellung steht, brachten
+   gegen den jeweils besten Stand nichts Messbares; ebenso wenig das
+   Mitteln mehrerer Trainingsstände zu einem Netz.
+4. **Die Suche hat beim starken Netz kaum noch etwas zu korrigieren.**
+   Von den Such-Ideen aus der Fachliteratur wurde "Tree Reuse" gebaut
+   und gemessen: das Programm behält den Suchbaum vom vorigen Zug,
+   statt jedes Mal neu anzufangen. Auf dem alten Netz brachte das
+   einen knappen Gewinn (53,1 % über 1.200 Partien), auf dem neuen
+   Champion war nichts mehr zu sehen (51,0 % in einer kurzen Probe);
+   es bleibt darum draußen. Eine weitere Messung zeigte, dass das Netz
+   den Ausgang einer Runde schon so gut vorhersieht, dass eine
+   zusätzliche kleine Suche am Rundenende keinen Spielraum hätte.
+
+**Damit endet das Projekt:** Generation 35 war die letzte, Tessa ist
+der Schlussstand.
 
 ## 4. Warum so umständlich? (Unsere Arbeitsregeln, und woher sie kommen)
 
@@ -161,9 +195,12 @@ dann die `README.md`, dann `evaluations/STATUS.md`.
 ## 6. Ehrlichkeitsklausel
 
 Dieses Dokument ist eine Vereinfachung. Wo es mit den Fachdokumenten
-kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1595 für
-Generation 34, rund eine volle Spalte je Partie, neun von zehn
-Partien gegen den Fixpunkt) stammen aus den am 2026-10-03/04
-protokollierten Messungen (`evaluations/PREREG_v34_window.md` par.10e,
-`PREREG_v35_window.md` par.11c); sie veralten mit dem Projekt, die
-Aussagen zur Methode nicht.
+kollidiert, gelten die Fachdokumente. Die Zahlen hier stammen aus den
+bis 2026-10-09 protokollierten Messungen: Elo 1595 für Generation 34
+aus `evaluations/PREREG_v34_window.md` par.10e; die Duelle, Spalten und Punkte
+der Generation 35 aus `evaluations/PREREG_v35_window.md` (par.12-21a,
+Promotion par.22) und `evaluations/PREREG_tree_reuse.md` (par.3c,
+par.3e); die Rundenend-Messung aus
+`evaluations/PREREG_tiling_surprise_probe.md` (par.3b). Die Elo-Zahl 1660
+des neuen Champions stammt aus dem Fit vom 2026-10-09 (par.22a). Die Zahlen veralten mit dem Projekt, die Aussagen zur Methode
+nicht.

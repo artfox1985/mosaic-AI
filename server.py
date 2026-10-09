@@ -1957,8 +1957,12 @@ def ai_start_tile():
 # A=+0.0059, B=0.5804, Brier 0.22806 (evaluations/artifacts/platt_v34-b01_frozenv3.json,
 # im selben Lauf reproduziert der Vorgaenger v32-b01 seine Werte exakt: A=-0.0127, B=0.5989,
 # Brier 0.22864); Trendmetrik frozen_v1: A=+0.4738, B=0.5204, Brier 0.26848.
-_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "0.0059"))  # v34-b01, Platt frozen_v3 2026-10-03
-_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.5804"))  # v34-b01 (v32-b01: -0.0127 / 0.5989)
+# Promotion 2026-10-09, Champion v35-b16: Anzeige-Fit auf frozen_v3
+# A=-0.0312, B=0.5870, Brier 0.22688 (evaluations/artifacts/platt_v35-b16_frozenv3.json,
+# im selben Lauf reproduziert der Vorgaenger v34-b01 seine Werte exakt: A=+0.0059, B=0.5804,
+# Brier 0.22806); Trendmetrik frozen_v1: A=+0.3981, B=0.5530, Brier 0.25353.
+_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0312"))  # v35-b16, Platt frozen_v3 2026-10-09
+_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.5870"))  # v35-b16 (v34-b01: +0.0059 / 0.5804)
 _DISPLAY_CAL_ON = os.environ.get("MOSAIC_DISPLAY_CAL", "1") != "0"
 
 

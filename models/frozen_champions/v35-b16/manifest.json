@@ -1,8 +1,7 @@
 {
  "champion": "v35-b16_brierbest",
  "freeze_date": "2026-10-09",
- "preliminary": true,
- "preliminary_note": "VORLAGE vor dem Nutzer-Entscheid (PREREG_v35_window.md par.20b: Promotion NUR nach Nutzer-Entscheid). Golden Probe, venv und Selbsttest fehlen noch (tools/v35_promotion_chain.sh Schritt 7); erst danach auf false setzen.",
+ "preliminary": false,
  "name_dialect": "hv",
  "model_file": "model.onnx",
  "pth_file": "model.pth",
@@ -51,13 +50,13 @@
  "wheel_note": "Das live installierte Wheel zur Einfrierzeit (direct_url.json sha256 cd8995bf..., geprueft 2026-10-09 gegen die Datei engine/target/wheels/mosaic_rust-1.1.0-cp314-cp314-win_amd64.whl): Build mit Tree-Reuse-Knopf (Default 0, also im Paket aus); Anker-Drift am 2026-10-08 GRUEN (1.763 Schritte). Gleiche Versionsnummer 1.1.0 wie v32-b01 (e11ea6d5) und v34-b01 (9449b63c), verschiedene Builds.",
  "worker_python": {
   "interpreter_relative": "venv/Scripts/python.exe",
-  "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, pip install --no-index --no-deps aus der Wheel-Kopie (nur mosaic_rust). OFFEN: venv legt tools/v35_promotion_chain.sh Schritt 7 an."
+  "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, pip install --no-index --no-deps aus der Wheel-Kopie (nur mosaic_rust), angelegt 2026-10-09 16:31 (8 s)."
  },
  "training_manifest": "models/manifest_train_v35-b16_20261009_041044.json",
  "prereg": "evaluations/PREREG_v35_window.md",
  "display_name": "Tessa",
  "display_name_note": "Informativ. Die GUI liest den Anzeigenamen NICHT aus dem Artefakt, sondern aus static/js/app.js (AI_DISPLAY_NAME).",
  "repo_note": "model.onnx, model.pth und das Wheel sind NICHT im Repo (.gitignore, Nutzer-Entscheid 2026-09-23); getrackt werden Spec, Manifest, Golden Probe und wheel.sha256.",
- "golden_probe_note": "OFFEN, Kette Schritt 7 (tools/v35_promotion_chain.sh: build_frozen_golden_probe --per-round 2 --sims 400 --c-puct 1.5 --seed-base 916001 --probe-seed-base 916101 --max-games 40, Seeds wie v34-b01). Nach dem Lauf nachtragen.",
- "selftest": "OFFEN, Kette Schritt 7 (frozen_referee_match --n-games 2 aus dem venv; Artefakt evaluations/artifacts/referee_selftest_v35-b16.json). Nach dem Lauf nachtragen."
+ "golden_probe_note": "tools/build_frozen_golden_probe.py --per-round 2 --sims 400 --c-puct 1.5 --seed-base 916001 --probe-seed-base 916101 --max-games 40 auf dem Wheel 1.1.0 (cd8995bf...): 10 Sonden (3 mit pending_dome_choice), 40 Partien, 2026-10-09 16:12-16:31 (1.191 s einkernig), Promotionskette tools/v35_promotion_chain.sh Schritt 7.",
+ "selftest": "frozen_referee_match --n-games 2 aus dem venv (--no-index --no-deps, nur mosaic_rust 1.1.0, sha256 cd8995bf...): Handshake GRUEN (contract 6ef829e564c58bd5), Golden-Selbsttest 10 Sonden 0 Abweichungen, zwei Echtpartien 1:1 (36:16 und 37:23, je Spieler 0); evaluations/artifacts/referee_selftest_v35-b16.json, 2026-10-09 16:31-16:33."
 }

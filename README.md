@@ -23,30 +23,49 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v34-b01`**, shown in the game as **Tessa** (promoted 2026-10-03),
-Elo **1595** (95% CI [1546, 1646]) from 960 rated games, anchored at the frozen
-heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
-`tools/elo_tracker.py report`). Its replication edge against the previous
-champion `v32-b01` ran to the cap: 285:115 over 200 pairs, block-z +10.00; it
-beat the anchor 45:5 and the artifact `v31-b01` 108:42. `Tessa` is the name the
-game shows for the reigning champion; the technical name stays in the ladder and
-the files (`models/champion.txt`). The ladder today: `v34-b01` 1595, `v32-b01`
-1460, `v31-b01` 1433 (`evaluations/PREREG_v34_window.md` par.10e).
+**Champion change in progress: `v35-b16` is being promoted** (user decision
+2026-10-09; the promotion chain started at 12:06 that day,
+`evaluations/PREREG_v35_window.md` par.22). The package is the network
+`alphazero_v35-b16_brierbest` with a spec byte-identical to the `v34-b01` spec
+(start-dome search, round 5 played by the net search); tree reuse is not part of
+the spec. Once the promotion is complete, the name the game shows for the
+reigning champion, **Tessa**, moves from `v34-b01` to `v35-b16`; the technical
+name stays in the ladder and the files (`models/champion.txt`).
 
-**`v35` is the last generation** (user decision 2026-10-04). Its first arm,
-`v35-b01`, trained on a window generated entirely by `v34-b01` and came out at
-52.0 % against the champion over one seed, which is not an edge. The offline
-measurement behind that result is the more important finding: the value head
-learns nothing measurable from a window whose search at 100 simulations is
-already weaker than the raw net in the opening (`PREREG_v35_window.md` par.11b
-and par.11d). The closing series therefore regenerates the whole window at 400
-simulations (`v35-b02`, running), then tries the value target itself (bootstrap
-from the own trajectory at one to three rounds, a margin blend, lambda 1.0,
-weight averaging over checkpoints; par.13 to par.16) and three search knobs
-with external evidence but no measurement here yet (tree reuse, variance-scaled
-exploration, subtree value bias; `PREREG_tree_reuse.md` and siblings). If one of
-them clears the gate it is promoted; if none does, the project closes with
-`v34-b01` as Tessa.
+Edges measured for `v35-b16`: gate 1 against the reigning champion `v34-b01`
+289:161 = 64.2 % (n = 450, both seeds stopped by the SPRT, block-z +6.63,
+par.20b); the replication to the cap on a fresh seed (20261603) 249:151 =
+62.3 % over 200 pairs, block-z +5.07; the anchor edge against `hv4_anchor`
+46:4 (fixed n = 50); the champion-2 edge against the frozen artifact `v32-b01`
+107:43 = 71.3 % (n = 150). After the fit `v35-b16@400` stands at **1660** (95% CI [1607, 1713]) from 1,050 rated games, `v34-b01@400` at 1575 [1527, 1624] (the new edges shift the ladder; it was 1595 before) and `v32-b01@400` at 1450 (`evaluations/PREREG_v35_window.md` par.22a). The ladder before this
+promotion, anchored at the frozen heuristic artifact
+`models/frozen_heuristics/hv4_anchor` (Heuristic@150 = 1000,
+`tools/elo_tracker.py report`): `v34-b01` 1595 (95% CI [1546, 1646]),
+`v32-b01` 1460, `v31-b01` 1433 (`evaluations/PREREG_v34_window.md` par.10e).
+
+**`v35` was the last generation** (user decision 2026-10-04), and its closing
+series measured its arms against `v34-b01` (summary table after par.16 of
+`PREREG_v35_window.md`). The first arm, `v35-b01`, trained on a window whose
+classes ran at 100 simulations and reached 52.0 % over one seed, no edge; the
+value head learned nothing measurable from that window (par.11b to par.11d).
+Regenerating the whole window at 400 simulations carried in every arm built on
+it: `v35-b02` 56.8 %, `v35-b03` 58.6 %, `v35-b05` 56.4 %, `v35-b06` 56.9 %,
+`v35-b04` 56.2 % (par.12 to par.14). The larger step came from the policy
+carriers, the set of games the policy head learns from: `v35-b10` (all 1,200
+window files as carriers instead of 400, no new generation) 60.9 % at block-z
++6.22 (par.18b), `v35-b09` (4,000 more policy games at 400 simulations) 59.1 %
+(par.17c), and `v35-b16`, the two stacked, 64.2 % (par.20b). Without a lever:
+`v35-b07` (lambda 1.0, par.15b), weight averaging `v35-b08`/`v35-b08b` (EMA,
+par.16a and par.16c), the bootstrap value-target variants `v35-b11` to
+`v35-b15` (against `v35-b02`, par.19.6) and `v35-b19` (against `v35-b16`,
+par.21a), and `v35-b18`, tree reuse on top of `v35-b16` (51.0 % in a quick look,
+`PREREG_tree_reuse.md` par.3e). Tree reuse alone on the `v34-b01` net carried
+narrowly, 53.1 % over three seeds at block-z +2.22 (par.3c), but did not show on
+the stronger net. The tiling-surprise probe found no systematic room for a
+mini-search over the round-end tiling (`PREREG_tiling_surprise_probe.md`
+par.3b). The one lesson of the series: the lever sat in the policy carriers,
+not in the value target and not in the search. The project closes with
+`v35-b16` as Tessa once the promotion is complete.
 
 **The cold-start question is settled.** `v30-b01` and `v30-b02` trained on the
 same replay window with the same seed and the same recipe and differed in a
@@ -143,13 +162,14 @@ Full history, all measurements and the methodology rules:
 The heart of the project: how the next candidate generation is produced
 from the reigning champion. Every step has a written pre-registration in
 `evaluations/PREREG_*.md`: design **and** decision rule are fixed *before*
-the run, so a result cannot be reinterpreted afterwards.
+the run, so a result cannot be reinterpreted afterwards. `v35` was the last
+generation; the steps below describe the cycle as it ran for it.
 
-1. **Self-play in four classes** (generator = the reigning champion). Policy
-   targets are recorded only in the policy classes; the value classes buy
-   diversity instead (a forced deviation or an excursion per game). Since
-   `v35-b02` every class runs at 400 simulations, so a game costs the same in
-   every class:
+1. **Self-play in four classes** (generator = the reigning champion). The value
+   classes buy diversity (a forced deviation or an excursion per game). In the
+   last generation's window (`v35-b02`) every class ran at 400 simulations, so a
+   game cost the same in every class and the search targets of the value classes
+   had the same budget as those of the policy classes (`PREREG_v35_window.md` par.18):
 
    ```bash
    # Since v35 the classes come from a recipe file; the chain is tools/v35_b02_generate.sh
@@ -161,19 +181,24 @@ the run, so a result cannot be reinterpreted afterwards.
 
    Four classes: a policy-carrying base class, a policy class with the
    dome-dice opening, and two value-only swarm classes (one forced deviation
-   per game, one excursion per game). Only the policy classes carry policy
-   targets; the carrier manifest (`data/policy_carrier_manifest_<window>.json`)
-   says which files those are. Measured on the v35-b02 run at 400 simulations
-   for every class: 6.9 s per game for both policy classes with the cache
+   per game, one excursion per game). Which files feed the policy head is
+   decided by the carrier manifest (`data/policy_carrier_manifest_<window>.json`),
+   not by the class: the `v35-b02` baseline used only the policy classes, the
+   promoted `v35-b16` used every file (par.18, par.20). Measured on the
+   v35-b02 run at 400 simulations for every class: 6.9 s per game for both policy classes with the cache
    watcher running alongside (`docs/measured_runtimes.md`); the v34 window
    with its 100-simulation classes ran those at 3.2 s per game. Note that
    `--games` counts excursion identities as well, so the excursion class
    needs the full number, not half of it.
 
-2. **Replay window** (v35: 1,200 files, 12,000 games at 10 games per file,
-   all generated by the reigning champion `v34-b01`): the 400 files of the
-   policy classes are the policy carriers (`data/policy_carrier_manifest_v35.json`),
-   the 800 swarm files enter as value-only data. Carrier status is applied as a
+2. **Replay window** (v35: the `v35-b02` window of 1,200 files, 12,000 games at
+   10 games per file, all generated by the champion of the time, `v34-b01`). In
+   the `v35-b02` baseline the 400 files of the policy classes were the policy
+   carriers (`data/policy_carrier_manifest_v35_b02.json`) and the 800 swarm files
+   entered as value-only data. The promoted `v35-b16` trained on 1,600 files
+   (those 1,200 plus 400 files of an extra policy class at 400 simulations) with
+   all 1,600 as policy carriers (`data/policy_carrier_manifest_v35_b16.json`,
+   `PREREG_v35_window.md` par.20). Carrier status is applied as a
    mask when the window is assembled, not in the per-file cache key. Older
    generations are no longer mixed in, and legacy-rule corpora never were
    again. The validation split is 120 files drawn from the same pool
@@ -228,8 +253,10 @@ the run, so a result cannot be reinterpreted afterwards.
    the wheel it was measured with, a golden probe and a manifest. The wheel
    travels with the artifact so that an old champion still plays the way it did
    when its Elo was measured. The artifact set holds the reigning champion and
-   its predecessor (today `v34-b01` and `v32-b01`); older ones are retired once
-   their edges are in the register. The full list is `docs/promotion_checklist.md`.
+   its predecessor; older ones are retired once their edges are in the register.
+   With the `v35-b16` promotion the set is to move from `v34-b01`/`v32-b01` to
+   `v35-b16`/`v34-b01` (`PREREG_v35_window.md` par.22). The full list is
+   `docs/promotion_checklist.md`.
 
 7. **Diagnostics on the winner**: Platt calibration (`tools/platt_fit.py`),
    Brier on a frozen legacy measurement set, the sigma/prior balance, and a
@@ -358,11 +385,14 @@ state  (888)    → Linear(512) → BN → ReLU ──────────�
        └→ Endgame Head:     Linear(64) → ReLU → Linear(1) → Tanh (aux, optional; not in the champion)
 ```
 
-The champion ONNX export (`alphazero_v34-b01_brierbest.onnx`)
+The ONNX export of `v34-b01` (`alphazero_v34-b01_brierbest.onnx`)
 carries two inputs (`planes` 79×6×6, `state` 888) and seven outputs (`policy`
 414, `value` 1, `moon` 5, `points` 1, `ownership` 72, `value_wdl_logits` 2,
 `opp_points` 1); the diagram above was checked against the export's weight
-shapes on 2026-10-05 (fusion input 2,240 = 48×36 conv features + 512). Aux heads are training signal only;
+shapes on 2026-10-05 (fusion input 2,240 = 48×36 conv features + 512). `v35-b16`
+is a warm start from that checkpoint with the same training recipe
+(`evaluations/PREREG_v35_window.md` par.20); its own export has not been
+shape-checked for this README. Aux heads are training signal only;
 the search reads none of them. The legacy flat `MosaicNet` (708 -> 3×512 trunk, Tanh value)
 remains loadable: the input layout is detected from the model file
 (`detect_layout`, `engine/src/net.rs`), never assumed.
