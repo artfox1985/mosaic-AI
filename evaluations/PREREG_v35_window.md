@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); **b10 60,9 % z +6,22, staerkste Kante (par.18b)**, **b09 59,1 % z +4,15 (par.17c)**; b07 NICHT; b08/b08b EMA ohne Gewinn (par.16a/16c). Policy-Kopf stichprobenbegrenzt. b11-b15 im Schnellblick gegen b02 ohne Hebel (par.19.6). b15 volle Breite 48,1 % kein Hebel (par.19.5d); b16 laeuft (par.20). Promotion = Nutzer-Entscheid. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % z +6,22 (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, staerkste Kante, Val-Brier 0,18857 (par.20b)**; b07 NICHT; b08/b08b EMA ohne Gewinn; b11-b15 ohne Hebel, b15 auch in voller Breite (par.19). Reihe DURCH. Offen (Nutzer): Promotion, Kante b16 gegen b10, b18 = Tree Reuse auf b16. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -1194,6 +1194,7 @@ Vorab-Test 32 s, Schnellblick 1.726 + 1.718 s; Arm 1,4 h.
 | b08b | EMA, Auswahl am eigenen Brier-Minimum (Epoche 5) | 0,18928 (Mittel) | Schnellblick gegen b02 92:108 = 46,0 % | -0,98 | kein Hebel (par.16c) |
 | b10 | Schwarm als Policy-Traeger (1.200 statt 400), 0 h Erzeugung | 0,18877 (3) | 420:270 = 60,9 % (2 Seeds, beide SPRT-Stopp) | +6,22 | traegt, staerkste Kante (par.18b) |
 | b09 | Policy-Volumen: +4.000 Partien @400 (rund 7 h Erzeugung) | 0,18880 (3) | 390:270 = 59,1 % (Seed 1 SPRT-Stopp) | +4,15 | traegt, Lesart (a) (par.17c) |
+| b16 | b09-Fenster, alle 1.600 Dateien Policy-Traeger (b10 + b09 gestapelt) | **0,18857 (3)** | **289:161 = 64,2 % (beide Seeds SPRT-Stopp)** | **+6,63** | traegt, staerkste Kante; Lesart (b) an der Grenze zu (a) (par.20b) |
 
 Laufzeiten je Arm (Kettenausgabe): b03 rund 4,0 h, b05 4,7 h, b06 4,7 h, b04 6,65 h (drei Seeds), b07 4,3 h, b08 0,42 h;
 Bloecke plus Merge je Arm rund 20 min, Training 1.358 bis 1.691 s, Tor-1-Seed 7.100 bis 7.300 s (17,5 bis 18,2 s je
@@ -2036,3 +2037,71 @@ laeuft nur nach Nutzer-Entscheid, wenn (a) oder (c) nahe der Grenze liegt. Die s
 **Kosten (HERLEITUNG aus b09/b10):** Manifest Sekunden, Merge rund 7 min (1.480 Bloecke, b09: 418 s), Training rund 40 min (b09:
 2.355 s mit Nebenlast), Offline 1 min, Tor 1 2 x rund 2 h; zusammen rund 5 h. Kette `tools/night_v35_b16_chain.sh` (Muster
 `night_v35_b09_b10_chain.sh`, Arm b09 ohne Erzeugung, Traeger 1.600 statt 800), Start nach b08b und b15 (Nutzer-Reihenfolge).
+
+### par.20a ERGEBNIS v35-b16 (Policy-Traeger gestapelt): BAU, TRAINING, OFFLINE, TOR 1 SEED 1 (2026-10-09 04:04-06:03, `tools/night_v35_b16_chain.sh`, exklusiv)
+
+**Bau:** Traeger-Manifest `policy_carrier_manifest_v35_b16.json` = alle 1.600 Dateien von `window_v35_b09.txt` (Kette prueft 1.600 von 1.600,
+davon die 800 b09-Traeger), Split byte-gleich b09 (Val 120 = b02, Train 1.480), alle Bloecke lagen (0 zu bauen), Merge unter neuem
+Fenster-Schluessel `58500785fe54` (rund 5 min). **Training** `v35-b16` 2.086,8 s (`manifest_train_v35-b16_20261009_041044.json`,
+2.832.807 Samples wie b09), Manifest-Diff gegen b09 ohne unerwartete Abweichung. **Val-Brier-Minimum 0,18857 in Epoche 3, das beste
+der ganzen Reihe** (b10 0,18877, b09 0,18880, b02 0,18942, v34-b01-Warmstart par.12f); Epoche 1 0,18890, Epoche 12 0,18958.
+
+**Offline (par.20 Punkt 1, gepaart ueber 120 Val-Dateien, Policy-CE auf der b02-Traegermaske):**
+
+| Referenz minus b16 | Val-Brier [CI95] | Policy-CE gepoolt [CI95] |
+| --- | --- | --- |
+| b02 | **+0,00085 [+0,00030; +0,00141]** | **+0,0371 [+0,0345; +0,0396]** |
+| b10 | +0,00019 [-0,00029; +0,00064] | **+0,0070 [+0,0058; +0,0082]** |
+
+b16 liegt offline ueber b02 in beiden Koepfen und ueber b10 in der Policy-CE mit CI-Trennung, beim Brier in der Tendenz: die Stapelung
+der Traeger (1.600 statt 1.200 bei b10, 800 bei b09) legt offline noch einmal etwas auf den jeweils besten Einzelhebel.
+
+**Tor 1 Seed 20261600: v35-b16 135:75 = 64,3 %** nach 105 Paaren (n = 210), SPRT **ACCEPT_H1** (LLR +7,02; fruehester Stopp der Reihe:
+b03 125, b10 150, b09 130 Paare), Block-z **+4,68** (21 Bloecke, Mittel 0,643, sd 0,140), gepaarte Differenz +0,57, McNemar
+p = 0,00002, A-Sweep 39 / B-Sweep 9 / Split 57. Laufzeit 3.725,0 s = 17,74 s je Partie, 10 Threads, exklusiv.
+
+Die sechs Kennzahlen (Bretter je Modell, n = 210 je Seite):
+
+| Kennzahl je Brett | v35-b16 | v34-b01 | gepaart [KI95] |
+| --- | --- | --- | --- |
+| Volle Spalten | 1,110 +- 0,049 | 0,943 +- 0,049 | - |
+| Spalten >= 4 / lange Reihen | 2,45 / 3,24 | 2,23 / 3,10 | - |
+| Zeilenfuellung H | 0,605 | 0,581 | - |
+| Strafsteine | 8,08 | 7,79 | - |
+| Eigene Punkte | 59,20 | 53,51 | - |
+| Margin | **+5,68** (groesste der Reihe; b10 Seed 1 +4,3) | -5,68 | - |
+| Plattenpunkte gesamt | 8,32 | 6,34 | - |
+| Platzierungspunkte | 56,80 | 51,41 | - |
+| davon Mehrfarbige Felder (46 Paare) | | | +1,91 [+0,56; +3,26] |
+| davon Aeussere Felder (32) | | | +0,52 [+0,12; +0,92] |
+| davon Vertikale Reihen (40) | | | +1,23 [-0,41; +2,86] |
+
+Auf demselben Seed: b02 218:182 (54,5 %), b03 159:91 (63,6 %, 125 Paare), b10 185:115 (61,7 %, 150 Paare), b09 164:96 (63,1 %,
+130 Paare), b16 135:75 (64,3 %, 105 Paare). Stufe genommen, Seed 20261601 laeuft seit 06:03; Verdikt gepoolt (par.20 Lesart (a)/(b)/(c)).
+
+### par.20b VERDIKT v35-b16: TOR 1 SEED 2 UND GEPOOLT, LESART (b) AN DER GRENZE ZU (a) (2026-10-09 06:03-07:03, exklusiv; Kette fertig 07:03, 3,0 h)
+
+**Seed 20261601: v35-b16 154:86 = 64,2 %** nach 120 Paaren (n = 240), SPRT **ACCEPT_H1** (LLR +7,22), Block-z **+4,62** (24 Bloecke, Mittel
+0,642, sd 0,150), gepaarte Differenz +0,57, McNemar p = 0,00006, A-Sweep 52 / B-Sweep 18 / Split 50. Laufzeit 4.375,2 s = 18,23 s je
+Partie, 10 Threads, exklusiv.
+
+Die sechs Kennzahlen Seed 2 (Bretter je Modell, n = 240 je Seite): volle Spalten **1,104 gegen 0,988**, Spalten >= 4 2,38 gegen 2,31,
+lange Reihen 3,22 gegen 3,15, H 0,602 gegen 0,587, Strafsteine 7,48 gegen 7,85, **Punkte 61,74 gegen 56,00 (Margin +5,73)**,
+Plattenpunkte 9,72 gegen 8,21, Platzierung 57,10 gegen 52,24; gepaart mit CI-Trennung: Mehrfarbige Felder +1,42 [+0,20; +2,63]
+(48 Paare), Aeussere Felder +0,64 [+0,17; +1,11] (40).
+
+**Gepoolt: 289:161 = 64,2 %** (n = 450 Partien, 225 Paare; beide Seeds SPRT-Stopp), **Block-z +6,63** (45 Bloecke, Mittel 0,642, sd 0,144).
+**VERDIKT TOR 1: v35-b16 TRAEGT, mit der staerksten Kante der Reihe** (b10 60,9 % z +6,22 ueber 690 Partien; b09 59,1 %; b02 54,6 % auf
+denselben Seeds; Margin +5,7 in beiden Seeds gegen +4,3 / +4,1 bei b10).
+
+**Lesart par.20, vorab festgelegt:** (a) verlangte "ueber b10 UND b09 um mehr als die Seed-Streuung (HERLEITUNG rund 4 Punkte)";
+b16 liegt 3,3 Punkte ueber b10 und 5,1 ueber b09, mit beiden Seeds im Band 57 bis 65 % von (b). **Mechanisch: (b) gesaettigt**, der
+zweite Hebel legt im Tor-1-Mass nichts Belegbares auf den ersten. Aber an der Grenze zu (a), und drei Nebenbefunde zeigen in Richtung
+(a): (1) offline liegt b16 ueber b10 bei der Policy-CE mit CI-Trennung (+0,0070 [+0,0058; +0,0082]) und beim Brier in der Tendenz
+(+0,00019), Val-Brier-Minimum 0,18857 als bestes der Reihe; (2) beide Seeds stoppten frueher als bei b10 (105 / 120 gegen 150 / 195
+Paare); (3) Margin und Plattenpunkte liegen ueber b10 (Platten 8,32 / 9,72 gegen 8,23 / 9,42). Ob das Addition oder Seed-Glueck ist,
+entscheidet nur die direkte Kante **b16 gegen b10** (2 x 200 Paare, rund 4 h, Aufloesung rund +-3,5 Punkte), nach par.20 ein
+Nutzer-Entscheid. Promotion NUR nach Nutzer-Entscheid; b16 ist nach Tor 1 der staerkste Kandidat der Reihe.
+
+**Laufzeiten:** Manifest 0 s, Merge 325 s, Training 2.086,8 s, Offline 48 s, Tor 1 3.725 + 4.375 s; Arm 10.700 s = 3,0 h (ohne
+Erzeugung; die 400 b09-Partien sind bezahlt, par.17a).
