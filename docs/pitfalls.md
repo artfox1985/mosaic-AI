@@ -710,3 +710,25 @@ Modulkonstanten per `assert` daneben festnageln (train.py, direkt unter dem Impo
 Und: die Suite laeuft mit `python -X utf8 -u -m unittest discover -s tools/tests -p "test_*.py"` (kein pytest installiert),
 513 Tests in rund 15 s; ein neuer atomarer Checkpoint (`_avg`) muss im Zaehltest `test_result_checkpoints_are_written_atomically`
 nachgezogen werden.
+
+## `python` zeigt auf den Store-Stub, Push bricht mit "no Python 3.x interpreter found" (2026-10-09)
+
+Symptom: `python` im Terminal meldet "Python wurde nicht gefunden; ... aus dem Microsoft Store
+installieren", der pre-push-Hook bricht in `cargo test --release` mit `error: no Python 3.x
+interpreter found` ab (pyo3 sucht `python`/`python3` ueber PATH), waehrend `py -0` und
+`pymanager list` die installierte 3.14 normal zeigen.
+
+Ursache (AppX-Ereignisprotokoll 18:46:52): der Microsoft Store hat den Python Install Manager
+(`PythonSoftwareFoundation.PythonManager`) auf 26.4 aktualisiert und neu registriert. Zwei Pakete
+deklarieren den App-Ausfuehrungsalias `python.exe`/`python3.exe`: der Install Manager UND der
+App Installer (`Microsoft.DesktopAppInstaller`, winget). Nach der Neuregistrierung gehoerte der Alias
+dem App Installer, dessen Stub nur auf den Store verweist. `py install --refresh` registriert die
+Manager-Aliase neu, gewinnt den Konflikt aber nicht; den entscheidet die Windows-Einstellung
+"Apps > Erweiterte App-Einstellungen > App-Ausfuehrungsaliase" (die Eintraege des App Installers fuer
+python.exe/python3.exe abschalten, die des Python Install Managers anlassen). Alternativ
+`MOSAIC_PYTHON_DIR` per `setx` auf das Verzeichnis mit `python3*.dll` setzen.
+
+Der Hook (`tools/hooks/pre-push`) ist seitdem gehaertet: findet `python` kein Verzeichnis, fragt er
+`py`, und er setzt `PYO3_PYTHON` auf die Exe, damit pyo3 nicht ueber den Alias stolpert. Fuer
+Sitzungen in diesem Harness gilt bis zur Einstellung: den Interpreter mit vollem Pfad oder mit
+vorangestelltem Verzeichnis im PATH aufrufen.

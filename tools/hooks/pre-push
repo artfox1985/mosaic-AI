@@ -243,6 +243,15 @@ PYDIR="${MOSAIC_PYTHON_DIR:-}"
 if [ -z "$PYDIR" ] && command -v python >/dev/null 2>&1; then
     PYDIR="$(python -c 'import sys; print(sys.base_prefix)' 2>/dev/null)"
 fi
+# Fallback ueber den Starter 'py' (Python Install Manager). Anlass 2026-10-09:
+# ein Store-Update des Install Managers hat den App-Ausfuehrungsalias
+# python.exe an den App Installer verloren; 'python' endete im Store-Stub
+# ("Python wurde nicht gefunden"), waehrend 'py' weiter lief. Ohne diesen
+# Fallback fand weder der Hook noch pyo3 einen Interpreter ("no Python 3.x
+# interpreter found"), und der Push brach ab.
+if [ -z "$PYDIR" ] && command -v py >/dev/null 2>&1; then
+    PYDIR="$(py -c 'import sys; print(sys.base_prefix)' 2>/dev/null)"
+fi
 
 # PATH ist hier ein :-getrennter POSIX-PATH. Ein Windows-Pfad mit Laufwerks-
 # buchstabe zerfaellt darin am Doppelpunkt in zwei unbrauchbare Eintraege
@@ -256,6 +265,16 @@ fi
 
 if [ -n "$PYDIR" ] && ls "$PYDIR"/python3*.dll >/dev/null 2>&1; then
     export PATH="$PYDIR:$PATH"
+    # pyo3 sucht den Interpreter selbst ueber PATH ('python', 'python3') und
+    # trifft dabei einen gekaperten Alias vor dem echten Verzeichnis. PYO3_PYTHON
+    # nennt ihm die Exe direkt (Windows-Pfad, weil cargo ein Windows-Prozess ist).
+    if [ -z "${PYO3_PYTHON:-}" ] && [ -f "$PYDIR/python.exe" ]; then
+        if command -v cygpath >/dev/null 2>&1; then
+            export PYO3_PYTHON="$(cygpath -w "$PYDIR/python.exe")"
+        else
+            export PYO3_PYTHON="$PYDIR/python.exe"
+        fi
+    fi
 elif [ -n "$PYDIR" ]; then
     echo "pre-push: WARNUNG -- in '$PYDIR' liegt keine python3*.dll." >&2
     echo "          Bei STATUS_DLL_NOT_FOUND: MOSAIC_PYTHON_DIR auf das" >&2
