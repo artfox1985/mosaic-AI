@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Korrigiert eine laufzeitgelernte Bias-Tabelle je Zustandsklasse (KataGo Subtree Value Bias) systematische Netzfehler in der 400-Sim-Suche, bei unveraendertem Netz und reproduzierbarer Arena? | Beleg: nichts gebaut, nichts gemessen; registriert 2026-10-05 auf Nutzer-Anweisung (par.1-par.4). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Korrigiert eine laufzeitgelernte Bias-Tabelle je Zustandsklasse (KataGo Subtree Value Bias) systematische Netzfehler in der 400-Sim-Suche, bei unveraendertem Netz und reproduzierbarer Arena? | Beleg: ENTSCHIEDEN; nicht mehr verfolgt (Projektabschluss 2026-10-09, par.5): nichts gebaut, nichts gemessen; Tree Reuse als verwandter Suchknopf auf b16 ohne sichtbaren Hebel (PREREG_tree_reuse.md par.3e). -->
 
 # Vorregistrierung: Subtree Value Bias Correction (Suchknopf, Spieler-Identitaet)
 
@@ -39,3 +39,7 @@ groessten, und dort rechnet die Netzsuche @400 schon mit eigenem Budget; die Wir
 
 Bucket-Definition; Mindestbesuche; ob der Knopf auch in der Erzeugung wirkt; Reihenfolge gegen
 `PREREG_tree_reuse.md` und `PREREG_variance_scaled_cpuct.md` (Vorschlag: Tree Reuse zuerst, dann die beiden).
+
+## par.5 ABSCHLUSS: NICHT MEHR VERFOLGT (Projektabschluss 2026-10-09)
+
+Nutzer 2026-10-09 (Projektabschluss): *"Difficulty levels kannst offen lassen. Den rest schliessen."* v35-b16 ist seit 2026-10-09 Champion und Tessa (`PREREG_v35_window.md` par.22a), v35 war die letzte Generation; es folgt keine Erzeugung, kein Training und keine Suchaenderung mehr. Nichts gebaut, nichts gemessen. Einordnung aus der Schlussreihe (HERLEITUNG): Tree Reuse, der dritte Suchknopf derselben Familie, trug auf dem starken Netz nichts Sichtbares (`PREREG_tree_reuse.md` par.3e), und die Tiling-Sonde fand keinen systematischen Netzfehler am Rundenende (`PREREG_tiling_surprise_probe.md` par.3b). Kopf: ENTSCHIEDEN.

@@ -95,41 +95,39 @@ anders vermerkt; "Schnellblick" = 2 x 50 Paare (par.19.0). Alle Messungen 2026-1
 b16); keine Wertziel-Variante und keine Gewichtsmittelung legte Belegbares auf das @400-Fenster (par.13-16
 Zusammenfassung, par.19.6); Tree Reuse traegt auf v34-b01 knapp, auf b16 nicht sichtbar.
 
-## 4. PREREG-BESTAND (Stand 2026-10-09 abends: 4 OFFEN; Ziel rund 7 erreicht)
+## 4. PREREG-BESTAND (Stand 2026-10-09 abends: 1 OFFEN; Ziel rund 7 erreicht)
 
-`PREREG_INDEX.md` (generiert, Stand-Zeile im Tabellenteil): **137 Dateien = 4 OFFEN + 119 ENTSCHIEDEN + 14 UEBERHOLT** (`v35_window` am Abend auf ENTSCHIEDEN gesetzt, par.22a Nachtrag 5d).
-Die vier OFFEN-Koepfe gegen die Zeile 1 der Dateien geprueft:
+`PREREG_INDEX.md` (generiert, Stand-Zeile im Tabellenteil): **137 Dateien = 1 OFFEN + 122 ENTSCHIEDEN + 14 UEBERHOLT.** Nutzer 2026-10-09: *"Difficulty levels kannst offen lassen. Den rest
+schliessen."* `asymmetric_selfplay` (par.9), `subtree_value_bias` (par.5) und `variance_scaled_cpuct` (par.5) sind als
+"nicht mehr verfolgt" ENTSCHIEDEN; `v35_window` ENTSCHIEDEN (par.22a). Die eine OFFEN bleibt bewusst:
 
 | Prereg | Was noch aussteht |
 | --- | --- |
-| `asymmetric_selfplay` | Sonden gefahren; offen war laut STATUS vom 2026-10-03 nur die Zusammensetzung des v35-Sockels. Der Sockel ist seit 2026-10-04 erzeugt (`PREREG_v35_window.md` par.10a), die Frage damit praktisch beantwortet (HERLEITUNG; Kopf nicht nachgezogen) |
 | `difficulty_levels` | ganze Leiter der GUI-Stufen auf den letzten Champion vertagt, jetzt also auf Tessa = v35-b16 |
-| `subtree_value_bias` | nichts gebaut, nichts gemessen (registriert 2026-10-05) |
-| `variance_scaled_cpuct` | nichts gebaut, nichts gemessen (registriert 2026-10-05) |
 
-**Am Projektende** koennen offene Preregs als "nicht mehr verfolgt" geschlossen werden (Kopf mit Verdikt-Satz, danach
-`python tools/generate_prereg_index.py`). Entscheid beim Nutzer, je Datei; das gilt besonders fuer `difficulty_levels`,
-das als einzige der vier noch einen Nutzen fuer die GUI haette.
+`difficulty_levels` bleibt auf Nutzer-Entscheid offen (einziger Nutzen fuer die GUI: Leiter der Stufen auf Tessa).
 
 ## 5. OFFENE NUTZER-ENTSCHEIDE
 
-1. **Loeschungen nach `docs/closeout_deletion_inventory.md`** (Vorlage vom 2026-10-09, Gruppen 3.1-3.7, Summen 3.8): Trainingscaches
-   und Korpora in `data/`, Zwischenstaende und Nebenstaende in `models/` (darunter `v35-b02`, `v35-b10`),
-   `frozen_heuristics/hv2_generator`, Ketten-Skripte, Release-Zip, `engine/target`. Je Gruppe restic-Beleg (bei `*.h5`
-   und `engine/target` gibt es keinen: unwiederbringlich) und pfadgenaue Freigabe.
-2. **Zwei-Champion-Regel:** `models/frozen_champions/v32-b01` ist Loeschkandidat (amtierend v35-b16, Vorgaenger v34-b01;
-   par.22a). Nur mit restic-Beleg und pfadgenauer Freigabe.
-3. **Direkte Kante b16 gegen b10** (2 x 200 Paare, rund 4 h, HERLEITUNG par.20b): fuer die Promotion nicht noetig; sie
-   wuerde nur klaeren, ob b16 ueber b10 addiert oder Seed-Glueck ist.
-4. **Claude-Partien g13/g14 gegen Tessa** (Nutzer 2026-10-08: erst gegen das finale Modell; das ist jetzt v35-b16).
-5. **Server-Neustart**, damit die Anzeige Champion, Spec und Kalibrierung von v35-b16 zieht (par.22a, 5b). Ob er seit
+**Erledigt 2026-10-09 abends** (Nutzer: *"V32 raus. Loeschen kannst wie vorgeschlagen"*): Loeschung nach
+`docs/closeout_deletion_inventory.md` Abschnitt 5 ausgefuehrt (26387 Dateien, 29942.2 MB: alle Trainingscaches, Arme ohne
+b02/b10/b16, Fortsetzungsstaende, alte Knoten, Artefakt `frozen_champions/v32-b01`, Smoke-Dateien, `engine/target`,
+`dist/Mosaic-AI`, `build`; 32 Ketten-Skripte per `git rm`), vorher daily-Snapshot `60e490bd`, Verifikation und restic-Beleg je
+Gruppe. Preregs geschlossen (Abschnitt 4). Nach dem Loeschen von `engine/target` baut der naechste `cargo`-Lauf komplett neu.
+
+Noch offen:
+1. **Direkte Kante b16 gegen b10** (2 x 200 Paare, rund 4 h, HERLEITUNG par.20b): fuer die Promotion nicht noetig; b10 ist
+   dafuer im Baum geblieben.
+2. **Claude-Partien g13/g14 gegen Tessa** (Nutzer 2026-10-08: erst gegen das finale Modell; das ist jetzt v35-b16).
+3. **Server-Neustart**, damit die Anzeige Champion, Spec und Kalibrierung von v35-b16 zieht (par.22a, 5b). Ob er seit
    16:4x erfolgt ist: ungeprueft.
-6. **Offene Preregs** (Abschnitt 4): schliessen als "nicht mehr verfolgt" oder weiterfuehren.
-7. **Push** (Abschnitt 7).
-8. Aeltere Punkte aus dem frueheren Abschnitt 6 (Code-Review 2 #17-#19, Budget-Knopf der Hilfsknoten, Gruppe B des
+4. **Push** (Abschnitt 7).
+5. Verbliebene N-Gruppen der Loeschvorlage (Korpora 2.471 MB, b02/b10, Nebenstaende b16/v34-b01, `hv2_generator`,
+   Release-Zip `dist/Mosaic-AI_v1.1-alpha31.zip`, `player_profiles.json.bak`): bleiben, bis der Nutzer anders entscheidet.
+6. Aeltere Punkte aus dem frueheren Abschnitt 6 (Code-Review 2 #17-#19, Budget-Knopf der Hilfsknoten, Gruppe B des
    Aufraeumens, Sichtluecke bei gezogenen Stapelplatten, `-Deep`-Lauf der Backup-Verifikation u. a.) stehen woertlich
    im Archivkapitel vom 2026-10-09; ohne Gegenwort gelten sie am Projektende als nicht mehr verfolgt (Vorschlag, kein
-   Entscheid).
+   Entscheid). Der `-Deep`-Lauf ist am 2026-10-09 gefahren (Loeschprotokoll).
 
 ## 6. VERWEISE UND LAUFZEITEN (gemessen)
 

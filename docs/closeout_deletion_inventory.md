@@ -264,3 +264,43 @@ python tools/check_conventions.py
 
 Waisenliste muss leer sein; Dateizahlen je Gruppe erneut zaehlen; Loeschprotokoll mit
 Snapshot-ID, Gruppen, Treffer- und Dateizahlen nach `archive/history.md`, Kurzvermerk in STATUS.
+
+## 5. Loeschprotokoll 2026-10-09 (AUSGEFUEHRT)
+
+**Nutzer-Freigabe 2026-10-09 abends:** *"Difficulty levels kannst offen lassen. Den rest schliessen. V32 raus. Loeschen kannst
+wie vorgeschlagen."* Geloescht wurden genau die Gruppen mit Empfehlung **L** aus Abschnitt 3 plus das Artefakt
+`frozen_champions/v32-b01` ("V32 raus"); alle Gruppen mit **N** und **B** bleiben (Korpora, b02, b10, Nebenstaende b16/v34-b01,
+`hv2_generator`, Release-Zip, `asym_probes.sh`, `r5_stage2_ab.sh`, Fensterlisten, Manifeste, `v35_promotion_chain.sh`).
+
+**Sicherung vorab:** daily-Snapshot `60e490bd` (2026-10-09 18:46:01, 6.362 Dateien, 6,574 GiB, Elternsnapshot `e6990f49`;
+`tools/mosaic_backup.ps1`). Ein veralteter Repo-Lock vom 2026-10-05 12:00 (PID 21020, kein restic-Prozess mehr) wurde mit
+`restic unlock` entfernt. `tools/verify_backup.ps1 -Source project`: Stufen 1-3 gruen (Struktur, Abdeckung 0 neu / 4
+geaendert, Stichprobe 12/12 byte-gleich), Stufen 4/5 ohne -Zips/-Deep; danach `verify_backup.ps1 -Source project -Deep` (18:51-18:57): Stufen 1-3 gruen, Stufe 5 `check --read-data` ueber alle 1.948 Packs (141 Snapshots, 28,7 GiB) in 5:43 min ohne Fehler. Die nicht gesicherten Gruppen (3.1, 3.6) wurden nach Stufe 1-3 geloescht, die gesicherten Gruppen erst nach der gruenen Tiefenpruefung.
+
+**restic-Beleg je gesicherter Gruppe** (`restic ls 60e490bd --recursive --json`, Pfade gezaehlt gegen den Baum):
+Smoke-Verzeichnisse 21 = 21, Heartbeat 1 = 1, `_resume.pth` 8 = 8, v35-Arme ohne b02/b10/b16 148 = 148, alte Knoten
+v33-b01/v32-b01/v31-b01/v29-b11 19 = 19, `frozen_champions/v32-b01` ohne venv 7 = 7. `*.h5`, `engine/target`, `dist/Mosaic-AI`,
+`build` und die venv-Ordner sind wie in `docs/backup_restore.md` NICHT im Backup (0 Treffer), ihr Neubau ist dokumentiert
+(Abschnitt 3.1, 3.6).
+
+| Gruppe | Dateien | MB |
+| --- | --- | --- |
+| 3.1 Bloecke data/.filecache_*.h5 | 13900 | 7272.7 |
+| 3.1 Monolithe data/.cache_*.h5 (alle 30, inkl. b16 und Val) | 30 | 10139.7 |
+| 3.6 engine/target | 11226 | 10793.0 |
+| 3.6 dist/Mosaic-AI | 127 | 95.0 |
+| 3.6 build | 16 | 25.8 |
+| 3.2 data/.heartbeat_v28-b02-policy_*.json | 1 | 0.0 |
+| 3.4 models/alphazero_v35-b*_resume.pth | 8 | 433.2 |
+| 3.4 v35-Arme ohne b02/b10/b16 (alle Dateien ausser _resume) | 148 | 1016.7 |
+| 3.4 alte Knoten v33-b01/v32-b01/v31-b01/v29-b11 | 19 | 92.6 |
+| 3.2 Smoke-Verzeichnisse data/probe_* | 21 | 10.6 |
+| 3.4 Artefakt models/frozen_champions/v32-b01 | 891 | 62.9 |
+| **Summe** | **26387** | **29942.2** |
+
+Dazu per `git rm` die 32 Ketten-Skripte aus Abschnitt 3.5 (Empfehlung L); die Git-Historie behaelt sie, die Docs, die
+sie als Quelle nennen (`measured_runtimes.md`, `pitfalls.md`, `working_rules.md`, Kommentare in vier Werkzeugen), bleiben
+als Chronik mit einem Hinweis in `measured_runtimes.md`.
+
+**Nachkontrolle:** `python tools/cache_inventory.py --orphans`: 0 Bloecke, 0 Waisen, 2.700 Korpusdateien (nach der Loeschung, 18:56). `models/frozen_champions/` = v34-b01 und v35-b16;
+`models/alphazero_*` = v34-b01, v35-b02, v35-b10, v35-b16.

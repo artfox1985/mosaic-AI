@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: W-v2 Runde 1 TRAEGT: G-KL +0,054 [+0,036; +0,073], kein Versatz, W 44,5 % (par.5d3a/b) -> Sockel-Vorschlag. Stoerer, Exploiter v1 (46 %), v32-Gegner tragen nicht. Q-Stichentscheid Modus 2 75 % gegen Bestand (par.5e3). @400 mit Modus 2: KL x2, Punkte gleich, aber -0,07 volle Spalten (par.8c1) -> Mischsockel-Vorschlag. Exploiter v2 (par.7c) vom Nutzer GESTRICHEN (2026-10-04 abends, par.7c1); kein Exploiter im v35-Fenster. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Erzeugt asymmetrisches Self-Play (Wuerfel, Stoerer, Exploiter, fremder Stil) Stellungen, die das Spiel gegen sich selbst nicht erreicht, und traegt ein Fenster daraus? | Beleg: ENTSCHIEDEN; nicht mehr verfolgt (Projektabschluss 2026-10-09, par.9). W-v2 Runde 1 und Q-Stichentscheid Modus 2 sind im v35-Sockel umgesetzt (par.5d, par.8a-8c); Stoerer, Exploiter v1, v32-Gegner tragen nicht; Mischsockel nie gefahren. -->
 
 # Vorregistrierung: asymmetrisches Self-Play (Wuerfel-Kuppelplatten, Stoerer)
 
@@ -1151,3 +1151,6 @@ par.8e besteht auch mit Modus 2, abgeschwaecht (par.8e: -0,20 Spalten @100 zu @4
 Rueckwaerts-Pruefung: par.8b1-Satz "Spalten-Tausch nicht sichtbar" ist durch diesen Absatz ueberholt; par.8f und
 `docs/generation_loop.md` sprechen von "mindestens teilweise Artefakt", das bleibt richtig.
 
+## par.9 ABSCHLUSS: NICHT MEHR VERFOLGT (Projektabschluss 2026-10-09)
+
+Nutzer 2026-10-09 (Projektabschluss): *"Difficulty levels kannst offen lassen. Den rest schliessen."* v35-b16 ist seit 2026-10-09 Champion und Tessa (`PREREG_v35_window.md` par.22a), v35 war die letzte Generation; es folgt keine Erzeugung, kein Training und keine Suchaenderung mehr. Was getragen hat, ist umgesetzt: W-v2 Runde 1 als Sockel-Baustein und der Q-Stichentscheid Modus 2 im Sockel @400 (par.5d, par.8a-8c; Erzeugung v35-b02, `PREREG_v35_window.md` par.10/12). Stoerer, Exploiter und fremder Stil trugen nicht (par.5-7). Offen bleibt nur die nie gestellte Frage nach einem Mischsockel; sie wird nicht mehr verfolgt. Kopf: ENTSCHIEDEN.

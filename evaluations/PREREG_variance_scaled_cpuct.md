@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Macht eine mit der empirischen Nutzenvarianz des Knotens skalierte Explorationskonstante (KataGo-Form, ohne Unsicherheitskopf) die 400-Sim-Suche staerker, bei unveraendertem Netz? | Beleg: nichts gebaut, nichts gemessen; registriert 2026-10-05 auf Nutzer-Anweisung (par.1-par.4). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Macht eine mit der empirischen Nutzenvarianz des Knotens skalierte Explorationskonstante (KataGo-Form, ohne Unsicherheitskopf) die 400-Sim-Suche staerker, bei unveraendertem Netz? | Beleg: ENTSCHIEDEN; nicht mehr verfolgt (Projektabschluss 2026-10-09, par.5): nichts gebaut, nichts gemessen; sigma/Prior des Champions 2,03 unter 3 (PREREG_v35_window.md par.22a). -->
 
 # Vorregistrierung: Varianz-skalierte Exploration in der Suche (Suchknopf, Spieler-Identitaet)
 
@@ -36,3 +36,7 @@ Stufenregel; Kriterium Tor 1. Zuordnung: dem Knopf allein.
 Bau rund ein halber bis ein Tag (Engine, Wheel-Runde, Abnahmen), Arena 2 x 1,5 h. Erwartung des Koordinators
 (Schaetzung): unter Tree Reuse, weil der externe Beleg die Haelfte mit dem Kopf einschliesst und unsere
 Wurzelselektion Gumbel ist, nicht PUCT.
+
+## par.5 ABSCHLUSS: NICHT MEHR VERFOLGT (Projektabschluss 2026-10-09)
+
+Nutzer 2026-10-09 (Projektabschluss): *"Difficulty levels kannst offen lassen. Den rest schliessen."* v35-b16 ist seit 2026-10-09 Champion und Tessa (`PREREG_v35_window.md` par.22a), v35 war die letzte Generation; es folgt keine Erzeugung, kein Training und keine Suchaenderung mehr. Nichts gebaut, nichts gemessen. Einordnung aus der Schlussreihe (HERLEITUNG): sigma/Prior-Balance des Champions 2,03 unter der Schwelle 3, die c_visit/c_scale-Familie oeffnet sich nach der Regel nicht (`PREREG_v35_window.md` par.22a); Tree Reuse auf b16 ohne sichtbaren Hebel (`PREREG_tree_reuse.md` par.3e). Kopf: ENTSCHIEDEN.

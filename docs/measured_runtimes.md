@@ -70,6 +70,10 @@ Faellen identisch, bei 4,8-fachem Tempo. Grund:
 `PREREG_search_rng_split.md` -- jede Partie haengt an ihrem eigenen,
 abgeleiteten Suchstrom.
 
+> Hinweis 2026-10-09 (Projektabschluss): die generationsgebundenen Ketten-Skripte (`night_v34_*`, `night_v35_*`, `v34_*`, `v35_*_generate.sh`,
+> `quicklook_b18_chain.sh`, `tree_reuse_arena_chain.sh`, `asym_*_chain.sh`), die diese Tabelle als Quelle nennt, sind aus dem Baum entfernt
+> (`docs/closeout_deletion_inventory.md` Abschnitt 5); die Git-Historie behaelt sie. Die Zeilen bleiben als Messprotokoll.
+
 ## Generation v24, gemessen am 2026-09-07
 
 Alle Werte aus den Artefakten der Laeufe, nicht geschaetzt. Threads wie angegeben, exklusiv.

@@ -400,7 +400,11 @@ class TiebreakSideClasses(unittest.TestCase):
             self.assertEqual((ns.games, ns.sims, ns.seed, ns.tau_tiebreak_q, ns.tau_tiebreak_side),
                              (games, sims, 20261720, 2, False), cls)
             self.assertEqual((ns.opponent_model, ns.record_sides, ns.deviate_prob), (opp, "both", 1.0), cls)
-        self.assertTrue((REPO / want["policy-vs-v32"][2]).exists(), "Gegner-Netz liegt")
+        # Das Gegner-Netz v32-b01 ist am Projektabschluss 2026-10-09 geloescht worden
+        # (docs/closeout_deletion_inventory.md Abschnitt 5); die Rezeptpruefung oben gilt weiter,
+        # die Dateipruefung nur, solange das Netz liegt.
+        if not (REPO / want["policy-vs-v32"][2]).exists():
+            self.skipTest("Gegner-Netz v32-b01 nicht im Baum (Projektabschluss, restic 60e490bd)")
 
     def test_s400_m2_b_class_par8c(self):
         """par.8c: wie policy-s400-m2, aber 300 Partien und eigener Seed."""
