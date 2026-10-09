@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | Beleg: TRAEGT, KNAPP (par.3c): v35-b17 = v34-b01 + tree_reuse-Spec gegen v34-b01 ohne, drei Seeds 637:563 = 53,1 %, Block-z +2,22 (120 Bloecke), Punkte +1,1 bis +2,1 je Seed; gleiches Netz, Gewinn gehoert der Suche. Kompilat, Wheel cd8995bf, Anker-Drift GRUEN (par.2b). b18 (Spec auf b10/b16) und par.5.6 = Nutzer-Entscheid. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Macht die Wiederverwendung des Teilbaums unter dem gespielten Zug (Gumbel-Wurzel frisch) die 400-Sim-Suche in der Arena staerker, bei unveraendertem Netz? | Beleg: TRAEGT, KNAPP (par.3c): v35-b17 = v34-b01 + tree_reuse-Spec gegen v34-b01 ohne, drei Seeds 637:563 = 53,1 %, Block-z +2,22 (120 Bloecke), Punkte +1,1 bis +2,1 je Seed; gleiches Netz, Gewinn gehoert der Suche. Kompilat, Wheel cd8995bf, Anker-Drift GRUEN (par.2b). b18 (Spec auf b16) im Schnellblick gegen b16 51,0 %, nicht spannend (par.3e); volle Breite und par.5.6 = Nutzer-Entscheid. -->
 
 # Vorregistrierung: Tree Reuse unterhalb der Wurzel (Suchknopf, Spieler-Identitaet)
 
@@ -330,6 +330,40 @@ Punktgewinn aus tieferer Suche bei gleichem Budget (uebernommene Besuche rund 18
 **Offen / Nutzer-Entscheid:** (1) b18 = dieselbe Spec auf dem staerksten Netz der Reihe (b10, oder b16 nach par.20), Tor 1 gegen
 v34-b01 mit denselben Seeds; (2) Reuse in der Erzeugung (par.5.1, Sonde Durchlaufzeit/Diversitaet) nur, wenn eine weitere Erzeugung
 ansteht; (3) par.5.6 nur, wenn die Fehlschlagquote als Grenze gilt. Laufzeiten in `docs/measured_runtimes.md`.
+
+### par.3d b18 = v35-b16 + Tree-Reuse-Spec, SCHNELLBLICK GEGEN b16 (NUTZER 2026-10-09: "starte b18 und b19 mit schnellblick gegen b16"; REGISTRIERT VOR dem Lauf)
+
+**Arm:** `v35-b18` = Netz `alphazero_v35-b16_brierbest.onnx` (staerkstes Netz der Reihe, `PREREG_v35_window.md` par.20b) mit Spec
+`models/v35-b18.spec.json` (= Champion-Spec plus `tree_reuse` 1, `tree_reuse_round5` 1; Inhalt gleich `v35-b17.spec.json`). Gegner B =
+dasselbe Netz mit der Champion-Spec. Gleiches Netz, Unterschied allein der Knopf: ein Gewinn gehoert der Suche (wie par.3).
+
+**Messung:** Schnellblick nach par.19.0 der v35-Prereg: `paired_gating.py --fixed-length`, 2 Seeds a 50 Paare @400, Seeds 20261700/20261701,
+Blockgroesse 5, `--log-games`, `--resume`, Artefakte `quicklook_v35-b18_vs_v35-b16_s<seed>.json`, sechs Kennzahlen, Block-z gepoolt.
+Kette `tools/quicklook_b18_chain.sh`. **Lesart vorab:** gepoolt >= 55 % oder Block-z >= +1,5 = "spannend" -> volle Breite gegen b16
+(2 x 200 Paare, Nutzer-Entscheid); 45 bis 55 % ohne Block-z >= +1,5 = der Knopf legt auf b16 nichts Sichtbares (Aufloesung +-7
+Punkte bei n = 200; die +3 Punkte aus par.3c liegen darunter, ein "nicht spannend" widerlegt sie also nicht); unter 45 % = Gegenbefund
+auf dem starken Netz. Erwartung (HERLEITUNG): wie par.3c rund +3 Punkte, also voraussichtlich "nicht spannend" bei dieser Aufloesung;
+der Schnellblick ist die vom Nutzer gewaehlte Vorsortierung. Kosten rund 1 h.
+
+### par.3e ERGEBNIS b18 SCHNELLBLICK GEGEN b16: NICHT SPANNEND (2026-10-09 07:54-08:50, `tools/quicklook_b18_chain.sh`, exklusiv)
+
+| Seed | b18 : b16 | Block-z (10 Bloecke) | gepaarte Diff | McNemar p | Laufzeit |
+| --- | --- | --- | --- | --- | --- |
+| 20261700 | 47:53 = 47,0 % | -0,67 | -0,12 | 0,664 | 1.667 s (16,7 s je Partie) |
+| 20261701 | 55:45 = 55,0 % | +1,12 | +0,20 | 0,424 | 1.652 s (16,5 s je Partie) |
+| **gepoolt** | **102:98 = 51,0 %** | **+0,29 (20 Bloecke, sd 0,152)** | | | 3.319 s |
+
+Die sechs Kennzahlen (Bretter je Modell, n = 100 je Seed und Seite): volle Spalten 0,89 / 0,98 gegen 0,90 / 1,03, Spalten >= 4 2,35 / 2,39
+gegen 2,36 / 2,32, H 0,584 / 0,594 gegen 0,600 / 0,593, Strafsteine 8,36 / 8,17 gegen 7,77 / 7,58, Punkte 55,38 / 58,26 gegen 55,13 / 56,87,
+Margin +0,25 / +1,39, Plattenpunkte 7,15 / 9,15 gegen 6,68 / 8,23. Die Reuse-Seite hat in beiden Seeds mehr Strafsteine und mehr
+Plattenpunkte; Punkte und Margin leicht positiv, Spalten leicht negativ.
+
+**Lesart par.3d: zwischen 45 und 55 % ohne Block-z >= +1,5 = NICHT SPANNEND.** Der Knopf legt auf dem staerksten Netz der Reihe
+nichts, was der Schnellblick sieht. Das ist mit par.3c vertraeglich (dort +3,1 Punkte bei n = 1.200 gegen ein schwaecheres Netz; hier
+Aufloesung +-7 Punkte bei n = 200), stuetzt aber die vorab genannte Erwartung, dass die Suche bei besserem Netz weniger zu korrigieren
+hat. Eine volle Breite b18 gegen b16 (4 h, Aufloesung +-3,5) wuerde die Frage "+1 bis +3 Punkte oder 0" klaeren; nach Regel nicht
+faellig, Nutzer-Entscheid. Laufzeit je Partie mit Reuse auf einer Seite 16,5 bis 16,7 s, also kein messbarer Aufschlag gegen die
+Schnellblicke ohne Reuse (17,2 bis 18,2 s); der Aufschlag aus par.2b/3c war Nebenlast.
 
 ## par.4 Kosten (HERLEITUNG)
 

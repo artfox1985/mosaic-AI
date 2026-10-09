@@ -14,14 +14,14 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**102 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**104 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
 "falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff` ist
 genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.
 
-**Beantwortet UND Default aus (66)** -- hier lohnt die Nachfrage,
+**Beantwortet UND Default aus (67)** -- hier lohnt die Nachfrage,
 ob der Knopf noch etwas offen haelt:
 
 - `MOSAIC_POINTS_UTILITY_W` (ENTSCHIEDEN, PREREG_task28_aggression.md)
@@ -58,6 +58,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_ROUND_TRANSITION_LEAF` (ENTSCHIEDEN, PREREG_round_transition_search_sampling.md par.9/par.10)
 - `MOSAIC_SINGLE_PASS_OTHER_VAL` (ENTSCHIEDEN, PREREG_evaluator_pretests.md par.5a/par.5b)
 - `MOSAIC_R5_SOLVER_ITERATIVE` (ENTSCHIEDEN, PREREG_r5_net_vs_solver.md par.5a)
+- `MOSAIC_TREE_REUSE` (ENTSCHIEDEN, PREREG_tree_reuse.md par.2/par.2a)
 - `MOSAIC_ORT_CUDA_ENABLED` (ENTSCHIEDEN, PREREG_gpu_inference_path.md par.11)
 - `MOSAIC_INTERLEAVE_ENABLED` (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_TILING_SELECT` (ENTSCHIEDEN, PREREG_t37_tiling_criterion.md)
@@ -91,7 +92,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_CACHE_NOPACK` (ENTSCHIEDEN, PREREG_v21_window.md)
 - `MOSAIC_VAL_POOL` (ENTSCHIEDEN, PREREG_v22_window.md par.6)
 
-**Beantwortet, Default AN (36)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
+**Beantwortet, Default AN (37)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
 
 - `MOSAIC_GUMBEL_C_SCALE` = 1.0 (ENTSCHIEDEN, PREREG_prior_blind_spot.md par.G3)
 - `MOSAIC_FLOOR_SHAPING_W` = 0.3 (ENTSCHIEDEN, PREREG_search_path_remeasurements.md M1)
@@ -114,6 +115,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_R5_CHANCE_NODES` = an (=0 Altverhalten) (ENTSCHIEDEN, PREREG_chance_nodes.md)
 - `MOSAIC_R5_NET_SOLVER` = an (=0 Gegenprobe Netz) (ENTSCHIEDEN, PREREG_r5_net_vs_solver.md par.2; PREREG_chance_nodes.md Teil E)
 - `MOSAIC_R5_NODE_BUDGET` = 200 (ENTSCHIEDEN, PREREG_chance_nodes.md)
+- `MOSAIC_TREE_REUSE_ROUND5` = 1 (an = Runde 5 mit Reuse; wirkungslos bei MOSAIC_TREE_REUSE 0) (ENTSCHIEDEN, PREREG_tree_reuse.md par.2/par.5.4)
 - `MOSAIC_INTERLEAVE_BATCH_MAX` = 128 (= EVAL_BATCH_MAX_N) (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_INTERLEAVE_FILL_TIMEOUT_US` = 200 (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_TILING_PLATTEN_GEW` = 1.0 (1 oder 8 Werte) (ENTSCHIEDEN, PREREG_placement_side.md)
@@ -198,8 +200,8 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_R5_NET_SOLVER` | an (=0 Gegenprobe Netz) | aktiv | ENTSCHIEDEN | Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs net_solver_enabled). SEIT 2026-09-26 nur noch der ENV-DEFAULT des Seiten-Felds SearchConfig r5_net_solver (Spec-Feld r5_net_solver, OPTIONAL, 0 oder 1 als Zahl; fehlt es, gilt dieser Env-Wert): die fuenf Netz-Sucheinstiege (net_mcts.rs net_search_drafting_action, _hybrid, net_root_child_stats, net_root_child_stats_and_policy, net_search_with_tree_inner) lesen das Feld ihrer Seite ueber r5_solver_takes_over, damit ein A/B Loeser gegen Netzsuche in Runde 5 mit demselben Champion fahrbar ist. 0 = das Netz sucht in Runde 5 wie in Runde 1-4. Nicht betroffen: Heuristik-Bahn (mcts.rs) und eingefrorener round5_anchor.rs, Tiling in Runde 5, TD-Bootstrap-Labels 4->5 (round5.rs exact_round5_outcome). Auswertung getrimmt: 1 = an, 0 = aus, leer = Default, jeder andere Wert = Default mit einmaliger Warnung (Code-Review 2026-10-02 #21, vorher ohne Trim und jeder Wert ausser 0 = an). Seit 2026-10-01 kann eine Seite mit 0 ueber das Spec-Feld r5_net_sims (OPTIONAL, ganze Zahl, OHNE Env-Knopf) eigene Sims fuer die Netzsuche in Runde 5 setzen (net_mcts.rs r5_adjusted_base_sims, PREREG_r5_net_vs_solver.md par.5b) | PREREG_r5_net_vs_solver.md par.2; PREREG_chance_nodes.md Teil E |
 | `MOSAIC_R5_NODE_BUDGET` | 200 | aktiv | ENTSCHIEDEN | Knotenbudget je R5-Entscheidung (round5.rs node_budget, NODE_BUDGET round5.rs:88). Wirkt auf Heuristik-Bahn, exact_round5_outcome (4->5-Label) und als ENV-DEFAULT des Seiten-Felds SearchConfig r5_solver_node_budget (Spec-Feld r5_solver_node_budget, OPTIONAL, ganze Zahl >= 1; seit 2026-09-27, PREREG_r5_net_vs_solver.md par.5a). Getrimmt gelesen; ein ungueltiger Wert faellt mit einmaliger Warnung auf 200 zurueck (Code-Review 2026-10-02 #21, vorher still) | PREREG_chance_nodes.md |
 | `MOSAIC_R5_SOLVER_ITERATIVE` | 0 (aus = Loeser ohne Vertiefung, Bestand) | diagnose | ENTSCHIEDEN | Runde-5-Loeser der Netzseiten mit iterativer Vertiefung (round5.rs choose_action_iterative): d = 2, 3, ... Alpha-Beta mit statischem Blattwert an der Tiefengrenze, Wurzelkinder je Iteration nach der vorigen sortiert, ein gemeinsames Knotenbudget, Rueckgabe = bester Zug der letzten vollstaendigen Iteration; Not-Deckel max(5 s, Budget x 4,4 ms x 5). Nur ENV-DEFAULT des Seiten-Felds SearchConfig r5_solver_iterative (Spec-Feld r5_solver_iterative, OPTIONAL, 0 oder 1 als Zahl). 0 = Bestand, bitidentisch: derselbe Kern wie round5::choose_action. Wirkt nur, wo r5_net_solver an ist; Heuristik-Bahn, Anker und Label-Pfade lesen ihn nicht | PREREG_r5_net_vs_solver.md par.5a |
-| `MOSAIC_TREE_REUSE` | 0 (aus = jede Suche frisch, Bestand) | aktiv | OFFEN | Teilbaum-Wiederverwendung zwischen zwei Entscheiden DERSELBEN Seite (ENTWURF 2026-10-05, ungebaut und ungemessen). Env-Default des Seiten-Felds SearchConfig tree_reuse (Spec-Feld tree_reuse, OPTIONAL, 0 oder 1 als Zahl; fehlt es, gilt dieser Env-Wert; net_mcts.rs read_tree_reuse_env). Wirkt NUR im Arena-Agenten (self_play.rs NetArenaAgent, net_arena_choose_action_with_tree -> net_mcts.rs net_search_drafting_action_reuse): der Agent haelt den Baum seiner letzten Suche, take_reuse_start sucht darin den Knoten, der zum echten Zustand passt (verdeckte Bestaende der damaligen Welt eingesetzt, Rest per state_to_json_exact verglichen), und die Suche laeuft in DIESER Welt weiter (keine neue Wurzel-Determinisierung). Wurzel frisch: Gumbel-Top-m und Sequential Halving ueber alle Kandidaten, uebernommene Kinder mit Besuchen/Werten/Prioren, finale Wahl ueber die Halving-Ueberlebenden. Budget = nur NEUE Simulationen. Kein Reuse bei ISMCTS k > 1, Klasse W, PUCT-Pfad, Runde-5-Loeser; Runde 5 selbst steuert MOSAIC_TREE_REUSE_ROUND5 (Default an = mit Reuse). Self-Play, Referee/GUI und Record-Einstiege lesen das Feld nicht. Diagnose je Partie: Logzeile [tree_reuse] (nur bei Knopf an) | PREREG_tree_reuse.md par.2/par.2a |
-| `MOSAIC_TREE_REUSE_ROUND5` | 1 (an = Runde 5 mit Reuse; wirkungslos bei MOSAIC_TREE_REUSE 0) | aktiv | OFFEN | Teilbaum-Wiederverwendung auch in Runde 5 (ENTWURF, ungebaut und ungemessen; par.5.4 entschieden 2026-10-06). Env-Default des Seiten-Felds SearchConfig tree_reuse_round5 (Spec-Feld tree_reuse_round5, OPTIONAL, 0 oder 1 als Zahl; fehlt es, gilt dieser Env-Wert; net_mcts.rs read_tree_reuse_round5_env, TREE_REUSE_ROUND5_DEFAULT). Wirkt NUR bei tree_reuse an, in net_mcts.rs net_search_drafting_action_reuse: 1 = Runde 5 laeuft mit gehaltenem Baum wie R1-R4, 0 = Runde 5 sucht frisch und haelt nichts (Ausschluss ueber round5::applies, Stand des ersten Entwurfs). Der Runde-5-Loeser (r5_net_solver an) bleibt in beiden Faellen ohne Reuse | PREREG_tree_reuse.md par.2/par.5.4 |
+| `MOSAIC_TREE_REUSE` | 0 (aus = jede Suche frisch, Bestand) | aktiv | ENTSCHIEDEN | Teilbaum-Wiederverwendung zwischen zwei Entscheiden DERSELBEN Seite (ENTWURF 2026-10-05, ungebaut und ungemessen). Env-Default des Seiten-Felds SearchConfig tree_reuse (Spec-Feld tree_reuse, OPTIONAL, 0 oder 1 als Zahl; fehlt es, gilt dieser Env-Wert; net_mcts.rs read_tree_reuse_env). Wirkt NUR im Arena-Agenten (self_play.rs NetArenaAgent, net_arena_choose_action_with_tree -> net_mcts.rs net_search_drafting_action_reuse): der Agent haelt den Baum seiner letzten Suche, take_reuse_start sucht darin den Knoten, der zum echten Zustand passt (verdeckte Bestaende der damaligen Welt eingesetzt, Rest per state_to_json_exact verglichen), und die Suche laeuft in DIESER Welt weiter (keine neue Wurzel-Determinisierung). Wurzel frisch: Gumbel-Top-m und Sequential Halving ueber alle Kandidaten, uebernommene Kinder mit Besuchen/Werten/Prioren, finale Wahl ueber die Halving-Ueberlebenden. Budget = nur NEUE Simulationen. Kein Reuse bei ISMCTS k > 1, Klasse W, PUCT-Pfad, Runde-5-Loeser; Runde 5 selbst steuert MOSAIC_TREE_REUSE_ROUND5 (Default an = mit Reuse). Self-Play, Referee/GUI und Record-Einstiege lesen das Feld nicht. Diagnose je Partie: Logzeile [tree_reuse] (nur bei Knopf an) | PREREG_tree_reuse.md par.2/par.2a |
+| `MOSAIC_TREE_REUSE_ROUND5` | 1 (an = Runde 5 mit Reuse; wirkungslos bei MOSAIC_TREE_REUSE 0) | aktiv | ENTSCHIEDEN | Teilbaum-Wiederverwendung auch in Runde 5 (ENTWURF, ungebaut und ungemessen; par.5.4 entschieden 2026-10-06). Env-Default des Seiten-Felds SearchConfig tree_reuse_round5 (Spec-Feld tree_reuse_round5, OPTIONAL, 0 oder 1 als Zahl; fehlt es, gilt dieser Env-Wert; net_mcts.rs read_tree_reuse_round5_env, TREE_REUSE_ROUND5_DEFAULT). Wirkt NUR bei tree_reuse an, in net_mcts.rs net_search_drafting_action_reuse: 1 = Runde 5 laeuft mit gehaltenem Baum wie R1-R4, 0 = Runde 5 sucht frisch und haelt nichts (Ausschluss ueber round5::applies, Stand des ersten Entwurfs). Der Runde-5-Loeser (r5_net_solver an) bleibt in beiden Faellen ohne Reuse | PREREG_tree_reuse.md par.2/par.5.4 |
 | `MOSAIC_ORT_CUDA_ENABLED` | aus | aktiv | ENTSCHIEDEN | Weg B: ORT-CUDA-Backend fuer eval_batch; wirkt nur mit Feature ort_cuda_probe (net_ort.rs:132) | PREREG_gpu_inference_path.md par.11 |
 | `MOSAIC_INTERLEAVE_ENABLED` | aus | aktiv | ENTSCHIEDEN | Weg V: Sammel-Faden-Verschraenkung mehrerer Suchfaeden zu einem Batch (net_batcher.rs:217) | PREREG_async_search.md |
 | `MOSAIC_INTERLEAVE_BATCH_MAX` | 128 (= EVAL_BATCH_MAX_N) | aktiv | ENTSCHIEDEN | Obergrenze der Sammel-Fuellung je eval_batch-Aufruf (net_batcher.rs, configured_batch_max) | PREREG_async_search.md |

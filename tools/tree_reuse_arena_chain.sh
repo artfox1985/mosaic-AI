@@ -9,7 +9,7 @@
 # Je Seed danach arena_column_probe und plate_points_from_arena (sechs Standard-Kennzahlen),
 # zum Schluss gating_block_z gepoolt. paired_gating.py laeuft mit --resume (Zwischenstand je Block).
 #
-# Start (Terminal-Tab, keine Pipe):   & "D:\Program Files\Git\bin\bash.exe" tools/tree_reuse_arena_chain.sh
+# Start (Terminal-Tab, keine Pipe, ueber die Git-Bash):   bash tools/tree_reuse_arena_chain.sh
 # Ein liegendes Artefakt eines Seeds wird uebersprungen (Wiederaufnahme nach Abbruch).
 set -u
 cd "$(dirname "$0")/.." || exit 1

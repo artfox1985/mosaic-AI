@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % z +6,22 (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, staerkste Kante, Val-Brier 0,18857 (par.20b)**; b07 NICHT; b08/b08b EMA ohne Gewinn; b11-b15 ohne Hebel, b15 auch in voller Breite (par.19). Reihe DURCH. Offen (Nutzer): Promotion, Kante b16 gegen b10, b18 = Tree Reuse auf b16. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01: b02 56,8 %, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); b10 60,9 % (par.18b), b09 59,1 % (par.17c), **b16 64,2 % z +6,63, staerkste Kante (par.20b)**; b07 NICHT; b08/b08b EMA ohne Gewinn; b11-b15 ohne Hebel (par.19). Laufen: Schnellblick b18 (b16 + Tree Reuse) und b19 (b16 + Trajektorie, par.21) gegen b16. Offen: Promotion, Kante b16 gegen b10. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -2105,3 +2105,28 @@ Nutzer-Entscheid. Promotion NUR nach Nutzer-Entscheid; b16 ist nach Tor 1 der st
 
 **Laufzeiten:** Manifest 0 s, Merge 325 s, Training 2.086,8 s, Offline 48 s, Tor 1 3.725 + 4.375 s; Arm 10.700 s = 3,0 h (ohne
 Erzeugung; die 400 b09-Partien sind bezahlt, par.17a).
+
+## par.21 ARM v35-b19: b16 PLUS TRAJEKTORIEN-BOOTSTRAP k = 1 (NUTZER 2026-10-09: "starte b18 und b19 mit schnellblick gegen b16"; REGISTRIERT VOR Bau und Lauf)
+
+**Frage:** Legt das ungeglaettete Trajektorien-Wertziel (b03-Form, par.13: echter Suchwert eine Runde spaeter statt Rollout) etwas auf
+das staerkste Netz der Reihe? b03 trug gegen v34-b01 (58,6 %), wurde aber nie gegen b02 gemessen; die geglaetteten Varianten
+b11-b15 verloren gegen b02 Spalten-Kontrast (par.19.6). Policy-Traeger (b16) und Wertziel (b03) wirken auf verschiedene Koepfe,
+der Rumpf ist gemeinsam.
+
+**Arm:** `v35-b19` = b16-Fenster (`data/window_v35_b09.txt`, 1.600 Dateien) und b16-Traeger (alle 1.600,
+`policy_carrier_manifest_v35_b16.json`), Umgebung `MOSAIC_BOOTSTRAP_SOURCE=trajectory`, `MOSAIC_BOOTSTRAP_HORIZON_ROUNDS=1`
+(Marker `bootstraptraj_h1_v1` in beiden Schluesseln). Bloecke: die 1.200 b02-Dateien liegen unter diesem Marker seit b03, die 400
+`policy-s400-vol`-Dateien werden neu gebaut (rund 5 min); Merge unter neuem Fenster-Schluessel; Split wie b16 (Val byte-gleich b02);
+Training byte-gleich b16 (`train_arm`), Manifest-Diff gegen das b16-Manifest: erlaubt `name`, `cache_file`, `MOSAIC_BOOTSTRAP_SOURCE`,
+`MOSAIC_BOOTSTRAP_HORIZON_ROUNDS`. Keine Erzeugung, keine Code-Aenderung.
+
+**Messung:** (1) Vorfilter offline gegen b16 (`checkpoint_val_eval.py`, b02-Val-Satz, Traegermaske b02): liegt das CI der Brier-Differenz
+b16 minus b19 ganz unter 0, Arm beendet. (2) Schnellblick nach par.19.0 gegen `alphazero_v35-b16_brierbest.onnx`: 2 Seeds a 50 Paare
+@400, Seeds 20261700/20261701, `--fixed-length`, `--resume`, Artefakte `quicklook_v35-b19_vs_v35-b16_s<seed>.json`, sechs
+Kennzahlen, Block-z gepoolt. **Lesart vorab wie par.19.0 Punkt 4:** >= 55 % oder Block-z >= +1,5 = spannend -> volle Breite gegen b16
+(Nutzer-Entscheid); 45 bis 55 % = kein Hebel; unter 45 % = Gegenbefund. Erwartung (HERLEITUNG aus par.13a und par.19.6): Val-Brier
+nicht unter b16, Schnellblick im Band 45 bis 55 %; ein "spannend" waere der erste Beleg, dass die Trajektorie auf dem @400-Fenster
+mehr ist als der Fenster-Effekt.
+
+**Kosten (HERLEITUNG):** Bloecke 400 Dateien 5 min, Merge 6 min, Training rund 35 min (2,83 M Samples), Vorfilter 30 s, Schnellblick
+rund 1 h; zusammen rund 2 h. Kette `tools/night_v35_b19_chain.sh`, laeuft nach b18.
