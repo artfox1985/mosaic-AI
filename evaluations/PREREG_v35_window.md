@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); **b10 60,9 % z +6,22, staerkste Kante (par.18b)**, **b09 59,1 % z +4,15 (par.17c)**; b07 NICHT; b08 EMA ohne Gewinn. Policy-Kopf stichprobenbegrenzt. Trajektorien-Varianten b11-b15 im Schnellblick gegen b02 ohne Hebel (39 bis 54 %, Bootstrap-Quelle ABGESCHLOSSEN, par.19.6). Reihe durch; Promotion und Kanten = Nutzer-Entscheid. -->
+<!-- STATUS: OFFEN | Frage: Traegt das v35-Fenster (fuenf v34-b01-Klassen, Modus-2-Sockel, W-v2, Wertmaske) ein Netz, das v34-b01 schlaegt? | Beleg: TRAGEN gegen v34-b01 (gepoolt): b02 56,8 % z +4,07, b03 58,6 %, b05 56,4 %, b06 56,9 %, b04 56,2 % (par.12-14); **b10 60,9 % z +6,22, staerkste Kante (par.18b)**, **b09 59,1 % z +4,15 (par.17c)**; b07 NICHT; b08/b08b EMA ohne Gewinn (par.16a/16c). Policy-Kopf stichprobenbegrenzt. b11-b15 im Schnellblick gegen b02 ohne Hebel (par.19.6). b15 volle Breite 48,1 % kein Hebel (par.19.5d); b16 laeuft (par.20). Promotion = Nutzer-Entscheid. -->
 
 # Vorregistrierung: v35-Fenster
 
@@ -1145,6 +1145,41 @@ als `final`, Auswahlwechsel bricht ab); `train.py:1246` (Signatur-Default `"fina
 `tools/tests/test_weight_average.py` (Auswahl, `final` unveraendert, Resume, Validierung, Parser- und
 Signatur-Default, Quelltext-Reihenfolge).
 
+### par.16c ERGEBNIS v35-b08b (EMA, Auswahl am eigenen Brier-Minimum): VORAB-TEST BESTANDEN, SCHNELLBLICK KEIN HEBEL (2026-10-08 23:12 bis 2026-10-09 00:34, `tools/night_v35_b08b_chain.sh`, exklusiv)
+
+**Training** `v35-b08b` 1.387,4 s (b02-Monolith `8e8096768cf0`, Seed 20260965, `--weight-average ema 0,75 ab Epoche 2
+--weight-average-select brierbest`), Manifest-Diff gegen b02 ohne unerwartete Abweichung. Der EMA-Pfad ist Wert fuer Wert derselbe
+wie bei b08 (Mittel-Brier je Epoche 0,18943 / 0,18940 / 0,18934 / 0,18930 / 0,18932 / 0,18936 / ... / 0,18966; GPU-Lauf
+deterministisch), **Auswahl Epoche 5** (wie par.16a vorhergesagt), nach BN-Neuschaetzung (7.957 Batches) Val-Brier **0,18928**,
+Policy-Val 0,4781 (Einzelstand `_brierbest` Epoche 5: 0,18942 / 0,4835).
+
+**Vorab-Test par.16b** (`checkpoint_val_eval_v35-b08b_avg_vs_brierbest.json`, Einzelstand minus Mittel, gepaart 120 Val-Dateien):
+Brier **+0,00014 [-0,00010; +0,00038]** (Mittel besser, CI ueber 0 hinweg; Erwartung par.16a +0,00012 getroffen), Policy-CE gepoolt
+**+0,0138 [+0,0126; +0,0151]** (Mittel klar besser: es enthaelt die frueheren, weniger ueberpassten Epochen 2 bis 5). Lesart par.16b:
+CI nicht ganz unter 0 = bestanden, Schnellblick gefahren.
+
+**Schnellblick** gegen `v35-b02_brierbest` @400, je 50 Paare (`--fixed-length`), mit `alphazero_v35-b08b_avg.onnx`:
+
+| Seed | b08b : b02 | Block-z (10 Bloecke) | gepaarte Diff | McNemar p | Laufzeit |
+| --- | --- | --- | --- | --- | --- |
+| 20261700 | 44:56 = 44,0 % | -0,90 | -0,24 | 0,327 | 1.726 s (17,3 s je Partie) |
+| 20261701 | 48:52 = 48,0 % | -0,35 | -0,08 | 0,839 | 1.718 s (17,2 s je Partie) |
+| **gepoolt** | **92:108 = 46,0 %** | **-0,98 (20 Bloecke, sd 0,182)** | | | |
+
+**Lesart par.19.0 Punkt 4: zwischen 45 und 55 % ohne Block-z >= +1,5 = ABGESCHLOSSEN, KEIN HEBEL** (gepoolt 46,0 %; Seed 1 allein
+laege unter 45). Die sechs Kennzahlen (Bretter je Modell, n = 100 je Seed und Seite): volle Spalten 0,88 / 1,00 gegen 0,94 / 1,07,
+Strafsteine 8,53 / 7,44 gegen 8,13 / 7,56, Punkte 54,54 / 58,07 gegen 55,84 / 58,62, Margin -1,30 / -0,55, Plattenpunkte 7,26 /
+8,42 gegen 7,93 / 8,50; kein Kriterium mit CI-Trennung (Horizontale Reihen Seed 1 +0,39 [+0,01; +0,77] bei 23 Paaren, Vertikale
+Seed 1 -1,53 [-4,11; +1,05]).
+
+**Lesung:** die Gewichtsmittelung tut offline genau das Erwartete (Brier und Policy-CE besser als der Einzelstand, mit dem richtigen
+Stand gespeichert), aber gegen b02 in der Arena bleibt nichts davon; die Policy-CE-Verbesserung ist derselbe Checkpoint-Epochen-
+Effekt wie bei b15 (par.19.5b): eine glattere, fruehere Policy, die im Spiel @400 nichts einbringt. Mit b08 (par.16a) zusammen:
+**Gewichtsmittelung ist auf diesem Fenster kein Hebel**, in keiner der beiden Bauformen. Arm abgeschlossen.
+
+**Laufzeiten:** Training 1.387,4 s (EMA-Overhead gegen b14b 1.384,7 s ohne Mittelung: keiner messbar; gegen b08 1.461,0 s minus),
+Vorab-Test 32 s, Schnellblick 1.726 + 1.718 s; Arm 1,4 h.
+
 ### par.13-16 ZUSAMMENFASSUNG DER NETZARME (Arm-Kette 2026-10-06 06:45 bis 2026-10-07 07:38, 24,9 h)
 
 | Arm | Aenderung gegen b02 | Val-Brier-Minimum (Epoche) | Tor 1 gegen v34-b01, gepoolt | Block-z | Verdikt |
@@ -1156,6 +1191,7 @@ Signatur-Default, Quelltext-Reihenfolge).
 | b04 | Margen-Bootstrap b = 20 | 0,19034 (4) | 674:526 = 56,2 % (3 Seeds) | +3,98 | traegt, kein Hebel (par.14c) |
 | b07 | lambda 1,0 (kein root_q) | 0,18946 (2) | 418:382 = 52,25 % | +1,26 | traegt NICHT (par.15b) |
 | b08 | EMA ueber Epochen | 0,18942 (5); EMA-Endstand 0,18967 | kein Tor 1 (Vorab-Test negativ) | - | kein Gewinn so gebaut (par.16a) |
+| b08b | EMA, Auswahl am eigenen Brier-Minimum (Epoche 5) | 0,18928 (Mittel) | Schnellblick gegen b02 92:108 = 46,0 % | -0,98 | kein Hebel (par.16c) |
 | b10 | Schwarm als Policy-Traeger (1.200 statt 400), 0 h Erzeugung | 0,18877 (3) | 420:270 = 60,9 % (2 Seeds, beide SPRT-Stopp) | +6,22 | traegt, staerkste Kante (par.18b) |
 | b09 | Policy-Volumen: +4.000 Partien @400 (rund 7 h Erzeugung) | 0,18880 (3) | 390:270 = 59,1 % (Seed 1 SPRT-Stopp) | +4,15 | traegt, Lesart (a) (par.17c) |
 
@@ -1928,6 +1964,37 @@ Gegenbefund = b15 traegt gegen b02; dann (und nur dann) begruendet b15 einen Vor
 Schnellblick-Seeds 20261700/01 gehen NICHT in die Poolung ein (andere Seeds, andere Laenge). Vorab: Aufloesung bei n = 800 rund
 +-3,5 Punkte Siegquote; Erwartung aus dem Schnellblick 50 bis 55 %, also eher "kein Hebel" mit besserer Aufloesung. Kosten
 HERLEITUNG 2 x rund 2 h (18 s je Partie). Kette `tools/night_v35_b15_full_chain.sh` (Muster `tree_reuse_arena_chain.sh`).
+
+### par.19.5d ERGEBNIS VOLLE BREITE v35-b15 GEGEN b02: KEIN HEBEL, LESART BESTAETIGT (2026-10-09 00:34-04:04, `tools/night_v35_b15_full_chain.sh`, exklusiv)
+
+| Seed | b15 : b02 | SPRT | Block-z | gepaarte Diff | McNemar p | Laufzeit |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261600 | 154:176 = 46,7 % (165 Paare) | **H0, Stopp** (LLR -7,32) | -1,17 (33 Bloecke) | -0,13 | 0,27 | 5.883,9 s (17,8 s je Partie) |
+| 20261601 | 197:203 = 49,3 % (200 Paare, Deckel) | `UNDECIDED_CAP_REACHED` (LLR -3,92) | -0,36 (40 Bloecke) | -0,03 | 0,80 | 6.686,3 s (16,7 s je Partie) |
+| **gepoolt** | **351:379 = 48,1 %** (n = 730) | | **-1,12 (73 Bloecke)** | | | 12.570 s = 3,5 h |
+
+**Verdikt nach dem Kriterium par.12 (Block-z >= +1,96 oder gepoolt >= 52,5 % ohne Gegenbefund): NICHT erfuellt, b15 traegt nicht
+gegen b02.** Der Nutzer-Entscheid gegen die Schnellblick-Lesart (par.19.5c) hat die Lesart bestaetigt: das 54,0 % des Schnellblicks war
+die obere Seite des Rauschbands (Seed 20261700 58 %), in voller Breite liegt b15 auf beiden Seeds unter b02 (Seed 1 sogar mit
+SPRT-Stopp fuer H0, einziger H0-Stopp der Reihe). Kosten der Bestaetigung: 3,5 h.
+
+Die sechs Kennzahlen (Bretter je Modell, n = 330 / 400 je Seite):
+
+| Kennzahl je Brett | Seed 1 b15 / b02 | Seed 2 b15 / b02 |
+| --- | --- | --- |
+| Volle Spalten | 0,97 / 1,07 | 1,04 / 1,06 |
+| Spalten >= 4 / lange Reihen | 2,30 / 3,15 gegen 2,33 / 3,17 | 2,32 / 3,13 gegen 2,37 / 3,23 |
+| Zeilenfuellung H | 0,590 / 0,598 | 0,593 / 0,586 |
+| Strafsteine | 8,10 / 7,78 | 7,92 / 8,21 |
+| Eigene Punkte | 55,98 / 57,03 | 55,64 / 56,88 |
+| Margin | -1,05 | -1,25 |
+| Plattenpunkte gesamt | 7,72 / 7,80 | 8,13 / 8,61 |
+| gepaart mit CI-Trennung | Diagonale -0,51 [-0,98; -0,05] (68 Paare), Aeussere -0,41 [-0,75; -0,08] (57) | keines |
+
+**Lesung:** eigene Punkte in beiden Seeds 1,0 bis 1,2 unter b02, Spalten auf Seed 1 deutlich weniger; die Konfidenzgewichtung
+glaettet das Wertziel wie die anderen Varianten und verliert dieselbe Spalten-Information. Damit sind alle sechs Trainings der
+Trajektorien-Varianten abgeschlossen, keines traegt gegen b02; par.19.6 bleibt in Kraft. Nachtrag Kopf: b15 von "an der Schwelle"
+auf "kein Hebel (volle Breite)".
 
 **Reihenfolge (Nutzer-Rang, par.13f-Diskussion):** b11 und b12 zusammen gebaut (gleiche Funktion), b13 als Kontrolle
 daneben, dann b14a/b14b, zuletzt b15. **Bau erst nach dem Ende der laufenden Ketten** (Arm-Kette, dann b10/b09): die
