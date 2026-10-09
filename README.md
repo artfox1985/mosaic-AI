@@ -30,7 +30,10 @@ to the `v34-b01` spec (start-dome search, round 5 played by the net search); tre
 reuse is not part of the spec. **Tessa** is the name the game shows for the
 reigning champion; the technical name stays in the ladder and the files
 (`models/champion.txt`). This is the final champion: `v35` was the last
-generation and the project is closed with it. The distributable Windows bundle
+generation and the project is closed with it. For readers without a machine-learning
+background, [`docs/tessa_explained.html`](docs/tessa_explained.html) walks
+through how the network and the search find a move and where the learning
+signal comes from (open it in a browser). The distributable Windows bundle
 with this champion is `dist/Mosaic-AI_v1.1-alpha35.zip` (built 2026-10-09 with
 `tools/build_release.py`; not tracked and not in the backup).
 

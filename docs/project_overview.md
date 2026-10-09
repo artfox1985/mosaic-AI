@@ -4,7 +4,9 @@ Dieses Dokument erklärt das Projekt für Menschen ohne KI- oder
 Statistik-Hintergrund. Es beantwortet drei Fragen: Was machen wir?
 Wie machen wir es? Und warum ausgerechnet so?
 
-Stand: 2026-10-09 (Projektabschluss). Der tagesaktuelle Detailstand steht immer in
+Stand: 2026-10-09 (Projektabschluss). Eine bebilderte Erklärung, wie Netz und Suche einen Zug
+finden und woher das Lernsignal kommt, steht (englisch) in
+`docs/tessa_explained.html` (im Browser öffnen). Der tagesaktuelle Detailstand steht immer in
 `evaluations/STATUS.md` (Fachdokument, deutsch); die technische
 Kurzfassung in der `README.md` (englisch).
 
